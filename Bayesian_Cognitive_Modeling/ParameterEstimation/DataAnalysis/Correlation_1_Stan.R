@@ -4,7 +4,7 @@ rm(list=ls())
 library(rstan)
 
 #### Notes to Stan model #######################################################
-## 1) Multivariate normal distribution in Stan uses covariance matrix insted of 
+## 1) Multivariate normal distribution in Stan uses covariance matrix instead of 
 ##    precision matrix.
 ## 2) Multivariate normal distribution can be (and is) also vectorized.
 ## 3) Warnings may occur during sampling, ignore them.

@@ -5,7 +5,7 @@ library(rstan)
 
 #### Notes to Stan model #######################################################
 ## 1) We used implicit uniform distribution for sigma and vector mu
-## 2) The second loop in this model (1:m) is unnecessary here. You can try to
+## 2) The second loop in this model (1:m) is not necessary here. You can try to
 ##    remove it, but don't forget to remove its index j. Remember vectorization!
 ################################################################################
 model <- "

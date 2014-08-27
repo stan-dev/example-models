@@ -4,9 +4,9 @@ rm(list=ls())
 library(rstan)
 
 #### Notes to Stan model #######################################################
-## 1) Approach to this model can be difficult to understand for beginners. 
-##    Therefore I suggest either not trying to understand it and look on WinBUGS
-##    version or go deep into Stan manual.
+## Implementation of this model can be difficult to understand for beginners. 
+## Therefore I suggest either not trying to understand it and look on WinBUGS
+## version or go deep into Stan manual.
 ################################################################################
 model <- "
 # ChaSaSoon Censored Data

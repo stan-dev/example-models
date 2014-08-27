@@ -5,7 +5,7 @@ library(rstan)
 
 #### Notes to Stan model #######################################################
 ## Stan has hypergeometric distribution implemented, so in one way the code
-## is more intuitive. On the other side, Stan can't sample discrete parameters
+## is more intuitive. On the other hand, Stan can't sample discrete parameters,
 ## therefore we have to increment log probability manually (as we did in 
 ## Survey example).  
 ################################################################################

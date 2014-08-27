@@ -4,7 +4,7 @@ rm(list=ls())
 library(rstan)
 
 #### Notes to Stan model #######################################################
-## 1) All notes from previsou model Correlation_1 also applies to this model.
+## 1) All notes from previous model Correlation_1 also apply to this model.
 ## 2) If you change sigmaerror to c(0.03, 10) as suggested in excercise 5.2.2
 ##    warning statements will be more frequent and posterior less smooth.
 ################################################################################

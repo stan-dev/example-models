@@ -9,7 +9,7 @@ library(rstan)
 ##    you change the values, you'll need to increment iterations significantly  
 ## 2) Code is quite dissimilar to original WinBUGS model - using conditionals 
 ##    instead of step function. This will happen in further models more often.
-##    There are difference in what functions are efficient in BUGS and Stan.
+##    There is a difference in what functions are efficient in BUGS and Stan.
 ################################################################################
 model <- "
 // Change Detection

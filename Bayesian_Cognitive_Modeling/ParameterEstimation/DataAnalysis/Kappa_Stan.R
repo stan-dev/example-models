@@ -4,12 +4,12 @@ rm(list=ls())
 library(rstan)
 
 #### Notes to Stan model #######################################################
-## 1) First time we use simplex data type. Simplex is similar to vector, but 
-##    with a property that sum of all it's elements is equal to 1.
+## 1) This is the first time we use simplex data type. Simplex is similar to 
+##    vector, but with a property that sum of all it's elements is equal to 1.
 ## 2) Sampling statements for parameters alpha, beta and gamma could be removed
 ##    leading to uniform prior on (0, 1) interval which is the same as beta(1, 1)
 ## 3) Variable n was removed here. Stan doesn't need this information as
-##    an argument for multinomial distribution. Always make sure, that you know 
+##    an argument for multinomial distribution. Always make sure that you know 
 ##    what arguments are required for a function / sampling statement. In many 
 ##    cases these are different from BUGS. Very useful for this are last pages 
 ##    of Stan manual
