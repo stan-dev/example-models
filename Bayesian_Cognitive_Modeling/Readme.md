@@ -5,7 +5,7 @@ Models from the book Bayesian Cognitive Modeling: A Practical Course (2014) by M
 Original JAGS and WinBUGS models are available here: http://bayesmodels.com/ 
 On the same address you can also find the first two parts of the book and answers to the excercises. 
 
-Stan translation of the models was done by Martin Smira (smira.martin@gmail.com).
+Stan translation of the models was done by Martin Smira (smira.martin@gmail.com). Special thanks to Bob Carpenter and the whole Stan community.
 
 ### NOTES 
 
@@ -15,5 +15,4 @@ Stan translation of the models was done by Martin Smira (smira.martin@gmail.com)
 
 3. There is a chance that you'll find a mistake in the models, please let me know if you do. Also contact me if you have suggestions to improve the code, but keep in mind that we want to keep readability of the code high. However, please ignore the style inconsistency in the R plotting code. 
 
-4. In the models from the first chapters, you will find notes concerning Stan related differences in model implementation. It is also advised to read chapter "Stan for Users of BUGS" in Stan manual.
-
+4. In the models from the first chapters, you will find notes concerning Stan related differences in model implementation. It is also advised to read chapter "Stan for Users of BUGS" in the Stan manual.
