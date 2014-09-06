@@ -25,8 +25,8 @@ transformed parameters {
   cov_matrix[2] T;
 
   // Reparameterization
-  sigma[1] <- 1 / sqrt(lambda[1]);
-  sigma[2] <- 1 / sqrt(lambda[2]);
+  sigma[1] <- inv_sqrt(lambda[1]);
+  sigma[2] <- inv_sqrt(lambda[2]);
   T[1,1] <- square(sigma[1]);
   T[1,2] <- r * sigma[1] * sigma[2];
   T[2,1] <- r * sigma[1] * sigma[2];
@@ -34,7 +34,7 @@ transformed parameters {
 }
 model {
   // Priors
-  mu ~ normal(0, sqrt(1000));
+  mu ~ normal(0, inv_sqrt(.001));
   lambda ~ gamma(.001, .001);
   
   // Data
