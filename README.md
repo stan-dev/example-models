@@ -16,6 +16,21 @@ This repository holds open source Stan models, data simulators, and real data.  
 - Basic Distributions
 - Basic Estimators
 
-## Licensing
+## Organization
 
-All of the example models are licensed to their author under new BSD license.
+Each example model should be organized to include the following
+
+1.  Stan program(s) implementing the model (and variants),
+2.  program to simulate data (in R or Python),
+3.  simulated data file itself (for now in .data.R dump format, later in JSON),
+4.  summary of output fit for simulated data file (text),
+5.  any real data sets with summary of fit (in original and Stan-readable format, with munging program from original to Stan-readable),
+6.  citations to source for model and/or data,
+7.  documentation needed to understand the model (LaTeX, text, or HTML), including discussion of parameterizations and/or optimizations and their relations to performance (and to each other if there are multiple models),
+8.  keywords or other tags to help organize by category (e.g., from manual, from BUGS volume, from book, involving logistic regression, application area such as population model, model type such as IRT or mark-recapture, etc.)
+9.  author/copyright-holder info and open-source license info if not new BSD.
+
+
+### Licensing
+
+All of the example models are copyrighted by their author(s) or assignees under the new BSD license unless another open-source license is explicitly stipulated in the directory containing the model.
