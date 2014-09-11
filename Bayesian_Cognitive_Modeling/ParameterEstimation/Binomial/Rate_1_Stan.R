@@ -7,46 +7,28 @@ rm(list=ls())
 
 library(rstan)
 
-model <- "
-// Inferring a Rate
-data { 
-  int<lower=1> n; 
-  int<lower=0> k;
-} 
-parameters {
-  real<lower=0,upper=1> theta;
-} 
-model {
-  // Prior Distribution for Rate Theta
-  theta ~ beta(1, 1);
-  // Observed Counts
-  k ~ binomial(n, theta);
-}"
-
-k <- 5
-n <- 10
-
-data <- list(k=k, n=n) # to be passed on to Stan
+# to be passed on to Stan
+data <- read_rdump("Rate_1.data.R") 
 
 myinits <- list(
-  list(theta=0.1), #chain 1 starting value
-  list(theta=0.9)) #chain 2 starting value
+  list(theta=.1),  # chain 1 starting value
+  list(theta=.9))  # chain 2 starting value
 
 # parameters to be monitored:  
 parameters <- c("theta")
 
 # The following command calls Stan with specific options.
-# For a detailed description type "?rstan".
-samples <- stan(model_code=model,   
+# For a detailed description type "?stan".
+samples <- stan(file="Rate_1_model.stan",   
                 data=data, 
                 init=myinits,  # If not specified, gives random inits
                 pars=parameters,
-                iter=40000, 
+                iter=20000, 
                 chains=2, 
                 thin=1,
-                # warmup = 100,  # Stands for burn-in; Default = iter/2
-                # seed = 123  # Setting seed; Default is random seed
-                )
+                # warmup=100,  # Stands for burn-in; Default = iter/2
+                # seed=123  # Setting seed; Default is random seed
+)
 # Now the values for the monitored parameters are in the "samples" object, 
 # ready for inspection.
 

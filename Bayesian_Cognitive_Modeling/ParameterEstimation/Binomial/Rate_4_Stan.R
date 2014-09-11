@@ -3,40 +3,10 @@ rm(list=ls())
 
 library(rstan)
 
-model <- "
-// Prior and Posterior Prediction
-data {
-  int<lower=1> n; 
-  int<lower=0> k;
-} 
-parameters {
-  real<lower=0,upper=1> theta;
-  real<lower=0,upper=1> thetaprior;
-}
-model {
-  // Prior on Rate Theta
-  theta ~ beta(1, 1);
-  thetaprior ~ beta(1, 1);
-  // Observed Data
-  k ~ binomial(n, theta);
-}
-generated quantities {
-  int<lower=0> postpredk;
-  int<lower=0> priorpredk;
-    
-  // Posterior Predictive
-  postpredk <- binomial_rng(n, theta);
-  // Prior Predictive
-  priorpredk <- binomial_rng(n, thetaprior);
-}"
-
-k <- 1
-n <- 15
+# to be passed on to Stan
+data <- read_rdump("Rate_4a.data.R")
 # Uncomment for Trompetter Data
-# k <- 24
-# n <- 121
-
-data <- list(k=k, n=n) # to be passed on to Stan
+# data <- read_rdump("Rate_4b.data.R") 
 
 myinits <- list(
   list(theta=.5, thetaprior=.5))
@@ -45,8 +15,8 @@ myinits <- list(
 parameters <- c("theta", "thetaprior", "postpredk", "priorpredk")
 
 # The following command calls Stan with specific options.
-# For a detailed description type "?rstan".
-samples <- stan(model_code=model,   
+# For a detailed description type "?stan".
+samples <- stan(file="Rate_4_model.stan",   
                 data=data, 
                 init=myinits,  # If not specified, gives random inits
                 pars=parameters,
@@ -55,7 +25,7 @@ samples <- stan(model_code=model,
                 thin=1,
                 # warmup = 100,  # Stands for burn-in; Default = iter/2
                 # seed = 123  # Setting seed; Default is random seed
-                )
+)
 # Now the values for the monitored parameters are in the "samples" object, 
 # ready for inspection.
   

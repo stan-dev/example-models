@@ -3,31 +3,7 @@ rm(list=ls())
 
 library(rstan)
 
-model <- "
-// Inferring a Common Rate
-data { 
-  int<lower=1> n1; 
-  int<lower=1> n2; 
-  int<lower=0> k1;
-  int<lower=0> k2;
-} 
-parameters {
-  real<lower=0,upper=1> theta;
-} 
-model {
-  // Prior on Single Rate Theta
-  theta ~ beta(1, 1);
-  // Observed Counts
-  k1 ~ binomial(n1, theta);
-  k2 ~ binomial(n2, theta);
-}"
-
-k1 <- 5
-k2 <- 7
-n1 <- 10
-n2 <- 10
-
-data <- list(k1=k1, k2=k2, n1=n1, n2=n2)  # to be passed on to Stan
+data <- read_rdump("Rate_2,3.data.R")  # to be passed on to Stan
 
 myinits <- list(
   list(theta=0.5))
@@ -36,8 +12,8 @@ myinits <- list(
 parameters <- c("theta")
 
 # The following command calls Stan with specific options.
-# For a detailed description type "?rstan".
-samples <- stan(model_code=model,   
+# For a detailed description type "?stan".
+samples <- stan(file="Rate_3_model.stan",   
                 data=data, 
                 init=myinits,  # If not specified, gives random inits
                 pars=parameters,
@@ -46,7 +22,7 @@ samples <- stan(model_code=model,
                 thin=1,
                 # warmup = 100,  # Stands for burn-in; Default = iter/2
                 # seed = 123  # Setting seed; Default is random seed
-                )
+)
 print(samples)
 
 theta <- extract(samples)$theta
