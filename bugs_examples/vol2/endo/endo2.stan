@@ -1,6 +1,6 @@
 /*
  * Endo: conditional inference in case-contrl studies 
- * http://www.openbugs.info/Examples/Endo.html
+ * http://www.openbugs.net/Examples/Endo.html
  *
  * In this example, three methods of different 
  * model specifications are used for one equivalent

@@ -1,7 +1,7 @@
 /*
  * BUGS example vol 1: LeukFr 
  * http://mathstat.helsinki.fi/openbugs/Examples/Leukfr.html
- *  http://www.openbugs.info/Examples/Leukfr.html
+ *  http://www.openbugs.net/Examples/Leukfr.html
  *
  * The result for sigma is a bit different from those in the 
  * webpage. 

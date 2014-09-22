@@ -1,5 +1,5 @@
 # Alligators: multinomial - logistic regression 
-#  http://www.openbugs.info/Examples/Aligators.html
+#  http://www.openbugs.net/Examples/Aligators.html
 
 ## specify the model using Poisson distribution 
 

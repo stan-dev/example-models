@@ -1,5 +1,5 @@
 // Orange Trees 
-// http://www.openbugs.info/Examples/Otrees.html
+// http://www.openbugs.net/Examples/Otrees.html
 
 # status: error thrown out during execution immediately 
 

@@ -1,5 +1,5 @@
 # LSAT: item response
-# http://www.openbugs.info/Examples/Lsat.html
+# http://www.openbugs.net/Examples/Lsat.html
 
 data {
   int<lower=0> N; // 1000, number of students

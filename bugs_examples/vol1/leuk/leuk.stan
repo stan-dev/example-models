@@ -1,7 +1,7 @@
 /*
  * Leuk: Cox regression 
  * URL of OpenBugs' implementation: 
- *   http://www.openbugs.info/Examples/Leuk.html
+ *   http://www.openbugs.net/Examples/Leuk.html
  */
 
 data {

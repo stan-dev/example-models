@@ -1,4 +1,4 @@
-##  http://www.openbugs.info/Examples/Salm.html
+##  http://www.openbugs.net/Examples/Salm.html
 ##  this matches the jags implementation
 data {
     int<lower=0> Ndoses;

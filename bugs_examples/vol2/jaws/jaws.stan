@@ -1,5 +1,5 @@
 # Jaws: repeated measures analysis of variance
-#  http://www.openbugs.info/Examples/Jaws.html
+#  http://www.openbugs.net/Examples/Jaws.html
 
 data {
   int<lower=0> N; 

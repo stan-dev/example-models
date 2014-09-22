@@ -1,6 +1,6 @@
 /*
  * BUGS Volume 3, funshapes, parallelogram
- * http://www.openbugs.info/Examples/Funshapes.html
+ * http://www.openbugs.net/Examples/Funshapes.html
  */
 parameters {
   real<lower=0,upper=1> x; 

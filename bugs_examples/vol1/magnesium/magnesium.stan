@@ -1,5 +1,5 @@
 # Sensitivity to prior distributions: application to Magnesium meta-analysis
-#  http://www.openbugs.info/Examples/Magnesium.html
+#  http://www.openbugs.net/Examples/Magnesium.html
 
 # prior specification 1, 2, 3, 4, 5, and 6 combined  
 # in one posterior distribution.  

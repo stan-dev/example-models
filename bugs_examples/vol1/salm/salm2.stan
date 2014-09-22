@@ -1,4 +1,4 @@
-##  http://www.openbugs.info/Examples/Salm.html
+##  http://www.openbugs.net/Examples/Salm.html
 
 ## the version without centering x's 
 data {
