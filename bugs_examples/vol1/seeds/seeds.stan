@@ -1,5 +1,5 @@
 ## 
-##  http://www.openbugs.info/Examples/Seeds.html
+##  http://www.openbugs.net/Examples/Seeds.html
 data {
     int<lower=0> I;
     int<lower=0> n[I];

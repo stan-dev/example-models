@@ -1,7 +1,7 @@
 
 # Schools: ranking school examination resutls using 
 # multivariate hierarcical models 
-#  http://www.openbugs.info/Examples/Schools.html
+#  http://www.openbugs.net/Examples/Schools.html
 
 data {
   int<lower=0> N; 

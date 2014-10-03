@@ -1,5 +1,5 @@
 # Dyes: variance components model 
-#  http://www.openbugs.info/Examples/Dyes.html
+#  http://www.openbugs.net/Examples/Dyes.html
 
 data {
   int BATCHES; 

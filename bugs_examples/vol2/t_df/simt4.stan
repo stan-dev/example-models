@@ -1,6 +1,6 @@
 ##  simulate samples from student t distribution 
 ## 
-# http://www.openbugs.info/Examples/t-df.html
+# http://www.openbugs.net/Examples/t-df.html
 
 transformed data {
   int d; 

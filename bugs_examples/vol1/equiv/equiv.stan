@@ -1,5 +1,5 @@
 # Equiv: bioequivalence in a cross-over trial
-#  http://www.openbugs.info/Examples/Equiv.html
+#  http://www.openbugs.net/Examples/Equiv.html
 
 data {
   int<lower=0> P; 
