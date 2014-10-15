@@ -27,7 +27,7 @@ transformed parameters {
             lp_parts[2, i, j] <- exp(bernoulli_log(1, x_prob[i]) +
 									 bernoulli_log(1, z_prob[j]) + 
 									 bernoulli_log(k[i, j], alpha));
-			lp_parts[3, i, j] <- exp(bernoulli_log(0, x_prob[i]) + 
+            lp_parts[3, i, j] <- exp(bernoulli_log(0, x_prob[i]) + 
 									 bernoulli_log(1, z_prob[j]) + 
 									 bernoulli_log(k[i, j], beta));
             lp_parts[4, i, j] <- exp(bernoulli_log(1, x_prob[i]) + 

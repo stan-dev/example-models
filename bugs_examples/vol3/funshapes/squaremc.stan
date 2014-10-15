@@ -1,6 +1,6 @@
 /*
  * BUGS Volume 3, funshapes, square minus circle
- * http://www.openbugs.info/Examples/Funshapes.html
+ * http://www.openbugs.net/Examples/Funshapes.html
  *
  * first draw raw samples from diamond-like shape reflected per
  * quadrant, then reflect in transformed parameters

@@ -1,7 +1,7 @@
 
 ## estimated the degree of freedom (dof) from 
 ## samples by sim.stan
-# http://www.openbugs.info/Examples/t-df.html
+# http://www.openbugs.net/Examples/t-df.html
 
 ## estimate dof using discrete priors 
 

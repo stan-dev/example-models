@@ -1,5 +1,5 @@
 # Using Data Cloning to Calculate MLEs for the Seeds Model in vol1 
-# http://www.openbugs.info/Examples/DataCloning.html
+# http://www.openbugs.net/Examples/DataCloning.html
 
 # The basic idea is that we raise the likelihood in the 
 # posterior to the power of K so that the posterior

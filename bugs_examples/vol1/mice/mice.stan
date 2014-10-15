@@ -1,6 +1,6 @@
 # http://www.mrc-bsu.cam.ac.uk/bugs/winbugs/Vol1.pdf
 # Page 48: Mice Weibull regression 
-# http://www.openbugs.info/Examples/Mice.html
+# http://www.openbugs.net/Examples/Mice.html
 
 # note that Stan and JAGS have different parameterization for Weibull
 # distribution

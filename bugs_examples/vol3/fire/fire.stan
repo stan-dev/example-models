@@ -3,7 +3,7 @@
  *       directly because the composite lognormal-pareto distribution
  *       is not built in.
  *
- *  http://www.openbugs.info/Examples/Fire.html
+ *  http://www.openbugs.net/Examples/Fire.html
  *
  * see D. P. M. Scollnik (2007) 
  * http://www.tandfonline.com/doi/pdf/10.1080/03461230601110447

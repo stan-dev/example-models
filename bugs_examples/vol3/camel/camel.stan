@@ -1,6 +1,6 @@
 /**
  * Camel: Multivariate normal with structured missing data 
- * http://www.openbugs.info/Examples/Camel.html
+ * http://www.openbugs.net/Examples/Camel.html
  *
  * status: results not verified with in those in bugs 
  */

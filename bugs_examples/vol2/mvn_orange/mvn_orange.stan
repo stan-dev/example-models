@@ -1,5 +1,5 @@
 // Orange Trees (Multi-variate normal) 
-// http://www.openbugs.info/Examples/OtreesMVN.html
+// http://www.openbugs.net/Examples/OtreesMVN.html
 // and refer to ../orange 
 
 # FIXME: there are some discrepancy for parameters var 

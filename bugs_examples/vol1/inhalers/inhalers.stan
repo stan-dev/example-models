@@ -1,5 +1,5 @@
 # Inhaler: ordered categorical data 
-## http://www.openbugs.info/Examples/Inhalers.html
+## http://www.openbugs.net/Examples/Inhalers.html
 
 ## FIXME ii: 
 ## specify using categorical distribution directly 

@@ -1,6 +1,6 @@
 # http://www.mrc-bsu.cam.ac.uk/bugs/winbugs/Vol1.pdf
 # Page 51: Kidney: Weibull regression with random efects
-# http://www.openbugs.info/Examples/Kidney.html
+# http://www.openbugs.net/Examples/Kidney.html
 
 data {
   int<lower=0> NP; 
