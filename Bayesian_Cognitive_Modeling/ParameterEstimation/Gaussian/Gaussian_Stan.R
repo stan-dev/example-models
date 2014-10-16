@@ -17,7 +17,7 @@ model <- "
 // Inferring the Mean and Standard Deviation of a Gaussian
 data { 
   int<lower=1> n;
-  vector[n]<lower=0> x;
+  vector<lower=0>[n] x;
 }
 parameters {
   real mu;
