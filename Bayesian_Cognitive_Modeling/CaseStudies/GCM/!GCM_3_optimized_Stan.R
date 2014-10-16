@@ -69,10 +69,15 @@ transformed parameters {
                        - log(normal_cdf(1, muw[2], sigmaw) 
                              - normal_cdf(0, muw[2], sigmaw));
   }
-  for (k in 1:nsubj) {
-    vector[nstim] r;
-    r <- exp(log_r[k]);
-    lp_parts_c[k,1] <- log1m(phic) + binomial_log(y[k], n, r);
+  for (k in 1:nsubj) {    
+    vector[nstim] tmp;
+    
+     // Binomial distribution written as Log Probability Mass Function
+    for (i in 1:nstim)
+      tmp[i] <- lgamma(n + 1) - lgamma(y[k,i] + 1) - lgamma(n - y[k,i] + 1) 
+                + y[k,i] * log_r[k,i] + (n - y[k,i]) * log1m_exp(log_r[k,i]);
+  
+    lp_parts_c[k,1] <- log1m(phic) + sum(tmp);
     lp_parts_c[k,2] <- log(phic) + binomial_log(y[k], n, .5);
   }
 }
