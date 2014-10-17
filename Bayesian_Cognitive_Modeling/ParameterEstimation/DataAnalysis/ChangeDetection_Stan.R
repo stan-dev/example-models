@@ -57,7 +57,7 @@ parameters <- c("mu", "sigma", "tau")
 
 # The following command calls Stan with specific options.
 # For a detailed description type "?rstan".
-samples <- stan(fit=samples,   
+samples <- stan(model_code=model,   
                 data=data, 
                 init=myinits,  # If not specified, gives random inits
                 pars=parameters,
