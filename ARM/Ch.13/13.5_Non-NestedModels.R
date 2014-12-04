@@ -1,5 +1,7 @@
 library(rstan)
 library(ggplot2)
+library(grid)
+library(lme4)
 
 ## Read the pilots data & define variables
 # Data are at http://www.stat.columbia.edu/~gelman/arm/examples/pilots
@@ -84,13 +86,24 @@ age.ok <- age[ok]
 eth.ok <- eth[ok]
 
 ## Regression centering the predictors
-##M1 <- lmer (y ~ x.centered + (1 + x.centered | eth) + (1 + x.centered | age) + (1 + x.centered | eth:age))
 x.centered <- x - mean(x)
+M1 <- lmer (y ~ x.centered + (1 + x.centered | eth.ok) + (1 + x.centered | age.ok) + (1 + x.centered | eth.ok:age.ok),REML = FALSE)
 
-dataList.2 <- list(N=length(y),y=y,x=x.centered,n_eth=n.eth,n_age=n.age,eth=eth.ok,age=age[ok])
-earnings_latin_square.sf1 <- stan(file='earnings_latin_square.stan',
+dataList.2 <- list(N=length(y),y=y,x_centered=x.centered,n_eth=n.eth,n_age=n.age,eth=eth.ok,age=age[ok])
+earnings_latin_square.sf1 <- stan(file='earnings_latin_square_chr.stan',
                                   data=dataList.2, iter=1000, chains=4)
-print(earnings_latin_square.sf1,pars = c("a1","a2","b1","b2", "c","d","sigma_y", "lp__"))
+earnings_latin_square.rt <- stan(file='earnings_latin_square_RT.stan',
+                                  data=dataList.2, iter=1000, chains=4)
+print(earnings_latin_square.sf1,pars = c("a1","a2","b1","b2", "c","d",
+                                         "sigma_a1","sigma_a2","sigma_b1",
+                                         "sigma_b2","sigma_c","sigma_d",
+                                         "sigma_y", "lp__","mu_a1","mu_a2",
+                                         "mu_b1","mu_b2","mu_c","mu_d"))
+print(earnings_latin_square.sf1,pars = c("a1","a2","b1","b2", "c","d",
+                                         "sigma_a1","sigma_a2","sigma_b1",
+                                         "sigma_b2","sigma_c","sigma_d",
+                                         "sigma_y", "lp__","mu_a1","mu_a2",
+                                         "mu_b1","mu_b2","mu_c","mu_d"))
 post <- extract(earnings_latin_square.sf1)
 
  # plot figure 13.10
@@ -98,8 +111,8 @@ age.label <- c("AGE 18-34", "AGE 35-49", "AGE 50-64")
 eth.label <- c("BLACKS","HISPANICS","WHITES","OTHERS")
 x <- height[ok] - mean(height[ok])
 pushViewport(viewport(layout = grid.layout(3, 4)))
-a.hat.M1 <- colMeans(post1$a)
-b.hat.M1 <- colMeans(post1$b)
+a.hat.M1 <- c(mean(post$a1),mean(post$a2))
+b.hat.M1 <- c(mean(post$b1),mean(post$b2))
 
 for (j in 1:3) {
   for (k in 1:4) {

@@ -1,6 +1,6 @@
 data {
   int<lower=0> N; 
-  int<lower=0> n_treaments; 
+  int<lower=0> n_treatments; 
   int<lower=0> n_airports; 
   int<lower=1,upper=n_treatments> treatment_id[N];
   int<lower=1,upper=n_airports> airport_id[N];
