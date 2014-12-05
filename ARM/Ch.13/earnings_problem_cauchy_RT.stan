@@ -16,13 +16,13 @@ parameters {
   matrix[n_eth,n_age] eta_d;
   real mu_total;
   real beta_total;
-  real<lower=0,upper=100> sigma_a1;
-  real<lower=0,upper=100> sigma_a2;
-  real<lower=0,upper=100> sigma_b1;
-  real<lower=0,upper=100> sigma_b2;
-  real<lower=0,upper=100> sigma_c;
-  real<lower=0,upper=100> sigma_d;
-  real<lower=0,upper=100> sigma_y;
+  real<lower=0> sigma_a1;
+  real<lower=0> sigma_a2;
+  real<lower=0> sigma_b1;
+  real<lower=0> sigma_b2;
+  real<lower=0> sigma_c;
+  real<lower=0> sigma_d;
+  real<lower=0> sigma_y;
 }
 transformed parameters {
   vector[n_eth] a1;
@@ -50,6 +50,16 @@ transformed parameters {
 model {
   mu_total ~ normal(0,10);
   beta_total ~ normal(0,10);
+
+  sigma_a1 ~ cauchy(1,5);
+  sigma_a2 ~ cauchy(1,5);
+
+  sigma_b1 ~ cauchy(1,5);
+  sigma_b2 ~ cauchy(1,5);
+
+  sigma_c ~ cauchy(1,5);
+  sigma_d ~ cauchy(1,5);
+  sigma_y ~ cauchy(1,5);
 
   eta_a1 ~ normal(0, 1);
   eta_a2 ~ normal(0, 1);

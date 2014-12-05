@@ -8,40 +8,41 @@ library(lme4)
 
 pilots <- read.table ("pilots.dat", header=TRUE)
 attach (pilots)
-group.names <- as.vector(unique(group))
-scenario.names <- as.vector(unique(scenario))
-n.group <- length(group.names)
-n.scenario <- length(scenario.names)
+names(pilots) <- c('treatment','recovered','airport')
+treatment.names <- as.vector(unique(treatment))
+airport.names <- as.vector(unique(airport))
+n.treatment <- length(treatment.names)
+n.airport <- length(airport.names)
 successes <- NULL
 failures <- NULL
-group.id <- NULL
-scenario.id <- NULL
-for (j in 1:n.group){
-  for (k in 1:n.scenario){
-    ok <- group==group.names[j] & scenario==scenario.names[k]    
+treatment.id <- NULL
+airport.id <- NULL
+for (j in 1:n.treatment){
+  for (k in 1:n.airport){
+    ok <- treatment==treatment.names[j] & airport==airport.names[k]    
     successes <- c (successes, sum(recovered[ok]==1,na.rm=T))
     failures <- c (failures, sum(recovered[ok]==0,na.rm=T))
-    group.id <- c (group.id, j)
-    scenario.id <- c (scenario.id, k)
+    treatment.id <- c (treatment.id, j)
+    airport.id <- c (airport.id, k)
   }
 }
 
 y <- successes/(successes+failures)
-y.mat <- matrix (y, n.scenario, n.group)
-sort.group <- order(apply(y.mat,2,mean))
-sort.scenario <- order(apply(y.mat,1,mean))
+y.mat <- matrix (y, n.airport, n.treatment)
+sort.treatment <- order(apply(y.mat,2,mean))
+sort.airport <- order(apply(y.mat,1,mean))
 
-group.id.new <- sort.group[group.id]
-scenario.id.new <- sort.scenario[scenario.id]
-y.mat.new <- y.mat[sort.scenario,sort.group]
+treatment.id.new <- sort.treatment[treatment.id]
+airport.id.new <- sort.airport[airport.id]
+y.mat.new <- y.mat[sort.airport,sort.treatment]
 
-scenario.abbr <- c("Nagoya", "B'ham", "Detroit", "Ptsbgh", "Roseln", "Chrlt", "Shemya", "Toledo")
+aiport.abbr <- c("Nagoya", "B'ham", "Detroit", "Ptsbgh", "Roseln", "Chrlt", "Shemya", "Toledo")
 
 ## Model fit
 ## M1 <- lmer (y ~ 1 + (1 | group.id) + (1 | scenario.id))
-dataList.1 <- list(N=length(y),y=y,n_groups=n.group,n_scenarios=n.scenario,group_id=group.id,scenario_id=scenario.id)
-pilots.sf1 <- stan(file='pilots.stan', data=dataList.1, iter=20000, chains=4)
-print(pilots.sf1,pars = c("a","b", "sigma_y", "lp__"))
+dataList.1 <- list(N=length(y),y=y,n_treatments=n.treatment,n_airports=n.airport,treatment_id=treatment.id,airport_id=airport.id)
+pilots.sf1 <- stan(file='pilots.stan', data=dataList.1, iter=2000, chains=4)
+print(pilots.sf1,pars = c("gamma","delta","sigma_gamma","sigma_delta","sigma_y", "lp__"))
 
 ## Plot figure 13.8
 
@@ -84,26 +85,31 @@ n.eth <- 4
 age <- age.category
 age.ok <- age[ok]
 eth.ok <- eth[ok]
-
+eth.age.ok <- eth.ok * 10 + age.ok
+eth_age <- group_vec_creation(group_vec = eth.age.ok)$output_vec
 ## Regression centering the predictors
 x.centered <- x - mean(x)
 M1 <- lmer (y ~ x.centered + (1 + x.centered | eth.ok) + (1 + x.centered | age.ok) + (1 + x.centered | eth.ok:age.ok),REML = FALSE)
 
-dataList.2 <- list(N=length(y),y=y,x_centered=x.centered,n_eth=n.eth,n_age=n.age,eth=eth.ok,age=age[ok])
+dataList.2 <- list(N=length(y),y=y,x=cbind(1,x.centered),n_eth=n.eth,n_eth_age=12,n_age=n.age,eth=eth.ok,eth_age=eth_age,age=age[ok])
 earnings_latin_square.sf1 <- stan(file='earnings_latin_square_chr.stan',
-                                  data=dataList.2, iter=1000, chains=4)
+                                  data=dataList.problem, iter=2000, chains=4)
 earnings_latin_square.rt <- stan(file='earnings_latin_square_RT.stan',
-                                  data=dataList.2, iter=1000, chains=4)
+                                  data=dataList.2, iter=2000, chains=4)
+dataList.problem <- list(N=length(y),y=y,x_centered=x.centered,n_eth=n.eth,n_age=n.age,eth=eth.ok,eth_age=eth_age,age=age[ok])
+earnings_latin_square.rt <- stan(file='earnings_problem_RT.stan',
+                                  data=dataList.problem, iter=2000, chains=4)
+earnings_latin_square.rt <- stan(file='earnings_problem_cauchy_RT.stan',
+                                  data=dataList.problem, iter=2000, chains=4)
 print(earnings_latin_square.sf1,pars = c("a1","a2","b1","b2", "c","d",
                                          "sigma_a1","sigma_a2","sigma_b1",
                                          "sigma_b2","sigma_c","sigma_d",
                                          "sigma_y", "lp__","mu_a1","mu_a2",
                                          "mu_b1","mu_b2","mu_c","mu_d"))
-print(earnings_latin_square.sf1,pars = c("a1","a2","b1","b2", "c","d",
+print(earnings_latin_square.rt,pars = c("a1","a2","b1","b2", "c","d",
                                          "sigma_a1","sigma_a2","sigma_b1",
                                          "sigma_b2","sigma_c","sigma_d",
-                                         "sigma_y", "lp__","mu_a1","mu_a2",
-                                         "mu_b1","mu_b2","mu_c","mu_d"))
+                                         "sigma_y", "lp__"))
 post <- extract(earnings_latin_square.sf1)
 
  # plot figure 13.10
