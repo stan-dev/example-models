@@ -1,4 +1,4 @@
-## http://openbugs.info/Examples/Surgical.html
+## http://openbugs.net/Examples/Surgical.html
 ## random effects model 
 data {
   int<lower=0> N;

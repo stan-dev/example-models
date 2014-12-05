@@ -1,7 +1,7 @@
 
 # Hepatitis: a normal hierarchical model with measurement 
 # error
-#  http://openbugs.info/Examples/Hepatitis.html
+#  http://openbugs.net/Examples/Hepatitis.html
 
 # model the measurement eror here (compared with hepatitis.stan) 
 

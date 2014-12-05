@@ -20,7 +20,7 @@ transformed parameters {
 } 
 model {
   mu_a ~ normal(0, 1);
-  a ~ normal (100 * mu_a, sigma_a);
+  a ~ normal (mu_a, sigma_a);
   b ~ normal (0, 100);
   y ~ bernoulli_logit(y_hat);
 }

@@ -1,7 +1,7 @@
 /**
  * Bones: latent trait model for multiple ordered 
  * categorical responses 
- * http://www.openbugs.info/Examples/Bones.html
+ * http://www.openbugs.net/Examples/Bones.html
  *
  *
  * Note: 

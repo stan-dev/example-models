@@ -1,6 +1,6 @@
 /*
  * Hollow Square
- * http://www.openbugs.info/Examples/Funshapes.html
+ * http://www.openbugs.net/Examples/Funshapes.html
  *
  * Transform a uniform rectangle
  *    1234

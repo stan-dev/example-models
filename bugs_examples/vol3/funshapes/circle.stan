@@ -1,6 +1,6 @@
 /*
  * BUGS volume 3, fun shapes, circle
- * http://www.openbugs.info/Examples/Funshapes.html
+ * http://www.openbugs.net/Examples/Funshapes.html
  */
 parameters {
   real<lower=-1,upper=1> x; 

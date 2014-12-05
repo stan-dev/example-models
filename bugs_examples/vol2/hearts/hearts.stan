@@ -1,6 +1,6 @@
 /**
  * Hearts: a mixture model for count data
- * http://www.openbugs.info/Examples/Hearts.html
+ * http://www.openbugs.net/Examples/Hearts.html
  * 
  * integrate out the binary parameters in hearts.stan.0 
  */
