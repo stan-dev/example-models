@@ -95,7 +95,7 @@ dataList.2 <- list(N=length(y),y=y,x=cbind(1,x.centered),n_eth=n.eth,n_eth_age=1
 earnings_latin_square.sf1 <- stan(file='earnings_latin_square_chr.stan',
                                   data=dataList.problem, iter=2000, chains=4)
 earnings_latin_square.rt <- stan(file='earnings_latin_square_RT.stan',
-                                  data=dataList.2, iter=2000, chains=4)
+                                  data=dataList.2, iter=500, chains=4)
 dataList.problem <- list(N=length(y),y=y,x_centered=x.centered,n_eth=n.eth,n_age=n.age,eth=eth.ok,eth_age=eth_age,age=age[ok])
 earnings_latin_square.rt <- stan(file='earnings_problem_RT.stan',
                                   data=dataList.problem, iter=2000, chains=4)
@@ -106,9 +106,8 @@ print(earnings_latin_square.sf1,pars = c("a1","a2","b1","b2", "c","d",
                                          "sigma_b2","sigma_c","sigma_d",
                                          "sigma_y", "lp__","mu_a1","mu_a2",
                                          "mu_b1","mu_b2","mu_c","mu_d"))
-print(earnings_latin_square.rt,pars = c("a1","a2","b1","b2", "c","d",
-                                         "sigma_a1","sigma_a2","sigma_b1",
-                                         "sigma_b2","sigma_c","sigma_d",
+print(earnings_latin_square.rt,pars = c("gamma_01_eth","gamma_01_age","gamma_01_eth_age",
+                                        "sigma_gamma_01_eth","sigma_gamma_01_age","sigma_gamma_01_eth_age",
                                          "sigma_y", "lp__"))
 post <- extract(earnings_latin_square.sf1)
 

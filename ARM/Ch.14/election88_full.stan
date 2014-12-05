@@ -22,11 +22,7 @@ parameters {
   vector[n_state] d;
   vector[n_region_full] e;
   vector[5] beta;
-  real<lower=0,upper=100> sigma_a;
-  real<lower=0,upper=100> sigma_b;
-  real<lower=0,upper=100> sigma_c;
-  real<lower=0,upper=100> sigma_d;
-  real<lower=0,upper=100> sigma_e;
+  vector<lower=0>[5] sigmas;
 }
 transformed parameters {
   vector[N] y_hat;
@@ -38,11 +34,12 @@ transformed parameters {
                 + c[age_edu[i]] + d[state[i]] + e[region_full[i]];
 } 
 model {
-  a ~ normal (0, sigma_a);
-  b ~ normal (0, sigma_b);
-  c ~ normal (0, sigma_c);
-  d ~ normal (0, sigma_d);
-  e ~ normal (0, sigma_e);
+  sigmas ~ cauchy(1,5);
+  a ~ normal (0, sigmas[1]);
+  b ~ normal (0, sigmas[2]);
+  c ~ normal (0, sigmas[3]);
+  d ~ normal (0, sigmas[4]);
+  e ~ normal (0, sigmas[5]);
   beta ~ normal(0, 100);
   y ~ bernoulli_logit(y_hat);
 }

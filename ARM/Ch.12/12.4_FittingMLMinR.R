@@ -48,14 +48,14 @@ radon_no_pool.sf1 <- stan(file='radon_no_pool.stan', data=dataList.2,
 print(radon_no_pool.sf1)
 
 M1 <- extract(radon_no_pool.sf1)
-M1.factor <- colMeans(M1$factor)
+M1.factor <- colMeans(M1$a)
 M1.beta <- mean(M1$beta)
 
   # 95% CI for the slope
-M1.beta + c(-2,2) * sd(M1$beta[,1]) / sqrt(4000)
+M1.beta + c(-2,2) * sd(M1$beta)
 
   # 95% CI for the intercept in county 26
-M1.factor[26] + c(-2,2) * sd(M1$factor[,26])/sqrt(4000)
+M1.factor[26] + c(-2,2) * sd(M1$a[,26])
 
 # to plot Figure 12.4
 M1 <- lmer (y ~ x + (1 | county))
