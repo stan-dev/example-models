@@ -9,10 +9,11 @@ Stan translation of the models was done by Martin Smira (smira.martin@gmail.com)
 
 #### NOTES 
 
-1. All models are prepared for running from R using rstan. Model codes are included in R scripts as a string. This will change in future - models and data will be separated in standalone files that could be used in PyStan or CmdStan.
+1. All models are prepared for running from R using rstan. Model codes are included in R scripts as a string. This will change in future - models and data will be separated in standalone files that could be used in PyStan or CmdStan. We’re looking for a volunteer to pull the models out of the R code and generate data for them in a standalone file that could be used in PyStan or CmdStan.
 
-2. Here you can find all models for the first three parts of the book and even some from the fourth (last) part, more models will be published here soon. I've created a google spredsheet [[here](https://docs.google.com/spreadsheets/d/1DQ_4733UxOqiP_o-HJCaQYMCV94rAvN4GQGHLCDylvM/edit?usp=sharing)] with a list of all finished models and with some hopefully useful notes. If you can't wait for the other models, contact me via the email address above.
+2. We've created a google spredsheet [[here](https://docs.google.com/spreadsheets/d/1DQ_4733UxOqiP_o-HJCaQYMCV94rAvN4GQGHLCDylvM/edit?usp=sharing)] with a list of all models and with some notes concering model implementation. We weren't able to implement 3 models (out of 57 models) into Stan.
 
-3. There is a chance that you'll find a mistake in the models, please let me know if you do. Also contact me if you have suggestions to improve the code, but keep in mind that we want to keep readability of the code high. However, please ignore the style inconsistency in the R plotting code. 
+3. In the models from the first chapters, you will find notes concerning Stan related differences in model implementation. It is also advised to read chapter "Stan for Users of BUGS" in the Stan manual.
 
-4. In the models from the first chapters, you will find notes concerning Stan related differences in model implementation. It is also advised to read chapter "Stan for Users of BUGS" in the Stan manual.
+4. There is a chance that you'll find a mistake in the models, please let me know if you do. Also contact me if you have suggestions to improve the code, but keep in mind that we want to keep readability of the code high. However, please ignore the style inconsistency in the R plotting code. 
+
