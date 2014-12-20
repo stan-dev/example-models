@@ -52,8 +52,8 @@ lines(density(thetaprior, from=0, to=1), lty=3, col="gray")
 legend(0.6,5.75, c("Prior", "Posterior"), lty=c(3,1), col=c ("grey", "black"))
 
 #Prior and posterior predictive
-mybreaks <- seq(from=-.5,to=n+1,by=1)
-my.at    <- seq(from=0,to=n,by=1)
+mybreaks <- seq(from=-.5,to=data$n+1,by=1)
+my.at    <- seq(from=0,to=data$n,by=1)
 hist(postpredk,breaks=mybreaks,freq=F, right=F, ylab="", xlab="", ylim=c(0,0.3),
      main="", axes=F )
 axis(1, at=my.at,lab=my.at,cex.axis=0.8)
