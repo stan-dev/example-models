@@ -36,9 +36,9 @@ ind <- 0
 
 for (i in 1:length(n)) {
     logL <- 0
-    for(j in 1:m) {   
-        logL <- logL+lgamma(n[i]+1)-lgamma(k[j]+1)-lgamma(n[i]-k[j]+1)
-        logL <- logL+k[j]*log(theta[i])+(n[i]-k[j])*log(1-theta[i])
+    for(j in 1:data$m) {   
+        logL <- logL+lgamma(n[i]+1)-lgamma(data$k[j]+1)-lgamma(n[i]-data$k[j]+1)
+        logL <- logL+data$k[j]*log(theta[i])+(n[i]-data$k[j])*log(1-theta[i])
     }
     if (logL>cc) {
         ind <- i
@@ -52,24 +52,23 @@ layout(matrix(c(2,0,1,3),2,2,byrow=T), width=c(2/3, 1/3), heights=c(1/3, 2/3))
 xhist <- hist(n, plot=F)
 yhist <- hist(theta, plot=F)
 top <- max(c(xhist$counts, yhist$counts))
-xrange <- c(0, nmax)
+xrange <- c(0, data$nmax)
 yrange <- c(0, 1)
 
-par(mar=c(5,5,1,1))
-plot(n,theta,xlim=xrange, ylim=yrange,ylab="", xlab="")
+par(mar=c(5, 5, 1, 1))
+plot(n, theta, xlim=xrange, ylim=yrange,ylab="", xlab="")
 axis(1)
 mtext("Number of Surveys", side=1,line=2.25, cex=1.2)
 axis(2, cex=1.2)
 las=0
 mtext("Rate of Return", side=2 ,line=2.25, cex=1.2)
 las=1
-points(mean(n),mean(theta), col="red", lwd=3, pch=4) #expectation
-points(n[ind],theta[ind], col="green", lwd=3, pch=10) #Maximum Likelihood
+points(mean(n), mean(theta), col="red", lwd=3, pch=4) #expectation
+points(n[ind], theta[ind], col="green", lwd=3, pch=10) #Maximum Likelihood
 
-par(mar=c(0,4,1,1))
+par(mar=c(0, 4, 1, 1))
 barplot(xhist$counts, axes=FALSE, ylim=c(0, top), space=0,col="lightblue")
 
-par(mar=c(4,0,1,3))
+par(mar=c(4, 0, 1, 3))
 barplot(yhist$counts, axes=FALSE, xlim=c(0, top), space=0, horiz=TRUE,
         col="lightblue")
-
