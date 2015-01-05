@@ -17,7 +17,7 @@ parameters {
   real<lower=0> mudiff;
   real<lower=5,upper=50> lambdabon;
   real<lower=5,upper=50> lambdache;
-  vector<lower=0,upper=1>[p] theta;
+  matrix<lower=0,upper=1>[2,p] theta;
 } 
 transformed parameters {
   vector[2] lp_parts[p];
@@ -37,8 +37,8 @@ transformed parameters {
   // Data are Binomial with Rate Given by 
   // Each Person’s Group Assignment
   for (i in 1:p) {
-    lp_parts[i,1] <- log1m(phi) + beta_log(theta[i], alpha[1], beta[1]);
-    lp_parts[i,2] <- log(phi) + beta_log(theta[i], alpha[2], beta[2]);
+    lp_parts[i,1] <- log1m(phi) + binomial_log(k[i], n, theta[1,i]);
+    lp_parts[i,2] <- log(phi) + binomial_log(k[i], n, theta[2,i]);
   } 
 }
 model {
@@ -48,10 +48,11 @@ model {
   // Relatively Uninformative Prior on Base Rate
   phi ~ beta(5, 5);
     
+  theta[1] ~ beta(alpha[1], beta[1]);
+  theta[2] ~ beta(alpha[2], beta[2]);  
+  
   for (i in 1:p)  
     increment_log_prob(log_sum_exp(lp_parts[i]));    
-    
-  k ~ binomial(n, theta);
 }
 generated quantities {
   int<lower=0,upper=1> z[p];
@@ -80,9 +81,9 @@ data <- list(p=p, k=k, n=n, truth=truth) # To be passed on to Stan
 
 myinits <- list(
   list(mudiff=.1, phi=.5, mubon=.5, lambdabon=30, lambdache=25, 
-       theta=rep(.5, p)),
+       theta=matrix(rep(.5, 2 * p), 2, p)),
   list(mudiff=.15, phi=.5, mubon=.5, lambdabon=25, lambdache=30,
-       theta=rep(.5, p))) 
+       theta=matrix(rep(.5, 2 * p), 2, p))) 
 
 # Parameters to be monitored:
 parameters <- c("theta", "z", "mubon", "lambdabon", "muche", "lambdache", 
@@ -94,10 +95,10 @@ samples <- stan(model_code=model,
                 data=data, 
                 init=myinits,  # If not specified, gives random inits
                 pars=parameters,
-                iter=1000, 
+                iter=5000, 
                 chains=2, 
                 thin=1,
-                warmup = 200,  # Stands for burn-in; Default = iter/2
+                # warmup = 100,  # Stands for burn-in; Default = iter/2
                 # seed = 123  # Setting seed; Default is random seed
 )
 # Now the values for the monitored parameters are in the "samples" object, 
@@ -148,9 +149,9 @@ polygon(c(0,pc.dens$y,0,0), c(pc.dens$x[1]-.01,pc.dens$x,pc.dens$x[1]+.01,
 windows()
 par(cex.main = 1.5, mar = c(5, 6, 4, 5) + 0.1, mgp = c(3.5, 1, 0), cex.lab = 1.5,
     font.lab = 2, cex.axis = 1.3, bty = "n", las=1)
-plot(k,summary(samples)$summary[paste("z[", 1:118, "]", sep=""), 1], ylim=c(0,1),
-     xlim=c(0,n), lwd=2, pch=4, xlab= "Number of Items Recalled Correctly", 
-     ylab="Cheater Classification") 
+plot(k,summary(samples)$summary[237:354, 1],ylim=c(0,1),xlim=c(0,n), 
+     xlab= "Number of Items Recalled Correctly", ylab="Cheater Classification", 
+     lwd=2, pch=4) 
 # in the code, z=0 is bonafide and z=1 is cheating
 # so z gives the prob of being assigned to cheating group
 
