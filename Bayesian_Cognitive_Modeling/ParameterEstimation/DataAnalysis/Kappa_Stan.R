@@ -92,6 +92,7 @@ plot(samples)
 samples$mean$kappa
 
 # Compare to Cohen's point estimate
+n <- sum(y)
 p0 <- (y[1]+y[4])/n
 pe <- (((y[1]+y[2]) * (y[1]+y[3])) + ((y[2]+y[4]) * (y[3]+y[4]))) / n^2
 kappa.Cohen <- (p0-pe) / (1-pe) 

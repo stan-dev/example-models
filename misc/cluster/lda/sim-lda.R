@@ -13,6 +13,9 @@ avg_doc_length <- 10;
 doc_length <- rpois(M,avg_doc_length);
 N <- sum(doc_length);
 
+alpha <- rep(1/K,K);
+beta <- rep(1/V,V);
+
 theta <- rdirichlet(M,alpha);
 
 w <- rep(NA,N);
@@ -26,8 +29,5 @@ for (m in 1:M) {
     n <- n + 1;
   }
 }
-
-alpha <- rep(1/K,K);
-beta <- rep(1/V,V);
 
 dump(c("K","V","M","N","z","w","doc","alpha","beta"),"lda.data.R");
