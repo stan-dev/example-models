@@ -36,6 +36,7 @@ transformed parameters {
 model {
   // Priors
   mu ~ normal(0, 1);
+  delta ~ normal(0, 1);
   // Sampling from Prior Distribution for Delta
   deltaprior ~ normal(0, 1);
 
