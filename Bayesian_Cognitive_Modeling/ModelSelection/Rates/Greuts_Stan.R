@@ -76,7 +76,7 @@ myinits <- list(
   list(mu=.8, sigma=1.5, delta=.5, phia=rnorm(nsa), phic=rnorm(nsc),
        deltaprior=.5))
 
-parameters <- c("delta")  # parameters to be monitored
+parameters <- c("delta", "mu", "sigma")  # parameters to be monitored
 
 # The following command calls Stan with specific options.
 # For a detailed description type "?rstan".
@@ -91,7 +91,8 @@ samples <- stan(model_code=model,
                 # seed=123  # Setting seed; Default is random seed
 )
 # Now the values for the monitored parameters are in the "samples" object,
-# ready for inspection.
+# ready for inspection, e.g.;
+traceplot(samples, inc_warmup=FALSE)
 
 # Collect posterior samples across all chains:
 delta.posterior <- extract(samples)$delta      
@@ -102,12 +103,12 @@ library(polspline) # this package can be installed from within R
 fit.posterior <- logspline(delta.posterior)
 
 # 95% confidence interval:
-x0 <- qlogspline(0.025,fit.posterior)
-x1 <- qlogspline(0.975,fit.posterior)
+(x0 <- qlogspline(0.025,fit.posterior))
+(x1 <- qlogspline(0.975,fit.posterior))
 
 posterior <- dlogspline(0, fit.posterior) # this gives the pdf at point delta = 0
 prior     <- dnorm(0)            # height of order-restricted prior at delta = 0
-BF01      <- posterior/prior
+(BF01      <- posterior/prior)
 # BF01 = 3.96, BF10 = 0.25
 
 #####################################################################
@@ -127,9 +128,8 @@ par(new=T)
 plot(fit.posterior, ylim=c(0,2), xlim=c(-3,3), lty=1, lwd=1, axes=F)
 points(0, dlogspline(0, fit.posterior),pch=19, cex=2)
 # plot the prior:
-par(new=T)
-plot (function( x ) dnorm( x, 0, 1 ), -3, 3, xlim=c(-3,3), ylim=c(0,2), lwd=2,
-      lty=1, ylab=" ", xlab = " ") 
+curve(dnorm( x, 0, 1 ), -3, 3, xlim=c(-3,3), ylim=c(0,2), lwd=2,
+      lty=1, ylab=" ", xlab = " ", add = TRUE) 
 points(0, dnorm(0), pch=19, cex=2)
 
 text(0.3, 1.5, labels = "Posterior", cex = 1.5, pos=4)
