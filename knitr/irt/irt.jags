@@ -1,0 +1,15 @@
+model {
+  for (j in 1:J) {
+    alpha[j] ~ dnorm(0, 1)
+  }
+  for (i in 1:I) {
+    delta[i] ~ dgamma(2, 2);
+    beta[i] ~ dnorm(0, 0.04);
+  }
+  for (i in 1:I) {
+    for (j in 1:J) {
+      logit(p[i,j]) <- delta[i] * (alpha[j] - beta[i])
+      y[i,j] ~ dbern(p[i,j]);
+    }
+  }
+}

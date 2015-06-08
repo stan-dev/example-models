@@ -1,0 +1,85 @@
+---
+title: "Introduction to Item-Response Theory (IRT)"
+author: "<big>Bob Carpenter</big>"
+date: "<small>21 May 2015</small>"
+output:
+  html_document:
+    theme: cerulean
+---
+
+Item-response theory (IRT) is a model of educational testing that assigns each student an ability value and each question on a test a difficulty level (and optionally discimrinativeness among students).
+
+
+# Data
+
+In the simplest form, the data for an IRT model consists of
+
+* $I$: number of test questions (integer, non-negative)
+* $J$: number of students (integer, non-negative)
+* $y_{i,j}$ : 1 if student $j$ answered question $i$ correctly ($\{0,1\}$)
+
+# Basic Model: 1PL
+
+## Parameters
+
+The simplest form of IRT model is based on an ability parameter for students and a difficulty parameter for questions.
+
+* $\theta_j$ : ability for student $j$ (unconstrained)
+* $b_i$ : difficulty of test question $i$ (unconstrained)
+
+This form of IRT is called "one parameter logistic" (1PL) because there is a single parameter for each test question and because the logistic link function will be used.
+
+## Likelihood
+
+The likelihood function is uses the logistic link function,
+
+$$
+\mbox{logit}^{-1}(u) = \frac{1}{1 + \exp(-u)},
+$$
+
+to convert the parameters into a probability that a given question is answered correctly by a given student,
+
+$$
+\mbox{Pr}[y_{i,j} = 1] = \mbox{logit}^{-1}(\theta_j - b_i)
+$$
+
+Expressed using sampling notation, the likelihood is
+
+$$
+y_{i,j} \sim \mbox{Bernoulli}\left(\mbox{logit}^{-1}(\theta_j - b_i)\right)
+$$
+
+Under the assumption that the data are independent and identically distributed (i.i.d.), the full likelihood function is
+
+$$
+p(y \ | \ \theta,b) = \prod_{i=1}^I \prod_{j=1}^J \mbox{Bernoulli}\left(y_{i,j} \, | \, \mbox{logit}^{-1}(\theta_j - b_i)\right)
+$$
+
+## Identifiability
+
+This likelihood function is problematic in that for any constant $c$, adding $c$ to $\theta$ and subtracting it from $b$ produces the same likelihood function.
+
+$$
+p(y \, | \, \theta, b) = p(y \, | \, \theta + c, b - c)
+$$
+
+This means that the function $p(y \, | \, \theta, b)$ does not have a maximum value for $(\theta, b)$ given fixed data $y$ and hence there is no maximum likelihood estimator for the basic model. 
+
+One way to identify the model is to reduce the degrees of freedom in the parameterization by fixing $\theta_1 = 0$.  This identifies the remaining free parameters, because the student abilities $\theta_2,\ldots,\theta_J$ and the question difficulties $b_1,\ldots,b_I$ are all determined relative to student 1's ability.
+
+<<external-code, cache=FALSE>>=
+read_chunk('foo-bar.R')
+@
+
+
+
+```{r}
+```
+
+You can also embed plots, for example:
+
+```{r, echo=FALSE}
+plot(cars)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
