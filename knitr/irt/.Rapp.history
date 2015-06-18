@@ -1,0 +1,801 @@
+y
+sd(y)
+sd(1 + y)
+sd(1e10 + y)
+sd(1e5 + y)
+sd(1e6 + y)
+log1p(1e-20)
+log1p(1e-30)
+log1p(1e-10)
+print(log1p(1e-10),digits=20)
+print(1e-10,digits=20)
+print(1e-10,digits=30)
+print(1e-10,digits=25)
+print(1e-10,digits=22)
+print(1e-10,digits=23)
+print(1e-10,digits=22)
+52 * log(2)
+2^11
+52 * log(2) / log(10)
+for (i in 1:500) print(c(i,exp(-i)))
+for (i in 10*(1:100) print(c(i,exp(-i)))
+for (i in 10*(1:100)) print(c(i,exp(-i)))
+for (i in 10*(1:100)) print(c(i,exp(-i)), digits=22)
+quit()
+108605/(108605 + 181009)
+108605/(181009)
+softmax <- function(x) { exp(x) / sum(exp(x)) }
+softmax(c(2,2))
+softmax(c(1,3))
+softmax(c(.1, .3))
+softmax(c(10, 30))
+1250/4
+1725/4
+1200/4
+300 + 431 + 312
+1750/4
+list("1"=4)
+x <- list("1"=4)
+x
+x[[1]]
+x == x
+library(rstan)
+help(traceplot)
+is.vector("a")
+sqrt(.1256)
+library(rstan)
+help(rstan)
+help(pgamma)
+f <- function(x) { dgamma(x, shape=1, rate=0.0001); }
+curve(f,xlim=c(0,10))
+f <- function(x) { dgamma(x, shape=1, rate=1); }
+curve(f,xlim=c(0,10))
+f <- function(x) { dgamma(x, shape=1, rate=0.0001); }
+curve(f,xlim=c(0,100))
+curve(f,xlim=c(0,100,log=TRUE))
+curve(f,xlim=c(1,100,log=TRUE))
+curve(f,xlim=c(1,100))
+curve(f,xlim=c(1,10000))
+curve(f,xlim=c(1,1000000))
+curve(f,xlim=c(1,1e5))
+f <- function(x) { dgamma(x, shape=1, rate=0.0001, log=TRUE); }
+curve(f,xlim=c(1,1e5))
+help(pairs)
+library(rstan)
+help(rstan)
+load("/Users/carp/Library/Containers/com.apple.mail/Data/Library/Mail Downloads/75143952-5E1A-4E5F-B795-0904546328F2/hiBraimVectorized.stan.RData")
+library(rstan)
+help(pairs)
+help(rstan)
+library(rstan)
+lp(rstan)
+help(rstan)
+cost <- function(a,bob,d,ben) {}
+cost <- function(a,bob,d,ben) { a*250 + bob * 100 + d*50 + ben*75 }
+cost(2/52,3/12,3/12,3/12)
+cost(2/52,3/12,3/12,3/12) * 3 * 2
+cost(2/52,.2,.2.,.2) * 3 * 2
+cost(2/52,.2,.2,.2) * 3 * 2
+.15 * 52
+(4300 + 2400)/4
+library(rstan)
+help(stan)
+2850/4
+2500/4
+1700/4
+1/.81
+4925 * (1 + 17/30.5)
+5829 * .8
+library(rstan)
+time()
+help(time)
+fit <- stan(model_code="parameters { real y; } model { y ~ normal(0,1); }")
+install.packages("devtools")
+library(devtools)#
+    source_url("https://github.com/stan-dev/shinystan/raw/develop/install_shinystan.R")#
+    install_shinystan()
+quit()
+library(rstan)
+install.packages("devtools")
+library(devtools)#
+    source_url("https://github.com/stan-dev/shinystan/raw/develop/install_shinystan.R")#
+    install_shinystan()
+quit()
+2500 + 3300 + 1250 + 1290 + 2750 + 1250
+12340 - 1250
+11090/4
+12239 + 2772
+library(rstan)
+time()
+help(time)
+help(rstan)
+model <- stan_model(model_code="paramters { real y; } model { y ~ normal(0,1); }")
+model <- stan_model(model_code="parameters { real y; } model { y ~ normal(0,1); }")
+100000 * 10000000
+code_str <- "data { real mu; real sigma; } parameters { real y; } model { y ~ normal(mu,sigma); }"
+library(rstan)
+globalenv()
+ls()
+rm(code_str)
+ls()
+quit()
+1.11111111111111 - .0000000000001
+library(rstan)
+help(stan)
+setwd("~/stan-dev/example-models/knitr/irt/")
+source('irt-2pl-power.R')
+source('irt-2pl-power.R')
+source('irt-2pl-power.R')
+source('irt-2pl-power.R')
+source('irt-2pl-power.R')
+source('irt-2pl-power.R')
+a
+a <- rep(1, I);
+a <- rep(3, 2)
+rep(3,2)
+I
+I <- length()
+b <- ((0:20) - 10) / 2;#
+I <- length(b);#
+a <- rep(1, I);
+I
+a
+b
+fit1a <- sampling(model, algrorithm="Fixed_param",#
+                  data=c("I", "a", "b"), refresh=2000, seed=1234);
+fit1a <- sampling(model, algorithm="Fixed_param",#
+                  data=c("I", "a", "b"), refresh=2000, seed=1234);
+print(fit1a)
+print(fit, probs=c(0.1, 0.5, 0.9));
+print(fit1a, c("z_sim"), probs=c(0.1, 0.5, 0.9));
+fit1a <- sampling(model, algorithm="Fixed_param",#
+                  data=c("I", "a", "b"), iter=10000, refresh=10000, seed=1234);
+print(fit1a, c("z_sim"), probs=c(0.1, 0.5, 0.9));
+ssa <- extract(fit1a)$z_sim;
+dim(ssa)
+length(0:20)
+dim(ssa)[2]
+help(quantile)
+sims <- extract(fit1a)$z_sim
+dim(sims)[2]
+mean(sims[,1])
+quantile(sims[,1],0.5)
+quantile(sims[,1],0.5)[1]
+quantile(sims[,1],0.5) / 10
+sims <- extract(fit1a)$z_sim;#
+theta_sim <- c();#
+five <- c();#
+fifty <- c();#
+ninety_five <- c();#
+#
+for (int j in 1:dim(sims)[2]) {#
+  theta[j] <- #
+  five[j] <- quantile(sims[,i], 0.05);#
+  fifty[j] <- quantile(sims[,i], 0.50);#
+  ninety_five[j] <- quantile(sims[,i], 0.95);#
+}
+sims <- extract(fit1a)$z_sim;#
+theta_sim <- c();#
+five <- c();#
+fifty <- c();#
+ninety_five <- c();#
+for (int j in 1:dim(sims)[2]) {#
+  theta_sim[j] <- (j - 50) / 10;#
+  five[j] <- quantile(sims[,j], 0.05);#
+  fifty[j] <- quantile(sims[,j], 0.50);#
+  ninety_five[j] <- quantile(sims[,j], 0.95);#
+}
+sims <- extract(fit1a)$z_sim;#
+theta_sim <- c();#
+five <- c();#
+fifty <- c();#
+ninety_five <- c();#
+for (j in 1:dim(sims)[2]) {#
+  theta_sim[j] <- (j - 50) / 10;#
+  five[j] <- quantile(sims[,j], 0.05);#
+  fifty[j] <- quantile(sims[,j], 0.50);#
+  ninety_five[j] <- quantile(sims[,j], 0.95);#
+}
+theta_sim
+df_a <- data.frame(list(theta_sim, five, fifty, ninety_five));
+head(df_a)
+theta_sim
+five
+fifty
+ninety_five
+mean <- c();#
+sd <- c();#
+theta_sim <- c();#
+five <- c();#
+fifty <- c();#
+ninety_five <- c();#
+for (j in 1:dim(sims)[2]) {#
+  theta_sim[j] <- (j - 50) / 10;#
+  mean[j] <- mean(sims[,j]);#
+  sd[j] <- sd(sims[,j]);#
+  five[j] <- quantile(sims[,j], 0.05);#
+  fifty[j] <- quantile(sims[,j], 0.50);#
+  ninety_five[j] <- quantile(sims[,j], 0.95);#
+}
+df_a <- data.frame(list(mean, sd, theta_sim, five, fifty, ninety_five));
+head(df_a)
+labels(df_a)
+length(mean)
+length(sd)
+length(theta_sim)
+length(five)
+length(fifty)
+length(ninety_five)
+df(mean, sd)
+df_a <- data.frame(mean, sd, theta_sim, five, fifty, ninety_five);
+head(df_a)
+plot_a <-#
+  ggplot2(df_a, aes(x=theta_sim, y=mean)) +#
+  geom_point() +#
+  geom_errorbar(aes(ymax = mean + 2 * sd, ymin = mean - 2 * sd), width=0.25);
+library(ggplot2)
+plot_a <-#
+  ggplot2(df_a, aes(x=theta_sim, y=mean)) +#
+  geom_point() +#
+  geom_errorbar(aes(ymax = mean + 2 * sd, ymin = mean - 2 * sd), width=0.25);
+plot_a <-#
+  ggplot(df_a, aes(x=theta_sim, y=mean)) +#
+  geom_point() +#
+  geom_errorbar(aes(ymax = mean + 2 * sd, ymin = mean - 2 * sd), width=0.25);
+plot_a
+source('irt-2pl-power.R')
+plot_a
+plot_a <-#
+  ggplot(df_a, aes(x=theta_sim, y=mean)) +#
+  geom_point() +#
+  geom_errorbar(aes(ymax = mean + 2 * sd, ymin = mean - 2 * sd));
+plot_a
+plot_a <-#
+  ggplot(df_a, aes(x=theta_sim, y=mean)) +#
+  geom_ribbon(aes(ymin=(mean - sd), ymax=(mean + sd)), colour="white") +#
+  geom_line();
+plot_a
+plot_a <-#
+  ggplot(df_a, aes(x=theta_sim, y=mean)) +#
+  geom_ribbon(aes(ymin=(mean - sd), ymax=(mean + sd)),#
+              colour="blue", size=1.5, fill="lightblue") +#
+  geom_line();
+plot_a
+plot_a <-#
+  ggplot(df_a, aes(x=theta_sim, y=mean)) +#
+  geom_ribbon(aes(ymin=(mean - sd), ymax=(mean + sd)),#
+              colour="black", fill="lightblue") +#
+  geom_line(size=1);
+plot_a
+plot_a <-#
+  ggplot(df_a, aes(x=theta_sim, y=mean)) +#
+  geom_ribbon(aes(ymin=(mean - sd), ymax=(mean + sd)),#
+              colour="gray", fill="lightgray") +#
+  geom_line(size=0.75);#
+plot_a;
+plot_a <-#
+  ggplot(df_a, aes(x=theta_sim, y=mean)) +#
+  geom_ribbon(aes(ymin=(mean - sd), ymax=(mean + sd)),#
+              colour="gray", fill="white") +#
+  geom_line(size=0.75);#
+plot_a;
+plot_a <-#
+  ggplot(df_a, aes(x=theta_sim, y=mean)) +#
+  geom_ribbon(aes(ymin=(mean - 2 * sd), ymax=(mean + 2 * sd)),#
+              colour="gray", fill="lightyellow") +#
+  geom_line(size=0.75);#
+plot_a;
+plot_a <-#
+  ggplot(df_a, aes(x=theta_sim, y=mean)) +#
+  # geom_ribbon(aes(ymin=(mean - 2 * sd), ymax=(mean + 2 * sd)),#
+  #              colour="gray", fill="lightyellow") +#
+  geom_ribbon(aes(ymin=five, ymax=ninety_five),#
+              colour="gray", fill="lightyellow") +#
+  geom_line(size=0.75);#
+plot_a;
+I
+plot_a <-#
+  ggplot(df_a, aes(x=theta_sim, y=mean)) +#
+  geom_ribbon(aes(ymin=(mean - 2 * sd), ymax=(mean + 2 * sd)),#
+              colour="gray", fill="lightyellow") +#
+#  the following version gives 90% intervals, but discrete looks odd#
+#  geom_ribbon(aes(ymin=five, ymax=ninety_five),#
+#              colour="gray", fill="lightyellow") +#
+  geom_line(size=0.75);#
+plot_a;
+plot_a <-#
+  ggplot(df_a, aes(x=theta_sim, y=mean)) +#
+  geom_ribbon(aes(ymin=(mean - 2 * sd), ymax=(mean + 2 * sd)),#
+              colour="gray", fill="lightyellow") +#
+#  the following version gives 90% intervals, but discrete looks odd#
+#  geom_ribbon(aes(ymin=five, ymax=ninety_five),#
+#              colour="gray", fill="lightyellow") +#
+  geom_line(size=0.75) +#
+  xlab("ability") +#
+  ylab("expected correct +/- 2 std dev") + #
+  ggtitle("Expected Correct Answers")#
+plot_a;
+fff <- function(x) { return(foo + x); }
+fff(3)
+foo <- 10
+fff(3)
+sample_to_df <- function(test_name) {#
+  fit <- sampling(model, algorithm="Fixed_param",#
+                data=c("I", "a", "b"), iter=10000, refresh=10000, seed=1234);#
+  sims <- extract(fit1a)$z_sim;#
+  questions <- c();#
+  mean <- c();#
+  sd <- c();#
+  theta_sim <- c();#
+  five <- c();#
+  fifty <- c();#
+  ninety_five <- c();#
+  for (j in 1:dim(sims)[2]) {#
+    questions[j] <- test_name;#
+    theta_sim[j] <- (j - 50) / 10;#
+    mean[j] <- mean(sims[,j]);#
+    sd[j] <- sd(sims[,j]);#
+    five[j] <- quantile(sims[,j], 0.05);#
+    fifty[j] <- quantile(sims[,j], 0.50);#
+    ninety_five[j] <- quantile(sims[,j], 0.95);#
+  }#
+  df <- data.frame(mean, sd, theta_sim, five, fifty, ninety_five);#
+  return(df);#
+}
+df_a <- sample_to_df("a = 1, b spaced (-5,5)");
+head(df_a)
+plot_a <-#
+  ggplot(df_a, aes(x=theta_sim, y=mean)) +#
+  geom_ribbon(aes(ymin=(mean - 2 * sd), ymax=(mean + 2 * sd)),#
+              colour="gray", fill="lightgray") +#
+#  the following version gives 90% intervals, but discrete looks odd#
+#  geom_ribbon(aes(ymin=five, ymax=ninety_five),#
+#              colour="gray", fill="lightyellow") +#
+  geom_line(size=0.75) +#
+  xlab("ability") +#
+  ylab("expected correct +/- 2 std dev");#
+plot_a;
+plot_a <-#
+  ggplot(df_a, aes(x=theta_sim, y=mean)) +#
+  geom_ribbon(aes(ymin=(mean - 2 * sd), ymax=(mean + 2 * sd)),#
+              colour="darkgray", fill="lightgray") +#
+#  the following version gives 90% intervals, but discrete looks odd#
+#  geom_ribbon(aes(ymin=five, ymax=ninety_five), ...#
+  geom_line(size=0.75) +#
+  xlab("ability") +#
+  ylab("expected correct +/- 2 std dev");#
+plot_a;
+a <- rep(4, I);#
+df_b <- sample_to_df("a=4, b=-5:5");
+plot_a <-#
+  ggplot(df_b, aes(x=theta_sim, y=mean)) +#
+  geom_ribbon(aes(ymin=(mean - 2 * sd), ymax=(mean + 2 * sd)),#
+              colour="darkgray", fill="lightgray") +#
+#  the following version gives 90% intervals, but discrete looks odd#
+#  geom_ribbon(aes(ymin=five, ymax=ninety_five), ...#
+  geom_line(size=0.75) +#
+  xlab("ability") +#
+  ylab("expected correct +/- 2 std dev");#
+plot_b;
+plot_a
+a <- rep(4, I);#
+df_b <- sample_to_df("a=4, b=-5:5");
+plot_b <-#
+  ggplot(df_b, aes(x=theta_sim, y=mean)) +#
+  geom_ribbon(aes(ymin=(mean - 2 * sd), ymax=(mean + 2 * sd)),#
+              colour="darkgray", fill="lightgray") +#
+#  the following version gives 90% intervals, but discrete looks odd#
+#  geom_ribbon(aes(ymin=five, ymax=ninety_five), ...#
+  geom_line(size=0.75) +#
+  xlab("ability") +#
+  ylab("expected correct +/- 2 std dev");#
+plot_b;
+a
+fit2 <- sampling(model, algorithm="Fixed_param",#
+                data=c("I", "a", "b"), iter=10000, refresh=10000, seed=1234);
+print(fit2)
+df_b <- sample_to_df("a=4, b=-5:5");
+plot_b <-#
+  ggplot(df_b, aes(x=theta_sim, y=mean)) +#
+  geom_ribbon(aes(ymin=(mean - 2 * sd), ymax=(mean + 2 * sd)),#
+              colour="darkgray", fill="lightgray") +#
+#  the following version gives 90% intervals, but discrete looks odd#
+#  geom_ribbon(aes(ymin=five, ymax=ninety_five), ...#
+  geom_line(size=0.75) +#
+  xlab("ability") +#
+  ylab("expected correct +/- 2 std dev");#
+plot_b;
+head(df_b)
+sample_to_df <- function(test_name) {#
+  fit <- sampling(model, algorithm="Fixed_param",#
+                data=c("I", "a", "b"), iter=10000, refresh=10000, seed=1234);#
+  sims <- extract(fit)$z_sim;#
+  questions <- c();#
+  mean <- c();#
+  sd <- c();#
+  theta_sim <- c();#
+  five <- c();#
+  fifty <- c();#
+  ninety_five <- c();#
+  for (j in 1:dim(sims)[2]) {#
+    questions[j] <- test_name;#
+    theta_sim[j] <- (j - 50) / 10;#
+    mean[j] <- mean(sims[,j]);#
+    sd[j] <- sd(sims[,j]);#
+    five[j] <- quantile(sims[,j], 0.05);#
+    fifty[j] <- quantile(sims[,j], 0.50);#
+    ninety_five[j] <- quantile(sims[,j], 0.95);#
+  }#
+  df <- data.frame(mean, sd, theta_sim, five, fifty, ninety_five);#
+  return(df);#
+}
+a <- rep(2, I);
+a
+b
+b <- ((0:20) - 10) / 2;#
+a <- rep(2, length(b));#
+#
+df_b <- sample_to_df("a=4, b=-5:5");
+plot_b <-#
+  ggplot(df_b, aes(x=theta_sim, y=mean)) +#
+  geom_ribbon(aes(ymin=(mean - 2 * sd), ymax=(mean + 2 * sd)),#
+              colour="darkgray", fill="lightgray") +#
+#  the following version gives 90% intervals, but discrete looks odd#
+#  geom_ribbon(aes(ymin=five, ymax=ninety_five), ...#
+  geom_line(size=0.75) +#
+  xlab("ability") +#
+  ylab("expected correct +/- 2 std dev");#
+plot_b;
+b <- ((0:20) - 10) / 2;#
+a <- rep(4, length(b));#
+#
+df_b <- sample_to_df("a=4, b=-5:5");
+plot_b <-#
+  ggplot(df_b, aes(x=theta_sim, y=mean)) +#
+  geom_ribbon(aes(ymin=(mean - 2 * sd), ymax=(mean + 2 * sd)),#
+              colour="darkgray", fill="lightgray") +#
+#  the following version gives 90% intervals, but discrete looks odd#
+#  geom_ribbon(aes(ymin=five, ymax=ninety_five), ...#
+  geom_line(size=0.75) +#
+  xlab("ability") +#
+  ylab("expected correct +/- 2 std dev");#
+plot_b;
+head(df_a)
+sample_to_df <- function(test_name) {#
+  fit <- sampling(model, algorithm="Fixed_param",#
+                data=c("I", "a", "b"), iter=10000, refresh=10000, seed=1234);#
+  sims <- extract(fit)$z_sim;#
+  questions <- c();#
+  mean <- c();#
+  sd <- c();#
+  theta_sim <- c();#
+  five <- c();#
+  fifty <- c();#
+  ninety_five <- c();#
+  for (j in 1:dim(sims)[2]) {#
+    questions[j] <- test_name;#
+    theta_sim[j] <- (j - 50) / 10;#
+    mean[j] <- mean(sims[,j]);#
+    sd[j] <- sd(sims[,j]);#
+    five[j] <- quantile(sims[,j], 0.05);#
+    fifty[j] <- quantile(sims[,j], 0.50);#
+    ninety_five[j] <- quantile(sims[,j], 0.95);#
+  }#
+  df <- data.frame(questions, mean, sd, theta_sim, five, fifty, ninety_five);#
+  return(df);#
+}#
+#
+## TEST 1a: 20 evenly spaced questions (-5 to 5)#
+b <- ((0:20) - 10) / 2;#
+I <- length(b);#
+a <- rep(1, I);#
+df_1a <- sample_to_df("a=1, b=-5:5");#
+#
+## TEST 1b: 20 evenly spaced questions (-5 to 5) discrim#
+b <- ((0:20) - 10) / 2;#
+a <- rep(4, length(b));#
+df_1b <- sample_to_df("a=4, b=-5:5");
+head(df_1a)
+head(df_1b)
+df_1ab <- rbind(df_1a,df_1b);
+head(df_1ab)
+plot_ab <-#
+  ggplot(df_1ab, aes(x=theta_sim, y=mean)) +#
+  facet_grid(. ~ questions) +#
+  geom_ribbon(aes(ymin=(mean - 2 * sd), ymax=(mean + 2 * sd)),#
+              colour="darkgray", fill="lightgray") +#
+#  the following version gives 90% intervals, but discrete looks odd#
+#  geom_ribbon(aes(ymin=five, ymax=ninety_five), ...#
+  geom_line(size=0.75) +#
+  xlab("ability") +#
+  ylab("expected correct +/- 2 std dev") #
+plot_ab;
+b <- ((0:20) - 10) / 2;#
+a <- rep(0.25, length(b));#
+df_1c <- sample_to_df("a=1/4, b=-5:5");
+plot_abc <-#
+  ggplot(df_1ab, aes(x=theta_sim, y=mean)) +#
+  facet_grid(. ~ questions) +#
+  geom_ribbon(aes(ymin=(mean - 2 * sd), ymax=(mean + 2 * sd)),#
+              colour="darkgray", fill="lightgray") +#
+#  the following version gives 90% intervals, but discrete looks odd#
+#  geom_ribbon(aes(ymin=five, ymax=ninety_five), ...#
+  geom_line(size=0.75) +#
+  xlab("ability") +#
+  ylab("expected correct +/- 2 std dev") #
+plot_abc;
+df_1abc <- rbind(df_1a,df_1b,df_1c);
+plot_abc <-#
+  ggplot(df_1abc, aes(x=theta_sim, y=mean)) +#
+  facet_grid(. ~ questions) +#
+  geom_ribbon(aes(ymin=(mean - 2 * sd), ymax=(mean + 2 * sd)),#
+              colour="darkgray", fill="lightgray") +#
+#  the following version gives 90% intervals, but discrete looks odd#
+#  geom_ribbon(aes(ymin=five, ymax=ninety_five), ...#
+  geom_line(size=0.75) +#
+  xlab("ability") +#
+  ylab("expected correct +/- 2 std dev") #
+plot_abc;
+plot_abc <-#
+  ggplot(df_1abc, aes(x=theta_sim, y=mean)) +#
+  facet_grid(. ~ questions) +#
+  geom_ribbon(aes(ymin=(mean - 2 * sd), ymax=(mean + 2 * sd)),#
+              colour="darkgray", fill="lightgray") +#
+#  the following version gives 90% intervals, but discrete looks odd#
+#  geom_ribbon(aes(ymin=five, ymax=ninety_five), ...#
+  geom_line(size=0.75) +#
+  xlab("ability") +#
+  ylab("expected correct +/- 2 std dev") +#
+  ggtitle("21 Spaced Difficulty Questions; b in [-5,5]")#
+plot_abc;
+sample_to_df <- function(test_name) {#
+  fit <- sampling(model, algorithm="Fixed_param",#
+                data=c("I", "a", "b"), iter=10000, refresh=10000, seed=1234);#
+  sims <- extract(fit)$z_sim;#
+  questions <- c();#
+  mean <- c();#
+  sd <- c();#
+  theta_sim <- c();#
+  five <- c();#
+  fifty <- c();#
+  ninety_five <- c();#
+  for (j in 1:dim(sims)[2]) {#
+    questions[j] <- test_name;#
+    theta_sim[j] <- (j - 50) / 10;#
+    mean[j] <- mean(sims[,j]);#
+    sd[j] <- sd(sims[,j]);#
+    five[j] <- quantile(sims[,j], 0.05);#
+    fifty[j] <- quantile(sims[,j], 0.50);#
+    ninety_five[j] <- quantile(sims[,j], 0.95);#
+  }#
+  df <- data.frame(questions, mean, sd, theta_sim, five, fifty, ninety_five);#
+  return(df);#
+}#
+#
+## TEST 1a: low discrim#
+b <- ((0:20) - 10) / 2;#
+a <- rep(0.25, length(b));#
+df_1a <- sample_to_df("low (a = 0.25)");#
+#
+## TEST 1b: medium discrim#
+b <- ((0:20) - 10) / 2;#
+I <- length(b);#
+a <- rep(1, I);#
+df_1b <- sample_to_df("medium (a = 1)");#
+#
+## TEST 1c: high discrim#
+b <- ((0:20) - 10) / 2;#
+a <- rep(4, length(b));#
+df_1c <- sample_to_df("high (a = 4)");#
+#
+df_1abc <- rbind(df_1a,df_1b,df_1c);#
+library(ggplot2);#
+plot_abc <-#
+  ggplot(df_1abc, aes(x=theta_sim, y=mean)) +#
+  facet_grid(. ~ questions) +#
+  geom_ribbon(aes(ymin=(mean - 2 * sd), ymax=(mean + 2 * sd)),#
+              colour="darkgray", fill="lightgray") +#
+#  the following version gives 90% intervals, but discrete looks odd#
+#  geom_ribbon(aes(ymin=five, ymax=ninety_five), ...#
+  geom_line(size=0.75) +#
+  xlab("ability") +#
+  ylab("expected correct +/- 2 std dev") +#
+  ggtitle("21 Spaced Difficulty Questions; b in [-5,5]")#
+plot_abc;
+sample_to_df <- function(test_name) {#
+  fit <- sampling(model, algorithm="Fixed_param",#
+                data=c("I", "a", "b"), iter=10000, refresh=10000, seed=1234);#
+  sims <- extract(fit)$z_sim;#
+  questions <- c();#
+  mean <- c();#
+  sd <- c();#
+  theta_sim <- c();#
+  five <- c();#
+  fifty <- c();#
+  ninety_five <- c();#
+  for (j in 1:dim(sims)[2]) {#
+    questions[j] <- test_name;#
+    theta_sim[j] <- (j - 50) / 10;#
+    mean[j] <- mean(sims[,j]);#
+    sd[j] <- sd(sims[,j]);#
+    five[j] <- quantile(sims[,j], 0.05);#
+    fifty[j] <- quantile(sims[,j], 0.50);#
+    ninety_five[j] <- quantile(sims[,j], 0.95);#
+  }#
+  df <- data.frame(questions, mean, sd, theta_sim, five, fifty, ninety_five);#
+  return(df);#
+}#
+#
+## TEST 1a: low discrim#
+b <- ((0:20) - 10) / 2;#
+a <- rep(0.25, length(b));#
+df_1a <- sample_to_df("low discrim (a = 0.25)");#
+#
+## TEST 1b: medium discrim#
+b <- ((0:20) - 10) / 2;#
+I <- length(b);#
+a <- rep(1, I);#
+df_1b <- sample_to_df("medium discrim (a = 1)");#
+#
+## TEST 1c: high discrim#
+b <- ((0:20) - 10) / 2;#
+a <- rep(4, length(b));#
+df_1c <- sample_to_df("high discrim (a = 4)");#
+#
+df_1abc <- rbind(df_1a,df_1b,df_1c);#
+library(ggplot2);#
+plot_abc <-#
+  ggplot(df_1abc, aes(x=theta_sim, y=mean)) +#
+  facet_grid(. ~ questions) +#
+  geom_ribbon(aes(ymin=(mean - 2 * sd), ymax=(mean + 2 * sd)),#
+              colour="darkgray", fill="lightgray") +#
+#  the following version gives 90% intervals, but discrete looks odd#
+#  geom_ribbon(aes(ymin=five, ymax=ninety_five), ...#
+  geom_line(size=0.75) +#
+  xlab("ability") +#
+  ylab("expected correct +/- 2 std dev") +#
+  ggtitle("21 Varying Difficulty Questions (b spaced in [-5,5])")#
+plot_abc;
+## TEST 2a: 20 all easy#
+b <- rep(-2, I);#
+a <- rep(1, I);#
+df_2a <- sample_to_df("easy (b = -2)");#
+#
+## TEST 2b: 20 all medium#
+b <- rep(0, I);#
+a <- rep(1, I);#
+df_2b <- sample_to_df("moderate (b = 0)");#
+#
+## TEST 2c: 20 all hard#
+b <- rep(2, I);#
+a <- rep(1, I);#
+df_2c <- sample_to_df("difficult (b = 2)");#
+#
+plot_2abc <-#
+  ggplot(df_1abc, aes(x=theta_sim, y=mean)) +#
+  facet_grid(. ~ questions) +#
+  geom_ribbon(aes(ymin=(mean - 2 * sd), ymax=(mean + 2 * sd)),#
+              colour="darkgray", fill="lightgray") +#
+  geom_line(size=0.5) +#
+  xlab("ability") +#
+  ylab("expected correct +/- 2 std dev") +#
+  ggtitle("21 Questions of Same Difficulty (discrim a = 1)")#
+plot_1abc;
+plot_2abc;
+df_2abc <- rbind(df_2a, df_2b, df_2c);#
+#
+plot_2abc <-#
+  ggplot(df_2abc, aes(x=theta_sim, y=mean)) +#
+  facet_grid(. ~ questions) +#
+  geom_ribbon(aes(ymin=(mean - 2 * sd), ymax=(mean + 2 * sd)),#
+              colour="darkgray", fill="lightgray") +#
+  geom_line(size=0.5) +#
+  xlab("ability") +#
+  ylab("expected correct +/- 2 std dev") +#
+  ggtitle("21 Questions of Same Difficulty (discrim a = 1)")#
+plot_2abc;
+## TEST 2a: 20 all easy#
+b <- rep(-2, I);#
+a <- rep(2, I);#
+df_2a <- sample_to_df("easy (b = -2)");#
+#
+## TEST 2b: 20 all medium#
+b <- rep(0, I);#
+a <- rep(2, I);#
+df_2b <- sample_to_df("moderate (b = 0)");#
+#
+## TEST 2c: 20 all hard#
+b <- rep(2, I);#
+a <- rep(2, I);#
+df_2c <- sample_to_df("difficult (b = 2)");#
+#
+df_2abc <- rbind(df_2a, df_2b, df_2c);#
+#
+plot_2abc <-#
+  ggplot(df_2abc, aes(x=theta_sim, y=mean)) +#
+  facet_grid(. ~ questions) +#
+  geom_ribbon(aes(ymin=(mean - 2 * sd), ymax=(mean + 2 * sd)),#
+              colour="darkgray", fill="lightgray") +#
+  geom_line(size=0.5) +#
+  xlab("ability") +#
+  ylab("expected correct +/- 2 std dev") +#
+  ggtitle("21 Questions of Same Difficulty (discrim a = 1)")#
+plot_2abc;
+## TEST 2a: 20 all easy#
+b <- rep(-2, I);#
+a <- rep(1, I);#
+df_2a <- sample_to_df("easy (b = -2)");#
+#
+## TEST 2b: 20 all medium#
+b <- rep(0, I);#
+a <- rep(1, I);#
+df_2b <- sample_to_df("moderate (b = 0)");#
+#
+## TEST 2c: 20 all hard#
+b <- rep(2, I);#
+a <- rep(1, I);#
+df_2c <- sample_to_df("difficult (b = 2)");#
+#
+df_2abc <- rbind(df_2a, df_2b, df_2c);#
+#
+plot_2abc <-#
+  ggplot(df_2abc, aes(x=theta_sim, y=mean)) +#
+  facet_grid(. ~ questions) +#
+  geom_ribbon(aes(ymin=(mean - 2 * sd), ymax=(mean + 2 * sd)),#
+              colour="darkgray", fill="lightgray") +#
+  geom_line(size=0.5) +#
+  xlab("ability") +#
+  ylab("expected correct +/- 2 std dev") +#
+  ggtitle("21 Questions of Same Difficulty (discrim a = 1)")#
+plot_2abc;
+sample_to_df <- function(test_name) {#
+  fit <- sampling(model, algorithm="Fixed_param",#
+                data=c("I", "a", "b"), refresh=2000, seed=1234);#
+  sims <- extract(fit)$z_sim;#
+  questions <- c();#
+  mean <- c();#
+  sd <- c();#
+  theta_sim <- c();#
+  five <- c();#
+  fifty <- c();#
+  ninety_five <- c();#
+  for (j in 1:dim(sims)[2]) {#
+    questions[j] <- test_name;#
+    theta_sim[j] <- (j - 50) / 10;#
+    mean[j] <- mean(sims[,j]);#
+    sd[j] <- sd(sims[,j]);#
+    five[j] <- quantile(sims[,j], 0.05);#
+    fifty[j] <- quantile(sims[,j], 0.50);#
+    ninety_five[j] <- quantile(sims[,j], 0.95);#
+  }#
+  df <- data.frame(questions, mean, sd, theta_sim, five, fifty, ninety_five);#
+  return(df);#
+}
+## TEST 2a: 20 all easy#
+b <- rep(-3, I);#
+a <- rep(1, I);#
+df_2a <- sample_to_df("easy (b = -3)");#
+#
+## TEST 2b: 20 all medium#
+b <- rep(0, I);#
+a <- rep(1, I);#
+df_2b <- sample_to_df("moderate (b = 0)");#
+#
+## TEST 2c: 20 all hard#
+b <- rep(3, I);#
+a <- rep(1, I);#
+df_2c <- sample_to_df("difficult (b = 3)");#
+#
+df_2abc <- rbind(df_2a, df_2b, df_2c);#
+#
+plot_2abc <-#
+  ggplot(df_2abc, aes(x=theta_sim, y=mean)) +#
+  facet_grid(. ~ questions) +#
+  geom_ribbon(aes(ymin=(mean - 2 * sd), ymax=(mean + 2 * sd)),#
+              colour="darkgray", fill="lightgray") +#
+  geom_line(size=0.5) +#
+  xlab("ability") +#
+  ylab("expected correct +/- 2 std dev") +#
+  ggtitle("21 Questions of Same Difficulty (discrim a = 1)")#
+plot_2abc;
+quit()
