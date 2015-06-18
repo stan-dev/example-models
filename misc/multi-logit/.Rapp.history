@@ -1,0 +1,283 @@
+a = NA
+exists('b')
+b = NA
+exists('b')
+15000 / 26
+14360/26
+600 * 26
+800 * 26
+1.035^15
+1.035^16
+1.04^14
+help(rstan)
+library(rstan)
+help(rstan)
+help(stan)
+help(traceplot)
+c(1,2) %*% c(3,4)
+.05 * 6.5
+sample(1,6,TRUE)
+sample(6,1,TRUE)
+ts <- function(ac) { if (6 + sample(20,1) < ac) return(0) else return(2 + sample(12,1))}
+ts(3)
+ts(2)
+ts(5)
+sample(6,1)
+quit()
+Sys.setenv(MAKEFLAGS = "-j4")
+install_rstan <- function(multiarch = FALSE) {#
+  on.exit(Sys.unsetenv("R_MAKEVARS_USER"))#
+  on.exit(Sys.unsetenv("R_MAKEVARS_SITE"), add = TRUE)#
+#
+  try(remove.packages("rstan"), silent = TRUE)#
+  Sys.setenv(R_MAKEVARS_USER = "foobar")#
+  Sys.setenv(R_MAKEVARS_SITE = "foobar")#
+  install.packages(c("inline", "Rcpp"), type = "source")#
+  library(inline) #
+  library(Rcpp)#
+  src <- ' #
+    std::vector<std::string> s; #
+    s.push_back("hello");#
+    s.push_back("world");#
+    return Rcpp::wrap(s);#
+  '#
+  hellofun <- cxxfunction(body = src, includes = '', plugin = 'Rcpp', verbose = FALSE)#
+  test <- try(hellofun())#
+  if(inherits(test, "try-error")) stop("hello world failed; ask for help on Rcpp list")#
+#
+  options(repos = c(getOption("repos"), #
+          rstan = "http://rstan.org/repo/"))#
+  if(multiarch) install.packages("rstan", type = 'source', INSTALL_opts = '--merge-multiarch')#
+  else install.packages("rstan", type = 'source')#
+  library(rstan)#
+  set_cppo("fast")#
+  if (any(grepl("^darwin", R.version$os, ignore.case = TRUE))) {#
+    cat('CC=clang', 'CXX=clang++ -arch x86_64 -ftemplate-depth-256', #
+        file = "~/.R/Makevars", sep = "\n", append = TRUE)#
+  }#
+  return(invisible(NULL))#
+}#
+install_rstan() # possibly with multiarch = TRUE, see below
+library(rstan)
+stan(model_code="parameters { real y; } model { y ~ normal(0,1); }")
+y <- runif(1000,0,1)
+y
+yt <- (y/(1 - y))
+yt
+yt <- log(y/(1 - y))
+yt
+quit()
+library(rstan)
+p(rstan)
+help(rstan)
+sqrt(.8 * .2 / 52)
+sqrt(.8 * .2 / 500)
+sqrt(.8 * .2 / 500) * 52 * 2
+sum(rnorm(1000,0.088,0.063) > 0)
+sum(rnorm(10000,0.088,0.063) > 0)
+help(glm)
+library(rstan)
+help(optimizing)
+Sys.setenv(MAKEFLAGS = "-j4")
+source('http://mc-stan.org/rstan/install.R', echo = TRUE, max.deparse.length = 2000)#
+install_rstan()
+library(rstan)
+quit()
+library(rstan)
+help(optimizing)
+? binomial
+?choose
+choose(6,3) * 6^3 / 6^6
+20/216
+library('rjags')
+jags()
+library("R2jags")
+jags()
+help(rjags)
+qlogis(3)
+qlogis(0.2)
+dbinom(4,5,0.5)
+dbinom(5,6,0.5)
+1350/4
+1250/4
+sqrt(1000000)
+10 * sqrt(2^30)
+a <- 1:10
+a[3]
+a[:]
+a[1:10]
+a[]
+200/26 * 2.06
+75 * 1.06
+75 * 1.06 * 2
+true ? 1.3 : 2.9
+for (n in 0:20) print(dbinom(n,20,0.5))
+for (n in 0:20) print(dbinom(n,20,0.5),digits=3)
+for (n in 0:20) print(sprintf("%3d %5.3f",n,dbinom(n,20,0.5)),digits=3)
+for (n in 0:20) print(sprintf("%3d %5.3f",n,dbinom(n,20,0.5)),digits=3,quote=FALSE)
+for (n in 0:20) print(sprintf("%3d %5.3f %5.3f",n,dbinom(n,20,0.5),pbinom(n,20,0.5)),digits=3,quote=FALSE)
+for (n in 0:20) print(sprintf("%3d  %5.3f  %5.3f",n,dbinom(n,20,0.5),pbinom(n,20,0.5)),digits=3,quote=FALSE)
+rbinom(100,20,0.5)
+table(rbinom(100,20,0.5))
+1/(1 - exp(2))
+1/(1 + exp(-2))
+exp(-2)
+exp(2)
+y <- rnorm(0,1e-10)
+y <- rnorm(100,0,1e-10)
+y
+sd(y)
+sd(1 + y)
+sd(1e10 + y)
+sd(1e5 + y)
+sd(1e6 + y)
+log1p(1e-20)
+log1p(1e-30)
+log1p(1e-10)
+print(log1p(1e-10),digits=20)
+print(1e-10,digits=20)
+print(1e-10,digits=30)
+print(1e-10,digits=25)
+print(1e-10,digits=22)
+print(1e-10,digits=23)
+print(1e-10,digits=22)
+52 * log(2)
+2^11
+52 * log(2) / log(10)
+for (i in 1:500) print(c(i,exp(-i)))
+for (i in 10*(1:100) print(c(i,exp(-i)))
+for (i in 10*(1:100)) print(c(i,exp(-i)))
+for (i in 10*(1:100)) print(c(i,exp(-i)), digits=22)
+quit()
+108605/(108605 + 181009)
+108605/(181009)
+softmax <- function(x) { exp(x) / sum(exp(x)) }
+softmax(c(2,2))
+softmax(c(1,3))
+softmax(c(.1, .3))
+softmax(c(10, 30))
+1250/4
+1725/4
+1200/4
+300 + 431 + 312
+1750/4
+list("1"=4)
+x <- list("1"=4)
+x
+x[[1]]
+x == x
+library(rstan)
+help(traceplot)
+is.vector("a")
+sqrt(.1256)
+library(rstan)
+help(rstan)
+help(pgamma)
+f <- function(x) { dgamma(x, shape=1, rate=0.0001); }
+curve(f,xlim=c(0,10))
+f <- function(x) { dgamma(x, shape=1, rate=1); }
+curve(f,xlim=c(0,10))
+f <- function(x) { dgamma(x, shape=1, rate=0.0001); }
+curve(f,xlim=c(0,100))
+curve(f,xlim=c(0,100,log=TRUE))
+curve(f,xlim=c(1,100,log=TRUE))
+curve(f,xlim=c(1,100))
+curve(f,xlim=c(1,10000))
+curve(f,xlim=c(1,1000000))
+curve(f,xlim=c(1,1e5))
+f <- function(x) { dgamma(x, shape=1, rate=0.0001, log=TRUE); }
+curve(f,xlim=c(1,1e5))
+help(pairs)
+library(rstan)
+help(rstan)
+load("/Users/carp/Library/Containers/com.apple.mail/Data/Library/Mail Downloads/75143952-5E1A-4E5F-B795-0904546328F2/hiBraimVectorized.stan.RData")
+library(rstan)
+help(pairs)
+help(rstan)
+library(rstan)
+lp(rstan)
+help(rstan)
+cost <- function(a,bob,d,ben) {}
+cost <- function(a,bob,d,ben) { a*250 + bob * 100 + d*50 + ben*75 }
+cost(2/52,3/12,3/12,3/12)
+cost(2/52,3/12,3/12,3/12) * 3 * 2
+cost(2/52,.2,.2.,.2) * 3 * 2
+cost(2/52,.2,.2,.2) * 3 * 2
+.15 * 52
+(4300 + 2400)/4
+library(rstan)
+help(stan)
+2850/4
+2500/4
+1700/4
+1/.81
+4925 * (1 + 17/30.5)
+5829 * .8
+library(rstan)
+time()
+help(time)
+fit <- stan(model_code="parameters { real y; } model { y ~ normal(0,1); }")
+setwd("~/stan-dev/example-models/misc/multi-logit/")
+source('sim.R')
+source('sim.R')
+y
+source('sim.R')
+lambda
+source('sim.R')
+y_multi
+source('sim.R')
+y_multi
+y_multi
+source('sim.R')
+y_multi
+(1:K) * y_multi
+sort()
+source('sim.R')
+y
+source('sim.R')
+y
+y_multi
+K
+source('sim.R')
+help("%*%")
+(1:3) %*% (1:3)
+source('sim.R')
+y
+source('sim.R')
+source('sim.R')
+y
+summary(y)
+hist(y)
+hist(y+0.5)
+source('sim.R')
+y
+sum(y==1)
+sum(y==2)
+sum(y==3)
+sum(y==4)
+library(rstan)
+hlep(stan)
+help(stan)
+source('sim.R')
+source('fit.R')
+source('fit.R')
+print(fit)
+source('fit.R')
+print(fit)
+source('fit.R')
+source('fit.R')
+source('fit.R')
+source('fit.R')
+source('fit.R')
+source('fit.R')
+source('fit.R')
+source('fit.R')
+source('fit.R')
+source('fit.R')
+source('sim.R')
+help(stan_rdump)
+source('sim.R')
+alpha
+alpha
+stan_rdump( c("alpha","beta"), "multi_logit.parameters.R");
+quit()
