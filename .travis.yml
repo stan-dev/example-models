@@ -15,6 +15,6 @@ env:
 #before_script:
 
 script:
-- echo "git diff --name-only HEAD~1 $(git rev-parse origin/master)"
+- echo "git diff --name-only HEAD `git rev-parse origin/master`"
 
 #after_script:
