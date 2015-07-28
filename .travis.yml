@@ -14,6 +14,6 @@ sudo: false
 
 script:
 #- echo "git diff --name-only HEAD `git rev-parse origin/master`"
-- git rev-parse origin/master
+- git rev-parse master
 
 #after_script:
