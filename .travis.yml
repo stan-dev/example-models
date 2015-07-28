@@ -8,6 +8,8 @@ env:
   global:
     - CHANGED_FOLDERS=
 
+sudo: false
+
 #before_install:
 
 #install:
