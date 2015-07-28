@@ -1,0 +1,20 @@
+language: cpp
+
+compiler:
+- clang
+- gcc
+
+env:
+  global:
+    - CHANGED_FOLDERS=
+
+#before_install:
+
+#install:
+
+#before_script:
+
+script:
+- echo "git diff --name-only HEAD~1 $(git rev-parse origin/master)"
+
+#after_script:
