@@ -1,8 +1,4 @@
-language: cpp
-
-compiler:
-- clang
-- gcc
+language: bash
 
 env:
   global:
