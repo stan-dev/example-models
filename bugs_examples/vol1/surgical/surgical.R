@@ -39,6 +39,7 @@ surgical_stanified_summary =
 
 # Plot Figure 6 in manual
 library(ggplot2)
+theme_set(theme_bw())
 sss = data.frame(surgical_stanified_summary[,c(1,3,4)])
 sss$hospital = as.factor(paste0(LETTERS[1:length(data$n)],"(",data$r,"/",data$n,")"))
 colnames(sss)[2:3] = c("min","max")
