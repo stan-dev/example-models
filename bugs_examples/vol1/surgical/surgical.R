@@ -26,8 +26,8 @@ surgical_summary = summary(surgical,probs = c(.025,0.975),
                         pars = "p")$summary[,c(1,3,4,5,6)]
 
 # Stanified, default random init
-surgical_stanified = stan(file = "surgical_stanified.stan", data = data,
-                          chains = chains, iter = iter)
+surgical_stanified = stan(file = "surgical_stanified.stan", data = data, chains = chains,
+                iter = iter)
 plot(surgical_stanified, ask = FALSE)
 surgical_stanified_summary =
   summary(surgical_stanified,probs = c(.025,0.975),
@@ -37,7 +37,7 @@ surgical_stanified_summary =
 (surgical_summary)
 (surgical_stanified_summary)
 
-# Figure 6 in manual
+# Plot Figure 6 in manual
 library(ggplot2)
 sss = data.frame(surgical_stanified_summary[,c(1,3,4)])
 sss$hospital = as.factor(paste0(LETTERS[1:length(data$n)],"(",data$r,"/",data$n,")"))
@@ -61,5 +61,4 @@ ggplot(data = ssr) +
   geom_point(aes(y = hospital, x = mean), shape = 21, fill = "white", size = 4) +
   xlab("Rank of Hospital") +
   ggtitle("BUGS Vol 1, Example 4: Hospital mortality")
-
 
