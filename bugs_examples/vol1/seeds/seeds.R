@@ -82,3 +82,26 @@ cbind(seeds_random_summary[,1:2], bugs_results)
 # alpha2   1.3459 0.291     1.370    0.25
 # alpha12 -0.8084 0.447    -0.790    0.43
 # sigma    0.3066 0.136     0.290    0.15
+
+# 3.1 Constraining random effects to sum to zero
+# There is an example in the bugs manual how to constrain parameters to sum
+# up to 0.
+# This does not improve convergence and n_eff
+seeds_centered = stan(file = "seeds_centered.stan", data = data, chains = chains,
+                       iter = iter)
+plot(seeds_centered, ask = FALSE)
+seeds_centered_summary =  summary(seeds_centered, probs = c(.025,0.975),
+                                   pars = pars)$summary[,c(1,3,4,5,6)]
+(seeds_centered_summary)
+par(mfcol = c(3,1))
+b_centered = as.numeric(extract(seeds_centered, pars = "b")$b)
+hist(b_centered, main = paste("Mean of centered b=", signif(mean(b_centered),2)),
+     xlim = c(-1.5,1.5))
+b_stan = as.numeric(extract(seeds, pars = "b")$b)
+hist(b_stan, main = paste("Mean of default model b=", signif(mean(b_stan),2)),
+     xlim =  c(-1.5,1.5))
+b_stanified = as.numeric(extract(seeds_stanified, pars = "b")$b)
+hist(b_stanified, main = paste("Mean of stanified b=", signif(mean(b_stanified),2)),
+     xlim = c(-1.5,1.5))
+
+
