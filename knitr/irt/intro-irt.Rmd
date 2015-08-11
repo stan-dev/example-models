@@ -1,0 +1,538 @@
+---
+title: "7 Estimation Pitfalls in Item-Response Theory and How to Avoid Them"
+author: "<big>Bob Carpenter</big><br />Columbia University"
+date: "<small>23 May 2015</small>"
+output:
+  html_document:
+    highlight: monochrome
+    theme: readable
+---
+
+Item-response theory (IRT) is a model of educational testing that assigns each student an ability value and each question on a test a difficulty level (and optionally discimrinativeness among students).
+
+## Reproducibility
+
+To ensure the experiments are reproducible, all seeds are being set
+explicitly.  These can be changed to explore variation in results with
+different randomizations.
+
+```{r
+set.seed(3874656474);
+```
+
+## Data
+
+In the simplest form, the data for an IRT model consists of
+
+* $I$: number of test questions (integer, non-negative)
+* $J$: number of students (integer, non-negative)
+* $y_{i,j}$ : 1 if student $j$ answered question $i$ correctly ($\{0,1\}$)
+
+## Basic Model (1PL)
+
+The simplest form of IRT model is based on an ability parameter for students and a difficulty parameter for questions.
+
+### Parameters (1PL)
+
+* $\theta_j$ : ability for student $j$ (unconstrained)
+* $b_i$ : difficulty of test question $i$ (unconstrained)
+
+This form of IRT is called "one parameter logistic" (1PL) because there is a single parameter for each test question and because the logistic link function will be used.
+
+### Likelihood (1PL)
+
+The likelihood function uses the inverse of the logistic link function,
+
+$$
+\mbox{logit}^{-1}(u) = \frac{1}{1 + \exp(-u)},
+$$
+
+to convert the parameters into a probability that a given question is answered correctly by a given student,
+
+$$
+\mbox{Pr}[y_{i,j} = 1] = \mbox{logit}^{-1}(\theta_j - b_i)
+$$
+
+Expressed using sampling notation, the likelihood is
+
+$$
+y_{i,j} \sim \mbox{Bernoulli}\left(\mbox{logit}^{-1}(\theta_j - b_i)\right)
+$$
+
+Under the assumption that the data are independent and identically distributed (i.i.d.), the full likelihood function is
+
+$$
+p(y \ | \ \theta,b) = \prod_{i=1}^I \prod_{j=1}^J \mbox{Bernoulli}\left(y_{i,j} \, | \, \mbox{logit}^{-1}(\theta_j - b_i)\right)
+$$
+
+
+### Prior (1PL)
+
+The prior on $\theta$ and $b$ is going to be an independent fixed
+normal prior on both coefficient vectors.  The student abilities will
+be given a unit normal prior
+$$
+\theta_j \sim \mbox{Normal}(0, 1)
+$$
+and the difficulties a prior centering the mean accuracy at around 73% accuracy (1 on the logit scale).  
+$$
+b_i \sim \mbox{Normal}(0, 2);
+$$
+
+In later sections we consider the issues of separability that arise in
+any logistic regression and the additive invariance that leads to
+non-identifiability when trying to define a maximum likelihood
+estimate for IRT models.  We will also consider our preferred
+resolution to both problems, a centered hierarchical prior for the
+abilities $\theta$ and a free hierarchical prior on the problem
+difficulties.  
+
+### Joint (1PL)
+
+The joint probability function is given by the prior times the likelihood, 
+$$
+p(\theta, b, y) = p(\theta) \, p(b) \, p(y \, | \, \theta, b),
+$$
+and by Bayes's rule, this is proportional to the posterior
+$$
+p(\theta, b \, | \, y) \propto  p(\theta) \, p(b) \, p(y \, | \, \theta, b).
+$$
+Stan models typically define log joint probability functions
+
+#### 1PL as a sparse logistic legression
+
+The 1PL IRT model may be reformulated as a traditional binary logistic
+regression with an $I + J$ coefficient vector $\beta = (\theta,b)$ and
+for each outcome $y_{i,j}$ an $(I+J)$-dimensional predictor vector
+$x_{i,j}$ where $x_{i,j,i} = 1$, $x_{i,j, I + j} = 1$ and all other
+coefficients are zero.  Then
+
+$$
+\mbox{Pr}[y_{i,j} = 1] 
+= \mbox{logit}^{-1}(\beta^{\top} x_{i,j})
+= \mbox{logit}^{-1}\left( \sum_{k=1}^{I+J} \beta_k x_{i,j,k} \right)
+$$
+
+
+### Simulating data in R (1PL)
+
+To simulate the data using R, the model is simply evaluated in the forward direction from the priors.  Thus the model is known in advance to be well specified for the data, which is a very unrealistic assumption in practice, but a very convenient assumption for validating computational estimation behavior.
+
+```{r, echo=FALSE}
+knitr::read_chunk('irt-1pl-sim.R')
+```
+
+
+```{r sim-1pl}
+```
+
+
+The data can be summarized in histograms.
+
+
+```{r sim-1pl-hist}
+```
+
+
+### Coding model in Stan (1PL)
+
+The following Stan program computes the model described in the
+previous section.
+
+```{r, echo=FALSE}
+knitr::read_chunk('irt_1pl.stan')
+```
+```{r irt-1pl-stan, eval=FALSE}
+```
+
+The data block declares variables for the constant sizes $I$ and $J$ (constrained to be non-negative) and for the data variable $y$ (constrained to be 0 or 1).  
+
+The parameters block declares vectors of size $I$ and $J$ for the parameters $b$ and $\theta$, with no constraints on their values.
+
+The model block defines the joint probability function with separate statements for the priors and a loop for the likelihood with a logit-scaled Bernoulli distribution and a vectorized probability statement.
+
+#### A note on vectorization
+
+The vectorized form used in the model block for the 1PL model is equivalent to the fully unfolded form:
+
+```{r, eval=FALSE}
+for (i in 1:I)
+  for (j in 1:J)
+    y[i,j] ~ bernoulli_logit(theta[j] - b[i]);
+```
+
+Because <tt>theta</tt> is a size <tt>J</tt> vector, the expression <tt>(theta - b[i])</tt> evaluates to a <tt>J</tt>-vector with entry <tt>j</tt> given by <tt>(theta[j] - b[i])</tt>.  The expression <tt>y[i]</tt> evaluates a size <tt>J</tt> array (it would be written as <tt>y[i,]</tt> in R).
+
+#### A note on alternative parameterizations
+
+Stan uses alternative parameterizations such as the logit-scaled Bernoulli for many of the distributions commonly used for generalized linear models.  They provide better efficiency because of fewer operations and derivatives and better robustness through more stable arithmetic.  The logit-scaled Bernoulli is defined as
+
+$$
+\mbox{BernoulliLogit}(u \, | \, \alpha)
+= \mbox{Bernoulli}(u \, | \, \mbox{logit}^{-1}(\alpha)).
+$$
+
+Eliminating the direct application of the inverse logit function avoid losing precision due to subtraction and overflowing/underflowing due to exponentiation.  Because Stan works on the log scale, The logit-scaled Bernoulli allows whichever of 
+$\log \mbox{logit}^{-1}(u)$
+or 
+$\log (1 - \mbox{logit}^{-1}(u))$
+is needed to be calculated efficiently and with much higher precision.
+
+### Fitting model in Stan (1PL)
+
+```{r, echo=FALSE}
+knitr::read_chunk('irt-1pl-fit.R')
+```
+
+#### Initialization
+
+First the RStan library is loaded, then the model is compiled from its file.
+
+
+```{r fit-1pl-stan-compile}
+```
+
+
+By default, RStan will initialize parameters uniformly on $(-2,2)$ in the unconstrained space.  Because there are no constraints on $\theta$
+or $b$ in the model, this means $\theta$ and $b$ would have each of their elements initialized with a value drawn from $\mbox{Unif}(-2,2)$.  
+
+RStan allows an optional initialization.  The initialization here just
+explicitly mimics Stan's default in order to allow comparison with JAGS.
+
+
+```{r fit-1pl-stan-init}
+```
+
+
+And then the <tt>sampling</tt> function is called on the model, given the data which is in the global environment, and the initialization function.
+
+
+```{r fit-1pl-stan-sampling}
+```
+
+
+Next, the fit is printed out, with a subset of variables selected by name and the quantiles specified explicitly (here to give a median and 90% central posterior interval).
+
+
+```{r fit-1pl-stan-print}
+```
+
+
+The $\hat{R}$ convergence diagnostics are all 1 (within the 2 decimal places printed), and the effective sample sizes are very high (2000 to 4000) compared to the total number of draws (4000).  This indicates very good mixing behavior for this simple model.  
+
+The simulated values for $\theta$ and $b$ are as follows.
+
+```{r fit-1pl-stan-compare}
+```
+
+These are mostly recovered within their 90% posterior intervals.  The posterior is much wider for the student abilities ($\theta$) than question difficulties ($b$) because there five times as many students as questions---each question is evaluated with 100 students, whereas each student is evaluated with only 20 questions.
+
+### Pitfall #1: Location Invariance
+
+The 1PL likelihood function is problematic because it only uses the
+differences between the abilities and difficulties.  For any constant
+$c$, adding $c$ to the difficulties and subtracing them from the
+abilities yields the same distribution for $y$,
+$$
+p(y \, | \, b, \theta) = p(y \, | \, b + c, \theta - c).
+$$
+This means that the function $p(y \, | \, b, \theta)$ does not have a maximum value for $(b,\theta)$ given fixed data $y$ and hence there is no maximum likelihood estimator for the basic model. 
+
+#### Avoiding pitfall #1:  Pinning Values
+
+One approach to locating the model is to fix one of the student ability values, for instance, setting $\theta_{1} = 0$ (alternatively one of the test difficulties can be pinned).  This removes a degree of freedom in the parameterization and identifies the remaining free parameters, because the student abilities $\theta_2,\ldots,\theta_J$ and the question difficulties $b_1,\ldots,b_I$ are all determined relative to student 1's ability ($\theta_1$).
+
+In Stan, this can be accomplished as in the following model.  
+
+```{r, echo=FALSE}
+knitr::read_chunk('irt_1pl_pin.stan')
+```
+```{r irt-1pl-pin-stan, eval=FALSE}
+```
+
+This can be fit with the following R code.  
+
+```{r, echo=FALSE}
+knitr::read_chunk('irt-1pl-pin-fit.R')
+```
+
+```{r fit-1pl-stan-pin}
+```
+
+
+The results can be shown as follows.
+
+
+```{r fit-print-1pl-stan-pin}
+```
+
+
+This shows dramatically worse mixing than the model fit with priors, with the $\hat{R}$ showing convergence has not been reached and an effective sample size rate two orders of magnitude lower than the fit with priors.  While it would be possible to run for more iterations and perhaps drive $\hat{R}$ down to 1 and effective sample sizes up, there are better approaches.
+
+#### Avoiding pitfall #1:  Sum to One Constraint
+
+An alternative approach suggested by Gelman and Hill (*Data Analysis Using Regression and Multilevel/Hierarchical Models*, 2007, section 14.3, "Defining the model using redundant parameters") is to let the parameters float and then renormalize them.  To let the parameters float, $\theta$ is given an improper uniform prior on $(-\infty,\infty)$.  The result of an improper prior for $\theta$ here is an improper posterior with an infinite ridge of fixed height due to the additive invariance of $\theta$ and $b$.
+
+Then the "adjusted" student abilities $\theta_j$ and problem difficulties $b_i$ are defined by subtracting the mean ability in the floating parameter $\theta$,
+$$
+\theta_j = \theta^{\mathrm{raw}}_j - \bar{\theta^{\mathrm{raw}}}
+$$
+$$
+b_i = b^{\mathrm{raw}}_i - \bar{\theta^{\mathrm{raw}}}
+$$
+where $\bar{\theta^{\mathrm{raw}}}$ is the sample mean of the vector $\theta^{\mathrm{raw}}$.  The hope is that even though the posterior in $\theta^{\mathrm{raw}}$ is improper, the "posterior" in $\theta$ will be proper.
+
+**WARNING: Do not do this.**    Stan cannot sample from an improper posterior and then hope to adjust it later.  It is not clear that BUGS or JAGS can, either, because the normalization would have to happen at each conditional sample within each iteration in order for the resulting transform to define a proper posterior.
+
+And if the warning's not enough, here's an example of what happens.  The model is coded with the adjustments done in the 
+
+```{r, echo=FALSE}
+knitr::read_chunk('irt_1pl_adjust.stan')
+```
+```{r irt-1pl-adjust-stan, eval=FALSE}
+```
+
+The raw parameters are defined in the parameters block---these are the ones over which sampling is performed.  Then transformed versions of the parameters are defined by subtracting the mean.  The subtraction is done in a local variable block to allow <tt>mean_theta_raw</tt> to be calculated once and reused in both normalizations.  In general, it is a big computational win to save on calculations that introduce a lot of edges in the expression graph (for a mean, there is an edge for each operand and one for the division by the size).
+
+Stan is called as usual.
+
+```{r, echo=FALSE}
+knitr::read_chunk('irt-1pl-adjust-fit.R')
+```
+```{r fit-1pl-stan-adjust}
+```
+The results show the problem with improper posteriors.
+
+```{r fit-print-1pl-stan-adjust}
+```
+
+### Pitfall #2: Poor Mixing and Exchangeability
+
+Not only is there poor mixing with the value-pinning approach, 
+it is awkward to pin the value of a single ability (difficulty) variable because the model is no longer exchangeable on the students (test questions).  With a value pinned, comparison to simulated values has to be done in relative terms.
+
+
+#### Avoiding pitfall #2:  Priors
+
+Rather than pinning a value, in the example we ran at the very start, we placed priors on both $\theta$ and $b$.  For all but a non-measurable set of edge cases, 
+$$
+p(b) \, p(\theta) 
+\neq 
+p(b + c) \, p(\theta - c),
+$$
+and thus the posterior does not have the same additive invariance as the likelihood function.  
+
+### Pitfall #3: Vague Priors
+
+Even mild priors identify the parameters in theory, but in practice may not be strong enough.  For example, consider fitting the same model we fit with the $\mbox{Normal}(0,100)$ priors commonly employed in BUGS or JAGS examples.  
+
+```{r, echo=FALSE}
+knitr::read_chunk('irt_1pl_vague.stan')
+```
+```{r irt-1pl-vague-stan, eval=FALSE}
+```
+
+This model includes data for specifying the priors. This can be fit with the following R code, which then sets the fixed prior values.  
+
+```{r, echo=FALSE}
+knitr::read_chunk('irt-1pl-vague-fit.R')
+```
+
+
+```{r fit-1pl-vague-stan}
+```
+
+
+The results can be shown as follows.
+
+
+```{r fit-print-1pl-vague-stan}
+```
+
+
+This is so far from convergence as indicated by $\hat{R}$ that there seems little hope that further iterations would provide a useful effective sample size. 
+
+#### Avoiding Pitfall #3:  Tighten Priors
+
+In principle, it is enough to put a prior on one of the parameter vectors, such as $p(\theta)$, but this performs poorly in practice.  What does suffice is putting an appropriate prior on one of the parameters, such as $\theta$.  For example, the following fits with a unit normal on $\theta$.
+
+
+```{r fit-print-1pl-vague-stan-one-fixed}
+```
+
+
+
+### Pitfall #4: Separability
+
+A second problem facing logistic regression models in general and IRT models in particular is separability.  Consider the case where a question is so easy that every student gets it right or so hard every student gets it wrong---there are no means by which to estimate its true difficulty.  In the case where every student gets a question right, the likelihood keeps increasing as the question's difficulty approaches negative infinity.  The same problem arises for a student who gets every question right;  the likelihood keeps increasing as the student's ability approaches infinity.  Unlike in the additive invariance case, where there are multiple solutions for the parameters that maximize the likelihood, in the separabe case there are no finite parameters that maximize the likelihood.  
+
+#### Avoiding Pitfall #4: Priors
+
+The easiest way to solve the separability problem is to add priors.  It then becomes a balance between the likelihood term $p(y_{i,1},\ldots,y_{i,J} \, | \, b_i, \theta)$ and the prior term $p(b_i)$.  For example, if all the students answered question $i$ correctly, the likelihood quickly asymptotes at 1 as the problem difficulty $b_i$ becomes more negative.
+
+#### MISSING EXPERIMENT:  separable +/- priors
+
+
+### Pitfall #5:  Unknown Priors
+
+Up until now, we've been cheating with the priors, choosing them to match the data-generating process.  In reality, we do not know the parameters of the (hyperprior) distribution used to generate the parameters.  Even more to the point, we do not even know the parametric family of the parameter-generating process---it's elephants all the way down.    
+
+#### Avoiding pitfall #5: Hierarchical models
+
+```{r, echo=FALSE}
+knitr::read_chunk('irt_1pl_hier.stan')
+```
+```{r irt-1pl-hier-stan, eval=FALSE}
+```
+
+This model now includes parameter declarations for the priors along with hyperpriors. This can be fit with the following R code, which then sets the fixed prior values.  
+
+
+```{r, echo=FALSE}
+knitr::read_chunk('irt-1pl-hier-fit.R')
+```
+
+
+
+```{r fit-1pl-hier-stan}
+```
+
+
+So now that we have a fit that looks like it converged, let's compare the posterior estimates with the true values from the simulation.  We'll plot using the following function.
+
+```{r, echo=FALSE}
+knitr::read_chunk("fit-vs-sim.R")
+```
+
+
+```{r fit-vs-sim-function}
+```
+
+
+To plot the posterior with 90% intervals, the following function calls can be used.  
+
+
+```{r}
+fit_vs_sim("b", 0.9);
+fit_vs_sim("theta", 0.9);
+```
+
+
+As is clear from this diagram, the posterior intervals are much wider for <tt>theta</tt> (student ability) than for <tt>b</tt> (question difficulty) because there are fewer students per test item than there are test items per student.  It's also clear from the print results that <code>mu_b</code>, <code>sigma_b</code> and <code>sigma_theta</code> are recovered within their 80% intervals.
+
+## Model with Discrimination (2PL)
+
+So far, we have only considered the 1PL IRT model with a single parameter for each test item corresponding to one dimension of difficulty.  The 2PL model enhances this by adding a second parameter for each item corresponding to how discriminative it is.  That is, some test items are better at separating people who know the answer versus those who don't, whereas other test items are noisier with responses being more random.
+
+### Additional Parameters (2PL)
+
+In addition to the two 1PL parameters, the 2PL model adds
+
+* $a_i$ : discriminativeness of test question $i$ (unconstrained)
+
+### Likelihood (2PL)
+
+The discrimination parameter acts multiplicatively, with the probability of a correct answer being given by student $j$ to question $i$ modeled as
+
+$$
+\mbox{Pr}[y_{i,j} = 1] = \mbox{logit}^{-1}(a_i (\theta_j - b_i)).
+$$
+
+Because the parameter is multiplicative, values above 1 mean sharper distinction and low values mean less sharp distinction.
+
+```{r}
+x <- (-100:100)/10
+y1 <- inv_logit(0.25 * x);
+y2 <- inv_logit(x);
+y3 <- inv_logit(4 * x);
+df_logit <-
+  data.frame(x = rep(x,3), y = c(y1, y2, y3),  discrim=c(rep("1/4", length(x)), 
+                                                         rep("1", length(x)),
+                                                         rep("4", length(x))));
+ilogit_plot <- ggplot(df_logit, aes(x=x, y=y, group=discrim, colour=discrim)) +
+     geom_line(size=1) +
+     ggtitle("Effect of Discrimination Parameter") +
+     xlab("theta[j] - b[i]") +
+     ylab("Pr[y[i,j] = 1]");
+plot(ilogit_plot);
+```
+
+For discrimiantion 4, the curve is very sharp, with most students with slightly higher than difficulty ability getting it right and most students with slightly lower than the difficulty getting it wrong.  For disrimination 1/4, the effect is the opposite, with students of much lower ability than question difficulty having a good shot at getting a correct answer and students of much higher ability having a good shot at getting it wrong.  An ideal test question has high discrimination.  
+
+A discrimination value of -1 reverses the process, with students of higher ability <tt>theta</tt> being more likely to get the question wrong.  The following plot illustrates.
+
+```{r}
+x <- (-100:100)/10;
+y1 <- inv_logit(-1 * x);
+y2 <- inv_logit(x);
+df_logit <-
+  data.frame(x = rep(x,2), y = c(y1, y2),  discrim=c(rep("-1", length(x)), 
+                                                     rep("1", length(x))));
+ilogit_plot2 <- ggplot(df_logit, aes(x=x, y=y, group=discrim, colour=discrim)) +
+        geom_line(size=1) +
+        ggtitle("Effect of Negative Discrimination Parameter") +
+        xlab("theta[j] - b[i]") +
+        ylab("Pr[y[i,j] = 1]");
+plot(ilogit_plot2);
+```
+
+
+### Pitfall #6: Scale Invariance
+
+There are two immediate problems with the IRT 2PL model, the first of which is scale invariance.  If we multiply <tt>a</tt> by a constant and divide <tt>theta</tt> and <tt>b</tt> by the same constant, we get the same likelihood, because
+$$
+a_i \times c \times (\theta_j / c - b_i / c) = a_i \times (\theta_j - b_i).
+$$
+
+#### Avoiding Pitfall #6:  Priors
+
+Putting a unit normal prior on $\theta$ solves the problem by fixing the scale of $\theta$ to 1, which then causes $a$ and $b$ to follow suit.
+
+### Pitfall #7: Sign Invariance
+
+The second pitfall of the IRT 2PL model is sign invariance.  The problem is that if we reverse the signs of $a$, $b$, and $\theta$, the predictions remain the same.  This follows from simply taking $c = -1$ above,
+$$
+- a_i \times (-\theta_j - (-b_i)) = a_i \times (\theta_j - b_i).
+$$
+
+#### Avoiding Pitfall #7:  Constrain to Positive
+
+A reasonable test question will not have a negative discrimination, so the typical solution for sidestepping sign invariance is to constrain $a_i > 0$. 
+
+In Stan this is straightforward to code.
+
+
+# Bonus #1: Power Calculations using IRT 2PL
+
+How well do tests separate students of different abilities?  It is straightforward to do this kind of power calculation directly in Stan.  Consider the following model, which will simulate the number of questions from a test with a number of questions of given difficulty and discriminativeness.
+
+```{r, echo=FALSE}
+knitr::read_chunk('irt_2pl_power.stan')
+```
+```{r irt-2pl-power-stan, eval=FALSE}
+```
+
+The data block declares the number of questions (<tt>I</tt>), along with vectors of the question discriminativeness (<tt>a</tt>) and difficulty (<tt>b</tt>).  The generated quantitites block then declares two variables, <tt>theta_sim</tt> for the abilities of 100 students and <tt>z_sim</tt> for the simulated number of questions they answer correctly.  Because <tt>bernoulli_rng</tt> returns an integer 0 or 1, it can be used directly in the arithmetic statement.  The student abilities are evenly spaced between -5 (exclusive) and 5 (inclusive).  For efficiency and clarity, <code>theta_sim</code> should be either a local or defined in the data block so that it is not treated as a sampled parameter.
+
+To run the simulations, first the model is compiled and then a function is defined that will do the sampling using Stan and convert the sample summary statistics to an appropriate data frame to pass to ggplot.
+
+
+```{r, echo=FALSE}
+knitr::read_chunk("irt-2pl-power.R")
+```
+
+```{r power-2pl-compile}
+```
+
+The first set of plots is for tests with questions of evenly spaced difficulty between -5 and 5.  Three conditions are sampled corresponding to a test with questions of low discriminativeness, medium discriminativeness, and high discriminativeness.  Only a single long chain is used for each simulation because the draws are independent Monte Carlo draws, not MCMC draws.
+
+```{r power-2pl-test-1}
+```
+
+```{r power-2pl-plot-1}
+```
+
+The second group of plots is for tests consisting of questions all of the same idifficulty and unit discriminativeness.
+
+```{r power-2pl-test-2}
+```
