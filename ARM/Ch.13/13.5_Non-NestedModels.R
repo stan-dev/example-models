@@ -16,7 +16,7 @@ group.id <- NULL
 scenario.id <- NULL
 for (j in 1:n.group){
   for (k in 1:n.scenario){
-    ok <- group==group.names[j] & scenario==scenario.names[k]    
+    ok <- group==group.names[j] & scenario==scenario.names[k]
     successes <- c (successes, sum(recovered[ok]==1,na.rm=T))
     failures <- c (failures, sum(recovered[ok]==0,na.rm=T))
     group.id <- c (group.id, j)
@@ -39,7 +39,7 @@ scenario.abbr <- c("Nagoya", "B'ham", "Detroit", "Ptsbgh", "Roseln", "Chrlt", "S
 ## M1 <- lmer (y ~ 1 + (1 | group.id) + (1 | scenario.id))
 dataList.1 <- list(N=length(y),y=y,n_groups=n.group,n_scenarios=n.scenario,group_id=group.id,scenario_id=scenario.id)
 pilots.sf1 <- stan(file='pilots.stan', data=dataList.1, iter=20000, chains=4)
-print(pilots.sf1,pars = c("a","b", "sigma_y", "lp__"))
+print(pilots.sf1,pars = c("gamma","delta", "mu", "sigma_y", "lp__"))
 
 ## Plot figure 13.8
 
@@ -59,7 +59,7 @@ library(foreign)
 heights <- read.dta ("heights.dta")
 attach(heights)
 
-  # define variables 
+  # define variables
 age <- 90 - yearbn                     # survey was conducted in 1990
 age[age<18] <- NA
 age.category <- ifelse (age<35, 1, ifelse (age<50, 2, 3))
