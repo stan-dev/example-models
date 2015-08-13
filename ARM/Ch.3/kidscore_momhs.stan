@@ -1,12 +1,13 @@
 data {
   int<lower=0> N;
-  vector[N] kid_score;
-  vector[N] mom_hs;
+  vector<lower=0, upper=200>[N] kid_score;
+  vector<lower=0, upper=1>[N] mom_hs;
 }
 parameters {
   vector[2] beta;
   real<lower=0> sigma;
 }
 model {
+  sigma ~ cauchy(0, 2);
   kid_score ~ normal(beta[1] + beta[2] * mom_hs, sigma);
 }
