@@ -3,30 +3,33 @@ library(ggplot2)
 
 ### Data
 
-source("kidiq.data.R", echo = TRUE)
+source("ARM/Ch.3/kidiq.data.R", echo = TRUE)
 
 ### Model: kid_score ~ mom_hs + mom_iq
 data.list <- c("N", "kid_score", "mom_hs", "mom_iq", "mom_hs_new", "mom_iq_new")
-kidiq_prediction.sf <- stan(file='kidiq_prediction.stan', data=data.list,
-                            iter=1000, chains=4)
+kidiq_prediction.sf <- stan(file = 'ARM/Ch.3/kidiq_prediction.stan',
+                            data = data.list,
+                            iter = 500, chains = 4)
 print(kidiq_prediction.sf, pars = c("kid_score_pred"), prob = c(0.025, 0.975))
-
+pairs(kidiq_prediction.sf)
 
 ### Data
 
-source("kids_before1987.data.R", echo = TRUE)
+source("ARM/Ch.3/kids_before1987.data.R", echo = TRUE)
 
 ### Model: ppvt ~ hs + afqt
 data.list <- c("N", "ppvt", "hs", "afqt")
-kidiq_pre1987.sf <- stan(file='kidiq_validation.stan', data=data.list,
-                         iter=1000, chains=4)
+kidiq_pre1987.sf <- stan(file = 'ARM/Ch.3/kidiq_validation.stan',
+                         data = data.list,
+                         iter = 500, chains = 4)
 print(kidiq_pre1987.sf, pars = c("beta", "sigma", "lp__"))
+pairs(kidiq_prediction.sf)
 
 ### External validation
 
 ## Data
 
-source("kids_after1987.data.R", echo = TRUE)
+source("ARM/Ch.3/kids_after1987.data.R", echo = TRUE)
 
 ## Predicted scores
 

@@ -4,12 +4,12 @@ library(ggplot2)
 
 ### Data
 
-source("kidiq.data.R", echo = TRUE)
+source("ARM/Ch.3/kidiq.data.R", echo = TRUE)
 
 ### Regression line as a function of one input variable
 data.list.2 <- c("N", "kid_score", "mom_iq")
-stanfit.2 <- stan(file='kidscore_momiq.stan', data=data.list.2,
-                  iter=1000, chains=4)
+stanfit.2 <- stan(file='ARM/Ch.3/kidscore_momiq.stan', data=data.list.2,
+                  iter=500, chains=4)
 print(stanfit.2, pars = c("beta", "sigma", "lp__"))
 
 # Figure 3.2
@@ -28,8 +28,8 @@ print(p2)
 
 ## Model with no interaction: kid_score ~ mom_hs + mom_iq
 data.list.3 <- c("N", "kid_score", "mom_hs", "mom_iq")
-stanfit.3 <- stan(file='kidiq_multi_preds.stan', data=data.list.3,
-                  iter=1000, chains=4)
+stanfit.3 <- stan(file='ARM/Ch.3/kidiq_multi_preds.stan', data=data.list.3,
+                  iter=500, chains=4)
 print(stanfit.3, pars = c("beta", "sigma", "lp__"))
 
 # Figure 3.3
@@ -50,8 +50,8 @@ p3 <- ggplot(kidiq.data.3, aes(x = mom_iq, y = kid_score, color = mom_hs)) +
 print(p3)
 
 ## Model with interaction: kid_score ~ mom_hs + mom_iq + mom_hs:mom_iq
-stanfit.4 <- stan(file='kidiq_interaction.stan', data=data.list.3,
-                  iter=1000, chains=4)
+stanfit.4 <- stan(file='ARM/Ch.3/kidiq_interaction.stan', data=data.list.3,
+                  iter=500, chains=4)
 print(stanfit.4, pars = c("beta", "sigma", "lp__"))
 
 # Figure 3.4 (a)
