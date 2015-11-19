@@ -2,3 +2,5 @@ language: bash
 
 sudo: false
 
+before_script:
+- git clone https://github.com/stan-dev/cmdstan.git
