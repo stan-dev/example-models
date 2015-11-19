@@ -1,10 +1,9 @@
 language: bash
+sudo: false
 
 env:
   global:
     - CHANGED_FOLDERS=
-
-sudo: false
 
 #before_install:
 
@@ -14,6 +13,6 @@ sudo: false
 
 script:
 #- echo "git diff --name-only HEAD `git rev-parse origin/master`"
-- git rev-parse master
+- git rev-parse origin/master
 
 #after_script:
