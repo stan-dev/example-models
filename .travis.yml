@@ -2,5 +2,6 @@ language: bash
 
 sudo: false
 
-before_script:
+before_install:
 - git clone https://github.com/stan-dev/cmdstan.git
+- cd cmdstan; make build
