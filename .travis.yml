@@ -4,4 +4,5 @@ sudo: false
 
 before_install:
 - git clone https://github.com/stan-dev/cmdstan.git
+- cd cmdstan; git submodule update --init --recursive
 - cd cmdstan; make build
