@@ -3,13 +3,15 @@ library(ggplot2)
 
 ### Data
 
-source("kidiq.data.R", echo = TRUE)
+source("ARM/Ch.3/kidiq.data.R", echo = TRUE)
 
-### Model: kid_score ~ mom_hs + mom_iq + mom_hs:mom_iq
+### Model: lm(kid_score ~ mom_hs + mom_iq + mom_hs:mom_iq)
 data.list <- c("N", "kid_score", "mom_hs", "mom_iq")
-kidiq_interaction <- stan(file='kidiq_interaction.stan', data=data.list,
-                          iter=1000, chains=4)
-print(kidiq_interaction, pars = c("beta", "sigma", "lp__"))
+kidiq_interaction <- stan(file = 'ARM/Ch.3/kidiq_interaction.stan',
+                          data = data.list,
+                          iter = 1000, chains = 4)
+kidiq_interaction
+pairs(kidiq_interaction)
 
 ### Figures
 beta.post <- extract(kidiq_interaction, "beta")$beta
@@ -31,7 +33,6 @@ print(p +
       scale_y_continuous("Child test score", breaks = seq(20, 140, 40)))
 
 # Figure 3.4 (b)
-dev.new()
 print(p +
       scale_x_continuous("Mother IQ score", limits = c(0, 150),
                          breaks = seq(0, 150, 50)) +

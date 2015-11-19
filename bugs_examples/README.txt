@@ -1,8 +1,8 @@
 This folder contains WinBUGS examples in Stan. The descriptions can be found at:
- http://www.mrc-bsu.cam.ac.uk/bugs/winbugs/Vol1.pdf
- http://www.mrc-bsu.cam.ac.uk/bugs/winbugs/Vol2.pdf
- http://www.mrc-bsu.cam.ac.uk/bugs/winbugs/Vol3.pdf
-
+ http://www.mrc-bsu.cam.ac.uk/wp-content/uploads/WinBUGS_Vol1.pdf
+ http://www.mrc-bsu.cam.ac.uk/wp-content/uploads/WinBUGS_Vol2.pdf
+ http://www.mrc-bsu.cam.ac.uk/wp-content/uploads/WinBUGS_Vol3.pdf
+  
 OpenBUGS examples: 
  http://www.openbugs.net/w/Examples
  http://mathstat.helsinki.fi/openbugs/ExamplesFrames.html

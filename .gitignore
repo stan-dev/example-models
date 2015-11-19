@@ -8,3 +8,7 @@
 *.hpp
 *~
 .DS_Store
+.Rproj.user
+.Rhistory
+.RData
+*.rda
