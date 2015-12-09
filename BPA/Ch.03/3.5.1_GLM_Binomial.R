@@ -1,3 +1,5 @@
+## 3. Introduction to the generalized linear model (GLM): The simplest
+## model for count data
 ## 3.5. Binomial GLM for modeling bounded counts or proportions
 ## 3.5.1. Generation and analysis of simulated data
 
@@ -26,7 +28,7 @@ params <- c("alpha", "beta1", "beta2", "p")
 ni <- 2000
 nt <- 1
 nb <- 1000
-nc <- 3
+nc <- 4
 
 ## Stan
 out <- stan("GLM_Binomial.stan", data = stan_data,
@@ -35,4 +37,4 @@ out <- stan("GLM_Binomial.stan", data = stan_data,
             seed = 1,
             open_progress = FALSE)
 
-print(out, digits = 3)
+print(out)
