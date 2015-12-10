@@ -30,7 +30,7 @@ nt <- 1
 nb <- 1000
 nc <- 4
 
-## Stan
+## Call Stan from R
 out <- stan("GLM_Binomial.stan", data = stan_data,
             init = inits, pars = params,
             chains = nc, thin = nt, iter = ni, warmup = nb,

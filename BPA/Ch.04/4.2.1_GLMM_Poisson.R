@@ -30,14 +30,16 @@ params <- c("alpha", "beta1", "beta2", "beta3", "lambda", "sigma",
             "eps")
 
 # MCMC settings
-ni <- 30000
+ni <- 15000
 nt <- 10
-nb <- 20000
+nb <- 5000
 nc <- 4
 
-## Stan
-out <- stan("GLMM_Poisson.stan", model, data = stan_data,
+## Call Stan from R
+out <- stan("GLMM_Poisson.stan", data = stan_data,
             init = inits, pars = params,
             chains = nc, iter = ni, warmup = nb, thin = nt,
             seed = 1,
             open_progress = FALSE)
+
+print(out)

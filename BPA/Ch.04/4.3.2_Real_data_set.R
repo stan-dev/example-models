@@ -57,7 +57,7 @@ nt <- 1
 nb <- 1000
 nc <- 4
 
-## Stan
+## Call Stan from R
 out0 <- stan("GLM0.stan", data = stan_data,
              init = inits, pars = params,
              chains = nc, iter = ni, warmup = nb, thin = nt,
@@ -94,7 +94,7 @@ nt <- 1
 nb <- 1000
 nc <- 4
 
-## Stan
+## Call Stan from R
 out1 <- stan("GLM1.stan", data = stan_data,
              init = inits, pars = params,
              chains = nc, iter = ni, warmup = nb, thin = nt,
@@ -133,7 +133,7 @@ nt <- 1
 nb <- 1000
 nc <- 4
 
-## Stan
+## Call Stan from R
 out2 <- stan("GlM2.stan", data = stan_data,
              init = inits, pars = params,
              chains = nc, iter = ni, warmup = nb, thin = nt,
@@ -170,7 +170,7 @@ nt <- 1
 nb <- 1000
 nc <- 4
 
-## Stan
+## Call Stan from R
 out3 <- stan("GLMM1.stan", data = stan_data,
              init = inits, pars = params,
              chains = nc, iter = ni, warmup = nb, thin = nt,
@@ -251,7 +251,7 @@ nt <- 5
 nb <- 1000
 nc <- 4
 
-## Stan
+## Call Stan from R
 out5 <- stan("GLMM3.stan", data = stan_data,
              init = inits, pars = params,
              chains = nc, thin = nt, iter = ni, warmup = nb,
@@ -296,6 +296,7 @@ nt <- 8
 nb <- 1000
 nc <- 4
 
+## Call Stan from R
 out6 <- stan("GLMM4.stan", data = stan_data,
              init = inits, pars = params,
              chains = nc, iter = ni, warmup = nb, thin = nt,
@@ -343,6 +344,7 @@ nt <- 5
 nb <- 1000
 nc <- 4
 
+## Call Stan from R
 out7 <- stan("GLMM5.stan", data = stan_data,
              init = inits, pars = params,
              chains = nc, iter = ni, warmup = nb, thin = nt,

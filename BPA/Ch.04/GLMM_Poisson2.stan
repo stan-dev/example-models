@@ -10,8 +10,8 @@ parameters {
   real alpha[nsite];
   real eps[nyear];
   real beta[3];
-  real sd_alpha;
-  real sd_year;
+  real<lower=0> sd_alpha;
+  real<lower=0> sd_year;
 }
 
 transformed parameters {
@@ -20,8 +20,10 @@ transformed parameters {
   for (i in 1:nyear)
     for (j in 1:nsite)
     // Linear predictor including random site and random year effects
-      log_lambda[i, j] <- alpha[j] + beta[1] * year[i] +
-                          beta[2] * year[i]^2 + beta[3] * year[i]^3 +
+      log_lambda[i, j] <- alpha[j] +
+                          beta[1] * year[i] +
+                          beta[2] * pow(year[i], 2) +
+                          beta[3] * pow(year[i], 3) +
                           eps[i];
 }
 
@@ -42,10 +44,11 @@ model {
   // Hyperparameter 3
   sd_year ~ uniform(0, 1);
 
+  // Random year effects
+  eps ~ normal(0, sd_year);
+
   // Likelihood
   for (i in 1:nyear) {
-    // Random year effects
-    eps[i] ~ normal(0, sd_year);
     for (j in 1:nsite) {
       // Distribution for random part
       // Link function
