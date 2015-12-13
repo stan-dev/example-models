@@ -6,26 +6,13 @@ rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 set.seed(123)
 
-## Data generation code is transplanted from bpa-code.txt
-n.years <- 25           # Number of years
-N1 <- 30                # Initial population size
-mean.lambda <- 1.02     # Mean annual population growth rate
-sigma2.lambda <- 0.02   # Process (temporal) variation of the growth rate
-sigma2.y <- 20          # Variance of the observation error
-
-y <- N <- numeric(n.years)
-N[1] <- N1
-lambda <- rnorm(n.years - 1, mean.lambda, sqrt(sigma2.lambda))
-for (t in 1:(n.years-1)) {
-  N[t + 1] <- N[t] * lambda[t]
-}
-
-for (t in 1:n.years) {
-  y[t] <- rnorm(1, N[t], sqrt(sigma2.y))
-}
+## Read data
+## The data generation code is in bpa-code.txt, available at
+## http://www.vogelwarte.ch/de/projekte/publikationen/bpa/complete-code-and-data-files-of-the-book.html
+source("ssm.data.R")
 
 ## Bundle data
-stan_data <- list(y = y, T = n.years)
+stan_data <- list(y = y, T = T)
 
 ## Parameters monitored
 params <- c("lambda", "mean_lambda", "sigma2_obs", "sigma2_proc",

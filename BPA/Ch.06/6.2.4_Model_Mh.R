@@ -8,18 +8,13 @@ rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 set.seed(1234)
 
-## Generate simulated data
-## data.fn() is defined in bpa-code.txt, available at
+## Read data
+## The data generation code is in bpa-code.txt, available at
 ## http://www.vogelwarte.ch/de/projekte/publikationen/bpa/complete-code-and-data-files-of-the-book.html
-data <- data.fn()
-
-## Aggregate capture-histories and augment data set
-y <- sort(apply(data$yobs, 1, sum), decreasing = TRUE)
-nz <- 300
-yaug <- c(y, rep(0, nz))
+source("Mh.data.R")
 
 ## Bundle data
-stan_data <- list(y = yaug, M = length(yaug), T = ncol(data$yobs))
+stan_data <- list(y = y, M = M, T = T)
 
 ## Initial values
 inits <- function() list(mean_p = 0.5, sigma = runif(1, 0.5, 0.9))

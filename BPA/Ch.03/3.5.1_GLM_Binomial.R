@@ -6,15 +6,15 @@
 library(rstan)
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
-
-## Generate simulated data
-## data.fn() is defined in bpa-code.txt
 set.seed(123)
-data <- data.fn(nyears = 40, alpha = 1, beta1 = -0.03, beta2 = -0.9)
+
+## Read data
+## The data generation code is in bpa-code.txt, available at
+## http://www.vogelwarte.ch/de/projekte/publikationen/bpa/complete-code-and-data-files-of-the-book.html
+source("GLM_Binomial.data.R")
 
 ## Bundle data
-stan_data <- list(C = data$C, N = data$N,
-                  nyears = length(data$C), year = data$YR)
+stan_data <- list(C = C, N = N, nyears = nyears, year = year)
 
 ## Initial values
 inits <- function() list(alpha = runif(1, -1, 1),
@@ -37,4 +37,5 @@ out <- stan("GLM_Binomial.stan", data = stan_data,
             seed = 1,
             open_progress = FALSE)
 
+## Summarize posteriors
 print(out)

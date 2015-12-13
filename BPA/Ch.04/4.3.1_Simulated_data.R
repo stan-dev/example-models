@@ -9,16 +9,13 @@ rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 set.seed(123)
 
-## Generate simualted data
-## data.fn() is defined in bpa-code.txt, available at
+## Read data
+## The data generation code is in bpa-code.txt, available at
 ## http://www.vogelwarte.ch/de/projekte/publikationen/bpa/complete-code-and-data-files-of-the-book.html
-data <- data.fn(nsite = 100, nyear = 40, sd.site = 0.3, sd.year = 0.2)
+source("GLMM_Poisson2.data.R")
 
 ## Bundle data
-stan_data <- list(C = data$C,
-                  nsite = ncol(data$C),
-                  nyear = nrow(data$C),
-                  year = (data$year-20) / 20) # Note year standardized
+stan_data <- list(C = C, nsite = nsite, nyear = nyear, year = year)
 
 ## Parameters monitored
 params <- c("mu", "alpha", "beta", "sd_alpha", "sd_year")
@@ -47,4 +44,5 @@ out <- stan("GLMM_Poisson2.stan", data = stan_data,
 ## Note: this model converges very slowly, and there may be
 ## transitions after warmup that exceed the maximum treedepth.
 
+## Summarize posteriors
 print(out)

@@ -8,22 +8,18 @@ library(rstan)
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 
-## Generate simualted data
-## data.fn() is defined in bpa-code.txt, available at
+## Read data
+## The data generation code is in bpa-code.txt, available at
 ## http://www.vogelwarte.ch/de/projekte/publikationen/bpa/complete-code-and-data-files-of-the-book.html
-set.seed(123)
-data <- data.fn()
-mny <- mean(data$year)
-sdy <- sd(data$year)
-cov1 <- (data$year - mny) / sdy
+source("GLMM_Poisson.data.R")
 
 ## Bundle data
-stan_data <- list(C = data$C, n = length(data$C), year = cov1)
+stan_data <- list(C = C, n = n, year = year)
 
 ## Initial values
-inits <- function() { list(alpha = runif(1, -2, 2),
-                           beta1 = runif(1, -3, 3),
-                           sd = runif(1, 0, 1))}
+inits <- function() list(alpha = runif(1, -2, 2),
+                         beta1 = runif(1, -3, 3),
+                         sd = runif(1, 0, 1))
 
 ## Parameters monitored
 params <- c("alpha", "beta1", "beta2", "beta3", "lambda", "sigma",
@@ -42,4 +38,5 @@ out <- stan("GLMM_Poisson.stan", data = stan_data,
             seed = 1,
             open_progress = FALSE)
 
+## Summarize posteriors
 print(out)
