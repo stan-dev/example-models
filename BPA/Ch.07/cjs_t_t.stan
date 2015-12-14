@@ -1,3 +1,6 @@
+// This models is derived from section 11.3 of "Stan Modeling Language
+// User's Guide and Reference Manual"
+
 functions {
   int first_capture(int[] y_i) {
     for (k in 1:size(y_i))
