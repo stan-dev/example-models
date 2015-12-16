@@ -1,0 +1,269 @@
+
+R version 3.2.3 (2015-12-10) -- "Wooden Christmas-Tree"
+Copyright (C) 2015 The R Foundation for Statistical Computing
+Platform: x86_64-apple-darwin13.4.0 (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+[Previously saved workspace restored]
+
+> ## 5. State-space models
+> ## 5.4. Real example: House martin population counts in the village of
+> ## Magden
+> 
+> library(rstan)
+Loading required package: ggplot2
+rstan (Version 2.8.1, packaged: 2015-11-18 17:18:35 UTC, GitRev: 05c3d0058b6a)
+For execution on a local, multicore CPU with excess RAM we recommend calling
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+> rstan_options(auto_write = TRUE)
+> options(mc.cores = parallel::detectCores())
+> set.seed(123)
+> 
+> ## Data generation code is transplanted from original bpa-code.txt
+> ## House martin population data from Magden
+> pyears <- 6 # Number of future years with predictions
+> hm <- c(271, 261, 309, 318, 231, 216, 208, 226, 195, 226, 233,
++         209, 226, 192, 191, 225, 245, 205, 191, 174)
+> year <- 1990:2009
+> 
+> ## Bundle data
+> stan_data <- list(y = log(hm), T = length(year), pyears = pyears)
+> 
+> ## Parameters monitored
+> params <- c("r", "mean_r", "sigma2_obs", "sigma2_proc",
++             "N_est")
+> 
+> ## MCMC settings
+> ni <- 30000
+> nt <- 10
+> nb <- 20000
+> nc <- 4
+> 
+> ## Initial values
+> inits <- lapply(1:nc, function(i) {
++     list(sigma_proc = runif(1, 0, 1),
++          mean_r = rnorm(1),
++          sigma_obs = runif(1, 0, 1))})
+> 
+> ## Call Stan from R
+> hm_ssm <- stan("ssm2.stan",
++                data = stan_data, init = inits, pars = params,
++                chains = nc, thin = nt, iter = ni, warmup = nb,
++                seed = 1,
++                control = list(adapt_delta = 0.99),
++                open_progress = FALSE)
+starting worker pid=6878 on localhost:11609 at 21:21:49.749
+starting worker pid=6886 on localhost:11609 at 21:21:49.884
+starting worker pid=6894 on localhost:11609 at 21:21:50.014
+starting worker pid=6902 on localhost:11609 at 21:21:50.154
+
+SAMPLING FOR MODEL 'ssm2' NOW (CHAIN 1).
+
+Chain 1, Iteration:     1 / 30000 [  0%]  (Warmup)
+SAMPLING FOR MODEL 'ssm2' NOW (CHAIN 2).
+
+Chain 2, Iteration:     1 / 30000 [  0%]  (Warmup)
+SAMPLING FOR MODEL 'ssm2' NOW (CHAIN 3).
+
+Chain 3, Iteration:     1 / 30000 [  0%]  (Warmup)
+SAMPLING FOR MODEL 'ssm2' NOW (CHAIN 4).
+
+Chain 4, Iteration:     1 / 30000 [  0%]  (Warmup)
+Chain 1, Iteration:  3000 / 30000 [ 10%]  (Warmup)
+Chain 2, Iteration:  3000 / 30000 [ 10%]  (Warmup)
+Chain 4, Iteration:  3000 / 30000 [ 10%]  (Warmup)
+Chain 3, Iteration:  3000 / 30000 [ 10%]  (Warmup)
+Chain 3, Iteration:  6000 / 30000 [ 20%]  (Warmup)
+Chain 3, Iteration:  9000 / 30000 [ 30%]  (Warmup)
+Chain 4, Iteration:  6000 / 30000 [ 20%]  (Warmup)
+Chain 3, Iteration: 12000 / 30000 [ 40%]  (Warmup)
+Chain 4, Iteration:  9000 / 30000 [ 30%]  (Warmup)
+Chain 2, Iteration:  6000 / 30000 [ 20%]  (Warmup)
+Chain 3, Iteration: 15000 / 30000 [ 50%]  (Warmup)
+Chain 4, Iteration: 12000 / 30000 [ 40%]  (Warmup)
+Chain 1, Iteration:  6000 / 30000 [ 20%]  (Warmup)
+Chain 3, Iteration: 18000 / 30000 [ 60%]  (Warmup)
+Chain 4, Iteration: 15000 / 30000 [ 50%]  (Warmup)
+Chain 2, Iteration:  9000 / 30000 [ 30%]  (Warmup)
+Chain 1, Iteration:  9000 / 30000 [ 30%]  (Warmup)
+Chain 3, Iteration: 20001 / 30000 [ 66%]  (Sampling)
+Chain 4, Iteration: 18000 / 30000 [ 60%]  (Warmup)
+Chain 2, Iteration: 12000 / 30000 [ 40%]  (Warmup)
+Chain 3, Iteration: 23000 / 30000 [ 76%]  (Sampling)
+Chain 1, Iteration: 12000 / 30000 [ 40%]  (Warmup)
+Chain 3, Iteration: 26000 / 30000 [ 86%]  (Sampling)
+Chain 3, Iteration: 29000 / 30000 [ 96%]  (Sampling)
+Chain 4, Iteration: 20001 / 30000 [ 66%]  (Sampling)
+Chain 3, Iteration: 30000 / 30000 [100%]  (Sampling)
+#  Elapsed Time: 23.1616 seconds (Warm-up)
+#                3.35749 seconds (Sampling)
+#                26.5191 seconds (Total)
+
+
+Chain 2, Iteration: 15000 / 30000 [ 50%]  (Warmup)
+Chain 1, Iteration: 15000 / 30000 [ 50%]  (Warmup)
+Chain 2, Iteration: 18000 / 30000 [ 60%]  (Warmup)
+Chain 1, Iteration: 18000 / 30000 [ 60%]  (Warmup)
+Chain 1, Iteration: 20001 / 30000 [ 66%]  (Sampling)
+Chain 2, Iteration: 20001 / 30000 [ 66%]  (Sampling)
+Chain 2, Iteration: 23000 / 30000 [ 76%]  (Sampling)
+Chain 1, Iteration: 23000 / 30000 [ 76%]  (Sampling)
+Chain 2, Iteration: 26000 / 30000 [ 86%]  (Sampling)
+Chain 2, Iteration: 29000 / 30000 [ 96%]  (Sampling)
+Chain 2, Iteration: 30000 / 30000 [100%]  (Sampling)
+#  Elapsed Time: 35.112 seconds (Warm-up)
+#                3.02833 seconds (Sampling)
+#                38.1404 seconds (Total)
+
+
+Chain 1, Iteration: 26000 / 30000 [ 86%]  (Sampling)
+Chain 1, Iteration: 29000 / 30000 [ 96%]  (Sampling)
+Chain 1, Iteration: 30000 / 30000 [100%]  (Sampling)
+#  Elapsed Time: 35.4619 seconds (Warm-up)
+#                6.32816 seconds (Sampling)
+#                41.7901 seconds (Total)
+
+
+Chain 4, Iteration: 23000 / 30000 [ 76%]  (Sampling)
+Chain 4, Iteration: 26000 / 30000 [ 86%]  (Sampling)
+Chain 4, Iteration: 29000 / 30000 [ 96%]  (Sampling)
+Chain 4, Iteration: 30000 / 30000 [100%]  (Sampling)
+#  Elapsed Time: 25.7403 seconds (Warm-up)
+#                60.1667 seconds (Sampling)
+#                85.907 seconds (Total)
+
+Warning messages:
+1: There were 118 divergent transitions after warmup. Increasing adapt_delta above 0.99 may help. 
+2: There were 644 transitions after warmup that exceeded the maximum treedepth. Increase max_treedepth above 10. 
+3: Examine the pairs() plot to diagnose sampling problems
+ 
+> 
+> ## Note: there may be divergent transitions after warmup.
+> 
+> ## Summarize posteriors
+> print(hm_ssm, digits = 3)
+Inference for Stan model: ssm2.
+4 chains, each with iter=30000; warmup=20000; thin=10; 
+post-warmup draws per chain=1000, total post-warmup draws=4000.
+
+               mean se_mean     sd    2.5%     25%     50%     75%   97.5%
+r[1]         -0.017   0.001  0.056  -0.131  -0.048  -0.020   0.015   0.103
+r[2]          0.080   0.002  0.083  -0.068   0.008   0.085   0.149   0.222
+r[3]         -0.007   0.001  0.059  -0.135  -0.041  -0.005   0.029   0.106
+r[4]         -0.186   0.003  0.106  -0.348  -0.278  -0.193  -0.096  -0.004
+r[5]         -0.072   0.001  0.056  -0.194  -0.105  -0.068  -0.036   0.030
+r[6]         -0.034   0.001  0.053  -0.143  -0.064  -0.035  -0.005   0.074
+r[7]          0.024   0.002  0.065  -0.104  -0.022   0.024   0.074   0.143
+r[8]         -0.067   0.002  0.069  -0.188  -0.122  -0.067  -0.017   0.068
+r[9]          0.068   0.002  0.074  -0.066   0.008   0.070   0.129   0.197
+r[10]         0.016   0.001  0.056  -0.097  -0.018   0.016   0.049   0.130
+r[11]        -0.053   0.001  0.062  -0.167  -0.100  -0.053  -0.011   0.070
+r[12]         0.019   0.001  0.062  -0.107  -0.023   0.018   0.066   0.131
+r[13]        -0.084   0.002  0.073  -0.212  -0.146  -0.085  -0.026   0.054
+r[14]        -0.004   0.001  0.054  -0.113  -0.034  -0.006   0.025   0.114
+r[15]         0.088   0.002  0.079  -0.052   0.021   0.095   0.154   0.220
+r[16]         0.042   0.001  0.063  -0.081  -0.004   0.045   0.086   0.159
+r[17]        -0.103   0.002  0.074  -0.232  -0.163  -0.104  -0.043   0.031
+r[18]        -0.066   0.001  0.058  -0.190  -0.101  -0.065  -0.028   0.045
+r[19]        -0.066   0.001  0.061  -0.185  -0.104  -0.068  -0.024   0.053
+mean_r       -0.022   0.001  0.025  -0.073  -0.035  -0.021  -0.008   0.030
+sigma2_obs    0.006   0.000  0.006   0.000   0.002   0.005   0.009   0.020
+sigma2_proc   0.011   0.000  0.009   0.000   0.005   0.010   0.016   0.032
+N_est[1]    274.474   0.277 16.087 245.957 264.878 272.622 282.565 311.246
+N_est[2]    269.907   0.304 14.457 245.410 260.358 267.818 278.342 301.821
+N_est[3]    292.636   0.523 20.065 251.455 279.294 295.822 307.924 324.895
+N_est[4]    290.948   0.666 23.907 245.436 271.518 293.276 311.394 328.031
+N_est[5]    241.179   0.297 13.062 219.790 231.642 239.244 249.204 270.183
+N_est[6]    224.399   0.316 13.498 202.410 215.154 221.851 232.777 254.202
+N_est[7]    216.883   0.338 13.355 195.434 207.718 214.101 225.214 246.670
+N_est[8]    221.961   0.209 11.270 198.442 215.054 222.902 228.521 243.978
+N_est[9]    207.746   0.351 13.741 187.213 196.890 205.421 216.864 237.272
+N_est[10]   222.183   0.186 10.973 199.513 215.373 222.906 228.613 243.870
+N_est[11]   225.723   0.217 11.606 201.762 217.956 226.674 233.356 247.714
+N_est[12]   214.044   0.196 10.573 194.421 207.586 213.000 220.257 237.289
+N_est[13]   218.123   0.204 11.116 195.166 210.902 219.002 225.690 238.986
+N_est[14]   200.612   0.274 11.560 181.323 192.194 198.994 208.033 225.460
+N_est[15]   199.839   0.241 11.544 180.995 191.259 198.241 207.256 225.016
+N_est[16]   218.263   0.264 12.165 193.362 210.348 219.686 226.056 240.652
+N_est[17]   227.876   0.480 17.147 193.323 214.953 229.996 241.967 254.783
+N_est[18]   205.321   0.177 10.529 184.353 199.261 205.099 211.320 226.769
+N_est[19]   192.155   0.171 10.131 172.805 186.370 191.535 197.554 214.018
+N_est[20]   180.018   0.249 11.919 159.878 172.520 177.814 186.817 207.796
+N_est[21]   177.793   0.392 22.895 134.679 162.614 177.249 191.812 226.489
+N_est[22]   175.954   0.515 30.569 119.977 156.548 174.840 192.867 240.575
+N_est[23]   173.283   0.625 36.485 108.254 149.515 171.672 192.104 252.882
+N_est[24]   171.182   0.736 43.112  98.262 143.727 167.964 192.518 269.794
+N_est[25]   168.862   0.807 48.274  90.577 138.127 164.086 191.424 285.265
+N_est[26]   166.597   0.907 53.321  83.039 133.461 161.154 190.170 294.338
+lp__         80.101   0.741 12.607  63.673  72.738  77.675  84.354 114.842
+            n_eff  Rhat
+r[1]         4000 1.002
+r[2]         1137 1.007
+r[3]         3036 1.000
+r[4]          958 1.006
+r[5]         3177 1.000
+r[6]         3678 1.000
+r[7]         1810 1.002
+r[8]         1604 1.002
+r[9]         1367 1.003
+r[10]        3497 1.001
+r[11]        1846 1.002
+r[12]        1888 1.004
+r[13]        1620 1.002
+r[14]        4000 1.000
+r[15]        1360 1.003
+r[16]        2331 1.002
+r[17]        1267 1.003
+r[18]        2684 1.002
+r[19]        3193 1.000
+mean_r       2363 1.000
+sigma2_obs    990 1.004
+sigma2_proc  1484 1.004
+N_est[1]     3363 1.001
+N_est[2]     2256 1.002
+N_est[3]     1473 1.006
+N_est[4]     1289 1.004
+N_est[5]     1939 1.004
+N_est[6]     1825 1.002
+N_est[7]     1564 1.004
+N_est[8]     2905 1.001
+N_est[9]     1529 1.003
+N_est[10]    3467 1.000
+N_est[11]    2854 1.000
+N_est[12]    2924 1.002
+N_est[13]    2978 1.001
+N_est[14]    1784 1.001
+N_est[15]    2286 1.001
+N_est[16]    2123 1.001
+N_est[17]    1276 1.005
+N_est[18]    3519 1.001
+N_est[19]    3524 1.001
+N_est[20]    2288 1.001
+N_est[21]    3413 1.001
+N_est[22]    3525 1.001
+N_est[23]    3411 1.001
+N_est[24]    3430 1.001
+N_est[25]    3579 1.001
+N_est[26]    3458 1.001
+lp__          290 1.029
+
+Samples were drawn using NUTS(diag_e) at Wed Dec 16 21:23:19 2015.
+For each parameter, n_eff is a crude measure of effective sample size,
+and Rhat is the potential scale reduction factor on split chains (at 
+convergence, Rhat=1).
+> 
+> proc.time()
+   user  system elapsed 
+  1.672   0.184  91.081 

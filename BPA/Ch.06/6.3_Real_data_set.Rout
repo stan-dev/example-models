@@ -1,0 +1,289 @@
+
+R version 3.2.3 (2015-12-10) -- "Wooden Christmas-Tree"
+Copyright (C) 2015 The R Foundation for Statistical Computing
+Platform: x86_64-apple-darwin13.4.0 (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+[Previously saved workspace restored]
+
+> ## 6. Estimation of the size of a closed population
+> ## 6.2. Generation and analysis of simulated data with data
+> ## augmentation
+> ## 6.3. Analysis of a real data set: model Mtbh for species richness estimation
+> 
+> library(rstan)
+Loading required package: ggplot2
+rstan (Version 2.8.1, packaged: 2015-11-18 17:18:35 UTC, GitRev: 05c3d0058b6a)
+For execution on a local, multicore CPU with excess RAM we recommend calling
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+> rstan_options(auto_write = TRUE)
+> options(mc.cores = parallel::detectCores())
+> set.seed(1234)
+> 
+> ## Read in data
+> ## "p610.txt" is available at
+> ## http://www.vogelwarte.ch/de/projekte/publikationen/bpa/complete-code-and-data-files-of-the-book.html
+> p610 <- read.table("p610.txt", header = TRUE)
+> y <- p610[, 5:9]                        # Grab counts
+> y[y > 1] <- 1                           # Counts to det-nondetections
+> 
+> ## Bundle data
+> stan_data <- list(y = as.matrix(y), M = nrow(y), T = ncol(y))
+> 
+> ## Parameters monitored
+> params <- c("N", "mean_p", "gamma", "sigma", "omega")
+> 
+> ## MCMC settings
+> ni <- 30000
+> nt <- 10
+> nb <- 20000
+> nc <- 4
+> 
+> ## Initial values
+> inits <- lapply(1:nc, function(i) {
++     list(mean_p = runif(ncol(y), 0.3, 0.8),
++          sigma = runif(1, 0.1, 0.9),
++          omega = runif(1, 0.5, 0.8),
++          gamma = runif(1, -0.5, 5),
++          eps = rep(0, nrow(y)))})
+> 
+> ## Call Stan from R
+> out <- stan("Mtbh.stan",
++             data = stan_data, init = inits, pars = params,
++             chains = nc, iter = ni, warmup = nb, thin = nt,
++             seed = 1,
++             control = list(adapt_delta = 0.9),
++             open_progress = FALSE)
+starting worker pid=7675 on localhost:11397 at 22:06:26.034
+starting worker pid=7683 on localhost:11397 at 22:06:26.162
+starting worker pid=7691 on localhost:11397 at 22:06:26.295
+starting worker pid=7699 on localhost:11397 at 22:06:26.433
+
+SAMPLING FOR MODEL 'Mtbh' NOW (CHAIN 1).
+
+Chain 1, Iteration:     1 / 30000 [  0%]  (Warmup)
+SAMPLING FOR MODEL 'Mtbh' NOW (CHAIN 2).
+
+Chain 2, Iteration:     1 / 30000 [  0%]  (Warmup)
+SAMPLING FOR MODEL 'Mtbh' NOW (CHAIN 3).
+[1] "Error : Rejecting initial value:"                        
+[2] "  Gradient evaluated at the initial value is not finite."
+[3] "  Stan can't start sampling from this initial value."    
+error occurred during calling the sampler; sampling not done
+
+SAMPLING FOR MODEL 'Mtbh' NOW (CHAIN 4).
+[1] "Error : Rejecting initial value:"                        
+[2] "  Gradient evaluated at the initial value is not finite."
+[3] "  Stan can't start sampling from this initial value."    
+error occurred during calling the sampler; sampling not done
+
+Chain 1, Iteration:  3000 / 30000 [ 10%]  (Warmup)
+Chain 2, Iteration:  3000 / 30000 [ 10%]  (Warmup)
+Chain 1, Iteration:  6000 / 30000 [ 20%]  (Warmup)
+Chain 2, Iteration:  6000 / 30000 [ 20%]  (Warmup)
+Chain 1, Iteration:  9000 / 30000 [ 30%]  (Warmup)
+Chain 2, Iteration:  9000 / 30000 [ 30%]  (Warmup)
+Chain 1, Iteration: 12000 / 30000 [ 40%]  (Warmup)
+Chain 2, Iteration: 12000 / 30000 [ 40%]  (Warmup)
+Chain 1, Iteration: 15000 / 30000 [ 50%]  (Warmup)
+Chain 2, Iteration: 15000 / 30000 [ 50%]  (Warmup)
+Chain 1, Iteration: 18000 / 30000 [ 60%]  (Warmup)
+Chain 2, Iteration: 18000 / 30000 [ 60%]  (Warmup)
+Chain 1, Iteration: 20001 / 30000 [ 66%]  (Sampling)
+Chain 2, Iteration: 20001 / 30000 [ 66%]  (Sampling)
+Chain 1, Iteration: 23000 / 30000 [ 76%]  (Sampling)
+Chain 2, Iteration: 23000 / 30000 [ 76%]  (Sampling)
+Chain 1, Iteration: 26000 / 30000 [ 86%]  (Sampling)
+Chain 2, Iteration: 26000 / 30000 [ 86%]  (Sampling)
+Chain 1, Iteration: 29000 / 30000 [ 96%]  (Sampling)
+Chain 1, Iteration: 30000 / 30000 [100%]  (Sampling)
+#  Elapsed Time: 1609.34 seconds (Warm-up)
+#                862.391 seconds (Sampling)
+#                2471.73 seconds (Total)
+
+
+Chain 2, Iteration: 29000 / 30000 [ 96%]  (Sampling)
+Chain 2, Iteration: 30000 / 30000 [100%]  (Sampling)
+#  Elapsed Time: 1687.2 seconds (Warm-up)
+#                901.965 seconds (Sampling)
+#                2589.16 seconds (Total)
+
+here are whatever error messages were returned
+[[1]]
+Stan model 'Mtbh' does not contain samples.
+
+[[2]]
+Stan model 'Mtbh' does not contain samples.
+
+Warning messages:
+1: In .local(object, ...) :
+  some chains had errors; consider specifying chains = 1 to debug
+2: There were 141 divergent transitions after warmup. Increasing adapt_delta above 0.9 may help. 
+3: Examine the pairs() plot to diagnose sampling problems
+ 
+> ## Note: There may be divergent transitions after warmup.
+> ## The estimates may slightly differ from those by WinBUGS (p.160).
+> 
+> ## Summarize posteriors
+> print(out, digits = 3)
+Inference for Stan model: Mtbh.
+2 chains, each with iter=30000; warmup=20000; thin=10; 
+post-warmup draws per chain=1000, total post-warmup draws=2000.
+
+            mean se_mean     sd    2.5%    25%    50%     75%   97.5% n_eff
+N         43.796   0.241  7.373  34.000 38.750 42.000  47.000  62.000   939
+mean_p[1]  0.226   0.002  0.079   0.092  0.166  0.221   0.279   0.392  1226
+mean_p[2]  0.278   0.003  0.093   0.119  0.209  0.270   0.340   0.475  1270
+mean_p[3]  0.279   0.003  0.098   0.111  0.208  0.270   0.339   0.491  1439
+mean_p[4]  0.208   0.002  0.084   0.072  0.147  0.197   0.259   0.394  1566
+mean_p[5]  0.305   0.003  0.102   0.127  0.232  0.301   0.370   0.514  1332
+gamma     -0.099   0.015  0.514  -1.124 -0.442 -0.099   0.246   0.873  1116
+sigma      0.902   0.020  0.356   0.450  0.628  0.823   1.096   1.756   316
+omega      0.303   0.002  0.064   0.202  0.258  0.294   0.338   0.454  1008
+lp__      77.184   3.038 51.845 -25.047 38.376 79.072 117.829 165.049   291
+           Rhat
+N         1.000
+mean_p[1] 1.000
+mean_p[2] 1.000
+mean_p[3] 1.001
+mean_p[4] 1.000
+mean_p[5] 1.000
+gamma     1.001
+sigma     1.003
+omega     1.002
+lp__      1.004
+
+Samples were drawn using NUTS(diag_e) at Wed Dec 16 22:49:49 2015.
+For each parameter, n_eff is a crude measure of effective sample size,
+and Rhat is the potential scale reduction factor on split chains (at 
+convergence, Rhat=1).
+> 
+> ## Model M0
+> 
+> ## Define parameters to be monitored
+> params <- c("N", "p", "omega")
+> 
+> ## Call Stan from R
+> out0 <- stan("M0.stan",
++              data = stan_data, pars = params,
++              chains = nc, iter = ni, warmup = nb, thin = nt,
++              seed = 1,
++              open_progress = FALSE)
+starting worker pid=7877 on localhost:11397 at 22:49:49.824
+starting worker pid=7885 on localhost:11397 at 22:49:49.973
+starting worker pid=7893 on localhost:11397 at 22:49:50.115
+starting worker pid=7901 on localhost:11397 at 22:49:50.255
+
+SAMPLING FOR MODEL 'M0' NOW (CHAIN 1).
+
+Chain 1, Iteration:     1 / 30000 [  0%]  (Warmup)
+SAMPLING FOR MODEL 'M0' NOW (CHAIN 2).
+
+Chain 2, Iteration:     1 / 30000 [  0%]  (Warmup)
+Chain 1, Iteration:  3000 / 30000 [ 10%]  (Warmup)
+SAMPLING FOR MODEL 'M0' NOW (CHAIN 3).
+
+Chain 3, Iteration:     1 / 30000 [  0%]  (Warmup)
+Chain 2, Iteration:  3000 / 30000 [ 10%]  (Warmup)
+SAMPLING FOR MODEL 'M0' NOW (CHAIN 4).
+
+Chain 4, Iteration:     1 / 30000 [  0%]  (Warmup)
+Chain 1, Iteration:  6000 / 30000 [ 20%]  (Warmup)
+Chain 3, Iteration:  3000 / 30000 [ 10%]  (Warmup)
+Chain 2, Iteration:  6000 / 30000 [ 20%]  (Warmup)
+Chain 4, Iteration:  3000 / 30000 [ 10%]  (Warmup)
+Chain 1, Iteration:  9000 / 30000 [ 30%]  (Warmup)
+Chain 3, Iteration:  6000 / 30000 [ 20%]  (Warmup)
+Chain 2, Iteration:  9000 / 30000 [ 30%]  (Warmup)
+Chain 4, Iteration:  6000 / 30000 [ 20%]  (Warmup)
+Chain 1, Iteration: 12000 / 30000 [ 40%]  (Warmup)
+Chain 3, Iteration:  9000 / 30000 [ 30%]  (Warmup)
+Chain 2, Iteration: 12000 / 30000 [ 40%]  (Warmup)
+Chain 4, Iteration:  9000 / 30000 [ 30%]  (Warmup)
+Chain 1, Iteration: 15000 / 30000 [ 50%]  (Warmup)
+Chain 3, Iteration: 12000 / 30000 [ 40%]  (Warmup)
+Chain 2, Iteration: 15000 / 30000 [ 50%]  (Warmup)
+Chain 4, Iteration: 12000 / 30000 [ 40%]  (Warmup)
+Chain 1, Iteration: 18000 / 30000 [ 60%]  (Warmup)
+Chain 3, Iteration: 15000 / 30000 [ 50%]  (Warmup)
+Chain 2, Iteration: 18000 / 30000 [ 60%]  (Warmup)
+Chain 1, Iteration: 20001 / 30000 [ 66%]  (Sampling)
+Chain 4, Iteration: 15000 / 30000 [ 50%]  (Warmup)
+Chain 3, Iteration: 18000 / 30000 [ 60%]  (Warmup)
+Chain 2, Iteration: 20001 / 30000 [ 66%]  (Sampling)
+Chain 4, Iteration: 18000 / 30000 [ 60%]  (Warmup)
+Chain 3, Iteration: 20001 / 30000 [ 66%]  (Sampling)
+Chain 1, Iteration: 23000 / 30000 [ 76%]  (Sampling)
+Chain 4, Iteration: 20001 / 30000 [ 66%]  (Sampling)
+Chain 2, Iteration: 23000 / 30000 [ 76%]  (Sampling)
+Chain 3, Iteration: 23000 / 30000 [ 76%]  (Sampling)
+Chain 1, Iteration: 26000 / 30000 [ 86%]  (Sampling)
+Chain 4, Iteration: 23000 / 30000 [ 76%]  (Sampling)
+Chain 2, Iteration: 26000 / 30000 [ 86%]  (Sampling)
+Chain 3, Iteration: 26000 / 30000 [ 86%]  (Sampling)
+Chain 1, Iteration: 29000 / 30000 [ 96%]  (Sampling)
+Chain 1, Iteration: 30000 / 30000 [100%]  (Sampling)
+#  Elapsed Time: 6.67587 seconds (Warm-up)
+#                4.48298 seconds (Sampling)
+#                11.1588 seconds (Total)
+
+
+Chain 4, Iteration: 26000 / 30000 [ 86%]  (Sampling)
+Chain 2, Iteration: 29000 / 30000 [ 96%]  (Sampling)
+Chain 3, Iteration: 29000 / 30000 [ 96%]  (Sampling)
+Chain 2, Iteration: 30000 / 30000 [100%]  (Sampling)
+#  Elapsed Time: 6.84586 seconds (Warm-up)
+#                4.67137 seconds (Sampling)
+#                11.5172 seconds (Total)
+
+
+Chain 3, Iteration: 30000 / 30000 [100%]  (Sampling)
+#  Elapsed Time: 6.92509 seconds (Warm-up)
+#                4.16076 seconds (Sampling)
+#                11.0859 seconds (Total)
+
+
+Chain 4, Iteration: 29000 / 30000 [ 96%]  (Sampling)
+Chain 4, Iteration: 30000 / 30000 [100%]  (Sampling)
+#  Elapsed Time: 7.0315 seconds (Warm-up)
+#                4.23994 seconds (Sampling)
+#                11.2714 seconds (Total)
+
+> 
+> ## Summarize posteriors
+> print(out0, digits = 3)
+Inference for Stan model: M0.
+4 chains, each with iter=30000; warmup=20000; thin=10; 
+post-warmup draws per chain=1000, total post-warmup draws=4000.
+
+          mean se_mean    sd     2.5%      25%      50%      75%    97.5% n_eff
+N       37.776   0.061 3.747   32.000   35.000   37.000   40.000   46.000  3804
+p        0.301   0.001 0.044    0.219    0.271    0.301    0.331    0.386  3899
+omega    0.263   0.001 0.044    0.185    0.231    0.261    0.291    0.354  4000
+lp__  -117.109   0.015 0.962 -119.562 -117.495 -116.831 -116.421 -116.154  3908
+       Rhat
+N     1.000
+p     1.001
+omega 1.000
+lp__  1.000
+
+Samples were drawn using NUTS(diag_e) at Wed Dec 16 22:50:04 2015.
+For each parameter, n_eff is a crude measure of effective sample size,
+and Rhat is the potential scale reduction factor on split chains (at 
+convergence, Rhat=1).
+> 
+> proc.time()
+    user   system  elapsed 
+   1.951    0.255 2620.406 

@@ -12,10 +12,7 @@ set.seed(123)
 ## Read data
 ## The data generation code is in bpa-code.txt, available at
 ## http://www.vogelwarte.ch/de/projekte/publikationen/bpa/complete-code-and-data-files-of-the-book.html
-source("GLMM_Poisson2.data.R")
-
-## Bundle data
-stan_data <- list(C = C, nsite = nsite, nyear = nyear, year = year)
+stan_data <- read_rdump("GLMM_Poisson2.data.R")
 
 ## Parameters monitored
 params <- c("mu", "alpha", "beta", "sd_alpha", "sd_year")
@@ -29,7 +26,7 @@ nc <- 4
 ## Initial values
 inits <- lapply(1:nc, function(i) {
     list(mu = runif(1, 0, 2),
-         alpha = runif(data$nsite, -1, 1),
+         alpha = runif(stan_data$nsite, -1, 1),
          beta = runif(3, -1, 1),
          sd_alpha = runif(1, 0, 0.1),
          sd_year = runif(1, 0, 0.1))})

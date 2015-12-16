@@ -10,12 +10,7 @@ set.seed(123)
 ## Read data
 ## The data generation code is in bpa-code.txt, available at
 ## http://www.vogelwarte.ch/de/projekte/publikationen/bpa/complete-code-and-data-files-of-the-book.html
-source("cjs_mnl_age.data.R")
-
-## Bundle data
-stan_data <- list(marr_j = CH.J.marray,
-                  marr_a = CH.A.marray,
-                  n_occasions = dim(CH.J.marray)[2])
+stan_data <- read_rdump("cjs_mnl_age.data.R")
 
 ## Parameters monitored
 params <- c("mean_phijuv", "mean_phiad", "mean_p")

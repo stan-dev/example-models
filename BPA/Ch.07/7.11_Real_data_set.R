@@ -9,11 +9,7 @@ set.seed(123)
 ## Read data
 ## The data generation code is in bpa-code.txt, available at
 ## http://www.vogelwarte.ch/de/projekte/publikationen/bpa/complete-code-and-data-files-of-the-book.html
-source("cjs_mnl_ran.data.R")
-
-## Bundle data
-stan_data <- list(marr = m.leisleri,
-                  n_occasions = dim(m.leisleri)[2])
+stan_data <- read_rdump("cjs_mnl_ran.data.R")
 
 ## Parameters monitored
 params <- c("phi", "mean_p", "mean_phi", "sigma2", "sigma2_real",

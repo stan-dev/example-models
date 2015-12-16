@@ -9,10 +9,7 @@ set.seed(123)
 ## Read data
 ## The data generation code is in bpa-code.txt, available at
 ## http://www.vogelwarte.ch/de/projekte/publikationen/bpa/complete-code-and-data-files-of-the-book.html
-source("ssm.data.R")
-
-## Bundle data
-stan_data <- list(y = y, T = T)
+stan_data <- read_rdump("ssm.data.R")
 
 ## Parameters monitored
 params <- c("lambda", "mean_lambda", "sigma2_obs", "sigma2_proc",

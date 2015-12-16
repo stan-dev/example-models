@@ -1,6 +1,6 @@
 data {
-  int<lower=0> n_occasions;
-  int<lower=0> marr[n_occasions-1,n_occasions];
+  int<lower=0> n_occasions;     // Number of capture occasions
+  int<lower=0> marr[n_occasions-1,n_occasions]; // m-array
 }
 
 transformed data {

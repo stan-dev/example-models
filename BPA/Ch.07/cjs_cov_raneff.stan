@@ -42,10 +42,10 @@ functions {
 }
 
 data {
-  int<lower=0> nind;
-  int<lower=2> n_occasions;
-  int<lower=0,upper=1> y[nind, n_occasions];
-  real x[n_occasions - 1];
+  int<lower=0> nind;            // Number of individuals
+  int<lower=2> n_occasions;     // Number of capture occasions
+  int<lower=0,upper=1> y[nind, n_occasions];    // Capture-history
+  real x[n_occasions - 1];      // Covariate
 }
 
 transformed data {

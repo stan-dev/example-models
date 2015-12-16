@@ -42,13 +42,13 @@ functions {
 }
 
 data {
-  int<lower=0> nind;
-  int<lower=2> n_occasions;
-  int<lower=0,upper=1> y[nind, n_occasions];
-  int<lower=1> g;
-  int<lower=1,upper=g> group[nind];
-  real df;
-  matrix[g,g] R;
+  int<lower=0> nind;            // Number of individuals
+  int<lower=2> n_occasions;     // Number of capture occasions
+  int<lower=0,upper=1> y[nind, n_occasions];    // Capture-history
+  int<lower=1> g;               // Number of groups
+  int<lower=1,upper=g> group[nind];     // Groups
+  real df;                      // Degree of freedom
+  matrix[g,g] R;                // Scale matrix
 }
 
 transformed data {

@@ -11,10 +11,7 @@ set.seed(123)
 ## Read data
 ## The data generation code is in bpa-code.txt, available at
 ## http://www.vogelwarte.ch/de/projekte/publikationen/bpa/complete-code-and-data-files-of-the-book.html
-source("GLM_Binomial.data.R")
-
-## Bundle data
-stan_data <- list(C = C, N = N, nyears = nyears, year = year)
+stan_data <- read_rdump("GLM_Binomial.data.R")
 
 ## Initial values
 inits <- function() list(alpha = runif(1, -1, 1),

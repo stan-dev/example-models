@@ -1,7 +1,7 @@
 data {
-  int<lower=0> n_occasions;
-  int<lower=0> marr_j[n_occasions - 1, n_occasions];
-  int<lower=0> marr_a[n_occasions - 1, n_occasions];
+  int<lower=0> n_occasions;     // Number of capture occasions
+  int<lower=0> marr_j[n_occasions - 1, n_occasions];    // Juv. m-array
+  int<lower=0> marr_a[n_occasions - 1, n_occasions];    // Ad. m-array
 }
 
 parameters {

@@ -1,0 +1,168 @@
+
+R version 3.2.3 (2015-12-10) -- "Wooden Christmas-Tree"
+Copyright (C) 2015 The R Foundation for Statistical Computing
+Platform: x86_64-apple-darwin13.4.0 (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+[Previously saved workspace restored]
+
+> ## 8. Estimation of survival probabilities using mark-recovery data
+> ## 8.3. The mark-recovery model fitted with the multinomial likelihood 
+> ## 8.3.2. Age-dependent parameters
+> 
+> library(rstan)
+Loading required package: ggplot2
+rstan (Version 2.8.1, packaged: 2015-11-18 17:18:35 UTC, GitRev: 05c3d0058b6a)
+For execution on a local, multicore CPU with excess RAM we recommend calling
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+> rstan_options(auto_write = TRUE)
+> options(mc.cores = parallel::detectCores())
+> set.seed(123)
+> 
+> ## Read data
+> ## The data generation code is in bpa-code.txt, available at
+> ## http://www.vogelwarte.ch/de/projekte/publikationen/bpa/complete-code-and-data-files-of-the-book.html
+> stan_data <- read_rdump("mr_mnl_age.data.R")
+> 
+> ## Initial values
+> inits <- function() list(mean_sj = runif(1, 0, 1),
++                          mean_sa = runif(1, 0, 1),
++                          mean_rj = runif(1, 0, 1),
++                          mean_ra = runif(1, 0, 1))
+> 
+> ## Parameters monitored
+> params <- c("mean_sj", "mean_rj", "mean_sa", "mean_ra")
+> 
+> ## MCMC settings
+> ni <- 2000
+> nt <- 1
+> nb <- 1000
+> nc <- 4
+> 
+> ## Call Stan from R
+> mr_age <- stan("mr_mnl_age.stan",
++                data = stan_data, init = inits, pars = params,
++                chains = nc, iter = ni, warmup = nb, thin = nt,
++                seed = 1,
++                open_progress = FALSE)
+starting worker pid=10419 on localhost:11540 at 05:21:16.791
+starting worker pid=10427 on localhost:11540 at 05:21:16.932
+starting worker pid=10435 on localhost:11540 at 05:21:17.061
+starting worker pid=10443 on localhost:11540 at 05:21:17.190
+
+SAMPLING FOR MODEL 'mr_mnl_age' NOW (CHAIN 1).
+
+Chain 1, Iteration:    1 / 2000 [  0%]  (Warmup)
+Chain 1, Iteration:  200 / 2000 [ 10%]  (Warmup)
+Chain 1, Iteration:  400 / 2000 [ 20%]  (Warmup)
+SAMPLING FOR MODEL 'mr_mnl_age' NOW (CHAIN 2).
+
+Chain 2, Iteration:    1 / 2000 [  0%]  (Warmup)
+Chain 1, Iteration:  600 / 2000 [ 30%]  (Warmup)
+Chain 2, Iteration:  200 / 2000 [ 10%]  (Warmup)
+Chain 1, Iteration:  800 / 2000 [ 40%]  (Warmup)
+Chain 2, Iteration:  400 / 2000 [ 20%]  (Warmup)
+Chain 1, Iteration: 1000 / 2000 [ 50%]  (Warmup)
+Chain 1, Iteration: 1001 / 2000 [ 50%]  (Sampling)
+SAMPLING FOR MODEL 'mr_mnl_age' NOW (CHAIN 3).
+
+Chain 3, Iteration:    1 / 2000 [  0%]  (Warmup)
+Chain 2, Iteration:  600 / 2000 [ 30%]  (Warmup)
+Chain 1, Iteration: 1200 / 2000 [ 60%]  (Sampling)
+Chain 2, Iteration:  800 / 2000 [ 40%]  (Warmup)
+Chain 3, Iteration:  200 / 2000 [ 10%]  (Warmup)
+Chain 1, Iteration: 1400 / 2000 [ 70%]  (Sampling)
+Chain 2, Iteration: 1000 / 2000 [ 50%]  (Warmup)
+Chain 2, Iteration: 1001 / 2000 [ 50%]  (Sampling)
+Chain 3, Iteration:  400 / 2000 [ 20%]  (Warmup)
+SAMPLING FOR MODEL 'mr_mnl_age' NOW (CHAIN 4).
+
+Chain 4, Iteration:    1 / 2000 [  0%]  (Warmup)
+Chain 1, Iteration: 1600 / 2000 [ 80%]  (Sampling)
+Chain 2, Iteration: 1200 / 2000 [ 60%]  (Sampling)
+Chain 3, Iteration:  600 / 2000 [ 30%]  (Warmup)
+Chain 1, Iteration: 1800 / 2000 [ 90%]  (Sampling)
+Chain 4, Iteration:  200 / 2000 [ 10%]  (Warmup)
+Chain 2, Iteration: 1400 / 2000 [ 70%]  (Sampling)
+Chain 3, Iteration:  800 / 2000 [ 40%]  (Warmup)
+Chain 1, Iteration: 2000 / 2000 [100%]  (Sampling)
+#  Elapsed Time: 1.04634 seconds (Warm-up)
+#                1.07952 seconds (Sampling)
+#                2.12585 seconds (Total)
+
+
+Chain 4, Iteration:  400 / 2000 [ 20%]  (Warmup)
+Chain 2, Iteration: 1600 / 2000 [ 80%]  (Sampling)
+Chain 3, Iteration: 1000 / 2000 [ 50%]  (Warmup)
+Chain 3, Iteration: 1001 / 2000 [ 50%]  (Sampling)
+Chain 4, Iteration:  600 / 2000 [ 30%]  (Warmup)
+Chain 2, Iteration: 1800 / 2000 [ 90%]  (Sampling)
+Chain 3, Iteration: 1200 / 2000 [ 60%]  (Sampling)
+Chain 4, Iteration:  800 / 2000 [ 40%]  (Warmup)
+Chain 2, Iteration: 2000 / 2000 [100%]  (Sampling)
+#  Elapsed Time: 1.00664 seconds (Warm-up)
+#                1.06232 seconds (Sampling)
+#                2.06896 seconds (Total)
+
+
+Chain 3, Iteration: 1400 / 2000 [ 70%]  (Sampling)
+Chain 4, Iteration: 1000 / 2000 [ 50%]  (Warmup)
+Chain 4, Iteration: 1001 / 2000 [ 50%]  (Sampling)
+Chain 3, Iteration: 1600 / 2000 [ 80%]  (Sampling)
+Chain 4, Iteration: 1200 / 2000 [ 60%]  (Sampling)
+Chain 3, Iteration: 1800 / 2000 [ 90%]  (Sampling)
+Chain 4, Iteration: 1400 / 2000 [ 70%]  (Sampling)
+Chain 4, Iteration: 1600 / 2000 [ 80%]  (Sampling)
+Chain 3, Iteration: 2000 / 2000 [100%]  (Sampling)
+#  Elapsed Time: 1.11587 seconds (Warm-up)
+#                1.17774 seconds (Sampling)
+#                2.29361 seconds (Total)
+
+
+Chain 4, Iteration: 1800 / 2000 [ 90%]  (Sampling)
+Chain 4, Iteration: 2000 / 2000 [100%]  (Sampling)
+#  Elapsed Time: 1.11966 seconds (Warm-up)
+#                0.995811 seconds (Sampling)
+#                2.11547 seconds (Total)
+
+> 
+> ## Summarize posteriors
+> print(mr_age, digits = 3)
+Inference for Stan model: mr_mnl_age.
+4 chains, each with iter=2000; warmup=1000; thin=1; 
+post-warmup draws per chain=1000, total post-warmup draws=4000.
+
+            mean se_mean    sd     2.5%      25%      50%      75%    97.5%
+mean_sj    0.314   0.002 0.064    0.210    0.270    0.307    0.351    0.463
+mean_rj    0.260   0.001 0.029    0.220    0.241    0.256    0.273    0.332
+mean_sa    0.837   0.001 0.028    0.781    0.819    0.837    0.856    0.891
+mean_ra    0.167   0.001 0.032    0.111    0.145    0.163    0.186    0.236
+lp__    -243.569   0.055 1.539 -247.480 -244.294 -243.217 -242.451 -241.701
+        n_eff  Rhat
+mean_sj   686 1.005
+mean_rj   540 1.005
+mean_sa  1267 1.001
+mean_ra   848 1.003
+lp__      781 1.003
+
+Samples were drawn using NUTS(diag_e) at Thu Dec 17 05:21:22 2015.
+For each parameter, n_eff is a crude measure of effective sample size,
+and Rhat is the potential scale reduction factor on split chains (at 
+convergence, Rhat=1).
+> 
+> 
+> proc.time()
+   user  system elapsed 
+  1.489   0.183   7.106 

@@ -11,10 +11,7 @@ set.seed(1234)
 ## Read data
 ## The data generation code is in bpa-code.txt, available at
 ## http://www.vogelwarte.ch/de/projekte/publikationen/bpa/complete-code-and-data-files-of-the-book.html
-source("Mth.data.R")
-
-## Bundle data
-stan_data <- list(y = y, M = M, T = T)
+stan_data <- read_rdump("Mth.data.R")
 
 ## Initial values
 inits <- function() list(sigma = runif(1, 0.5, 0.9))
@@ -34,6 +31,7 @@ out <- stan("Mth.stan",
             chains = nc, iter = ni, warmup = nb, thin = nt,
             seed = 1,
             open_progress = FALSE)
+## Note: There may be divergent transitions after warmup.
 
 ## Summarize posteriors
 print(out, digits = 3)

@@ -42,11 +42,11 @@ functions {
 }
 
 data {
-  int<lower=0> nind;
-  int<lower=2> n_occasions;
-  int<lower=0,upper=1> y[nind, n_occasions];
-  int<lower=1> max_age;
-  int<lower=0,upper=max_age> x[nind, n_occasions - 1];
+  int<lower=0> nind;            // Number of individuals
+  int<lower=2> n_occasions;     // Number of capture occasions
+  int<lower=0,upper=1> y[nind, n_occasions];    // Capture-history
+  int<lower=1> max_age;         // Maximum age
+  int<lower=0,upper=max_age> x[nind, n_occasions - 1];  // Age
 }
 
 transformed data {

@@ -10,11 +10,7 @@ set.seed(123)
 ## Read data
 ## The data generation code is in bpa-code.txt, available at
 ## http://www.vogelwarte.ch/de/projekte/publikationen/bpa/complete-code-and-data-files-of-the-book.html
-source("cjs_group.data.R")
-
-## Bundle data
-stan_data <- list(y = y, nind = nind, n_occasions = n_occasions,
-                  g = g, group = group)
+stan_data <- read_rdump("cjs_group.data.R")
 
 ## Parameters monitored
 params <- c("phi_g", "p_g")
@@ -27,8 +23,8 @@ nc <- 4
 
 ## Initial values
 inits <- lapply(1:nc, function(i) {
-    list(phi_g = runif(length(unique(group)), 0, 1),
-         p_g = runif(length(unique(group)), 0, 1))})
+    list(phi_g = runif(length(unique(stan_data$group)), 0, 1),
+         p_g = runif(length(unique(stan_data$group)), 0, 1))})
 
 ## Call Stan from R
 cjs_group <- stan("cjs_group.stan",

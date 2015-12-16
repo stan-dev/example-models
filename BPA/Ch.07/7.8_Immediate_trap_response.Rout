@@ -1,0 +1,172 @@
+
+R version 3.2.3 (2015-12-10) -- "Wooden Christmas-Tree"
+Copyright (C) 2015 The R Foundation for Statistical Computing
+Platform: x86_64-apple-darwin13.4.0 (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+[Previously saved workspace restored]
+
+> ## 7. Estimation of survival probabilities using capture-recapture data
+> ## 7.8. Immediate trap response in recapture probability
+> 
+> library(rstan)
+Loading required package: ggplot2
+rstan (Version 2.8.1, packaged: 2015-11-18 17:18:35 UTC, GitRev: 05c3d0058b6a)
+For execution on a local, multicore CPU with excess RAM we recommend calling
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+> rstan_options(auto_write = TRUE)
+> options(mc.cores = parallel::detectCores())
+> set.seed(123)
+> 
+> ## Import data
+> ## The data file "trap.txt" is available at
+> ## http://www.vogelwarte.ch/de/projekte/publikationen/bpa/complete-code-and-data-files-of-the-book.html
+> CH <- as.matrix(read.table(file = "trap.txt", sep = " "))
+> # Create matrix m indicating when an individual was captured
+> m <- CH[, 1:(dim(CH)[2] - 1)]
+> u <- which(m == 0)
+> m[u] <- 2
+> 
+> ## Bundle data
+> stan_data <- list(y = CH,
++                   nind = dim(CH)[1],
++                   n_occasions = dim(CH)[2],
++                   m = m)
+> 
+> ## Parameters monitored
+> params <- c("mean_phi", "beta")
+> 
+> ## MCMC settings
+> ni <- 3000
+> nt <- 2
+> nb <- 1000
+> nc <- 4
+> 
+> ## Initial values
+> inits <- function() list(mean_phi = runif(1, 0, 1),
++                          beta = runif(2, 0, 1))
+> 
+> ## Call Stan from R
+> cjs_trap  <- stan("cjs_trap.stan",
++                   data = stan_data, init = inits, pars = params,
++                   chains = nc, iter = ni, warmup = nb, thin = nt,
++                   seed = 1,
++                   open_progress = FALSE)
+starting worker pid=9467 on localhost:11224 at 23:19:59.970
+starting worker pid=9475 on localhost:11224 at 23:20:00.101
+starting worker pid=9483 on localhost:11224 at 23:20:00.228
+starting worker pid=9491 on localhost:11224 at 23:20:00.354
+
+SAMPLING FOR MODEL 'cjs_trap' NOW (CHAIN 1).
+
+Chain 1, Iteration:    1 / 3000 [  0%]  (Warmup)
+SAMPLING FOR MODEL 'cjs_trap' NOW (CHAIN 2).
+
+Chain 2, Iteration:    1 / 3000 [  0%]  (Warmup)
+Chain 1, Iteration:  300 / 3000 [ 10%]  (Warmup)
+Chain 1, Iteration:  600 / 3000 [ 20%]  (Warmup)
+Chain 2, Iteration:  300 / 3000 [ 10%]  (Warmup)
+SAMPLING FOR MODEL 'cjs_trap' NOW (CHAIN 3).
+
+Chain 3, Iteration:    1 / 3000 [  0%]  (Warmup)
+Chain 1, Iteration:  900 / 3000 [ 30%]  (Warmup)
+Chain 1, Iteration: 1001 / 3000 [ 33%]  (Sampling)
+Chain 2, Iteration:  600 / 3000 [ 20%]  (Warmup)
+Chain 3, Iteration:  300 / 3000 [ 10%]  (Warmup)
+SAMPLING FOR MODEL 'cjs_trap' NOW (CHAIN 4).
+
+Chain 4, Iteration:    1 / 3000 [  0%]  (Warmup)
+Chain 2, Iteration:  900 / 3000 [ 30%]  (Warmup)
+Chain 1, Iteration: 1300 / 3000 [ 43%]  (Sampling)
+Chain 2, Iteration: 1001 / 3000 [ 33%]  (Sampling)
+Chain 3, Iteration:  600 / 3000 [ 20%]  (Warmup)
+Chain 4, Iteration:  300 / 3000 [ 10%]  (Warmup)
+Chain 1, Iteration: 1600 / 3000 [ 53%]  (Sampling)
+Chain 2, Iteration: 1300 / 3000 [ 43%]  (Sampling)
+Chain 3, Iteration:  900 / 3000 [ 30%]  (Warmup)
+Chain 3, Iteration: 1001 / 3000 [ 33%]  (Sampling)
+Chain 4, Iteration:  600 / 3000 [ 20%]  (Warmup)
+Chain 1, Iteration: 1900 / 3000 [ 63%]  (Sampling)
+Chain 2, Iteration: 1600 / 3000 [ 53%]  (Sampling)
+Chain 3, Iteration: 1300 / 3000 [ 43%]  (Sampling)
+Chain 4, Iteration:  900 / 3000 [ 30%]  (Warmup)
+Chain 1, Iteration: 2200 / 3000 [ 73%]  (Sampling)
+Chain 2, Iteration: 1900 / 3000 [ 63%]  (Sampling)
+Chain 4, Iteration: 1001 / 3000 [ 33%]  (Sampling)
+Chain 3, Iteration: 1600 / 3000 [ 53%]  (Sampling)
+Chain 1, Iteration: 2500 / 3000 [ 83%]  (Sampling)
+Chain 2, Iteration: 2200 / 3000 [ 73%]  (Sampling)
+Chain 4, Iteration: 1300 / 3000 [ 43%]  (Sampling)
+Chain 2, Iteration: 2500 / 3000 [ 83%]  (Sampling)
+Chain 3, Iteration: 1900 / 3000 [ 63%]  (Sampling)
+Chain 1, Iteration: 2800 / 3000 [ 93%]  (Sampling)
+Chain 4, Iteration: 1600 / 3000 [ 53%]  (Sampling)
+Chain 1, Iteration: 3000 / 3000 [100%]  (Sampling)
+#  Elapsed Time: 1.27234 seconds (Warm-up)
+#                2.60782 seconds (Sampling)
+#                3.88016 seconds (Total)
+
+
+Chain 2, Iteration: 2800 / 3000 [ 93%]  (Sampling)
+Chain 3, Iteration: 2200 / 3000 [ 73%]  (Sampling)
+Chain 2, Iteration: 3000 / 3000 [100%]  (Sampling)
+#  Elapsed Time: 1.255 seconds (Warm-up)
+#                2.44249 seconds (Sampling)
+#                3.69749 seconds (Total)
+
+
+Chain 4, Iteration: 1900 / 3000 [ 63%]  (Sampling)
+Chain 3, Iteration: 2500 / 3000 [ 83%]  (Sampling)
+Chain 4, Iteration: 2200 / 3000 [ 73%]  (Sampling)
+Chain 3, Iteration: 2800 / 3000 [ 93%]  (Sampling)
+Chain 3, Iteration: 3000 / 3000 [100%]  (Sampling)
+#  Elapsed Time: 1.30293 seconds (Warm-up)
+#                2.83895 seconds (Sampling)
+#                4.14188 seconds (Total)
+
+
+Chain 4, Iteration: 2500 / 3000 [ 83%]  (Sampling)
+Chain 4, Iteration: 2800 / 3000 [ 93%]  (Sampling)
+Chain 4, Iteration: 3000 / 3000 [100%]  (Sampling)
+#  Elapsed Time: 1.39608 seconds (Warm-up)
+#                3.14325 seconds (Sampling)
+#                4.53933 seconds (Total)
+
+> 
+> ## Summarize posteriors
+> print(cjs_trap, digits = 3)
+Inference for Stan model: cjs_trap.
+4 chains, each with iter=3000; warmup=1000; thin=2; 
+post-warmup draws per chain=1000, total post-warmup draws=4000.
+
+             mean se_mean    sd     2.5%      25%      50%      75%    97.5%
+mean_phi    0.565   0.003 0.080    0.463    0.513    0.548    0.595    0.788
+beta[1]     0.760   0.003 0.092    0.537    0.712    0.775    0.827    0.895
+beta[2]     0.388   0.006 0.210    0.058    0.212    0.370    0.546    0.811
+lp__     -242.744   0.032 1.248 -246.016 -243.293 -242.446 -241.842 -241.325
+         n_eff  Rhat
+mean_phi   907 1.003
+beta[1]   1008 1.002
+beta[2]   1146 1.002
+lp__      1533 1.001
+
+Samples were drawn using NUTS(diag_e) at Wed Dec 16 23:20:07 2015.
+For each parameter, n_eff is a crude measure of effective sample size,
+and Rhat is the potential scale reduction factor on split chains (at 
+convergence, Rhat=1).
+> 
+> proc.time()
+   user  system elapsed 
+ 19.617   0.674  27.960 

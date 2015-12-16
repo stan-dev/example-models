@@ -1,0 +1,186 @@
+
+R version 3.2.3 (2015-12-10) -- "Wooden Christmas-Tree"
+Copyright (C) 2015 The R Foundation for Statistical Computing
+Platform: x86_64-apple-darwin13.4.0 (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+[Previously saved workspace restored]
+
+> ## 6. Estimation of the size of a closed population
+> ## 6.4. Capture-recapture models with individual covariates: model
+> ## Mt+X
+> ## 6.4.1. Individual covariate model for species richness estimation
+> 
+> library(rstan)
+Loading required package: ggplot2
+rstan (Version 2.8.1, packaged: 2015-11-18 17:18:35 UTC, GitRev: 05c3d0058b6a)
+For execution on a local, multicore CPU with excess RAM we recommend calling
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+> rstan_options(auto_write = TRUE)
+> options(mc.cores = parallel::detectCores())
+> set.seed(1234)
+> 
+> ## Generate simulated data
+> ## data.fn() is defined in bpa-code.txt, available at
+> ## http://www.vogelwarte.ch/de/projekte/publikationen/bpa/complete-code-and-data-files-of-the-book.html
+> p610 <- read.table("p610.txt", header = TRUE)
+> y <- p610[,5:9]                         # Grab counts
+> y[y > 1] <- 1                           # Convert to det-nondetections
+> ever.observed <- apply(y, 1, max)
+> wt <- p610$bm[ever.observed == 1]       # Body mass
+> yy <- as.matrix(y[ever.observed == 1,]) # Detection histories
+> dimnames(yy) <- NULL
+> 
+> ## Augment both data sets
+> nz <- 150
+> yaug <- rbind(yy, array(0, dim = c(nz, ncol(yy))))
+> logwt3 <- c(log(wt^(1/3)), rep(NA, nz))
+> 
+> ## Bundle data
+> bsize <- logwt3[1:nrow(yy)]
+> stan_data <- list(y = yaug,
++                   bsize = bsize - mean(bsize),
++                   M = nrow(yaug),
++                   T = ncol(yaug),
++                   C = nrow(yy),
++                   prior_sd_upper = 3)
+> 
+> ## Initial values
+> inits <- function() list(beta = runif(1, 0, 1),
++                          mu_size = rnorm(1, 0, 1))
+> 
+> ## Parameters monitored
+> params <- c("N", "mean_p", "beta", "omega", "mu_size", "sd_size")
+> 
+> ## MCMC settings
+> ni <- 15000
+> nt <- 10
+> nb <- 5000
+> nc <- 4
+> 
+> ## Call Stan from R
+> outX <- stan("MtX.stan",
++              data = stan_data, init = inits, pars = params,
++              chains = nc, iter = ni, warmup = nb, thin = nt,
++              seed = 1,
++              open_progress = FALSE)
+starting worker pid=8014 on localhost:11325 at 22:50:29.491
+starting worker pid=8022 on localhost:11325 at 22:50:29.623
+starting worker pid=8030 on localhost:11325 at 22:50:29.756
+starting worker pid=8038 on localhost:11325 at 22:50:29.887
+
+SAMPLING FOR MODEL 'MtX' NOW (CHAIN 1).
+
+Chain 1, Iteration:     1 / 15000 [  0%]  (Warmup)
+SAMPLING FOR MODEL 'MtX' NOW (CHAIN 2).
+
+Chain 2, Iteration:     1 / 15000 [  0%]  (Warmup)
+SAMPLING FOR MODEL 'MtX' NOW (CHAIN 3).
+
+Chain 3, Iteration:     1 / 15000 [  0%]  (Warmup)
+SAMPLING FOR MODEL 'MtX' NOW (CHAIN 4).
+
+Chain 4, Iteration:     1 / 15000 [  0%]  (Warmup)
+Chain 3, Iteration:  1500 / 15000 [ 10%]  (Warmup)
+Chain 2, Iteration:  1500 / 15000 [ 10%]  (Warmup)
+Chain 1, Iteration:  1500 / 15000 [ 10%]  (Warmup)
+Chain 4, Iteration:  1500 / 15000 [ 10%]  (Warmup)
+Chain 3, Iteration:  3000 / 15000 [ 20%]  (Warmup)
+Chain 1, Iteration:  3000 / 15000 [ 20%]  (Warmup)
+Chain 2, Iteration:  3000 / 15000 [ 20%]  (Warmup)
+Chain 4, Iteration:  3000 / 15000 [ 20%]  (Warmup)
+Chain 1, Iteration:  4500 / 15000 [ 30%]  (Warmup)
+Chain 3, Iteration:  4500 / 15000 [ 30%]  (Warmup)
+Chain 2, Iteration:  4500 / 15000 [ 30%]  (Warmup)
+Chain 1, Iteration:  5001 / 15000 [ 33%]  (Sampling)
+Chain 3, Iteration:  5001 / 15000 [ 33%]  (Sampling)
+Chain 4, Iteration:  4500 / 15000 [ 30%]  (Warmup)
+Chain 2, Iteration:  5001 / 15000 [ 33%]  (Sampling)
+Chain 4, Iteration:  5001 / 15000 [ 33%]  (Sampling)
+Chain 1, Iteration:  6500 / 15000 [ 43%]  (Sampling)
+Chain 2, Iteration:  6500 / 15000 [ 43%]  (Sampling)
+Chain 3, Iteration:  6500 / 15000 [ 43%]  (Sampling)
+Chain 1, Iteration:  8000 / 15000 [ 53%]  (Sampling)
+Chain 2, Iteration:  8000 / 15000 [ 53%]  (Sampling)
+Chain 4, Iteration:  6500 / 15000 [ 43%]  (Sampling)
+Chain 3, Iteration:  8000 / 15000 [ 53%]  (Sampling)
+Chain 1, Iteration:  9500 / 15000 [ 63%]  (Sampling)
+Chain 2, Iteration:  9500 / 15000 [ 63%]  (Sampling)
+Chain 1, Iteration: 11000 / 15000 [ 73%]  (Sampling)
+Chain 2, Iteration: 11000 / 15000 [ 73%]  (Sampling)
+Chain 4, Iteration:  8000 / 15000 [ 53%]  (Sampling)
+Chain 3, Iteration:  9500 / 15000 [ 63%]  (Sampling)
+Chain 2, Iteration: 12500 / 15000 [ 83%]  (Sampling)
+Chain 1, Iteration: 12500 / 15000 [ 83%]  (Sampling)
+Chain 3, Iteration: 11000 / 15000 [ 73%]  (Sampling)
+Chain 2, Iteration: 14000 / 15000 [ 93%]  (Sampling)
+Chain 1, Iteration: 14000 / 15000 [ 93%]  (Sampling)
+Chain 4, Iteration:  9500 / 15000 [ 63%]  (Sampling)
+Chain 2, Iteration: 15000 / 15000 [100%]  (Sampling)
+#  Elapsed Time: 18.3952 seconds (Warm-up)
+#                34.5891 seconds (Sampling)
+#                52.9842 seconds (Total)
+
+
+Chain 1, Iteration: 15000 / 15000 [100%]  (Sampling)
+#  Elapsed Time: 17.9771 seconds (Warm-up)
+#                36.2848 seconds (Sampling)
+#                54.2619 seconds (Total)
+
+
+Chain 3, Iteration: 12500 / 15000 [ 83%]  (Sampling)
+Chain 4, Iteration: 11000 / 15000 [ 73%]  (Sampling)
+Chain 3, Iteration: 14000 / 15000 [ 93%]  (Sampling)
+Chain 3, Iteration: 15000 / 15000 [100%]  (Sampling)
+#  Elapsed Time: 17.2708 seconds (Warm-up)
+#                50.3489 seconds (Sampling)
+#                67.6198 seconds (Total)
+
+
+Chain 4, Iteration: 12500 / 15000 [ 83%]  (Sampling)
+Chain 4, Iteration: 14000 / 15000 [ 93%]  (Sampling)
+Chain 4, Iteration: 15000 / 15000 [100%]  (Sampling)
+#  Elapsed Time: 18.7541 seconds (Warm-up)
+#                65.904 seconds (Sampling)
+#                84.6582 seconds (Total)
+
+> 
+> ## Summarize posteriors
+> print(outX, digits = 3)
+Inference for Stan model: MtX.
+4 chains, each with iter=15000; warmup=5000; thin=10; 
+post-warmup draws per chain=1000, total post-warmup draws=4000.
+
+            mean se_mean     sd   2.5%    25%    50%    75%   97.5% n_eff  Rhat
+N         40.929   0.323 10.863 32.000 36.000 38.000 43.000  66.025  1134 1.007
+mean_p[1]  0.271   0.001  0.075  0.138  0.218  0.265  0.318   0.437  3763 1.000
+mean_p[2]  0.322   0.001  0.079  0.180  0.266  0.318  0.376   0.484  3835 1.001
+mean_p[3]  0.322   0.002  0.081  0.176  0.264  0.318  0.377   0.492  2903 1.000
+mean_p[4]  0.248   0.001  0.074  0.125  0.195  0.241  0.295   0.414  4000 1.000
+mean_p[5]  0.348   0.001  0.083  0.196  0.290  0.344  0.401   0.523  3893 1.001
+beta      -1.147   0.019  0.918 -3.141 -1.703 -1.068 -0.493   0.423  2319 1.000
+omega      0.230   0.002  0.068  0.148  0.192  0.218  0.251   0.377  1344 1.005
+mu_size    0.063   0.003  0.114 -0.100 -0.005  0.046  0.107   0.334  1287 1.005
+sd_size    0.366   0.002  0.064  0.274  0.323  0.357  0.396   0.518  1438 1.005
+lp__      67.252   0.644 26.189  9.236 51.864 69.438 85.536 112.173  1651 1.004
+
+Samples were drawn using NUTS(diag_e) at Wed Dec 16 22:51:57 2015.
+For each parameter, n_eff is a crude measure of effective sample size,
+and Rhat is the potential scale reduction factor on split chains (at 
+convergence, Rhat=1).
+> 
+> proc.time()
+   user  system elapsed 
+ 22.298   1.984 112.650 

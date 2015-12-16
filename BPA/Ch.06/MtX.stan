@@ -1,8 +1,8 @@
 data {
-  int<lower=0> M;
-  int<lower=0> T;
-  int<lower=0> C;
-  int<lower=0,upper=1> y[M, T];
+  int<lower=0> M;               // Size of augumented data set
+  int<lower=0> T;               // Number of sampling occasions
+  int<lower=0> C;               // Size of observed data set
+  int<lower=0,upper=1> y[M, T]; // Capture-history matrix
   real<lower=-6,upper=6> bsize[C];      // Body size
   real<lower=0> prior_sd_upper;
 }
@@ -15,8 +15,8 @@ transformed data {
 }
 
 parameters {
-  real<lower=0,upper=1> omega;
-  real<lower=0,upper=1> mean_p[T];
+  real<lower=0,upper=1> omega;          // Inclusion probability
+  real<lower=0,upper=1> mean_p[T];      // Mean detection probability
   real beta;
   real mu_size;
   real<lower=0> sd_size;

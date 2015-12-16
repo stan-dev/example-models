@@ -9,10 +9,7 @@ set.seed(123)
 ## Read data
 ## The data generation code is in bpa-code.txt, available at
 ## http://www.vogelwarte.ch/de/projekte/publikationen/bpa/complete-code-and-data-files-of-the-book.html
-source("cjs_t_t.data.R")
-
-## Bundle data
-stan_data <- list(y = y, nind = nind, n_occasions = n_occasions)
+stan_data <- read_rdump("cjs_t_t.data.R")
 
 ## Parameters monitored
 params <- c("phi_t", "p_t")
@@ -25,9 +22,8 @@ nc <- 4
 
 ## Initial values
 inits <- lapply(1:nc, function(i) {
-    list(phi_t = runif((dim(CH)[2] - 1), 0, 1),
-         p_t = runif((dim(CH)[2] - 1), 0, 1))})
-
+    list(phi_t = runif((dim(stan_data$y)[2] - 1), 0, 1),
+         p_t = runif((dim(stan_data$y)[2] - 1), 0, 1))})
 
 ## Call Stan from R
 cjs_t_t  <- stan("cjs_t_t.stan",

@@ -1,0 +1,169 @@
+
+R version 3.2.3 (2015-12-10) -- "Wooden Christmas-Tree"
+Copyright (C) 2015 The R Foundation for Statistical Computing
+Platform: x86_64-apple-darwin13.4.0 (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+[Previously saved workspace restored]
+
+> ## 7. Estimation of survival probabilities using capture-recapture data
+> ## 7.5. Models with individual variation
+> ## 7.5.2. Random group effects
+> 
+> library(rstan)
+Loading required package: ggplot2
+rstan (Version 2.8.1, packaged: 2015-11-18 17:18:35 UTC, GitRev: 05c3d0058b6a)
+For execution on a local, multicore CPU with excess RAM we recommend calling
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+> rstan_options(auto_write = TRUE)
+> options(mc.cores = parallel::detectCores())
+> set.seed(123)
+> 
+> ## Read data
+> ## The data generation code is in bpa-code.txt, available at
+> ## http://www.vogelwarte.ch/de/projekte/publikationen/bpa/complete-code-and-data-files-of-the-book.html
+> stan_data <- read_rdump("cjs_group.data.R")
+> 
+> ## Parameters monitored
+> params <- c("mean_phi", "mean_p", "sigma")
+> 
+> ## MCMC settings
+> ni <- 6000
+> nt <- 3
+> nb <- 3000
+> nc <- 4
+> 
+> ## Initial values
+> inits <- lapply(1:nc, function(i) {
++     list(phi_g = runif(length(unique(stan_data$group)), 0, 1),
++          p_g = runif(length(unique(stan_data$group)), 0, 1))})
+> 
+> ## Call Stan from R
+> cjs_group_raneff <- stan("cjs_group_raneff.stan",
++                          data = stan_data, init = inits, pars = params,
++                          chains = nc, iter = ni, warmup = nb, thin = nt,
++                          seed = 1,
++                          open_progress = FALSE)
+starting worker pid=8814 on localhost:11534 at 23:01:45.654
+starting worker pid=8822 on localhost:11534 at 23:01:45.777
+starting worker pid=8830 on localhost:11534 at 23:01:45.902
+starting worker pid=8838 on localhost:11534 at 23:01:46.034
+
+SAMPLING FOR MODEL 'cjs_group_raneff' NOW (CHAIN 1).
+
+Chain 1, Iteration:    1 / 6000 [  0%]  (Warmup)
+SAMPLING FOR MODEL 'cjs_group_raneff' NOW (CHAIN 2).
+
+Chain 2, Iteration:    1 / 6000 [  0%]  (Warmup)
+SAMPLING FOR MODEL 'cjs_group_raneff' NOW (CHAIN 3).
+
+Chain 3, Iteration:    1 / 6000 [  0%]  (Warmup)
+SAMPLING FOR MODEL 'cjs_group_raneff' NOW (CHAIN 4).
+
+Chain 4, Iteration:    1 / 6000 [  0%]  (Warmup)
+Chain 1, Iteration:  600 / 6000 [ 10%]  (Warmup)
+Chain 4, Iteration:  600 / 6000 [ 10%]  (Warmup)
+Chain 3, Iteration:  600 / 6000 [ 10%]  (Warmup)
+Chain 2, Iteration:  600 / 6000 [ 10%]  (Warmup)
+Chain 4, Iteration: 1200 / 6000 [ 20%]  (Warmup)
+Chain 1, Iteration: 1200 / 6000 [ 20%]  (Warmup)
+Chain 3, Iteration: 1200 / 6000 [ 20%]  (Warmup)
+Chain 2, Iteration: 1200 / 6000 [ 20%]  (Warmup)
+Chain 4, Iteration: 1800 / 6000 [ 30%]  (Warmup)
+Chain 1, Iteration: 1800 / 6000 [ 30%]  (Warmup)
+Chain 3, Iteration: 1800 / 6000 [ 30%]  (Warmup)
+Chain 2, Iteration: 1800 / 6000 [ 30%]  (Warmup)
+Chain 4, Iteration: 2400 / 6000 [ 40%]  (Warmup)
+Chain 2, Iteration: 2400 / 6000 [ 40%]  (Warmup)
+Chain 3, Iteration: 2400 / 6000 [ 40%]  (Warmup)
+Chain 1, Iteration: 2400 / 6000 [ 40%]  (Warmup)
+Chain 4, Iteration: 3000 / 6000 [ 50%]  (Warmup)
+Chain 4, Iteration: 3001 / 6000 [ 50%]  (Sampling)
+Chain 3, Iteration: 3000 / 6000 [ 50%]  (Warmup)
+Chain 3, Iteration: 3001 / 6000 [ 50%]  (Sampling)
+Chain 2, Iteration: 3000 / 6000 [ 50%]  (Warmup)
+Chain 2, Iteration: 3001 / 6000 [ 50%]  (Sampling)
+Chain 4, Iteration: 3600 / 6000 [ 60%]  (Sampling)
+Chain 1, Iteration: 3000 / 6000 [ 50%]  (Warmup)
+Chain 1, Iteration: 3001 / 6000 [ 50%]  (Sampling)
+Chain 3, Iteration: 3600 / 6000 [ 60%]  (Sampling)
+Chain 4, Iteration: 4200 / 6000 [ 70%]  (Sampling)
+Chain 2, Iteration: 3600 / 6000 [ 60%]  (Sampling)
+Chain 1, Iteration: 3600 / 6000 [ 60%]  (Sampling)
+Chain 4, Iteration: 4800 / 6000 [ 80%]  (Sampling)
+Chain 3, Iteration: 4200 / 6000 [ 70%]  (Sampling)
+Chain 2, Iteration: 4200 / 6000 [ 70%]  (Sampling)
+Chain 4, Iteration: 5400 / 6000 [ 90%]  (Sampling)
+Chain 1, Iteration: 4200 / 6000 [ 70%]  (Sampling)
+Chain 3, Iteration: 4800 / 6000 [ 80%]  (Sampling)
+Chain 4, Iteration: 6000 / 6000 [100%]  (Sampling)
+#  Elapsed Time: 79.4079 seconds (Warm-up)
+#                48.5645 seconds (Sampling)
+#                127.972 seconds (Total)
+
+
+Chain 2, Iteration: 4800 / 6000 [ 80%]  (Sampling)
+Chain 3, Iteration: 5400 / 6000 [ 90%]  (Sampling)
+Chain 1, Iteration: 4800 / 6000 [ 80%]  (Sampling)
+Chain 3, Iteration: 6000 / 6000 [100%]  (Sampling)
+#  Elapsed Time: 86.3026 seconds (Warm-up)
+#                60.171 seconds (Sampling)
+#                146.474 seconds (Total)
+
+
+Chain 2, Iteration: 5400 / 6000 [ 90%]  (Sampling)
+Chain 1, Iteration: 5400 / 6000 [ 90%]  (Sampling)
+Chain 2, Iteration: 6000 / 6000 [100%]  (Sampling)
+#  Elapsed Time: 88.9279 seconds (Warm-up)
+#                71.5268 seconds (Sampling)
+#                160.455 seconds (Total)
+
+
+Chain 1, Iteration: 6000 / 6000 [100%]  (Sampling)
+#  Elapsed Time: 90.1045 seconds (Warm-up)
+#                80.7981 seconds (Sampling)
+#                170.903 seconds (Total)
+
+Warning messages:
+1: There were 480 divergent transitions after warmup. Increasing adapt_delta above 0.8 may help. 
+2: Examine the pairs() plot to diagnose sampling problems
+ 
+> ## Note: there may be divergent transitions after warmup.
+> 
+> ## Summarize posteriors
+> print(cjs_group_raneff, digits = 3)
+Inference for Stan model: cjs_group_raneff.
+4 chains, each with iter=6000; warmup=3000; thin=3; 
+post-warmup draws per chain=1000, total post-warmup draws=4000.
+
+              mean se_mean    sd      2.5%       25%       50%       75%
+mean_phi     0.660   0.005 0.245     0.011     0.605     0.713     0.794
+mean_p       0.470   0.001 0.019     0.434     0.456     0.469     0.483
+sigma        2.274   0.098 2.527     0.123     0.400     1.138     3.394
+lp__     -1367.954   0.077 2.432 -1373.408 -1369.461 -1367.608 -1366.175
+             97.5% n_eff  Rhat
+mean_phi     0.998  2088 1.000
+mean_p       0.506   384 1.012
+sigma        9.001   659 1.004
+lp__     -1364.180   998 1.002
+
+Samples were drawn using NUTS(diag_e) at Wed Dec 16 23:04:46 2015.
+For each parameter, n_eff is a crude measure of effective sample size,
+and Rhat is the potential scale reduction factor on split chains (at 
+convergence, Rhat=1).
+> 
+> proc.time()
+   user  system elapsed 
+ 19.413   0.662 201.028 

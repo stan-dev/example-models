@@ -1,0 +1,167 @@
+
+R version 3.2.3 (2015-12-10) -- "Wooden Christmas-Tree"
+Copyright (C) 2015 The R Foundation for Statistical Computing
+Platform: x86_64-apple-darwin13.4.0 (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+[Previously saved workspace restored]
+
+> ## 6. Estimation of the size of a closed population
+> ## 6.2. Generation and analysis of simulated data with data
+> ## augmentation
+> ## 6.2.3. Behavioral or memory effects: model Mb
+> 
+> library(rstan)
+Loading required package: ggplot2
+rstan (Version 2.8.1, packaged: 2015-11-18 17:18:35 UTC, GitRev: 05c3d0058b6a)
+For execution on a local, multicore CPU with excess RAM we recommend calling
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+> rstan_options(auto_write = TRUE)
+> options(mc.cores = parallel::detectCores())
+> set.seed(1234)
+> 
+> ## Read data
+> ## The data generation code is in bpa-code.txt, available at
+> ## http://www.vogelwarte.ch/de/projekte/publikationen/bpa/complete-code-and-data-files-of-the-book.html
+> stan_data <- read_rdump("Mb.data.R")
+> 
+> ## Initial values
+> inits <- function() list(p = runif(1, 0, 1))
+> 
+> ## Parameters monitored
+> params <- c("N", "p", "c", "trap_response", "omega")
+> 
+> ## MCMC settings
+> ni <- 2000
+> nt <- 1
+> nb <- 1000
+> nc <- 4
+> 
+> ## Call Stan from R
+> out <- stan("Mb.stan",
++             data = stan_data, init = inits, pars = params,
++             chains = nc, iter = ni, warmup = nb, thin = nt,
++             seed = 1,
++             open_progress = FALSE)
+starting worker pid=7364 on localhost:11622 at 21:57:54.188
+starting worker pid=7372 on localhost:11622 at 21:57:54.320
+starting worker pid=7380 on localhost:11622 at 21:57:54.444
+starting worker pid=7388 on localhost:11622 at 21:57:54.573
+
+SAMPLING FOR MODEL 'Mb' NOW (CHAIN 1).
+
+Chain 1, Iteration:    1 / 2000 [  0%]  (Warmup)
+Chain 1, Iteration:  200 / 2000 [ 10%]  (Warmup)
+SAMPLING FOR MODEL 'Mb' NOW (CHAIN 2).
+
+Chain 2, Iteration:    1 / 2000 [  0%]  (Warmup)
+Chain 1, Iteration:  400 / 2000 [ 20%]  (Warmup)
+Chain 1, Iteration:  600 / 2000 [ 30%]  (Warmup)
+Chain 2, Iteration:  200 / 2000 [ 10%]  (Warmup)
+SAMPLING FOR MODEL 'Mb' NOW (CHAIN 3).
+
+Chain 3, Iteration:    1 / 2000 [  0%]  (Warmup)
+Chain 1, Iteration:  800 / 2000 [ 40%]  (Warmup)
+Chain 2, Iteration:  400 / 2000 [ 20%]  (Warmup)
+Chain 1, Iteration: 1000 / 2000 [ 50%]  (Warmup)
+Chain 1, Iteration: 1001 / 2000 [ 50%]  (Sampling)
+Chain 3, Iteration:  200 / 2000 [ 10%]  (Warmup)
+Chain 2, Iteration:  600 / 2000 [ 30%]  (Warmup)
+SAMPLING FOR MODEL 'Mb' NOW (CHAIN 4).
+
+Chain 4, Iteration:    1 / 2000 [  0%]  (Warmup)
+Chain 1, Iteration: 1200 / 2000 [ 60%]  (Sampling)
+Chain 3, Iteration:  400 / 2000 [ 20%]  (Warmup)
+Chain 2, Iteration:  800 / 2000 [ 40%]  (Warmup)
+Chain 1, Iteration: 1400 / 2000 [ 70%]  (Sampling)
+Chain 3, Iteration:  600 / 2000 [ 30%]  (Warmup)
+Chain 2, Iteration: 1000 / 2000 [ 50%]  (Warmup)
+Chain 2, Iteration: 1001 / 2000 [ 50%]  (Sampling)
+Chain 4, Iteration:  200 / 2000 [ 10%]  (Warmup)
+Chain 3, Iteration:  800 / 2000 [ 40%]  (Warmup)
+Chain 1, Iteration: 1600 / 2000 [ 80%]  (Sampling)
+Chain 2, Iteration: 1200 / 2000 [ 60%]  (Sampling)
+Chain 4, Iteration:  400 / 2000 [ 20%]  (Warmup)
+Chain 3, Iteration: 1000 / 2000 [ 50%]  (Warmup)
+Chain 3, Iteration: 1001 / 2000 [ 50%]  (Sampling)
+Chain 2, Iteration: 1400 / 2000 [ 70%]  (Sampling)
+Chain 1, Iteration: 1800 / 2000 [ 90%]  (Sampling)
+Chain 4, Iteration:  600 / 2000 [ 30%]  (Warmup)
+Chain 3, Iteration: 1200 / 2000 [ 60%]  (Sampling)
+Chain 4, Iteration:  800 / 2000 [ 40%]  (Warmup)
+Chain 2, Iteration: 1600 / 2000 [ 80%]  (Sampling)
+Chain 1, Iteration: 2000 / 2000 [100%]  (Sampling)
+#  Elapsed Time: 1.25578 seconds (Warm-up)
+#                1.46484 seconds (Sampling)
+#                2.72062 seconds (Total)
+
+
+Chain 3, Iteration: 1400 / 2000 [ 70%]  (Sampling)
+Chain 4, Iteration: 1000 / 2000 [ 50%]  (Warmup)
+Chain 4, Iteration: 1001 / 2000 [ 50%]  (Sampling)
+Chain 2, Iteration: 1800 / 2000 [ 90%]  (Sampling)
+Chain 3, Iteration: 1600 / 2000 [ 80%]  (Sampling)
+Chain 4, Iteration: 1200 / 2000 [ 60%]  (Sampling)
+Chain 2, Iteration: 2000 / 2000 [100%]  (Sampling)
+#  Elapsed Time: 1.33165 seconds (Warm-up)
+#                1.39473 seconds (Sampling)
+#                2.72638 seconds (Total)
+
+
+Chain 3, Iteration: 1800 / 2000 [ 90%]  (Sampling)
+Chain 4, Iteration: 1400 / 2000 [ 70%]  (Sampling)
+Chain 3, Iteration: 2000 / 2000 [100%]  (Sampling)
+#  Elapsed Time: 1.30074 seconds (Warm-up)
+#                1.33255 seconds (Sampling)
+#                2.63329 seconds (Total)
+
+
+Chain 4, Iteration: 1600 / 2000 [ 80%]  (Sampling)
+Chain 4, Iteration: 1800 / 2000 [ 90%]  (Sampling)
+Chain 4, Iteration: 2000 / 2000 [100%]  (Sampling)
+#  Elapsed Time: 1.37105 seconds (Warm-up)
+#                1.31945 seconds (Sampling)
+#                2.6905 seconds (Total)
+
+> 
+> ## Summarize posteriors
+> print(out, digits = 3)
+Inference for Stan model: Mb.
+4 chains, each with iter=2000; warmup=1000; thin=1; 
+post-warmup draws per chain=1000, total post-warmup draws=4000.
+
+                  mean se_mean    sd     2.5%      25%      50%      75%
+N              201.864   0.205 8.943  186.000  196.000  201.000  207.000
+p                0.288   0.001 0.026    0.238    0.271    0.288    0.305
+c                0.400   0.001 0.031    0.341    0.379    0.400    0.422
+trap_response    0.112   0.001 0.040    0.037    0.085    0.110    0.140
+omega            0.649   0.001 0.044    0.568    0.620    0.647    0.677
+lp__          -764.783   0.032 1.244 -767.966 -765.366 -764.486 -763.855
+                 97.5% n_eff  Rhat
+N              222.000  1901 1.000
+p                0.337  1453 1.000
+c                0.460  1723 1.001
+trap_response    0.192  1586 1.002
+omega            0.737  1566 1.000
+lp__          -763.346  1476 1.001
+
+Samples were drawn using NUTS(diag_e) at Wed Dec 16 21:58:00 2015.
+For each parameter, n_eff is a crude measure of effective sample size,
+and Rhat is the potential scale reduction factor on split chains (at 
+convergence, Rhat=1).
+> 
+> proc.time()
+   user  system elapsed 
+ 21.475   0.746  28.134 

@@ -11,10 +11,7 @@ options(mc.cores = parallel::detectCores())
 ## Read data
 ## The data generation code is in bpa-code.txt, available at
 ## http://www.vogelwarte.ch/de/projekte/publikationen/bpa/complete-code-and-data-files-of-the-book.html
-source("GLMM_Poisson.data.R")
-
-## Bundle data
-stan_data <- list(C = C, n = n, year = year)
+stan_data <- read_rdump("GLMM_Poisson.data.R")
 
 ## Initial values
 inits <- function() list(alpha = runif(1, -2, 2),

@@ -11,10 +11,7 @@ set.seed(1234)
 ## Read data
 ## The data generation code is in bpa-code.txt, available at
 ## http://www.vogelwarte.ch/de/projekte/publikationen/bpa/complete-code-and-data-files-of-the-book.html
-source("Mh.data.R")
-
-## Bundle data
-stan_data <- list(y = y, M = M, T = T)
+stan_data <- read_rdump("Mh.data.R")
 
 ## Initial values
 inits <- function() list(mean_p = 0.5, sigma = runif(1, 0.5, 0.9))

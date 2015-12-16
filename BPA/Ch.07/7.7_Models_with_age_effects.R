@@ -9,11 +9,7 @@ set.seed(123)
 ## Read data
 ## The data generation code is in bpa-code.txt, available at
 ## http://www.vogelwarte.ch/de/projekte/publikationen/bpa/complete-code-and-data-files-of-the-book.html
-source("cjs_age.data.R")
-
-## Bundle data
-stan_data <- list(y = y, nind = nind, n_occasions = n_occasions,
-                  x = x, max_age = max_age)
+stan_data <- read_rdump("cjs_age.data.R")
 
 ## Parameters monitored
 params <- c("beta", "mean_p")

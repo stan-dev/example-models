@@ -1,12 +1,12 @@
 data {
-  int<lower=0> M;
-  int<lower=0> T;
-  int<lower=0,upper=1> y[M, T];
+  int<lower=0> M;               // Size of augumented data set
+  int<lower=0> T;               // Number of sampling occasions
+  int<lower=0,upper=1> y[M, T]; // Capture-history matrix
 }
 
 transformed data {
   int<lower=0,upper=T> s[M];
-  int<lower=0,upper=M> C;
+  int<lower=0,upper=M> C;       // Size of observed data set
 
   C <- 0;
   for (i in 1:M) {
@@ -17,10 +17,10 @@ transformed data {
 }
 
 parameters {
-  real<lower=0,upper=1> omega;
-  real<lower=0,upper=1> mean_p[T];
+  real<lower=0,upper=1> omega;          // Inclusion probability
+  real<lower=0,upper=1> mean_p[T];      // Mean detection probability
   real<lower=0> sigma;
-  real eps[M];
+  real eps[M];                          // Random effects
 }
 
 transformed parameters {

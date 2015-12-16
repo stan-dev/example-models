@@ -1,0 +1,218 @@
+
+R version 3.2.3 (2015-12-10) -- "Wooden Christmas-Tree"
+Copyright (C) 2015 The R Foundation for Statistical Computing
+Platform: x86_64-apple-darwin13.4.0 (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+[Previously saved workspace restored]
+
+> ## 7. Estimation of survival probabilities using capture-recapture data
+> ## 7.11. Analysis of a real data set: survival of female Leisler’s bats
+> 
+> library(rstan)
+Loading required package: ggplot2
+rstan (Version 2.8.1, packaged: 2015-11-18 17:18:35 UTC, GitRev: 05c3d0058b6a)
+For execution on a local, multicore CPU with excess RAM we recommend calling
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+> rstan_options(auto_write = TRUE)
+> options(mc.cores = parallel::detectCores())
+> set.seed(123)
+> 
+> ## Read data
+> ## The data generation code is in bpa-code.txt, available at
+> ## http://www.vogelwarte.ch/de/projekte/publikationen/bpa/complete-code-and-data-files-of-the-book.html
+> stan_data <- read_rdump("cjs_mnl_ran.data.R")
+> 
+> ## Parameters monitored
+> params <- c("phi", "mean_p", "mean_phi", "sigma2", "sigma2_real",
++             "fit", "fit_new")
+> 
+> ## MCMC settings
+> ni <- 3000
+> nt <- 2
+> nb <- 1000
+> nc <- 4
+> 
+> ## Initial values
+> inits <- function() list(mean_phi = runif(1, 0, 1),
++                          sigma = runif(1, 0, 5),
++                          mean_p = runif(1, 0, 1))
+> 
+> ## Call Stan from R
+> leis_result <- stan("cjs_mnl_ran.stan",
++                     data = stan_data, init = inits, pars = params,
++                     chains = nc, iter = ni, warmup = nb, thin = nt,
++                     seed = 1,
++                     open_progress = FALSE)
+starting worker pid=9858 on localhost:11580 at 23:21:49.251
+starting worker pid=9866 on localhost:11580 at 23:21:49.391
+starting worker pid=9874 on localhost:11580 at 23:21:49.524
+starting worker pid=9882 on localhost:11580 at 23:21:49.661
+
+SAMPLING FOR MODEL 'cjs_mnl_ran' NOW (CHAIN 1).
+
+Chain 1, Iteration:    1 / 3000 [  0%]  (Warmup)
+SAMPLING FOR MODEL 'cjs_mnl_ran' NOW (CHAIN 2).
+
+Chain 2, Iteration:    1 / 3000 [  0%]  (Warmup)
+Chain 1, Iteration:  300 / 3000 [ 10%]  (Warmup)
+Chain 1, Iteration:  600 / 3000 [ 20%]  (Warmup)
+SAMPLING FOR MODEL 'cjs_mnl_ran' NOW (CHAIN 3).
+
+Chain 3, Iteration:    1 / 3000 [  0%]  (Warmup)
+Chain 2, Iteration:  300 / 3000 [ 10%]  (Warmup)
+Chain 1, Iteration:  900 / 3000 [ 30%]  (Warmup)
+Chain 1, Iteration: 1001 / 3000 [ 33%]  (Sampling)
+Chain 2, Iteration:  600 / 3000 [ 20%]  (Warmup)
+Chain 3, Iteration:  300 / 3000 [ 10%]  (Warmup)
+SAMPLING FOR MODEL 'cjs_mnl_ran' NOW (CHAIN 4).
+
+Chain 4, Iteration:    1 / 3000 [  0%]  (Warmup)
+Chain 1, Iteration: 1300 / 3000 [ 43%]  (Sampling)
+Chain 2, Iteration:  900 / 3000 [ 30%]  (Warmup)
+Chain 2, Iteration: 1001 / 3000 [ 33%]  (Sampling)
+Chain 1, Iteration: 1600 / 3000 [ 53%]  (Sampling)
+Chain 3, Iteration:  600 / 3000 [ 20%]  (Warmup)
+Chain 4, Iteration:  300 / 3000 [ 10%]  (Warmup)
+Chain 1, Iteration: 1900 / 3000 [ 63%]  (Sampling)
+Chain 3, Iteration:  900 / 3000 [ 30%]  (Warmup)
+Chain 2, Iteration: 1300 / 3000 [ 43%]  (Sampling)
+Chain 3, Iteration: 1001 / 3000 [ 33%]  (Sampling)
+Chain 1, Iteration: 2200 / 3000 [ 73%]  (Sampling)
+Chain 4, Iteration:  600 / 3000 [ 20%]  (Warmup)
+Chain 3, Iteration: 1300 / 3000 [ 43%]  (Sampling)
+Chain 1, Iteration: 2500 / 3000 [ 83%]  (Sampling)
+Chain 2, Iteration: 1600 / 3000 [ 53%]  (Sampling)
+Chain 4, Iteration:  900 / 3000 [ 30%]  (Warmup)
+Chain 4, Iteration: 1001 / 3000 [ 33%]  (Sampling)
+Chain 1, Iteration: 2800 / 3000 [ 93%]  (Sampling)
+Chain 3, Iteration: 1600 / 3000 [ 53%]  (Sampling)
+Chain 1, Iteration: 3000 / 3000 [100%]  (Sampling)
+#  Elapsed Time: 1.30755 seconds (Warm-up)
+#                1.68425 seconds (Sampling)
+#                2.9918 seconds (Total)
+
+
+Chain 2, Iteration: 1900 / 3000 [ 63%]  (Sampling)
+Chain 3, Iteration: 1900 / 3000 [ 63%]  (Sampling)
+Chain 4, Iteration: 1300 / 3000 [ 43%]  (Sampling)
+Chain 3, Iteration: 2200 / 3000 [ 73%]  (Sampling)
+Chain 2, Iteration: 2200 / 3000 [ 73%]  (Sampling)
+Chain 4, Iteration: 1600 / 3000 [ 53%]  (Sampling)
+Chain 3, Iteration: 2500 / 3000 [ 83%]  (Sampling)
+Chain 2, Iteration: 2500 / 3000 [ 83%]  (Sampling)
+Chain 4, Iteration: 1900 / 3000 [ 63%]  (Sampling)
+Chain 3, Iteration: 2800 / 3000 [ 93%]  (Sampling)
+Chain 3, Iteration: 3000 / 3000 [100%]  (Sampling)
+#  Elapsed Time: 1.22271 seconds (Warm-up)
+#                1.98158 seconds (Sampling)
+#                3.2043 seconds (Total)
+
+The following numerical problems occured the indicated number of times after warmup on chain 3
+                                                                                count
+Exception thrown at line 60: normal_log: Scale parameter is 0, but must be > 0!     1
+When a numerical problem occurs, the Metropolis proposal gets rejected.
+However, by design Metropolis proposals sometimes get rejected even when there are no numerical problems.
+Thus, if the number in the 'count' column is small, do not ask about this message on stan-users.
+
+Chain 2, Iteration: 2800 / 3000 [ 93%]  (Sampling)
+Chain 4, Iteration: 2200 / 3000 [ 73%]  (Sampling)
+Chain 2, Iteration: 3000 / 3000 [100%]  (Sampling)
+#  Elapsed Time: 1.2816 seconds (Warm-up)
+#                2.75186 seconds (Sampling)
+#                4.03345 seconds (Total)
+
+
+Chain 4, Iteration: 2500 / 3000 [ 83%]  (Sampling)
+Chain 4, Iteration: 2800 / 3000 [ 93%]  (Sampling)
+Chain 4, Iteration: 3000 / 3000 [100%]  (Sampling)
+#  Elapsed Time: 1.24406 seconds (Warm-up)
+#                2.5852 seconds (Sampling)
+#                3.82926 seconds (Total)
+
+The following numerical problems occured the indicated number of times after warmup on chain 4
+                                                                                count
+Exception thrown at line 60: normal_log: Scale parameter is 0, but must be > 0!     1
+When a numerical problem occurs, the Metropolis proposal gets rejected.
+However, by design Metropolis proposals sometimes get rejected even when there are no numerical problems.
+Thus, if the number in the 'count' column is small, do not ask about this message on stan-users.
+> 
+> ## Summarize posteriors
+> print(leis_result, digits = 3)
+Inference for Stan model: cjs_mnl_ran.
+4 chains, each with iter=3000; warmup=1000; thin=2; 
+post-warmup draws per chain=1000, total post-warmup draws=4000.
+
+               mean se_mean    sd     2.5%     25%     50%     75%   97.5%
+phi[1]        0.718   0.002 0.102    0.489   0.655   0.725   0.793   0.890
+phi[2]        0.725   0.002 0.095    0.520   0.667   0.734   0.792   0.892
+phi[3]        0.778   0.001 0.081    0.603   0.725   0.784   0.835   0.922
+phi[4]        0.762   0.001 0.079    0.596   0.712   0.765   0.820   0.900
+phi[5]        0.735   0.001 0.084    0.558   0.683   0.740   0.794   0.884
+phi[6]        0.776   0.001 0.077    0.618   0.725   0.779   0.830   0.917
+phi[7]        0.537   0.003 0.090    0.363   0.474   0.538   0.600   0.710
+phi[8]        0.735   0.001 0.082    0.562   0.682   0.739   0.793   0.881
+phi[9]        0.789   0.001 0.074    0.635   0.739   0.793   0.843   0.921
+phi[10]       0.764   0.001 0.077    0.602   0.715   0.767   0.818   0.905
+phi[11]       0.698   0.001 0.086    0.522   0.643   0.703   0.758   0.858
+phi[12]       0.682   0.001 0.076    0.528   0.633   0.684   0.736   0.821
+phi[13]       0.745   0.001 0.071    0.593   0.700   0.747   0.795   0.875
+phi[14]       0.839   0.002 0.062    0.708   0.799   0.844   0.885   0.944
+phi[15]       0.856   0.002 0.058    0.730   0.819   0.861   0.898   0.958
+phi[16]       0.701   0.001 0.067    0.564   0.657   0.702   0.747   0.829
+phi[17]       0.596   0.002 0.079    0.438   0.544   0.598   0.652   0.742
+phi[18]       0.661   0.002 0.090    0.475   0.602   0.664   0.722   0.826
+mean_p        0.747   0.000 0.028    0.692   0.729   0.747   0.766   0.800
+mean_phi      0.739   0.001 0.039    0.661   0.713   0.740   0.765   0.812
+sigma2        0.449   0.009 0.309    0.067   0.237   0.378   0.579   1.262
+sigma2_real   0.016   0.000 0.012    0.003   0.009   0.013   0.020   0.047
+fit          20.982   0.053 2.183   17.387  19.427  20.761  22.284  26.042
+fit_new      18.885   0.056 3.537   12.967  16.397  18.599  21.024  26.792
+lp__        -94.174   0.188 4.824 -104.243 -97.191 -94.123 -91.149 -84.631
+            n_eff  Rhat
+phi[1]       3921 1.000
+phi[2]       3467 1.000
+phi[3]       3081 1.001
+phi[4]       3271 1.000
+phi[5]       3565 1.000
+phi[6]       3182 1.001
+phi[7]       1259 1.002
+phi[8]       4000 0.999
+phi[9]       2684 1.001
+phi[10]      3041 1.000
+phi[11]      3933 1.001
+phi[12]      3906 1.000
+phi[13]      3700 1.001
+phi[14]      1472 1.002
+phi[15]      1019 1.002
+phi[16]      3724 1.001
+phi[17]      2314 1.002
+phi[18]      3376 1.001
+mean_p       3119 1.000
+mean_phi     2416 1.000
+sigma2       1086 1.001
+sigma2_real  1494 1.001
+fit          1684 1.003
+fit_new      4000 1.000
+lp__          658 1.002
+
+Samples were drawn using NUTS(diag_e) at Wed Dec 16 23:21:56 2015.
+For each parameter, n_eff is a crude measure of effective sample size,
+and Rhat is the potential scale reduction factor on split chains (at 
+convergence, Rhat=1).
+> 
+> proc.time()
+   user  system elapsed 
+ 22.678   0.786  30.705 

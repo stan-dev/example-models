@@ -9,10 +9,7 @@ set.seed(123)
 ## Read data
 ## The data generation code is in bpa-code.txt, available at
 ## http://www.vogelwarte.ch/de/projekte/publikationen/bpa/complete-code-and-data-files-of-the-book.html
-source("mr_mnl_age3.data.R")
-
-## Bundle data
-stan_data <- list(marr_j = marr_j,  marr_a = marr_a, n_age = n_age)
+stan_data <- read_rdump("mr_mnl_age3.data.R")
 
 ## Initial values
 inits <- function() list(sjuv = runif(1, 0, 1),

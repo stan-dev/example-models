@@ -12,13 +12,7 @@ set.seed(123)
 ## Read data
 ## The data generation code is in bpa-code.txt, available at
 ## http://www.vogelwarte.ch/de/projekte/publikationen/bpa/complete-code-and-data-files-of-the-book.html
-source("GLM_Poisson.data.R")
-
-## Bundle data
-mean.year <- mean(data$year)             # Mean of year covariate
-sd.year <- sd(data$year)                 # SD of year covariate
-
-stan_data <- list(C = C, n = n, year = year)
+stan_data <- read_rdump("GLM_Poisson.data.R")
 
 ## Initial values
 inits <- function() list(alpha = runif(1, -2, 2),

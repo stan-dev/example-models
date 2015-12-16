@@ -1,0 +1,160 @@
+
+R version 3.2.3 (2015-12-10) -- "Wooden Christmas-Tree"
+Copyright (C) 2015 The R Foundation for Statistical Computing
+Platform: x86_64-apple-darwin13.4.0 (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> ## 8. Estimation of survival probabilities using mark-recovery data
+> ## 8.2. The mark-recovery model as a state-space model
+> ## 8.2.2. Analysis of a model with constant parameters
+> 
+> library(rstan)
+Loading required package: ggplot2
+rstan (Version 2.8.1, packaged: 2015-11-18 17:18:35 UTC, GitRev: 05c3d0058b6a)
+For execution on a local, multicore CPU with excess RAM we recommend calling
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+> rstan_options(auto_write = TRUE)
+> options(mc.cores = parallel::detectCores())
+> set.seed(123)
+> 
+> ## Read data
+> ## The data generation code is in bpa-code.txt, available at
+> ## http://www.vogelwarte.ch/de/projekte/publikationen/bpa/complete-code-and-data-files-of-the-book.html
+> stan_data <- read_rdump("mr_ss.data.R")
+> 
+> ## Initial values
+> inits <- function() list(mean_s = runif(1, 0, 1),
++                          mean_r = runif(1, 0, 1))
+> 
+> ## Parameters monitored
+> params <- c("mean_s", "mean_r")
+> 
+> ## MCMC settings
+> ni <- 2000
+> nt <- 1
+> nb <- 1000
+> nc <- 4
+> 
+> ## Call Stan from R
+> mr_ss <- stan("mr_ss.stan",
++               data = stan_data, init = inits, pars = params,
++               chains = nc, iter = ni, warmup = nb, thin = nt,
++               seed = 1,
++               open_progress = FALSE)
+starting worker pid=10317 on localhost:11185 at 05:20:31.196
+starting worker pid=10325 on localhost:11185 at 05:20:31.319
+starting worker pid=10333 on localhost:11185 at 05:20:31.443
+starting worker pid=10341 on localhost:11185 at 05:20:31.566
+
+SAMPLING FOR MODEL 'mr_ss' NOW (CHAIN 1).
+
+Chain 1, Iteration:    1 / 2000 [  0%]  (Warmup)
+SAMPLING FOR MODEL 'mr_ss' NOW (CHAIN 2).
+
+Chain 2, Iteration:    1 / 2000 [  0%]  (Warmup)
+SAMPLING FOR MODEL 'mr_ss' NOW (CHAIN 3).
+
+Chain 3, Iteration:    1 / 2000 [  0%]  (Warmup)
+SAMPLING FOR MODEL 'mr_ss' NOW (CHAIN 4).
+
+Chain 4, Iteration:    1 / 2000 [  0%]  (Warmup)
+Chain 1, Iteration:  200 / 2000 [ 10%]  (Warmup)
+Chain 2, Iteration:  200 / 2000 [ 10%]  (Warmup)
+Chain 3, Iteration:  200 / 2000 [ 10%]  (Warmup)
+Chain 4, Iteration:  200 / 2000 [ 10%]  (Warmup)
+Chain 1, Iteration:  400 / 2000 [ 20%]  (Warmup)
+Chain 3, Iteration:  400 / 2000 [ 20%]  (Warmup)
+Chain 2, Iteration:  400 / 2000 [ 20%]  (Warmup)
+Chain 4, Iteration:  400 / 2000 [ 20%]  (Warmup)
+Chain 1, Iteration:  600 / 2000 [ 30%]  (Warmup)
+Chain 3, Iteration:  600 / 2000 [ 30%]  (Warmup)
+Chain 2, Iteration:  600 / 2000 [ 30%]  (Warmup)
+Chain 4, Iteration:  600 / 2000 [ 30%]  (Warmup)
+Chain 1, Iteration:  800 / 2000 [ 40%]  (Warmup)
+Chain 3, Iteration:  800 / 2000 [ 40%]  (Warmup)
+Chain 2, Iteration:  800 / 2000 [ 40%]  (Warmup)
+Chain 4, Iteration:  800 / 2000 [ 40%]  (Warmup)
+Chain 1, Iteration: 1000 / 2000 [ 50%]  (Warmup)
+Chain 1, Iteration: 1001 / 2000 [ 50%]  (Sampling)
+Chain 3, Iteration: 1000 / 2000 [ 50%]  (Warmup)
+Chain 3, Iteration: 1001 / 2000 [ 50%]  (Sampling)
+Chain 2, Iteration: 1000 / 2000 [ 50%]  (Warmup)
+Chain 2, Iteration: 1001 / 2000 [ 50%]  (Sampling)
+Chain 4, Iteration: 1000 / 2000 [ 50%]  (Warmup)
+Chain 4, Iteration: 1001 / 2000 [ 50%]  (Sampling)
+Chain 1, Iteration: 1200 / 2000 [ 60%]  (Sampling)
+Chain 3, Iteration: 1200 / 2000 [ 60%]  (Sampling)
+Chain 2, Iteration: 1200 / 2000 [ 60%]  (Sampling)
+Chain 4, Iteration: 1200 / 2000 [ 60%]  (Sampling)
+Chain 1, Iteration: 1400 / 2000 [ 70%]  (Sampling)
+Chain 3, Iteration: 1400 / 2000 [ 70%]  (Sampling)
+Chain 4, Iteration: 1400 / 2000 [ 70%]  (Sampling)
+Chain 2, Iteration: 1400 / 2000 [ 70%]  (Sampling)
+Chain 1, Iteration: 1600 / 2000 [ 80%]  (Sampling)
+Chain 3, Iteration: 1600 / 2000 [ 80%]  (Sampling)
+Chain 4, Iteration: 1600 / 2000 [ 80%]  (Sampling)
+Chain 2, Iteration: 1600 / 2000 [ 80%]  (Sampling)
+Chain 1, Iteration: 1800 / 2000 [ 90%]  (Sampling)
+Chain 3, Iteration: 1800 / 2000 [ 90%]  (Sampling)
+Chain 4, Iteration: 1800 / 2000 [ 90%]  (Sampling)
+Chain 2, Iteration: 1800 / 2000 [ 90%]  (Sampling)
+Chain 1, Iteration: 2000 / 2000 [100%]  (Sampling)
+#  Elapsed Time: 15.9354 seconds (Warm-up)
+#                17.5763 seconds (Sampling)
+#                33.5117 seconds (Total)
+
+
+Chain 3, Iteration: 2000 / 2000 [100%]  (Sampling)
+#  Elapsed Time: 15.8304 seconds (Warm-up)
+#                16.9524 seconds (Sampling)
+#                32.7828 seconds (Total)
+
+
+Chain 4, Iteration: 2000 / 2000 [100%]  (Sampling)
+#  Elapsed Time: 15.9767 seconds (Warm-up)
+#                17.3144 seconds (Sampling)
+#                33.2911 seconds (Total)
+
+
+Chain 2, Iteration: 2000 / 2000 [100%]  (Sampling)
+#  Elapsed Time: 16.8098 seconds (Warm-up)
+#                18.9416 seconds (Sampling)
+#                35.7514 seconds (Total)
+
+> 
+> ## Summarize posteriors
+> print(mr_ss, digits = 3)
+Inference for Stan model: mr_ss.
+4 chains, each with iter=2000; warmup=1000; thin=1; 
+post-warmup draws per chain=1000, total post-warmup draws=4000.
+
+           mean se_mean    sd     2.5%      25%      50%      75%    97.5%
+mean_s    0.835   0.001 0.035    0.768    0.811    0.834    0.858    0.904
+mean_r    0.188   0.001 0.031    0.141    0.167    0.184    0.204    0.259
+lp__   -421.812   0.035 1.060 -424.762 -422.219 -421.502 -421.058 -420.761
+       n_eff  Rhat
+mean_s   882 1.009
+mean_r   777 1.009
+lp__     899 1.009
+
+Samples were drawn using NUTS(diag_e) at Thu Dec 17 05:21:09 2015.
+For each parameter, n_eff is a crude measure of effective sample size,
+and Rhat is the potential scale reduction factor on split chains (at 
+convergence, Rhat=1).
+> 
+> 
+> proc.time()
+   user  system elapsed 
+  1.442   0.186  39.707 

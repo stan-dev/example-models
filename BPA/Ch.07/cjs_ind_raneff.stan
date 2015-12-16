@@ -42,9 +42,9 @@ functions {
 }
 
 data {
-  int<lower=0> nind;
-  int<lower=2> n_occasions;
-  int<lower=0,upper=1> y[nind, n_occasions];
+  int<lower=0> nind;            // Number of individuals
+  int<lower=2> n_occasions;     // Number of capture occasions
+  int<lower=0,upper=1> y[nind, n_occasions];    // Capture-history
 }
 
 transformed data {

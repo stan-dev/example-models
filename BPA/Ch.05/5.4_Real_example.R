@@ -2,6 +2,11 @@
 ## 5.4. Real example: House martin population counts in the village of
 ## Magden
 
+library(rstan)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+set.seed(123)
+
 ## Data generation code is transplanted from original bpa-code.txt
 ## House martin population data from Magden
 pyears <- 6 # Number of future years with predictions
