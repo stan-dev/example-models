@@ -4,7 +4,7 @@ Models from the book "Bayesian Population Analysis using WinBUGS --- A Hierarchi
 
 Origical BUGS code and data files are available at [the website of the book](http://www.vogelwarte.ch/de/projekte/publikationen/bpa/complete-code-and-data-files-of-the-book.html).
 
-Stan translations was done by Hiroki Itô <abies.firma@gmail.com>.
+Stan translations was done by Hiroki Itô <abies.firma@gmail.com>. I thank Dr. Kéry and Dr. Shaub for permitting to publish Stan translated models.
 
 ## Contents of the book
 
