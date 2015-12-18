@@ -40,7 +40,7 @@ out <- stan("Mtbh.stan",
             data = stan_data, init = inits, pars = params,
             chains = nc, iter = ni, warmup = nb, thin = nt,
             seed = 1,
-            control = list(adapt_delta = 0.9),
+            control = list(adapt_delta = 0.95),
             open_progress = FALSE)
 ## Note: There may be divergent transitions after warmup.
 ## The estimates may slightly differ from those by WinBUGS (p.160).

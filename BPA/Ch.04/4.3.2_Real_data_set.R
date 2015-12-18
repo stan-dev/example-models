@@ -340,8 +340,8 @@ params <- c("mu", "beta1", "beta2", "alpha", "gamma", "eps",
 
 ## MCMC settings
 ni <- 6000
-nt <- 5
-nb <- 1000
+nt <- 4
+nb <- 2000
 nc <- 4
 
 ## Call Stan from R
@@ -349,6 +349,7 @@ out7 <- stan("GLMM5.stan", data = stan_data,
              init = inits, pars = params,
              chains = nc, iter = ni, warmup = nb, thin = nt,
              seed = 1,
+             control = list(adapt_delta = 0.9),
              open_progress = FALSE)
 
 ## Summarize posteriors
