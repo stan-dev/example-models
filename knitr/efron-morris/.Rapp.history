@@ -1,0 +1,408 @@
+library(devtools)#
+    source_url("https://github.com/stan-dev/shinystan/raw/develop/install_shinystan.R")#
+    install_shinystan()
+quit()
+library(rstan)
+install.packages("devtools")
+library(devtools)#
+    source_url("https://github.com/stan-dev/shinystan/raw/develop/install_shinystan.R")#
+    install_shinystan()
+quit()
+2500 + 3300 + 1250 + 1290 + 2750 + 1250
+12340 - 1250
+11090/4
+12239 + 2772
+library(rstan)
+time()
+help(time)
+help(rstan)
+model <- stan_model(model_code="paramters { real y; } model { y ~ normal(0,1); }")
+model <- stan_model(model_code="parameters { real y; } model { y ~ normal(0,1); }")
+100000 * 10000000
+code_str <- "data { real mu; real sigma; } parameters { real y; } model { y ~ normal(mu,sigma); }"
+library(rstan)
+globalenv()
+ls()
+rm(code_str)
+ls()
+quit()
+1.11111111111111 - .0000000000001
+library(rstan)
+help(rstan)
+help(stan)
+labels(head(mon))
+library(R2jags)
+help(jags)
+(1/12) sum(1:12) / 12 + (11/12) sum(2:12) / 11
+(1/12) * sum(1:12) / 12 + (11/12) * sum(2:12) / 11
+1/25
+2100/60
+fit_jags_mcmc <- as.mcmc(fit_jags);#
+arr <- as.array(fit_jags_mcmc);#
+arr <- aperm(arr, c(1,3,2));#
+mon <- monitor(arr, inc_warmup = FALSE);
+help(ggsave)
+library(ggplot2)
+help(ggsave)
+getwd()
+library(rstan)
+N <- 100
+x <- rnorm(N, 6, 0.5)
+x
+x <- rnorm(N, 5.5, 0.5)
+x
+prog <- "data {int N; real x[N]} parameters { real<lower=0> mu; real<lower=0> sigma; } model {x ~ normal(mu,sigma); }"
+fit <- stan(model_code=prog, data=c("N", "x"))
+prog <- "data { int N; real x[N]; } parameters { real<lower=0> mu; real<lower=0> sigma; } model { x ~ normal(mu,sigma); }"
+fit <- stan(model_code=prog, data=c("N", "x"))
+print(fit)
+prog <- "data { int N; real x[N]; } parameters { real<lower=0> mu; real<lower=0> sigma; } model { x ~ normal(mu,sigma); }"
+N <- 100
+x <- rnorm(N, 5.5, 0.5)
+fit <- stan(model_code=prog, data=c("N", "x"))
+library(rstan)
+help(stan)
+library(rstan)
+help(sampling)
+model <- "data { real y[3]; } parameters { real mu; } model { y ~ normal(mu, 1); }"
+compiled_model <- stan_model(model_code=model)
+inits <- function() { return(list(y=c(1,2,3)))}
+inits <- function() { return(list(mu=3)); }
+inits()
+fit <- sampling(compiled_model, data=c(1,2,3), init=inits)
+fit <- sampling(compiled_model, data=list(y=c(1,2,3)), init=inits)
+list(N=10000)
+library('rstan')
+code1 <- '#
+    data {#
+      int N;#
+    }#
+    parameters {#
+      vector[N] p;#
+    }#
+    model {#
+      p ~ normal(0, 1);#
+    }#
+'#
+#
+library(rstan)#
+sm <- stan_model(model_code = code1)#
+#
+## ok#
+system.time(sampling(sm, data = list(N = 10000), iter = 10))#
+#
+## really slow!#
+system.time(sampling(sm, data = list(N = 100000), iter = 10))
+help(stan)
+library(rstan)
+help(testify)
+quit()
+model <- "data { int N; real y[N]; } parameters { real mu; } model { y ~ normal(mu, 1); }"
+N <- 1
+y <- array(c(1), c(1))
+y
+library(rstan)
+fit <- stan(model_code=model, data=list(N=N, y=y))
+mu_post <- extract(fit)$mu
+hist(mu_post)
+sum(mu_post > 0) / length(mu_post)
+y <- rpois(100,10)
+hist(y)
+seq(0.5,19.5,1)
+hist(y, breaks=seq(0.5, 19.5, 1)
+)
+library(ggplot2)
+df = data.frame(y)
+qplot(y, data=df, geom="histogram")
+library(rstan)
+model <- "parameters { real mu; } model { mu ~ normal(0, 1); }"
+fit <- stan(model_code=model)
+install.packages("rstan", repos = "http://cran.rstudio.com", #
+                 dependencies = TRUE)
+quit()
+model <- "parameters { real mu; } model { mu ~ normal(0, 1); }"
+library(rstan)
+fit <- stan(model_code=model)
+load("/Users/carp/Library/Containers/com.apple.mail/Data/Library/Mail Downloads/8D3068C4-B018-402C-94F2-F5A2D61B6A35/stanmodel.rda")
+26629.43/3
+y <- rbinom(1000, 28, 0.056)
+hist(y)
+summary(y / 1000)
+summary(y / 28)
+y <- rbinom(1000, 10, 0.5)
+summary(y)
+255 * 280 * 1000
+help(pgamma)
+help(pnorm)
+library(rstan)
+model <- "#
+// Malingering, with Individual Differences#
+data {#
+int<lower=1> n;#
+int<lower=1> p;#
+int<lower=0,upper=n> k[p];#
+}#
+parameters {#
+real<lower=0,upper=1> phi;#
+real<lower=0,upper=1> mubon;#
+real<lower=0> mudiff;#
+real<lower=40,upper=800> lambdabon;#
+real<lower=4,upper=100> lambdamal;#
+matrix<lower=0,upper=1>[p,2] theta;#
+}#
+transformed parameters {#
+vector[2] lp_parts[p];#
+vector<lower=0>[2] alpha;#
+vector<lower=0>[2] beta;#
+real<lower=0,upper=1> mumal;#
+// Additivity on Logit Scale#
+mumal <- inv_logit(logit(mubon) - mudiff);#
+// Transformation to Group Mean and Precision#
+alpha[1] <- mubon * lambdabon;#
+beta[1] <- lambdabon * (1 - mubon);#
+alpha[2] <- mumal * lambdamal;#
+beta[2] <- lambdamal * (1 - mumal);#
+// Data are Binomial with Rate Given by#
+// Each Person’s Group Assignment#
+for (i in 1:p) {#
+lp_parts[i,1] <- log1m(phi) + binomial_log(k[i], n, theta[i,1]);#
+lp_parts[i,2] <- log(phi) + binomial_log(k[i], n, theta[i,2]);#
+}#
+}#
+model {#
+// Priors#
+mubon ~ beta(1, 1); // can be removed#
+mudiff ~ normal(0, 1 / sqrt(.5))T[0,]; // Constrained to be Positive#
+// Relatively Uninformative Prior on Base Rate#
+phi ~ beta(5, 5);#
+for (i in 1:p)#
+theta[i] ~ beta(alpha, beta);#
+for (i in 1:p)#
+increment_log_prob(log_sum_exp(lp_parts[i]));#
+}#
+generated quantities {#
+int<lower=0,upper=1> z[p];#
+for (i in 1:p) {#
+vector[2] prob;#
+prob <- softmax(lp_parts[i]);#
+// Each Person Belongs to One of Two Latent Groups#
+z[i] <- bernoulli_rng(prob[2]);#
+}#
+}"#
+k <- c(45, 45, 44, 45, 44, 45, 45, 45, 45, 45, 30,#
+20, 6, 44, 44, 27, 25, 17, 14, 27, 35, 30)#
+p <- length(k) # number of people#
+n <- 45 # number of questions#
+data <- list(p=p, k=k, n=n) # To be passed on to Stan#
+myinits <- list(#
+list(phi=.5, mubon=.5, mudiff=1, lambdabon=400, lambdamal=50,#
+theta=matrix(rep(.5, p * 2), p, 2)))#
+# Parameters to be monitored#
+parameters <- c("mubon", "lambdabon", "mumal", "lambdamal", "mudiff",#
+"phi", "theta", "z")#
+# The following command calls Stan with specific options.#
+# For a detailed description type "?rstan".#
+samples <- stan(model_code=model,#
+data=data,#
+init=myinits, # If not specified, gives random inits#
+pars=parameters,#
+iter=3000,#
+chains=1,#
+thin=1,#
+# warmup = 100, # Stands for burn-in; Default = iter/2#
+# seed = 123 # Setting seed; Default is random seed#
+)#
+# Now the values for the monitored parameters are in the "samples" object,#
+# ready for inspection.#
+print(samples, digits=3)
+print(samples$z[,1])
+print(extract(samples)$z[,1])
+a <- 5:7
+a
+a[2:3]
+a[2:3] <- a[1:2]
+a
+a[2:3] <- a
+a
+a <- 5:7
+a[c(2,3,1)] <- a
+a
+a <- 5:7
+a
+a[c(2,3,1)]
+a[c(2,3,1)] <- a
+a
+a <- 5:7
+a[c(2,3,1)] <- c(10,20,30)
+a
+a <- 5:7
+a[c(2,3,1)] <- a
+a
+a[(c(2,3,1))] <- 5:7
+a
+a <- 5:7
+a[2] <- a[1]
+a[3] <- a[2]
+a[1] <- a[3]
+a
+a <- c(1,2,3)
+a + c(10,10,10,10,10)
+3250 / 4
+library(rstan)
+stan_demo()
+quit()
+1.02^10
+2900/4
+sample(1:10)
+sample(100, 1:10, replace=true)
+help(sample)
+sample(10, replace=false)
+sample(1)
+sample(10)
+sample(10, 1)
+sample(10, 100, replace=TRUE)
+a <- sample(10, 10000, replace=TRUE)
+b <- matrix(a, 2, length(a)/2)
+head(b)
+for (i in 1:5000) b[,i] <- sort(b[,i])
+b[,2]
+b[,3]
+sum <- 0
+for (i in 1:5000) sum <- sum + b[2,i] - b[1,i]
+sum / 5000
+logit <- funtion(p) { log(p / (1 - p)) }
+logit <- function(p) { log(p / (1 - p)) }
+logit(0.1)
+logit(0.2)
+logit(0.5)
+logit(0.35)
+help(sample)
+library(rstan)
+help(rstan)
+quit()
+setwd("~/stan-dev/example-models/knitr/efron-morris/")
+df <- read("data.tsv")
+df <- read.tsv("data.tsv")
+df <- read.csv("data.tsv")
+df
+head(df)
+df <- read.csv("data.tsv", sep="\t")
+head(df)
+df
+options(width=120)
+df
+options("width"=120)
+df
+options("width"=200)
+df
+df[[3]]
+rows(df)
+dims(df)
+dim(df)
+dim(df)[1]
+df[[3]][1]
+list(N=dim(df)[1],#
+                      K1=df[[3]][1],                      #
+                      y1=df[[4]],#
+                      K2=df[[5]])
+list(N=dim(df)[1],#
+                      K1=df[[3]][1],                      #
+                      y1=df[[4]],#
+                      K2=df[[6]])
+source('fit.R')
+source('fit.R')
+source('fit.R')
+source('fit.R')
+print(fit, "theta")
+print(fit, "y2")
+y2
+df
+source('fit.R')
+source('fit.R')
+print(fit)
+print(fit, "y")
+df
+print(fit, "y", digits=1)
+quantile(c(1,2,3,4,5))
+quantile(c(1,2,3,4,5), prob=c(0.25, 0.75)
+)
+quantile(c(1,2,3,4,5), prob=c(0.25, 0.75))[1]
+df[[9]]
+fit_ss <- extract(fit)#
+print("%12s  (%3s, %3s)  %3s", "name", "0.1", "0.9", "y");#
+for (n in 1:N) {#
+  quantiles <- quantile(fit_ss$y[,n], prob=c(0.1, 0.9))#
+  print(sprintf("%12s  (%3.0f,  %3.0f)  %3.0f",#
+                df[[2]][n], quantiles[1], quantiles[2], y[n]),#
+        quote=FALSE);#
+}
+N <- dim(df)[1];#
+K1 <- df[[3]][1];#
+y1 <- df[[4]];#
+K2 <- df[[6]];#
+y <- df[[9]];
+fit <- stan("hier.stan", data=c("N", "K1", "y1", "K2"));#
+fit_ss <- extract(fit)#
+print("%12s  (%3s, %3s)  %3s", "name", "0.1", "0.9", "y");
+print("%12s  (%3s, %3s)  %3s", "name", "f", "g", "y");
+print(sprintf("%12s  (%3s, %3s)  %3s", "name", "f", "g", "y"), #
+      quote=FALSE);#
+for (n in 1:N) {#
+  quantiles <- quantile(fit_ss$y[,n], prob=c(0.1, 0.9))#
+  print(sprintf("%12s  (%3.0f,  %3.0f)  %3.0f",#
+                df[[2]][n], quantiles[1], quantiles[2], y[n]),#
+        quote=FALSE);#
+}
+print(sprintf("%12s  (%3s, %3s)  %3s", "name", "0.1", "0.9", "y"), #
+      quote=FALSE);#
+for (n in 1:N) {#
+  quantiles <- quantile(fit_ss$y[,n], prob=c(0.1, 0.9))#
+  print(sprintf("%12s  (%3.0f, %3.0f)  %3.0f",#
+                df[[2]][n], quantiles[1], quantiles[2], y[n]),#
+        quote=FALSE);#
+}
+L <- 0.1;#
+H <- 0.9;#
+print(sprintf("%12s  (%3.2f, %3.2f)  %3s", "name", L, H, "y"), #
+      quote=FALSE);
+for (n in 1:N) {#
+  quantiles <- quantile(fit_ss$y[,n], prob=c(low, high))#
+  print(sprintf("%12s  (%3.0f, %3.0f)  %3.0f",#
+                df[[2]][n], quantiles[1], quantiles[2], y[n]),#
+        quote=FALSE);#
+}
+for (n in 1:N) {#
+  quantiles <- quantile(fit_ss$y[,n], prob=c(L, H))#
+  print(sprintf("%12s  (%3.0f, %3.0f)  %3.0f",#
+                df[[2]][n], quantiles[1], quantiles[2], y[n]),#
+        quote=FALSE);#
+}
+[1]         name  (0.10, 0.90)    y
+K + K2[1]
+K1 + K2[1]
+0.8 * 412
+0.4 * 412
+log(0.275 / (1 - .275))
+1 / (1 + exp(-2))
+1 / (1 + exp(0))
+1 / (1 + exp(2))
+fit <- stan("hier-logit.stan", data=c("N", "K1", "y1", "K2"));
+fit <- stan("hier-logit.stan", data=c("N", "K1", "y1", "K2"));
+fit <- stan("hier-logit.stan", data=c("N", "K1", "y1", "K2"));
+fit <- stan("hier-logit.stan", data=c("N", "K1", "y1", "K2"));
+print(fit)
+print(fit, digits=3)
+fit <- stan("hier-logit.stan", data=c("N", "K1", "y1", "K2"),#
+            iter=5000,#
+            control=list(stepsize=0.01, adapt_delta=0.99));
+print(fit, digits=3)
+tracplot(fit, "lp__")
+traceplot(fit, "lp__")
+fit <- stan("hier-logit.stan", data=c("N", "K1", "y1", "K2"),#
+            iter=5000,#
+            control=list(stepsize=0.01, adapt_delta=0.99));
+print(fit, digits=3)
+fit_logistic <-#
+  stan("hier-logit.stan", data=c("N", "K1", "y1", "K2"),#
+       iter=5000);
+print(fit, digits=3)
