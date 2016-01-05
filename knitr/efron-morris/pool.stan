@@ -4,7 +4,7 @@ data {
   int<lower=0, upper=K> y[N];    // initial successes
 }
 parameters {
-  real<lower=0, upper=1> theta;  // player ability
+  real<lower=0, upper=1> theta;  // chance of success
 }
 model {
   y ~ binomial(K, theta);        // likelihood

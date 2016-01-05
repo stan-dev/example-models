@@ -2,7 +2,6 @@ data {
   int<lower=0> N;                     // players
   int<lower=0> K;                     // first at-bats
   int<lower=0, upper=K> y[N];         // first hits
-  int<lower=0> J[N];                  // remaining at bats
 }
 parameters {
   real<lower=0, upper=1> phi;         // population ability
@@ -15,6 +14,11 @@ model {
   y ~ binomial(K, theta);                        // likelihood
 }
 generated quantities {
-  int<lower=0, upper=1> some_ability_gt_350;
-  some_ability_gt_350 <- (max(theta) > 0.35);
+  int<lower=1, upper=N> rnk[N];   // rnk[n] is rank of player n
+  {
+    int dsc[N];
+    dsc <- sort_indices_desc(theta);
+    for (n in 1:N)
+      rnk[dsc[n]] <- n;
+  }
 }
