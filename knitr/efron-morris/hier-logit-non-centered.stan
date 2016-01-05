@@ -9,8 +9,8 @@ parameters {
   vector[N] alpha;               // success log-odds
 }
 model {
-  sigma ~ normal(0, 2);          // hyperprior
-  mu ~ normal(-1, 2);            // hyperprior
+  mu ~ normal(-1, 1);            // hyperprior
+  sigma ~ normal(0, 1);          // hyperprior
   alpha ~ normal(0, 1);          // hierarchical prior
   y ~ binomial_logit(K, mu + sigma * alpha);  // likelihood
 }

@@ -619,7 +619,7 @@ This trick, originally introduced by Matt Hoffman, is to parameterize in terms o
 It can be fit, with values extracted as before.
 ```{r  comment=NA, results='hide'}
 fit_hier_logit_nc <- stan("hier-logit-non-centered.stan", data=c("N", "K", "y"),
-                          control=list(stepsize=0.01, adapt_delta=0.99));
+                          control=list(stepsize=0.001, adapt_delta=0.999));
 ss_hier_logit_nc <- extract(fit_hier_logit_nc);
 ```
 And now we see much higher effective sample sizes and R-hat values rounding to 1.
@@ -648,10 +648,11 @@ A hierarchical model introduces an estimation bias toward the population mean an
 
 1.  How sensitive is the logistic model to the hyperprior?  If we made it much less informative or much more informative, how much do the fitted values differ?  How do the predictions differ?  Evaluate the prior used by Lunn et al. (2013), which is $\mathsf{Uniform}(-100,100)$ for $\mu$ and $\mathsf{Uniform}(0, 100)$ for $\sigma$.  Be sure to add constraints on the declarations of $\mu$ and $\sigma$ to match the constraints.  What happens if the width of the uniform grows much wider or much narrower?
 
+1.  Figure out how to take all the hard-coded output analysis in here and make it dynamic by making better use of knitr.
 
 ### References
 
-* Betancourt, M. and Girolami, M. (2015) Hamiltonian Monte Carlo for hierarchical models. <iCurrent Trends in Bayesian Methodology with Applications</i> <b>79</b>.
+* Betancourt, M. and Girolami, M. (2015) Hamiltonian Monte Carlo for hierarchical models. <i>Current Trends in Bayesian Methodology with Applications</i> <b>79</b>.
 
 * Efron, B. and Morris, C. (1975) Data analysis using Stein's estimator and its generalizations. <i>Journal of the American Statistical Association</i> <b>70</b>(350), 311--319. [ [pdf](http://www.medicine.mcgill.ca/epidemiology/hanley/bios602/MultilevelData/EfronMorrisJASA1975.pdf) ]
 
