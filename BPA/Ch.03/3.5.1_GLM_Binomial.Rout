@@ -3,19 +3,21 @@ R version 3.2.3 (2015-12-10) -- "Wooden Christmas-Tree"
 Copyright (C) 2015 The R Foundation for Statistical Computing
 Platform: x86_64-apple-darwin13.4.0 (64-bit)
 
-R is free software and comes with ABSOLUTELY NO WARRANTY.
-You are welcome to redistribute it under certain conditions.
-Type 'license()' or 'licence()' for distribution details.
+R は、自由なソフトウェアであり、「完全に無保証」です。 
+一定の条件に従えば、自由にこれを再配布することができます。 
+配布条件の詳細に関しては、'license()' あるいは 'licence()' と入力してください。 
 
-R is a collaborative project with many contributors.
-Type 'contributors()' for more information and
-'citation()' on how to cite R or R packages in publications.
+R は多くの貢献者による共同プロジェクトです。 
+詳しくは 'contributors()' と入力してください。 
+また、R や R のパッケージを出版物で引用する際の形式については 
+'citation()' と入力してください。 
 
-Type 'demo()' for some demos, 'help()' for on-line help, or
-'help.start()' for an HTML browser interface to help.
-Type 'q()' to quit R.
+'demo()' と入力すればデモをみることができます。 
+'help()' とすればオンラインヘルプが出ます。 
+'help.start()' で HTML ブラウザによるヘルプがみられます。 
+'q()' と入力すれば R を終了します。 
 
-[Previously saved workspace restored]
+ [以前にセーブされたワークスペースを復帰します] 
 
 > ## 3. Introduction to the generalized linear model (GLM): The simplest
 > ## model for count data
@@ -23,8 +25,8 @@ Type 'q()' to quit R.
 > ## 3.5.1. Generation and analysis of simulated data
 > 
 > library(rstan)
-Loading required package: ggplot2
-rstan (Version 2.8.1, packaged: 2015-11-18 17:18:35 UTC, GitRev: 05c3d0058b6a)
+ 要求されたパッケージ ggplot2 をロード中です 
+rstan (Version 2.8.2, packaged: 2015-11-26 15:27:02 UTC, GitRev: 05c3d0058b6a)
 For execution on a local, multicore CPU with excess RAM we recommend calling
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
@@ -57,10 +59,10 @@ options(mc.cores = parallel::detectCores())
 +             chains = nc, thin = nt, iter = ni, warmup = nb,
 +             seed = 1,
 +             open_progress = FALSE)
-starting worker pid=5161 on localhost:11761 at 19:17:23.191
-starting worker pid=5169 on localhost:11761 at 19:17:23.318
-starting worker pid=5177 on localhost:11761 at 19:17:23.442
-starting worker pid=5185 on localhost:11761 at 19:17:23.576
+starting worker pid=6992 on localhost:11463 at 20:06:11.534
+starting worker pid=7000 on localhost:11463 at 20:06:11.701
+starting worker pid=7008 on localhost:11463 at 20:06:11.860
+starting worker pid=7016 on localhost:11463 at 20:06:12.022
 
 SAMPLING FOR MODEL 'GLM_Binomial' NOW (CHAIN 1).
 
@@ -76,9 +78,9 @@ Chain 1, Iteration: 1400 / 2000 [ 70%]  (Sampling)
 Chain 1, Iteration: 1600 / 2000 [ 80%]  (Sampling)
 Chain 1, Iteration: 1800 / 2000 [ 90%]  (Sampling)
 Chain 1, Iteration: 2000 / 2000 [100%]  (Sampling)
-#  Elapsed Time: 0.058315 seconds (Warm-up)
-#                0.066214 seconds (Sampling)
-#                0.124529 seconds (Total)
+#  Elapsed Time: 0.055432 seconds (Warm-up)
+#                0.062876 seconds (Sampling)
+#                0.118308 seconds (Total)
 
 
 SAMPLING FOR MODEL 'GLM_Binomial' NOW (CHAIN 2).
@@ -95,9 +97,9 @@ Chain 2, Iteration: 1400 / 2000 [ 70%]  (Sampling)
 Chain 2, Iteration: 1600 / 2000 [ 80%]  (Sampling)
 Chain 2, Iteration: 1800 / 2000 [ 90%]  (Sampling)
 Chain 2, Iteration: 2000 / 2000 [100%]  (Sampling)
-#  Elapsed Time: 0.056943 seconds (Warm-up)
-#                0.048564 seconds (Sampling)
-#                0.105507 seconds (Total)
+#  Elapsed Time: 0.059468 seconds (Warm-up)
+#                0.062867 seconds (Sampling)
+#                0.122335 seconds (Total)
 
 
 SAMPLING FOR MODEL 'GLM_Binomial' NOW (CHAIN 3).
@@ -114,9 +116,9 @@ Chain 3, Iteration: 1400 / 2000 [ 70%]  (Sampling)
 Chain 3, Iteration: 1600 / 2000 [ 80%]  (Sampling)
 Chain 3, Iteration: 1800 / 2000 [ 90%]  (Sampling)
 Chain 3, Iteration: 2000 / 2000 [100%]  (Sampling)
-#  Elapsed Time: 0.059119 seconds (Warm-up)
-#                0.063753 seconds (Sampling)
-#                0.122872 seconds (Total)
+#  Elapsed Time: 0.065504 seconds (Warm-up)
+#                0.066562 seconds (Sampling)
+#                0.132066 seconds (Total)
 
 
 SAMPLING FOR MODEL 'GLM_Binomial' NOW (CHAIN 4).
@@ -133,9 +135,9 @@ Chain 4, Iteration: 1400 / 2000 [ 70%]  (Sampling)
 Chain 4, Iteration: 1600 / 2000 [ 80%]  (Sampling)
 Chain 4, Iteration: 1800 / 2000 [ 90%]  (Sampling)
 Chain 4, Iteration: 2000 / 2000 [100%]  (Sampling)
-#  Elapsed Time: 0.05554 seconds (Warm-up)
-#                0.062492 seconds (Sampling)
-#                0.118032 seconds (Total)
+#  Elapsed Time: 0.059779 seconds (Warm-up)
+#                0.065746 seconds (Sampling)
+#                0.125525 seconds (Total)
 
 > 
 > ## Summarize posteriors
@@ -145,50 +147,50 @@ Inference for Stan model: GLM_Binomial.
 post-warmup draws per chain=1000, total post-warmup draws=4000.
 
           mean se_mean   sd     2.5%      25%      50%      75%    97.5% n_eff
-alpha     1.02    0.00 0.06     0.89     0.97     1.01     1.06     1.15  1407
-beta1    -0.17    0.00 0.07    -0.32    -0.22    -0.18    -0.12    -0.03  1593
-beta2    -0.93    0.00 0.14    -1.20    -1.03    -0.93    -0.82    -0.65  1353
-p[1]      0.59    0.00 0.03     0.53     0.57     0.58     0.60     0.64  1934
-p[2]      0.60    0.00 0.02     0.56     0.59     0.60     0.62     0.65  2002
-p[3]      0.62    0.00 0.02     0.58     0.61     0.62     0.64     0.66  2074
-p[4]      0.64    0.00 0.02     0.60     0.62     0.64     0.65     0.67  2144
-p[5]      0.65    0.00 0.02     0.62     0.64     0.65     0.66     0.68  2198
-p[6]      0.66    0.00 0.02     0.63     0.65     0.66     0.67     0.69  1913
-p[7]      0.68    0.00 0.01     0.65     0.67     0.68     0.69     0.70  1823
-p[8]      0.69    0.00 0.01     0.66     0.68     0.69     0.70     0.71  1717
-p[9]      0.70    0.00 0.01     0.67     0.69     0.70     0.70     0.72  1611
-p[10]     0.70    0.00 0.01     0.68     0.70     0.70     0.71     0.73  1519
-p[11]     0.71    0.00 0.01     0.69     0.70     0.71     0.72     0.73  1449
-p[12]     0.72    0.00 0.01     0.70     0.71     0.72     0.73     0.74  1400
-p[13]     0.72    0.00 0.01     0.70     0.72     0.72     0.73     0.75  1370
-p[14]     0.73    0.00 0.01     0.70     0.72     0.73     0.74     0.75  1355
-p[15]     0.73    0.00 0.01     0.71     0.72     0.73     0.74     0.75  1435
-p[16]     0.73    0.00 0.01     0.71     0.73     0.73     0.74     0.76  1414
-p[17]     0.74    0.00 0.01     0.71     0.73     0.73     0.74     0.76  1403
-p[18]     0.74    0.00 0.01     0.71     0.73     0.74     0.74     0.76  1400
-p[19]     0.74    0.00 0.01     0.71     0.73     0.74     0.74     0.76  1405
-p[20]     0.73    0.00 0.01     0.71     0.73     0.73     0.74     0.76  1413
-p[21]     0.73    0.00 0.01     0.71     0.72     0.73     0.74     0.76  1427
-p[22]     0.73    0.00 0.01     0.70     0.72     0.73     0.74     0.75  1445
-p[23]     0.72    0.00 0.01     0.70     0.72     0.72     0.73     0.75  1470
-p[24]     0.72    0.00 0.01     0.70     0.71     0.72     0.73     0.74  1504
-p[25]     0.71    0.00 0.01     0.69     0.71     0.71     0.72     0.74  1548
-p[26]     0.71    0.00 0.01     0.68     0.70     0.71     0.72     0.73  1603
-p[27]     0.70    0.00 0.01     0.68     0.69     0.70     0.71     0.72  1669
-p[28]     0.69    0.00 0.01     0.67     0.68     0.69     0.70     0.71  1751
-p[29]     0.68    0.00 0.01     0.65     0.67     0.68     0.69     0.70  1845
-p[30]     0.67    0.00 0.01     0.64     0.66     0.67     0.68     0.69  1944
-p[31]     0.65    0.00 0.01     0.63     0.65     0.66     0.66     0.68  2028
-p[32]     0.64    0.00 0.01     0.61     0.63     0.64     0.65     0.67  2080
-p[33]     0.63    0.00 0.01     0.59     0.62     0.63     0.64     0.66  2059
-p[34]     0.61    0.00 0.02     0.58     0.60     0.61     0.62     0.64  1993
-p[35]     0.59    0.00 0.02     0.55     0.58     0.59     0.60     0.63  1906
-p[36]     0.57    0.00 0.02     0.53     0.56     0.57     0.58     0.61  1818
-p[37]     0.55    0.00 0.02     0.51     0.54     0.55     0.56     0.60  1736
-p[38]     0.53    0.00 0.03     0.48     0.51     0.53     0.54     0.58  1662
-p[39]     0.50    0.00 0.03     0.45     0.49     0.50     0.52     0.56  1602
-p[40]     0.48    0.00 0.03     0.42     0.46     0.48     0.50     0.54  1554
-lp__  -1628.30    0.03 1.21 -1631.43 -1628.81 -1628.00 -1627.43 -1626.94  1292
+alpha     1.02    0.00 0.06     0.89     0.97     1.02     1.06     1.14  1432
+beta1    -0.17    0.00 0.07    -0.31    -0.22    -0.17    -0.12    -0.03  1688
+beta2    -0.92    0.00 0.15    -1.21    -1.02    -0.92    -0.82    -0.63  1252
+p[1]      0.59    0.00 0.03     0.53     0.56     0.59     0.61     0.64  1867
+p[2]      0.60    0.00 0.03     0.55     0.59     0.60     0.62     0.65  1925
+p[3]      0.62    0.00 0.02     0.58     0.61     0.62     0.64     0.66  1992
+p[4]      0.64    0.00 0.02     0.60     0.62     0.64     0.65     0.68  2067
+p[5]      0.65    0.00 0.02     0.62     0.64     0.65     0.66     0.69  2143
+p[6]      0.66    0.00 0.02     0.63     0.65     0.66     0.68     0.69  2208
+p[7]      0.68    0.00 0.01     0.65     0.67     0.68     0.69     0.70  2244
+p[8]      0.69    0.00 0.01     0.66     0.68     0.69     0.70     0.71  2232
+p[9]      0.70    0.00 0.01     0.67     0.69     0.70     0.70     0.72  2169
+p[10]     0.70    0.00 0.01     0.68     0.70     0.70     0.71     0.73  2067
+p[11]     0.71    0.00 0.01     0.69     0.70     0.71     0.72     0.73  1948
+p[12]     0.72    0.00 0.01     0.70     0.71     0.72     0.73     0.74  1816
+p[13]     0.72    0.00 0.01     0.70     0.72     0.72     0.73     0.75  1694
+p[14]     0.73    0.00 0.01     0.71     0.72     0.73     0.74     0.75  1603
+p[15]     0.73    0.00 0.01     0.71     0.72     0.73     0.74     0.75  1538
+p[16]     0.73    0.00 0.01     0.71     0.73     0.73     0.74     0.76  1493
+p[17]     0.73    0.00 0.01     0.71     0.73     0.74     0.74     0.76  1463
+p[18]     0.74    0.00 0.01     0.71     0.73     0.74     0.74     0.76  1445
+p[19]     0.74    0.00 0.01     0.71     0.73     0.74     0.74     0.76  1437
+p[20]     0.73    0.00 0.01     0.71     0.73     0.73     0.74     0.76  1438
+p[21]     0.73    0.00 0.01     0.71     0.72     0.73     0.74     0.76  1447
+p[22]     0.73    0.00 0.01     0.70     0.72     0.73     0.74     0.75  1465
+p[23]     0.72    0.00 0.01     0.70     0.72     0.73     0.73     0.75  1493
+p[24]     0.72    0.00 0.01     0.69     0.71     0.72     0.73     0.74  1533
+p[25]     0.71    0.00 0.01     0.69     0.71     0.71     0.72     0.74  1589
+p[26]     0.71    0.00 0.01     0.68     0.70     0.71     0.72     0.73  1665
+p[27]     0.70    0.00 0.01     0.67     0.69     0.70     0.71     0.72  1762
+p[28]     0.69    0.00 0.01     0.66     0.68     0.69     0.70     0.71  1879
+p[29]     0.68    0.00 0.01     0.65     0.67     0.68     0.69     0.70  2011
+p[30]     0.67    0.00 0.01     0.64     0.66     0.67     0.68     0.69  2152
+p[31]     0.66    0.00 0.01     0.63     0.65     0.66     0.66     0.68  2284
+p[32]     0.64    0.00 0.01     0.61     0.63     0.64     0.65     0.67  2372
+p[33]     0.63    0.00 0.01     0.60     0.62     0.63     0.64     0.65  2392
+p[34]     0.61    0.00 0.02     0.58     0.60     0.61     0.62     0.64  2344
+p[35]     0.59    0.00 0.02     0.55     0.58     0.59     0.60     0.63  2253
+p[36]     0.57    0.00 0.02     0.53     0.56     0.57     0.58     0.61  2141
+p[37]     0.55    0.00 0.02     0.51     0.54     0.55     0.57     0.60  2024
+p[38]     0.53    0.00 0.03     0.48     0.51     0.53     0.55     0.58  1922
+p[39]     0.50    0.00 0.03     0.45     0.49     0.50     0.52     0.56  1837
+p[40]     0.48    0.00 0.03     0.42     0.46     0.48     0.50     0.54  1764
+lp__  -1628.33    0.03 1.21 -1631.49 -1628.90 -1628.03 -1627.45 -1626.94  1275
       Rhat
 alpha    1
 beta1    1
@@ -235,11 +237,11 @@ p[39]    1
 p[40]    1
 lp__     1
 
-Samples were drawn using NUTS(diag_e) at Wed Dec 16 19:17:26 2015.
+Samples were drawn using NUTS(diag_e) at Wed Jan  6 20:06:15 2016.
 For each parameter, n_eff is a crude measure of effective sample size,
 and Rhat is the potential scale reduction factor on split chains (at 
 convergence, Rhat=1).
 > 
 > proc.time()
-   user  system elapsed 
-  1.651   0.184   5.075 
+   ユーザ   システム       経過  
+    18.903      0.654     23.091 

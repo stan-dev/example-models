@@ -11,12 +11,12 @@ data {
 }
 
 parameters {
-  real alpha[nsite];            // site effects
-  real eps2[nyear - 1];	        // year effects (year > 1)
+  real alpha[nsite];            // Site effects
+  real eps2[nyear - 1];	        // Year effects (year > 1)
 }
 
 transformed parameters {
-  real eps[nyear];	        // year effects
+  real eps[nyear];	        // Year effects
   real log_lambda[nyear, nsite];
 
   eps[1] <- 0;

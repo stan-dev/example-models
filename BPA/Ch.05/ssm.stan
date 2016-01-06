@@ -1,18 +1,18 @@
 data {
   int<lower=0> T;
-  real y[T];
+  vector[T] y;
 }
 
 parameters {
-  real<lower=0> mean_lambda;    // Mean growth rate
-  real<lower=0> sigma_proc;     // SD of state process
-  real<lower=0> sigma_obs;      // SD of observation process
-  real<lower=0> lambda[T-1];
-  real<lower=0> N_est1;         // Initial population size
+  real<lower=0,upper=10> mean_lambda;    // Mean growth rate
+  real<lower=0,upper=10> sigma_proc;     // SD of state process
+  real<lower=0,upper=100> sigma_obs;     // SD of observation process
+  vector<lower=0>[T-1] lambda;
+  real<lower=0,upper=500> N_est1;        // Initial population size
 }
 
 transformed parameters {
-  real<lower=0> N_est[T];
+  vector<lower=0>[T] N_est;
 
   N_est[1] <- N_est1;
   // State process

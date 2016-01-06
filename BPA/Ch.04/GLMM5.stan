@@ -8,9 +8,9 @@ data {
   int<lower=0> obssite[nobs];   // Sites in observed data
   int<lower=0> misyear[nmis];   // Years in missing data
   int<lower=0> missite[nmis];   // Sites in missing data
-  int<lower=0,upper=1> first[nyear, nsite];     // First-year observer?
+  int<lower=0,upper=1> first[nyear, nsite]; // First-year observer?
   real year[nyear];             // Year
-  int<lower=0> newobs[nyear, nsite];    // Observers
+  int<lower=0> newobs[nyear, nsite];        // Observers
   int<lower=0> nnewobs;
 }
 
@@ -18,20 +18,20 @@ parameters {
   real mu;                      // Overall intercept
   real beta1;                   // Overall trend 
   real beta2;                   // First-year observer effect
-  real alpha[nsite];            // Random site effects
-  real<lower=0> sd_alpha;
-  real eps[nyear];              // Random year effects
-  real<lower=0> sd_eps;
-  real gamma[nnewobs];          // Random observer effects
-  real<lower=0> sd_gamma;
+  vector[nsite] alpha;          // Random site effects
+  real<lower=0,upper=3> sd_alpha;
+  vector[nyear] eps;            // Random year effects
+  real<lower=0,upper=1> sd_eps;
+  vector[nnewobs] gamma;        // Random observer effects
+  real<lower=0,upper=1> sd_gamma;
 }
 
 transformed parameters {
-  real log_lambda[nyear, nsite];
+  vector[nsite] log_lambda[nyear];
 
   for (i in 1:nyear)
     for (j in 1:nsite)
-      log_lambda[i, j] <- mu + beta1 * year[i] + beta2 * first[i, j] +
+      log_lambda[i][j] <- mu + beta1 * year[i] + beta2 * first[i, j] +
                           alpha[j] + gamma[newobs[i, j]] + eps[i];
 }
 
@@ -52,12 +52,12 @@ model {
 
   // Likelihood
   for (i in 1:nobs)
-    obs[i] ~ poisson_log(log_lambda[obsyear[i], obssite[i]]);
+    obs[i] ~ poisson_log(log_lambda[obsyear[i]][obssite[i]]);
 }
 
 generated quantities {
   int<lower=0> mis[nmis];
 
   for (i in 1:nmis)
-    mis[i] <- poisson_log_rng(log_lambda[misyear[i], missite[i]]);
+    mis[i] <- poisson_log_rng(log_lambda[misyear[i]][missite[i]]);
 }

@@ -7,24 +7,23 @@ data {
 
 parameters {
   real mu;
-  real alpha[nsite];
+  vector[nsite] alpha;
   real eps[nyear];
   real beta[3];
-  real<lower=0> sd_alpha;
-  real<lower=0> sd_year;
+  real<lower=0,upper=2> sd_alpha;
+  real<lower=0,upper=1> sd_year;
 }
 
 transformed parameters {
-  real log_lambda[nyear, nsite];
+  vector[nsite] log_lambda[nyear];
 
   for (i in 1:nyear)
-    for (j in 1:nsite)
     // Linear predictor including random site and random year effects
-      log_lambda[i, j] <- alpha[j] +
-                          beta[1] * year[i] +
-                          beta[2] * pow(year[i], 2) +
-                          beta[3] * pow(year[i], 3) +
-                          eps[i];
+    log_lambda[i] <- alpha +
+                     beta[1] * year[i] +
+                     beta[2] * pow(year[i], 2) +
+                     beta[3] * pow(year[i], 3) +
+                     eps[i];
 }
 
 model {
@@ -52,7 +51,7 @@ model {
     for (j in 1:nsite) {
       // Distribution for random part
       // Link function
-      C[i, j] ~ poisson_log(log_lambda[i, j]);
+      C[i, j] ~ poisson_log(log_lambda[i][j]);
     } #j
   } #i
 }

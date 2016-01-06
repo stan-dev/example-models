@@ -1,7 +1,7 @@
 data {
   int<lower=0> n;       // Number of years
   int<lower=0> C[n];    // Count
-  real year[n];         // Year
+  vector[n] year;       // Year
 }
 
 parameters {
@@ -14,11 +14,10 @@ parameters {
 transformed parameters {
   vector[n] log_lambda;
 
-  for (i in 1:n)
-    log_lambda[i] <- alpha +
-                     beta1 * year[i] +
-                     beta2 * pow(year[i], 2) +
-                     beta3 * pow(year[i], 3);
+  log_lambda <- alpha +
+                beta1 * year +
+                beta2 * year .* year +
+                beta3 * year .* year .* year;
 }
 
 model {

@@ -24,7 +24,7 @@ transformed parameters {
 
 model {
   // Prior
-  alpha ~ normal(0, 10);    // log(mean count)
+  alpha ~ normal(0, 10);        // Prior of log(mean count)
 
   // Likelihood
   for (i in 1:nobs)

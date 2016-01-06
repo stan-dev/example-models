@@ -1,19 +1,19 @@
 data {
   int<lower=0> T;
-  real y[T];
+  vector[T] y;
   int<lower=0> pyears;          // Number of years for prediction
 }
 
 parameters {
   real logN_est1;               // Initial log population size
   real mean_r;                  // Mean growth rate
-  real<lower=0> sigma_proc;     // SD of state procesdatas
-  real<lower=0> sigma_obs;      // SD of observation process
-  real r[T - 1];
+  real<lower=0,upper=1> sigma_proc; // SD of state procesdatas
+  real<lower=0,upper=1> sigma_obs;  // SD of observation process
+  vector[T-1] r;
 }
 
 transformed parameters {
-  real logN_est[T];
+  vector[T] logN_est;
 
   // State process
   logN_est[1] <- logN_est1;
@@ -29,7 +29,6 @@ model {
   sigma_obs ~ uniform(0, 1);
 
   // Likelihood
-  // State process
   r ~ normal(mean_r, sigma_proc);
 
   // Observation process
@@ -40,9 +39,9 @@ generated quantities {
   // Population sizes on real scale
   real sigma2_proc;
   real sigma2_obs;
-  real pr[pyears];
-  real plogN_est[pyears];               // Predicted log population size
-  real<lower=0> N_est[T + pyears];      // Population size
+  vector[pyears] pr;
+  vector[pyears] plogN_est;             // Predicted log population size
+  vector<lower=0>[T + pyears] N_est;    // Population size
 
   sigma2_proc <- square(sigma_proc);
   sigma2_obs <- square(sigma_obs);

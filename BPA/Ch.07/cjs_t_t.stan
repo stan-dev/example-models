@@ -89,7 +89,6 @@ model {
 
   // Likelihood
   for (i in 1:nind) {
-
     if (first[i] > 0) {
       for (t in (first[i] + 1):last[i]) {
         1 ~ bernoulli(phi[i, t - 1]);

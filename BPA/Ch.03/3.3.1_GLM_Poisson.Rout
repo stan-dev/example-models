@@ -3,19 +3,21 @@ R version 3.2.3 (2015-12-10) -- "Wooden Christmas-Tree"
 Copyright (C) 2015 The R Foundation for Statistical Computing
 Platform: x86_64-apple-darwin13.4.0 (64-bit)
 
-R is free software and comes with ABSOLUTELY NO WARRANTY.
-You are welcome to redistribute it under certain conditions.
-Type 'license()' or 'licence()' for distribution details.
+R は、自由なソフトウェアであり、「完全に無保証」です。 
+一定の条件に従えば、自由にこれを再配布することができます。 
+配布条件の詳細に関しては、'license()' あるいは 'licence()' と入力してください。 
 
-R is a collaborative project with many contributors.
-Type 'contributors()' for more information and
-'citation()' on how to cite R or R packages in publications.
+R は多くの貢献者による共同プロジェクトです。 
+詳しくは 'contributors()' と入力してください。 
+また、R や R のパッケージを出版物で引用する際の形式については 
+'citation()' と入力してください。 
 
-Type 'demo()' for some demos, 'help()' for on-line help, or
-'help.start()' for an HTML browser interface to help.
-Type 'q()' to quit R.
+'demo()' と入力すればデモをみることができます。 
+'help()' とすればオンラインヘルプが出ます。 
+'help.start()' で HTML ブラウザによるヘルプがみられます。 
+'q()' と入力すれば R を終了します。 
 
-[Previously saved workspace restored]
+ [以前にセーブされたワークスペースを復帰します] 
 
 > ## 3. Introduction to the generalized linear model (GLM): The simplest
 > ## model for count data
@@ -24,8 +26,8 @@ Type 'q()' to quit R.
 > ## 3.3.1. Generation and analysis of simulated data
 > 
 > library(rstan)
-Loading required package: ggplot2
-rstan (Version 2.8.1, packaged: 2015-11-18 17:18:35 UTC, GitRev: 05c3d0058b6a)
+ 要求されたパッケージ ggplot2 をロード中です 
+rstan (Version 2.8.2, packaged: 2015-11-26 15:27:02 UTC, GitRev: 05c3d0058b6a)
 For execution on a local, multicore CPU with excess RAM we recommend calling
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
@@ -57,10 +59,10 @@ options(mc.cores = parallel::detectCores())
 +             chains = nc, thin = nt, iter = ni, warmup = nb,
 +             seed = 1,
 +             open_progress = FALSE)
-starting worker pid=5111 on localhost:11743 at 19:17:17.732
-starting worker pid=5119 on localhost:11743 at 19:17:17.856
-starting worker pid=5127 on localhost:11743 at 19:17:17.997
-starting worker pid=5135 on localhost:11743 at 19:17:18.138
+starting worker pid=6874 on localhost:11377 at 20:05:47.944
+starting worker pid=6882 on localhost:11377 at 20:05:48.116
+starting worker pid=6890 on localhost:11377 at 20:05:48.269
+starting worker pid=6898 on localhost:11377 at 20:05:48.430
 
 SAMPLING FOR MODEL 'GLM_Poisson' NOW (CHAIN 1).
 
@@ -76,9 +78,9 @@ Chain 1, Iteration: 1400 / 2000 [ 70%]  (Sampling)
 Chain 1, Iteration: 1600 / 2000 [ 80%]  (Sampling)
 Chain 1, Iteration: 1800 / 2000 [ 90%]  (Sampling)
 Chain 1, Iteration: 2000 / 2000 [100%]  (Sampling)
-#  Elapsed Time: 0.102521 seconds (Warm-up)
-#                0.100042 seconds (Sampling)
-#                0.202563 seconds (Total)
+#  Elapsed Time: 0.11208 seconds (Warm-up)
+#                0.10726 seconds (Sampling)
+#                0.21934 seconds (Total)
 
 
 SAMPLING FOR MODEL 'GLM_Poisson' NOW (CHAIN 2).
@@ -95,9 +97,9 @@ Chain 2, Iteration: 1400 / 2000 [ 70%]  (Sampling)
 Chain 2, Iteration: 1600 / 2000 [ 80%]  (Sampling)
 Chain 2, Iteration: 1800 / 2000 [ 90%]  (Sampling)
 Chain 2, Iteration: 2000 / 2000 [100%]  (Sampling)
-#  Elapsed Time: 0.104794 seconds (Warm-up)
-#                0.121838 seconds (Sampling)
-#                0.226632 seconds (Total)
+#  Elapsed Time: 0.105697 seconds (Warm-up)
+#                0.122571 seconds (Sampling)
+#                0.228268 seconds (Total)
 
 
 SAMPLING FOR MODEL 'GLM_Poisson' NOW (CHAIN 3).
@@ -114,9 +116,9 @@ Chain 3, Iteration: 1400 / 2000 [ 70%]  (Sampling)
 Chain 3, Iteration: 1600 / 2000 [ 80%]  (Sampling)
 Chain 3, Iteration: 1800 / 2000 [ 90%]  (Sampling)
 Chain 3, Iteration: 2000 / 2000 [100%]  (Sampling)
-#  Elapsed Time: 0.09948 seconds (Warm-up)
-#                0.102363 seconds (Sampling)
-#                0.201843 seconds (Total)
+#  Elapsed Time: 0.110012 seconds (Warm-up)
+#                0.115907 seconds (Sampling)
+#                0.225919 seconds (Total)
 
 
 SAMPLING FOR MODEL 'GLM_Poisson' NOW (CHAIN 4).
@@ -133,9 +135,9 @@ Chain 4, Iteration: 1400 / 2000 [ 70%]  (Sampling)
 Chain 4, Iteration: 1600 / 2000 [ 80%]  (Sampling)
 Chain 4, Iteration: 1800 / 2000 [ 90%]  (Sampling)
 Chain 4, Iteration: 2000 / 2000 [100%]  (Sampling)
-#  Elapsed Time: 0.101876 seconds (Warm-up)
-#                0.088302 seconds (Sampling)
-#                0.190178 seconds (Total)
+#  Elapsed Time: 0.106543 seconds (Warm-up)
+#                0.117906 seconds (Sampling)
+#                0.224449 seconds (Total)
 
 > 
 > ## Summarize posteriors
@@ -145,103 +147,103 @@ Inference for Stan model: GLM_Poisson.
 post-warmup draws per chain=1000, total post-warmup draws=4000.
 
                mean se_mean   sd     2.5%      25%      50%      75%    97.5%
-alpha          4.28    0.00 0.03     4.22     4.26     4.29     4.30     4.34
+alpha          4.28    0.00 0.03     4.23     4.26     4.28     4.30     4.34
 beta1          1.25    0.00 0.04     1.16     1.22     1.25     1.28     1.33
 beta2          0.07    0.00 0.02     0.02     0.05     0.07     0.09     0.11
-beta3         -0.23    0.00 0.02    -0.28    -0.25    -0.23    -0.21    -0.19
-lambda[1]     32.14    0.09 3.20    26.13    29.94    32.07    34.20    38.58
-lambda[2]     29.97    0.07 2.55    25.11    28.20    29.93    31.63    35.13
-lambda[3]     28.43    0.05 2.07    24.52    27.01    28.41    29.80    32.56
-lambda[4]     27.43    0.04 1.72    24.20    26.25    27.43    28.57    30.78
-lambda[5]     26.87    0.03 1.47    24.03    25.85    26.86    27.85    29.79
-lambda[6]     26.70    0.03 1.32    24.18    25.80    26.67    27.59    29.26
-lambda[7]     26.91    0.03 1.23    24.60    26.07    26.89    27.74    29.29
-lambda[8]     27.46    0.03 1.19    25.24    26.64    27.46    28.27    29.79
-lambda[9]     28.36    0.03 1.20    26.11    27.54    28.34    29.18    30.71
-lambda[10]    29.61    0.03 1.24    27.27    28.76    29.62    30.45    32.03
-lambda[11]    31.23    0.04 1.30    28.75    30.33    31.22    32.10    33.77
-lambda[12]    33.24    0.04 1.37    30.58    32.30    33.23    34.15    35.97
-lambda[13]    35.68    0.04 1.46    32.81    34.69    35.69    36.64    38.60
-lambda[14]    38.59    0.05 1.56    35.49    37.52    38.61    39.60    41.71
-lambda[15]    42.01    0.05 1.65    38.76    40.90    42.02    43.08    45.31
-lambda[16]    46.00    0.06 1.75    42.51    44.83    46.02    47.13    49.54
-lambda[17]    50.61    0.06 1.85    46.92    49.39    50.62    51.80    54.36
-lambda[18]    55.92    0.06 1.95    52.03    54.63    55.91    57.17    59.88
-lambda[19]    61.97    0.06 2.05    57.86    60.62    61.98    63.29    66.11
-lambda[20]    68.84    0.07 2.15    64.52    67.43    68.86    70.23    73.18
-lambda[21]    76.58    0.07 2.25    72.07    75.10    76.62    78.04    81.10
-lambda[22]    85.24    0.07 2.36    80.48    83.72    85.27    86.81    89.98
-lambda[23]    94.86    0.07 2.49    89.90    93.25    94.89    96.46    99.79
-lambda[24]   105.44    0.07 2.64   100.16   103.71   105.49   107.15   110.63
-lambda[25]   116.97    0.07 2.82   111.45   115.09   117.02   118.82   122.51
-lambda[26]   129.38    0.07 3.05   123.41   127.35   129.42   131.36   135.32
-lambda[27]   142.59    0.08 3.31   136.07   140.35   142.61   144.74   149.03
-lambda[28]   156.42    0.09 3.60   149.46   153.98   156.36   158.76   163.55
-lambda[29]   170.65    0.09 3.90   163.00   168.02   170.58   173.28   178.36
-lambda[30]   185.01    0.10 4.19   176.76   182.16   184.94   187.83   193.24
-lambda[31]   199.14    0.11 4.44   190.47   196.11   199.06   202.15   207.87
-lambda[32]   212.63    0.11 4.62   203.55   209.50   212.52   215.73   221.86
-lambda[33]   225.01    0.11 4.73   215.65   221.86   224.91   228.11   234.55
-lambda[34]   235.81    0.10 4.78   226.25   232.57   235.72   238.92   245.31
-lambda[35]   244.50    0.10 4.84   234.91   241.23   244.39   247.66   253.99
-lambda[36]   250.62    0.09 5.05   240.71   247.22   250.55   253.99   260.67
-lambda[37]   253.74    0.09 5.57   242.62   249.99   253.71   257.45   264.71
-lambda[38]   253.53    0.11 6.53   240.70   249.09   253.54   257.85   266.49
-lambda[39]   249.80    0.15 7.90   234.86   244.25   249.70   255.07   265.51
-lambda[40]   242.50    0.23 9.60   224.44   235.69   242.33   248.98   261.55
-lp__       17473.30    0.04 1.42 17469.71 17472.59 17473.64 17474.32 17475.08
+beta3         -0.23    0.00 0.02    -0.28    -0.25    -0.23    -0.21    -0.18
+lambda[1]     32.20    0.08 3.13    26.31    30.08    32.11    34.22    38.55
+lambda[2]     30.02    0.06 2.48    25.27    28.39    29.99    31.62    35.03
+lambda[3]     28.48    0.05 2.00    24.60    27.18    28.46    29.78    32.54
+lambda[4]     27.47    0.03 1.66    24.23    26.36    27.42    28.54    30.78
+lambda[5]     26.91    0.03 1.43    24.20    25.95    26.89    27.85    29.69
+lambda[6]     26.74    0.03 1.28    24.36    25.86    26.70    27.60    29.18
+lambda[7]     26.94    0.02 1.20    24.71    26.09    26.92    27.73    29.28
+lambda[8]     27.49    0.03 1.17    25.32    26.67    27.47    28.26    29.80
+lambda[9]     28.38    0.03 1.19    26.13    27.57    28.36    29.17    30.75
+lambda[10]    29.63    0.04 1.23    27.32    28.80    29.59    30.43    32.12
+lambda[11]    31.25    0.04 1.30    28.80    30.36    31.20    32.09    33.85
+lambda[12]    33.26    0.05 1.38    30.64    32.32    33.21    34.16    36.08
+lambda[13]    35.70    0.05 1.47    32.90    34.72    35.65    36.66    38.69
+lambda[14]    38.60    0.05 1.56    35.61    37.56    38.55    39.62    41.78
+lambda[15]    42.02    0.06 1.66    38.87    40.91    41.98    43.12    45.37
+lambda[16]    46.00    0.06 1.76    42.70    44.83    45.96    47.15    49.45
+lambda[17]    50.61    0.07 1.86    47.14    49.37    50.57    51.82    54.24
+lambda[18]    55.91    0.07 1.95    52.24    54.59    55.85    57.20    59.69
+lambda[19]    61.95    0.07 2.04    58.14    60.56    61.89    63.31    65.98
+lambda[20]    68.81    0.07 2.13    64.82    67.37    68.74    70.26    73.08
+lambda[21]    76.55    0.07 2.23    72.38    75.05    76.45    78.07    80.98
+lambda[22]    85.20    0.07 2.33    80.86    83.61    85.12    86.74    89.81
+lambda[23]    94.81    0.07 2.45    90.15    93.12    94.72    96.44    99.71
+lambda[24]   105.38    0.07 2.60   100.38   103.60   105.33   107.11   110.62
+lambda[25]   116.90    0.07 2.78   111.57   114.99   116.86   118.73   122.40
+lambda[26]   129.31    0.07 3.01   123.54   127.25   129.30   131.29   135.32
+lambda[27]   142.50    0.07 3.28   136.21   140.30   142.53   144.71   149.00
+lambda[28]   156.33    0.08 3.58   149.43   153.89   156.37   158.73   163.42
+lambda[29]   170.56    0.09 3.89   163.05   167.87   170.54   173.17   178.26
+lambda[30]   184.92    0.10 4.19   176.76   182.05   184.92   187.74   193.29
+lambda[31]   199.05    0.11 4.45   190.55   196.04   199.08   202.05   207.89
+lambda[32]   212.55    0.11 4.64   203.61   209.42   212.52   215.65   221.89
+lambda[33]   224.96    0.11 4.74   215.91   221.73   224.94   228.18   234.54
+lambda[34]   235.77    0.11 4.77   226.64   232.46   235.73   239.00   245.37
+lambda[35]   244.50    0.10 4.82   235.37   241.18   244.41   247.78   254.04
+lambda[36]   250.65    0.08 5.00   241.22   247.17   250.55   254.03   260.62
+lambda[37]   253.82    0.09 5.51   243.23   250.08   253.79   257.46   264.71
+lambda[38]   253.66    0.10 6.46   241.28   249.29   253.61   257.91   266.25
+lambda[39]   249.99    0.14 7.87   234.88   244.64   249.83   255.25   265.64
+lambda[40]   242.74    0.19 9.61   224.29   236.25   242.41   249.10   261.88
+lp__       17473.34    0.04 1.41 17469.58 17472.67 17473.68 17474.36 17475.06
            n_eff Rhat
-alpha       1083    1
-beta1        982    1
-beta2       1071    1
-beta3        804    1
-lambda[1]   1257    1
-lambda[2]   1379    1
-lambda[3]   1541    1
-lambda[4]   1741    1
-lambda[5]   2024    1
-lambda[6]   2117    1
-lambda[7]   2020    1
-lambda[8]   1794    1
-lambda[9]   1557    1
-lambda[10]  1349    1
-lambda[11]  1222    1
-lambda[12]  1136    1
-lambda[13]  1075    1
-lambda[14]  1034    1
-lambda[15]  1009    1
-lambda[16]   996    1
-lambda[17]   994    1
-lambda[18]  1003    1
-lambda[19]  1026    1
-lambda[20]  1062    1
-lambda[21]  1114    1
-lambda[22]  1189    1
-lambda[23]  1288    1
-lambda[24]  1409    1
-lambda[25]  1540    1
-lambda[26]  1660    1
-lambda[27]  1748    1
-lambda[28]  1786    1
-lambda[29]  1784    1
-lambda[30]  1764    1
-lambda[31]  1751    1
-lambda[32]  1771    1
-lambda[33]  1857    1
-lambda[34]  2072    1
-lambda[35]  2533    1
-lambda[36]  3347    1
-lambda[37]  4000    1
-lambda[38]  3860    1
-lambda[39]  2752    1
-lambda[40]  1819    1
-lp__        1039    1
+alpha        883 1.01
+beta1        894 1.00
+beta2        998 1.01
+beta3        817 1.01
+lambda[1]   1366 1.01
+lambda[2]   1569 1.00
+lambda[3]   1869 1.00
+lambda[4]   2298 1.00
+lambda[5]   2488 1.00
+lambda[6]   2507 1.00
+lambda[7]   2306 1.00
+lambda[8]   1845 1.00
+lambda[9]   1425 1.00
+lambda[10]  1174 1.00
+lambda[11]  1019 1.00
+lambda[12]   922 1.00
+lambda[13]   861 1.00
+lambda[14]   822 1.00
+lambda[15]   798 1.01
+lambda[16]   785 1.01
+lambda[17]   784 1.01
+lambda[18]   793 1.01
+lambda[19]   814 1.01
+lambda[20]   852 1.01
+lambda[21]   913 1.01
+lambda[22]  1005 1.00
+lambda[23]  1138 1.00
+lambda[24]  1312 1.00
+lambda[25]  1524 1.00
+lambda[26]  1854 1.00
+lambda[27]  1928 1.00
+lambda[28]  1940 1.00
+lambda[29]  1898 1.00
+lambda[30]  1837 1.00
+lambda[31]  1786 1.00
+lambda[32]  1761 1.00
+lambda[33]  1794 1.00
+lambda[34]  1945 1.00
+lambda[35]  2329 1.00
+lambda[36]  4000 1.00
+lambda[37]  4000 1.00
+lambda[38]  4000 1.00
+lambda[39]  3192 1.00
+lambda[40]  2503 1.00
+lp__        1213 1.01
 
-Samples were drawn using NUTS(diag_e) at Wed Dec 16 19:17:21 2015.
+Samples were drawn using NUTS(diag_e) at Wed Jan  6 20:05:51 2016.
 For each parameter, n_eff is a crude measure of effective sample size,
 and Rhat is the potential scale reduction factor on split chains (at 
 convergence, Rhat=1).
 > 
 > proc.time()
-   user  system elapsed 
-  1.642   0.186   5.098 
+   ユーザ   システム       経過  
+    19.443      1.610     25.388 

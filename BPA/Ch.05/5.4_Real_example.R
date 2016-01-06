@@ -38,7 +38,7 @@ hm_ssm <- stan("ssm2.stan",
                data = stan_data, init = inits, pars = params,
                chains = nc, thin = nt, iter = ni, warmup = nb,
                seed = 1,
-               control = list(adapt_delta = 0.99),
+               control = list(adapt_delta = 0.999),
                open_progress = FALSE)
 
 ## Note: there may be divergent transitions after warmup.

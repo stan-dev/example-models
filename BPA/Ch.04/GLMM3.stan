@@ -13,19 +13,19 @@ data {
 
 parameters {
   real mu;                      // Overall mean
-  real alpha[nsite];            // Random site effects
-  real<lower=0> sd_alpha;
+  vector[nsite] alpha;          // Random site effects
+  real<lower=0,upper=5> sd_alpha;
   real beta2;                   // First-year observer effect
-  real eps[nyear];              // Random year effects
-  real<lower=0> sd_eps;
+  vector[nyear] eps;            // Random year effects
+  real<lower=0,upper=5> sd_eps;
 }
 
 transformed parameters {
-  real log_lambda[nyear, nsite];
+  vector[nsite] log_lambda[nyear];
 
   for (i in 1:nyear)
     for (j in 1:nsite)
-      log_lambda[i, j] <- mu + beta2 * first[i, j] +
+      log_lambda[i][j] <- mu + beta2 * first[i, j] +
                           alpha[j] + eps[i];
 }
 
@@ -42,12 +42,12 @@ model {
 
   // Likelihood
   for (i in 1:nobs)
-    obs[i] ~ poisson_log(log_lambda[obsyear[i], obssite[i]]);
+    obs[i] ~ poisson_log(log_lambda[obsyear[i]][obssite[i]]);
 }
 
 generated quantities {
   int<lower=0> mis[nmis];
 
   for (i in 1:nmis)
-    mis[i] <- poisson_log_rng(log_lambda[misyear[i], missite[i]]);
+    mis[i] <- poisson_log_rng(log_lambda[misyear[i]][missite[i]]);
 }

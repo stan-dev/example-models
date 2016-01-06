@@ -2,7 +2,7 @@ data {
   int<lower=0> nyears;          // Number of Years
   int<lower=0> C[nyears];       // Counts
   int<lower=0> N[nyears];       // Binomial Totals
-  real year[nyears];            // Year covariates
+  vector[nyears] year;          // Year covariates
 }
 
 parameters {
@@ -12,13 +12,12 @@ parameters {
 }
 
 transformed parameters {
-  real logit_p[nyears];
+  vector[nyears] logit_p;
 
-  for (i in 1:nyears)
-    // link function and linear predictor
-    logit_p[i] <- alpha +
-                  beta1 * year[i] +
-                  beta2 * pow(year[i], 2);
+  // Linear predictor
+  logit_p <- alpha +
+             beta1 * year +
+             beta2 * year .* year;
 }
 
 model {
@@ -28,10 +27,8 @@ model {
   beta2 ~ normal(0, 100);
 
   // Likelihood
-  for (i in 1:nyears) {
-    // 1. Distribution for random part
-    C[i] ~ binomial_logit(N[i], logit_p[i]);
-  }
+  // Distribution for random part
+  C ~ binomial_logit(N, logit_p);
 }
 
 generated quantities {

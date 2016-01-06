@@ -1,28 +1,27 @@
 data {
   int<lower=0> n;       // Number of years
   int<lower=0> C[n];    // Counts
-  real year[n];         // Year
+  vector[n] year;       // Year
 }
 
 parameters {
-  real alpha;
-  real beta1;
-  real beta2;
-  real beta3;
-  real eps[n];          // Year effects
-  real<lower=0> sigma;
+  real<lower=-20,upper=20> alpha;
+  real<lower=-10,upper=10> beta1;
+  real<lower=-10,upper=20> beta2;
+  real<lower=-10,upper=10> beta3;
+  vector[n] eps;        // Year effects
+  real<lower=0,upper=5> sigma;
 }
 
 transformed parameters {
-  real log_lambda[n];
+  vector[n] log_lambda;
 
   // Linear predictor incl. random year effect
- for (i in 1:n)
-   log_lambda[i] <- alpha +
-                    beta1 * year[i] +
-                    beta2 * pow(year[i], 2) +
-                    beta3 * pow(year[i], 3) +
-                    eps[i];
+ log_lambda <- alpha +
+               beta1 * year +
+               beta2 * year .* year +
+               beta3 * year .* year .* year +
+               eps;
 }
 
 model {
@@ -34,15 +33,12 @@ model {
   sigma ~ uniform(0, 5);
 
   // Likelihood
-  for (i in 1:n) {
-    C[i] ~ poisson_log(log_lambda[i]);
-    eps[i] ~ normal(0, sigma);
-   }
+  C ~ poisson_log(log_lambda);
+  eps ~ normal(0, sigma);
 }
 
 generated quantities {
-  real<lower=0> lambda[n];
+  vector<lower=0>[n] lambda;
 
-  for (i in 1:n)
-    lambda[i] <- exp(log_lambda[i]);
+  lambda <- exp(log_lambda);
 }
