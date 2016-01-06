@@ -706,7 +706,7 @@ Now the generated quantities uses the Beta prior for the population replications
 We fit and print values as before.
 ```{r comment=NA, results='hide'}
 fit_hier_post <- stan("hier-post.stan", data=c("N", "K", "y"),
-                      control=list(stepsize=0.01, adapt_delta=0.95));
+                      control=list(stepsize=0.01, adapt_delta=0.99));
 ss_hier_post <- extract(fit_hier_post);
 ```
 We can now print the replicated values <code>y_rep</code> as usual.
@@ -722,7 +722,7 @@ df_post_beta <- data.frame(list(dataset = rep("REAL", N),
 for (n in 1:15) {
   df_post_beta <- rbind(df_post_beta,
                         data.frame(list(dataset = rep(paste("repl ", n), N),
-                                        y = ss_hier_logit_post$y_rep[n,])));
+                                        y = ss_hier_post$y_rep[n,])));
 }
 post_plot_beta <-
   ggplot(df_post_beta, aes(y)) +
@@ -740,7 +740,7 @@ df_pop_post_beta <- data.frame(list(dataset = rep("REAL", N),
 for (n in 1:15) {
   df_pop_post_beta <- rbind(df_pop_post_beta,
                             data.frame(list(dataset = rep(paste("repl ", n), N),
-                                             y = ss_hier_logit_post$y_pop_rep[n,])));
+                                             y = ss_hier_post$y_pop_rep[n,])));
 }
 post_pop_plot_beta <-
   ggplot(df_pop_post_beta, aes(y)) +
@@ -752,7 +752,7 @@ post_pop_plot_beta <-
 post_pop_plot_beta;
 ```
 
-The plots are indistinguishable (by eye) from those produced by the normal prior on log odds
+The plots for replications of existing items is radicall different with the beta prior, with the replications being much closer to the originally observed values.   The replications for new items look similar.  By eye, it looks like the beta prior is controlling the posterior variance of individual item chance-of-success estimates much better, despite producing wider posterior 80% intervals for chance of success.
 
 ### Discussion
 
@@ -774,7 +774,7 @@ A hierarchical model introduces an estimation bias toward the population mean an
 
 1.  How sensitive is the logistic model to the hyperprior?  If we made it much less informative or much more informative, how much do the fitted values differ?  How do the predictions differ?  Evaluate the prior used by Lunn et al. (2013), which is $\mathsf{Uniform}(-100,100)$ for $\mu$ and $\mathsf{Uniform}(0, 100)$ for $\sigma$.  Be sure to add constraints on the declarations of $\mu$ and $\sigma$ to match the constraints.  What happens if the width of the uniform grows much wider or much narrower?
 
-1.  Figure out how to take all the hard-coded output analysis in here and make it dynamic by making better use of knitr.
+1.  Figure out how to take all the hard-coded output analysis in here and make it dynamic by making better use of knitr.  And take all the cut-and-paste duplicated code and wrap it into functions.  
 
 ### References
 
