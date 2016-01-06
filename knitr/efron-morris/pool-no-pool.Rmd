@@ -9,7 +9,7 @@ output:
 
 ### Abstract
 
-<small>This note illustrates the effects of pooling data (aka sharing strength) across items for repeated binary trial data.  It provides Stan models and R code to fit and check predictive models for three situations: (a) complete pooling, which assumes each item is the same, (b) no pooling, which assumes the items are unrelated, and (c) partial pooling, where the similarity among the items is estimated.  This note recreates the running example from the BUGS example of hospital mortality (Lunn et al. 2013).  Efron and Morris's (1975) baseball batting average data is used as a running example. </small>
+This note illustrates the effects of pooling data (aka sharing strength) across items for repeated binary trial data.  It provides Stan models and R code to fit and check predictive models for three situations: (a) complete pooling, which assumes each item is the same, (b) no pooling, which assumes the items are unrelated, and (c) partial pooling, where the similarity among the items is estimated.  This note recreates the running example from the BUGS example of hospital mortality (Lunn et al. 2013).  Efron and Morris's (1975) baseball batting average data is used as a running example.
 
 
 ## Repeated Binary Trials
@@ -627,6 +627,132 @@ And now we see much higher effective sample sizes and R-hat values rounding to 1
 print(fit_hier_logit_nc, c("mu", "sigma", "theta", "lp__"), probs=c(0.1, 0.5, 0.9));
 ```
 But the underlying fit hasn't changed.
+
+### Posterior Predictive Checks
+
+We now have two competing models giving us slightly different answers.  So the next thing to do is some posterior predictive checks to see if the models adequately capture the distributione of the data.  Following the advice of Gelman et al. (2013), we will take the fitted parameters of the data set and generate fake data sets. 
+
+As discussed by Gelman et al. (2013, p. 143), there is a choice of which parameters to fix and which to simulate.  We can generate new trials using fitted chance-of-success parameters ($\alpha$), or we can generate new items using the population parameters ($\mu$ and $\sigma$).  We'll provide both in the model below for comparison.  In both cases, we simulate from posterior draws, not from the posterior mean or other point estimates; Stan makes this easy with its generated quantities block.  Then we'll plot several of those versus the real data.
+
+The Stan file is <code>hier-logit-post.stan</code>, which is based on the more efficient non-centered parameterization:
+```{r comment=NA, echo=FALSE}
+file_path <- "hier-logit-post.stan";
+lines <- readLines(file_path, encoding="ASCII");
+for (n in 1:length(lines)) cat(lines[n],'\n');
+```
+The generated quantities block uses random number generators either to generate a new trials or to first generate a new chance of success and then new trials.
+
+The model is fit as usual, only now with the non-centered parameterization, we can get away with default parameters.
+```{r comment=NA, results='hide'}
+fit_hier_logit_post <- stan("hier-logit-post.stan", data=c("N", "K", "y"),
+                            control=list(stepsize=0.01, adapt_delta=0.95));
+ss_hier_logit_post <- extract(fit_hier_logit_post);
+```
+We can now print the replicated values <code>y_rep</code> as usual.
+```{r comment=NA}
+print(fit_hier_logit_post, c("y_rep", "y_pop_rep"), probs=c(0.1, 0.5, 0.9));
+```
+We printed both for comparison.  The variable <code>y_rep</code> is ordered because it's based on the actual items, which were sorted by success count in the original data.  On the other hand, the <code>y_pop_rep</code> values are fully exchangeable, so indistinguishable in their posterior (other than MCMC error).
+
+We can plot some of the simulated data sets along with the original data set to do a visual inspection as suggested by Gelman et al. (2013);  the <code>extract()</code> function has already permuted the posterior draws, so we can just take the initial fifteen for display.
+```{r comment=NA}
+df_post <- data.frame(list(dataset = rep("REAL", N),
+                           y = y));
+for (n in 1:15) {
+  df_post <- rbind(df_post,
+                   data.frame(list(dataset = rep(paste("repl ", n), N),
+                                   y = ss_hier_logit_post$y_rep[n,])));
+}
+post_plot <-
+  ggplot(df_post, aes(y)) +
+  facet_wrap(~ dataset) +
+  stat_count(width=0.8) +
+  scale_x_discrete(limits=c(10, 20, 30, 40)) +
+  scale_y_discrete(name="count", limits=c(0, 2, 4)) +
+  ggtitle("Existing Item Replication (Normal Prior on Log Odds)");
+post_plot;
+```
+
+And now we can do the same thing for the population-level replication; because the code's the same, we do not echo it to the output.
+```{r comment=NA, echo=FALSE}
+df_pop_post <- data.frame(list(dataset = rep("REAL", N),
+                               y = y));
+for (n in 1:15) {
+  df_pop_post <- rbind(df_pop_post,
+                       data.frame(list(dataset = rep(paste("repl ", n), N),
+                                        y = ss_hier_logit_post$y_pop_rep[n,])));
+}
+post_pop_plot <-
+  ggplot(df_pop_post, aes(y)) +
+  facet_wrap(~ dataset) +
+  stat_count(width=0.8) +
+  scale_x_discrete(limits=c(5, 10, 15, 20)) +
+  scale_y_discrete(name="count", limits=c(0, 2, 4)) +
+  ggtitle("New Item Replication (Normal Prior on Log Odds)");
+post_pop_plot;
+```
+
+The posterior simulations are not unreasonable for a binomial likelihood, but are noticeably more spread out than the actual data.  This may actually have more to do with how the data were selected out of all the major league baseball players than the actual data distribution.  Efron and Morris (1975, p 312) write, "This sample was chosen because we wanted between 30 and 50 at bats to assure a satisfactory approximation of the binomial by the normal distribution while leaving the bulk of at bats to be estimated.  We also wanted to include an unusually good hitter (Clemente) to test the method with at least one extreme parameter, a situation expected to be less favorable to Stein's estimator.  Stein's estimator requires equal variances, or in this situation, equal at bats, so the remaining 17 players are all whom either the April 26 or May 3 *New York Times* reported with 45 at bats."
+
+Now to see how posterior replications look for the model with the hierarchical Beta prior.
+
+```{r comment=NA, echo=FALSE}
+file_path <- "hier-post.stan";
+lines <- readLines(file_path, encoding="ASCII");
+for (n in 1:length(lines)) cat(lines[n],'\n');
+```
+Now the generated quantities uses the Beta prior for the population replications.
+
+We fit and print values as before.
+```{r comment=NA, results='hide'}
+fit_hier_post <- stan("hier-post.stan", data=c("N", "K", "y"),
+                      control=list(stepsize=0.01, adapt_delta=0.95));
+ss_hier_post <- extract(fit_hier_post);
+```
+We can now print the replicated values <code>y_rep</code> as usual.
+```{r comment=NA}
+print(fit_hier_post, c("y_rep", "y_pop_rep"), probs=c(0.1, 0.5, 0.9));
+```
+
+And we can print out the results as before.  This time we suppress printing the ggplot code, which is the same as before, and just show the graphs.
+
+```{r comment=NA, echo=FALSE}
+df_post_beta <- data.frame(list(dataset = rep("REAL", N),
+                                y = y));
+for (n in 1:15) {
+  df_post_beta <- rbind(df_post_beta,
+                        data.frame(list(dataset = rep(paste("repl ", n), N),
+                                        y = ss_hier_logit_post$y_rep[n,])));
+}
+post_plot_beta <-
+  ggplot(df_post_beta, aes(y)) +
+  facet_wrap(~ dataset) +
+  stat_count(width=0.8) +
+  scale_x_discrete(limits=c(5, 10, 15, 20)) +
+  scale_y_discrete(name="count", limits=c(0, 2, 4)) +
+  ggtitle("Existing Item Replication (Beta Prior on Probability)");
+post_plot_beta;
+```
+
+```{r comment=NA, echo=FALSE}
+df_pop_post_beta <- data.frame(list(dataset = rep("REAL", N),
+                               y = y));
+for (n in 1:15) {
+  df_pop_post_beta <- rbind(df_pop_post_beta,
+                            data.frame(list(dataset = rep(paste("repl ", n), N),
+                                             y = ss_hier_logit_post$y_pop_rep[n,])));
+}
+post_pop_plot_beta <-
+  ggplot(df_pop_post_beta, aes(y)) +
+  facet_wrap(~ dataset) +
+  stat_count(width=0.8) +
+  scale_x_discrete(limits=c(5, 10, 15, 20)) +
+  scale_y_discrete(name="count", limits=c(0, 2, 4)) +
+  ggtitle("New Item Replication (Beta Prior on Probability)");
+post_pop_plot_beta;
+```
+
+The plots are indistinguishable (by eye) from those produced by the normal prior on log odds
 
 ### Discussion
 
