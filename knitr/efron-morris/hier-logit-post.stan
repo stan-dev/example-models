@@ -18,7 +18,7 @@ generated quantities {
   int<lower=0, upper=K> y_rep[N];      // replications for existing items
   int<lower=0, upper=K> y_pop_rep[N];  // replications for simulated items
   for (n in 1:N)
-    y_pop_rep[n] <- binomial_rng(K, inv_logit(normal_rng(mu, sigma)));
+    y_pop_rep[n] <- binomial_rng(K, inv_logit(mu + sigma * normal_rng(0, 1)));
   for (n in 1:N)
-    y_rep[n] <- binomial_rng(K, inv_logit(alpha[n]));
+    y_rep[n] <- binomial_rng(K, inv_logit(mu + sigma * alpha[n]));
 }

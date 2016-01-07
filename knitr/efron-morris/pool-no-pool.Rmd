@@ -628,7 +628,87 @@ print(fit_hier_logit_nc, c("mu", "sigma", "theta", "lp__"), probs=c(0.1, 0.5, 0.
 ```
 But the underlying fit hasn't changed.
 
-### Posterior Predictive Checks
+### Posterior Prediction and Replication
+
+It is straightforward to both evaluate the posterior predictive density for new data $y^{\mathrm{new}}$ and to generate replicated data sets $y^{\mathrm{rep}}$ for posterior predictive checks.
+
+#### Posterior Predictive Distribution
+
+Given data $y$ and a model with parameters $\theta$, the posterior predictive distribution for new data $\tilde{y}$ is
+\[
+p(\tilde{y} \, | \, y)
+\ = \
+\int_{\Theta} p(\tilde{y} \, | \, \theta) \ p(\theta \, | \, y) \ \mathrm{d}\theta,
+\]
+where $\Theta$ is the support of the parameters $\theta$.  
+
+
+#### Evaluating Posterior Predictions
+
+Because the posterior predictive density is defined as an expectation, it can be computed (on the log scale) for new observations $y^{\mathrm{new}}$ via MCMC using the posterior draws $\theta^{(m)}$ as
+\[
+\log p(y^{\mathrm{new}} \, | \, y)
+\ \approx \
+\frac{1}{M} \ \sum_{m=1}^M \log p(y^{\mathrm{new}} \, | \, \theta^{(m)}).
+\]
+All that is needed is a way to evaluate the likelihood $p(\tilde{y} \, | \, \theta)$ for fixed $\tilde{y}$ and $\theta$.
+
+We now have two models whose posterior predictions can be compared.
+
+#### Posterior Predictions: Beta Priors on Chance-of-Success
+
+First we need to extract the new observations---the remaing at bats and hits for each player.
+```{r comment=NA}
+K_new <- df$RemainingAt.Bats;
+y_new <- df$RemainingHits;
+```
+
+Then we can use them in a Stan model to evaluate the posterior predictive density of the new data, which is in file <code>hier-heldout.stan</code>. 
+```{r comment=NA, echo=FALSE}
+file_path <- "hier-heldout.stan";
+lines <- readLines(file_path, encoding="ASCII");
+for (n in 1:length(lines)) cat(lines[n],'\n');
+```
+
+The model is fit as usual.
+```{r  comment=NA, results='hide'}
+fit_hier_heldout <- stan("hier-heldout.stan", data=c("N", "K", "y", "K_new", "y_new"),
+                       control=list(stepsize=0.01, adapt_delta=0.99));
+ss_hier_heldout <- extract(fit_hier_heldout);
+```
+
+Then we print the predictive density, the mean of which is our MCMC calculation of the posterior predictive density.
+```{r comment=NA}
+print(fit_hier_heldout, "log_p_new", probs=c(0.1, 0.5, 0.9));
+```
+The posterior mean, roughly -120, is the value of $p(y^{\mathrm{new}} \, | \, y)$ --- the predictive density of the new data conditioned on the old (and the model, of course).  Although the mean is the posterior log density, the posterior interval is quite wide, with some parameter values providing much higher density, as is to be expected in a hierarchical model.
+
+Now here is the same exercise for the model with a normal prior on log-odds, starting with the model in <code>hier-logit-heldout.stan</code>,
+```{r comment=NA, echo=FALSE}
+file_path <- "hier-logit-heldout.stan";
+lines <- readLines(file_path, encoding="ASCII");
+for (n in 1:length(lines)) cat(lines[n],'\n');
+```
+
+```{r  comment=NA, results='hide'}
+fit_hier_logit_heldout <- stan("hier-logit-heldout.stan",
+                               data=c("N", "K", "y", "K_new", "y_new"),
+                               control=list(stepsize=0.01, adapt_delta=0.99));
+ss_hier_logit_heldout <- extract(fit_hier_logit_heldout);
+```
+
+```{r comment=NA}
+print(fit_hier_logit_heldout, "log_p_new", probs=c(0.1, 0.5, 0.9));
+```
+Here the posterior log density is only -100 or so, which given that it's 18 players on the log scale, is a fair bit better than the -120 for the model with Beta priors on the chances of success.
+
+#### Simulating Replicated Data Sets
+
+To simulate replicated data sets from the posterior predictive distribution, we can use forward simulation based on the MCMC draws $\theta^{(m)}$.  For each posterior draw $\theta^{(m)}$, a replicated data set can be produced by forward simulation by drawing
+${y^{\mathrm{rep}}}^{(m)}$ according to the likelihood $p(y \, | \, \theta^{(m)})$.  This produces a Markov chain of replicated values which can be analyzed as usual to compute expectations of quantities of interest.
+
+
+#### Model Evaluation and Comparison
 
 We now have two competing models giving us slightly different answers.  So the next thing to do is some posterior predictive checks to see if the models adequately capture the distributione of the data.  Following the advice of Gelman et al. (2013), we will take the fitted parameters of the data set and generate fake data sets. 
 
@@ -667,7 +747,7 @@ post_plot <-
   ggplot(df_post, aes(y)) +
   facet_wrap(~ dataset) +
   stat_count(width=0.8) +
-  scale_x_discrete(limits=c(10, 20, 30, 40)) +
+  scale_x_discrete(limits=c(5, 10, 15, 20)) +
   scale_y_discrete(name="count", limits=c(0, 2, 4)) +
   ggtitle("Existing Item Replication (Normal Prior on Log Odds)");
 post_plot;
@@ -770,11 +850,11 @@ A hierarchical model introduces an estimation bias toward the population mean an
 
 1.  Given the hierarchical model, estimate the probability for each player that they have the highest batting ability.  What is the probability that Roberto Clemente will lead these 18 players (given the modeling assumptions)?  Compare that to the probability that each player will end the season with the highest batting average (observed success rate for season).  Write a Stan model to compute both values and fit it.
 
-1.  Lunn et al. (2013) contains a running analysis of pediatric cardiac surgery mortality for 12 hospitals.  Reanalyze their data with Stan using the models in this note.  The models will have to be generalized to allow $K$ to vary by item $n$. The data is available from Stan's example model repository as [BUGS Vol 1 examples: Surgical](https://github.com/stan-dev/example-models/tree/master/bugs_examples/vol1/surgical) and the WinBUGS project hosts the [original example description](http://www.openbugs.net/Examples/Surgical.html) (which has different counts from the data analyzed by Lunn et al.); Lunn et al. analyze slightly different data in the BUGS book than in their on-line example. 
+1.  Lunn et al. (2013) contains a running analysis of pediatric cardiac surgery mortality for 12 hospitals.  Reanalyze their data with Stan using the models in this note.  The models will have to be generalized to allow $K$ to vary by item $n$. The data is available from Stan's example model repository as [BUGS Vol 1 examples: Surgical](https://github.com/stan-dev/example-models/tree/master/bugs_examples/vol1/surgical) and the WinBUGS project hosts the [original example description](http://www.openbugs.net/Examples/Surgical.html) (which has different counts from the data analyzed by Lunn et al.); Lunn et al. analyze slightly different data in the BUGS book than in their on-line example.
 
 1.  How sensitive is the logistic model to the hyperprior?  If we made it much less informative or much more informative, how much do the fitted values differ?  How do the predictions differ?  Evaluate the prior used by Lunn et al. (2013), which is $\mathsf{Uniform}(-100,100)$ for $\mu$ and $\mathsf{Uniform}(0, 100)$ for $\sigma$.  Be sure to add constraints on the declarations of $\mu$ and $\sigma$ to match the constraints.  What happens if the width of the uniform grows much wider or much narrower?
 
-1.  Figure out how to take all the hard-coded output analysis in here and make it dynamic by making better use of knitr.  And take all the cut-and-paste duplicated code and wrap it into functions.  
+1.  Figure out how to take all the hard-coded output analysis in here and make it dynamic by making better use of knitr.  And take all the cut-and-paste duplicated code and wrap it into functions.
 
 ### References
 
