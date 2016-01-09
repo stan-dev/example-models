@@ -22,9 +22,9 @@ Each example model should be organized to include the following
 
 1.  Stan program(s) implementing the model (and variants),
 2.  program to simulate data (in R or Python),
-3.  simulated data file itself (for now in .data.R dump format)
+3.  simulated data file itself (for now in .data.R dump format). For each Stan file(s), such as foo.stan and bar.stan, there must be a foo.data.R file and a bar.data.R file in the same subdirectory as the .stan file (even if foo.data.R is the same as bar.data.R).
 4.  summary of output fit for simulated data file (text),
-    (a) check diagnostics for post-warmup iterations: n_divergent is zero for all iterations, tree_depth < max_depth for all iterations,
+    (a) check diagnostics for post-warmup iterations: n_divergent is zero for all post-warmup iterations, tree_depth < max_depth for all post-warmup iterations,
     (b) check for all parameters (and unnormalized density lp__) that R_hat < 1.1 and n_eff > 20, and
     (c) if diagnostics fail improve model with a note explaining the fix.
 5.  any real data sets with summary of fit (in original and Stan-readable format, with munging program from original to Stan-readable),
@@ -36,7 +36,7 @@ Each example model should be organized to include the following
 8.  keywords or other tags to help organize by category (e.g., from manual, from BUGS volume, from book, involving logistic regression, application area such as population model, model type such as IRT or mark-recapture, etc.)
 9.  author/copyright-holder info and open-source license info if not new BSD.
 
-The idea is to encourage people to go through *all* of these steps for their models, particularly 3 and 4, which often get overlooked.
+The idea is to encourage people to go through *all* of these steps for their models, particularly 3 and 4, which often get overlooked. And if the example cannot be executed via rstan::stan_demo(), then something is wrong.
 
 ### Licensing
 
