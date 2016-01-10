@@ -731,7 +731,7 @@ This event is about the season batting average being greather than 0.400.  What 
 
 Following Gelman et al. (2013), we conflate the notation for random variables and bound variables, using $z_n$ and $\theta_n$ for both the bound and random variables. 
 
-In Stan, we just delcare and define the indicators directly in the generated quantities block.  
+In Stan, we just declare and define the indicators directly in the generated quantities block.  
 
 ```
 generated quantities {
@@ -747,8 +747,9 @@ generated quantities {
     ability_gt_400[n] <- (theta[n] > 0.400);
   ...
 }
+```
 
-The indicator function is not necessary because Stan's boolean operator greater-than returns either 0 or 1.  The only trick to this code is the <code>0.0 + ...</code> in the fraction computation, the purpose of which is to cast the value to real instead of integers and thus prevent integer division from kicking in and rounding down.
+The indicator function is not explicitly specified because Stan's boolean operator greater-than returns either 0 or 1.  The only trick to this code is the <code>0.0 + ...</code> in the fraction computation, the purpose of which is to cast the value to real instead of integers and thus prevent integer division from kicking in and rounding down.
 
 As usual, the expectations appear as the posterior means in the summary.  We can summarize for all four models again.
 
@@ -766,3 +767,384 @@ The standard deviation and quantiles are not useful here and the quantiles are s
 It is clear from the results that the probabilty of batting 0.400 or better for the season is a different question than asking if the player's ability is 0.400 or better;  for example, with respect to the basic partial pooling model, there is roughly an estimated 10% chance of Roberto Clemente ($n = 1$) batting 0.400 or better for the season, but only an estimated 8% chance that he has ability greater than 0.400.  
 
 The NaN values in the R-hat column result when every posterior draw is the same;  there is no variance, and hence R-hat is not defined. 
+
+## Multiple Comparisons
+
+We snuck in a "multiple comparison" event in the last section, namely whether there was some player with an a chance of success for hits of .350 or greater.
+
+With traditional significance testing over multiple trials, it is common to adjust for falsely rejecting the null hypothesis (a so-called <a href="https://en.wikipedia.org/wiki/Type_I_and_type_II_errors#Type_I_error">Type I error</a>) by inflating the conventional (and arguably far too low) 5% target for reporting "significance."  
+
+For example, suppose we have our 18 players with ability parameters $\theta_n$ and we have $N$ null hypotheses of the form $H_0^n: \theta_n < 0.350$.  Now suppose we evaluate each of these 18 hypotheses independently at the conventional $p = 0.05$ significance level, giving each a 5% chance of rejecting the null hypothesis in error.  When we run all 18 hypothesis tests, the overall chance of falsely rejecting at least one of the null hypotheses is a whopping $1 - (1 - 0.05)^{18} = 0.60$.
+
+The traditional solution to this problem is to apply a <a href="https://en.wikipedia.org/wiki/Bonferroni_correction">Bonferroni adjustment</a> to control the false rejection rate;  the typical adjustment is to divide the $p$-value by the number of hypothesis tests in the "family" (that is, the collective test being done).  Here that sets the rate to $p = 0.05/18$, or approximately $p = 0.003$, and results in a slightly less than 5% chance of falsely rejecting a null hypothesis in error.  
+
+Although the Bonferroni correction does reduce the overall chance of falsely rejecting a null hypothesis, it also reduces the statistical power of the test to the same degree.  This means that many null hypotheses will fail to be rejected in error. 
+
+Rather than doing classical multiple comparison adjustments to adjust for false-discovery rate, such as a Bonferroni correction, Gelman et al. (2012) suggest using a hierarchical model to perform partial pooling instead.  As already shown, hierarchical models partially pool the data, which pulls estimates toward the population mean with a strength determined by the amount of observed variation in the population (see also Figure 2 of (Gelman et al. 2012)).  This automatically reduces the false-discovery rate, though not in a way that is intrinsically calibrated to false discovery, which is good, because reducing the overall false discovery rate in and of itself reduces the true discovery rate at the same time. 
+
+The generated quantity <code>some_ability_gt_350</code> will be set to 1 if the maximum ability estimate in $\theta$ is greater than 0.35.  And thus the posterior mean of this generated quantity will be the event probability
+\[
+\mathrm{Pr}[\mathrm{max}(\theta) > 0.350]
+\ = \ \int_{(0,1)^N} \mathrm{I}[\mathrm{max}(\theta) > 0.35] \ p(\theta \, | \, y, K) \ \mathrm{d}\theta
+\ \approx \ \frac{1}{M} \ \sum_{m=1}^M \ \mathrm{I}[\mathrm{max}(\theta^{(m)}) > 0.35]
+\]
+where $\theta^{(m)}$ is the sequence of posterior draws for the ability parameter vector.  Stan reports this value as the posterior mean of the generated quantity <code>some_ability_gt_350</code>, which takes on the value $\mathrm{I}[\mathrm{max}(\theta^{(m)}) > 0.35]$ in each iteration. 
+
+The probability estimate of there being a player with an ability (chance of success) greater than 0.350 is basically 0 in the complete pooling model, 25% in the hierarchical logit model, 62% in the basic hierarchical model, and basically 1 in the no pooling model.  Neither of the partially pooled estimates would be considered significant at conventional p=0.05 thresholds.  One way to get a handle on this is to look at the posterior 80% intervals for chance-of-success estimates in the first graph above. 
+
+## Ranking
+
+In addition to multiple comparisons, we can use the simultaneous estimation of the ability parameters to rank the items;  here we are ranking ballplayers by hitting ability.
+
+To code up ranking in Stan, we define a generated quantity to hold the ranks, then define them by sorting the chance-of-success parameters $\theta$ by index, then assigning ranks.
+
+```
+generated quantities {
+  ...
+  int<lower=1, upper=N> rnk[N];   // rnk[n] is rank of player n
+  ...
+  {
+    int dsc[N];
+    dsc <- sort_indices_desc(theta);
+    for (n in 1:N)
+      rnk[dsc[n]] <- n;
+  }
+  ...
+}
+```
+
+In this example, the integer array variable \code{dsc} is declared as a local variable to hold the sorted indices.  It is declared as a local variable so that its values are not saved every iteration.
+
+We can print just the ranks and the 80% central interval for the basic pooling model.
+
+```{r comment=NA}
+print(fit_hier, "rnk", probs=c(0.1, 0.5, 0.9));
+```
+
+It is again abundantly clear from the posterior intervals that our uncertainty is very great after only 45 at bats.
+
+In the original Volume I BUGS example (see [OpenBUGS: Surgical example](http://www.openbugs.net/Examples/Surgical.html)) of surgical mortality, the ranks of each hospital was plotted.  We can reproduce that figure here for the baseball data.
+
+```{r comment=NA}
+library(ggplot2);
+df_rank <- data.frame(list(name = rep(as.character(df[[1,2]]), 4000),
+                           rank = ss_hier$rnk[, 1]));
+for (n in 2:N) {
+  df_rank <- rbind(df_rank,
+                   data.frame(list(name = rep(as.character(df[[n,2]]), 4000),
+                              rank = ss_hier$rnk[, n])));
+}
+rank_plot <-
+  ggplot(df_rank, aes(rank)) +
+  stat_count(width=0.8) +
+  scale_x_discrete(limits=c(1, 5, 10, 15)) +
+  scale_y_discrete(name="posterior probability", breaks=c(0, 400, 800),
+                   labels=c("0.0", "0.1", "0.2")) + 
+  facet_wrap(~ name);
+rank_plot;
+```
+
+We have followed the original BUGS presentation where the normalized posterior frequency (i.e., the frequency divided by total count) is reported as a probability on the y axis.
+
+
+### Posterior p-Values
+
+A test statistic $T$ is a function from data to a real value.  We will concentrate on four specific test statistics for repeated binary trial data (though the choices we make are general): minimum value, maximum value, sample mean, and sample standard deviation.
+
+Given a test statistic $T$ and data $y$, the Bayesian $p$-value is
+
+\[
+p_B = \mathrm{Pr}[T(y^{\mathrm{rep}}) \geq T(y) \, | \, y].
+\]
+
+Expanding this as an expectation of an indicator function, 
+
+\[
+p_B 
+= \int_{\Theta} 
+    \mathrm{I}[T(y^{\mathrm{rep}}) \geq T(y)] 
+    \ p(\theta \, | \, y)
+    \ mathrm{d}\theta,
+\]
+
+leads to the obvious MCMC calculation based on $M$ draws of replicated data $y^{\mathrm{rep}}$,
+
+\[
+p_B
+\approx 
+\frac{1}{M}
+\
+\sum_{m=1}^M
+\mathrm{I}[T(y^{\mathrm{rep} \ (m)}) \geq T(y)].
+\]
+
+
+The test statistics are first defined as transformed data for the observed data.
+
+```
+transformed data {
+  real min_y;   // minimum successes
+  real max_y;   // maximum successes
+  real mean_y;  // sample mean successes
+  real sd_y;    // sample std dev successes
+
+  min_y <- min(y);
+  max_y <- max(y);
+  mean_y <- mean(to_vector(y));
+  sd_y <- sd(to_vector(y));
+}
+```
+
+
+The code to generate the replicated data is in the generated quantities block.
+
+```
+generated quantities {
+  ...
+  int<lower=0> y_rep[N];      // replications for existing items
+  ...
+  for (n in 1:N)
+    y_rep[n] <- binomial_rng(K[n], theta[n]);
+  ...
+}
+```
+
+Then the test statistics are defined in the generated quantities block.
+
+```
+generated quantities {
+  ...
+  real<lower=0> min_y_rep;   // posterior predictive min replicated successes
+  real<lower=0> max_y_rep;   // posterior predictive max replicated successes
+  real<lower=0> mean_y_rep;  // posterior predictive sample mean replicated successes
+  real<lower=0> sd_y_rep;    // posterior predictive sample std dev replicated successes
+  ...
+  min_y_rep <- min(y_rep);
+  max_y_rep <- max(y_rep);
+  mean_y_rep <- mean(to_vector(y_rep));
+  sd_y_rep <- sd(to_vector(y_rep));
+  ...
+}
+```
+
+And finally, the actual $p$-value indicators are computed and assigned to integer values.
+
+```
+generated quantities {
+  ...
+  int<lower=0, upper=1> p_min;  // posterior predictive p-values
+  int<lower=0, upper=1> p_max;
+  int<lower=0, upper=1> p_mean;
+  int<lower=0, upper=1> p_sd;
+  ...
+  p_min <- (min_y_rep >= min_y);
+  p_max <- (max_y_rep >= max_y);
+  p_mean <- (mean_y_rep >= mean_y);
+  p_sd <- (sd_y_rep >= sd_y);
+  ...
+}
+```
+
+The fit from the Stan program can then be used to display the Bayesian $p$-values for each of the models.
+
+```{r comment=NA}
+print(fit_pool, c("p_min", "p_max", "p_mean", "p_sd"), probs=c());
+print(fit_no_pool, c("p_min", "p_max", "p_mean", "p_sd"), probs=c());
+print(fit_hier, c("p_min", "p_max", "p_mean", "p_sd"), probs=c());
+print(fit_hier_logit, c("p_min", "p_max", "p_mean", "p_sd"), probs=c());
+```
+
+The only worrisomely extreme value is the $p$-value for standard deviation in the no-pooling model, where 99% of the simulated data sets under the model had standard deviations among the number of hits greater than the actual data.
+
+
+We can easily reproduce Figure 6.12 from (Gelman et al. 2013), which shows the posterior predictive distribution for the test statistic, the observed value as a vertical line, and the p-value for each of the tests.  Here is the plot for the basic hierarchical model.
+
+```{r comment=NA}
+y_min <- min(y);
+y_max <- max(y);
+y_mean <- mean(y);
+y_sd <- sd(y);
+df_pvals_min <- data.frame(list(test_stat = rep("min", 4000), 
+                                replication = ss_hier$min_y_rep));
+df_pvals_max <- data.frame(list(test_stat = rep("max", 4000), 
+                                replication = ss_hier$max_y_rep));
+df_pvals_mean <- data.frame(list(test_stat = rep("mean", 4000), 
+                                 replication = ss_hier$mean_y_rep));
+df_pvals_sd <- data.frame(list(test_stat = rep("sd", 4000), 
+                               replication = ss_hier$sd_y_rep));
+
+df_pvals <- rbind(df_pvals_min, df_pvals_max, df_pvals_mean, df_pvals_sd);
+
+post_test_stat_plot <-
+  ggplot(df_pvals, aes(replication)) +
+  facet_wrap(~ test_stat) +
+  geom_histogram(binwidth = 1, colour="black", size = 0.25, fill="white") + 
+  geom_vline(aes(xintercept = y_val), 
+             data = data.frame(y_val = c(rep(y_min, 4000), rep(y_max, 4000), 
+                                         rep(y_mean, 4000), rep(y_sd, 4000)),
+                               test_stat = df_pvals$test_stat,
+                               replication = df_pvals$replication),
+             colour = "blue", size = 0.5) +
+  ggtitle("Posterior p-Values (Beta Prior)");
+post_test_stat_plot;
+```
+
+## Graphical Posterior Predictive Checks
+
+In this section, we will compare the simulated data from the two different hierarchical models, one with the Beta prior on the chance-of-success scale and one with a normal prior on the log-odds scale.   Following the advice of Gelman et al. (2013), we will take the fitted parameters of the data set and generate replicated data sets, then compare the replicated data sets visually to the actual data set.
+
+As discussed by Gelman et al. (2013, p. 143), there is a choice of which parameters to fix and which to simulate.  We can generate new trials using fitted chance-of-success parameters ($\alpha$), or we can generate new items using the population parameters ($\mu$ and $\sigma$).  We'll provide both in the model below for comparison.  In both cases, we simulate from posterior draws, not from the posterior mean or other point estimates; Stan makes this easy with its generated quantities block.  Then we'll plot several of those versus the real data.
+
+The Stan code to generate replicated data for existing items (<code>y_rep</code>) and for new items drawn from the population distribution (<code>y_pop_rep</code>) is in the generated quantities block.
+
+```
+generated quantities {  
+  ...
+  int<lower=0> y_rep[N];      // replications for existing items
+  int<lower=0> y_pop_rep[N];  // replications for simulated items
+  ...
+  for (n in 1:N)
+    y_rep[n] <- binomial_rng(K[n], theta[n]);
+  for (n in 1:N)
+    y_pop_rep[n] <- binomial_rng(K[n], inv_logit(normal_rng(mu, sigma)));
+}
+```
+
+The random population member generation is put through the inverse-logit (logistic sigmoid) function to generate a probability, then a replication generated based on the number of trials.  For the basic hierarchical model, the population replication is carried out as
+
+```
+  for (n in 1:N)
+    y_pop_rep[n] <- binomial_rng(K[n], 
+                                 beta_rng(phi * kappa,
+                                          (1 - phi) * kappa));
+
+```
+
+In this case, the Beta variate is being generated inside the binomial pseudorandom number generator. 
+
+We can now print the replicated values <code>y_rep</code> in both the hierarchical and hierarchical logit models.
+
+```{r comment=NA}
+print(fit_hier, c("y_rep", "y_pop_rep[1]"), probs=c(0.1, 0.5, 0.9));
+print(fit_hier_logit, c("y_rep", "y_pop_rep[1]"), probs=c(0.1, 0.5, 0.9));
+```
+
+The variable <code>y_rep</code> is ordered because it's based on the actual items, which were sorted by success count in the original data.  On the other hand, the <code>y_pop_rep</code> values are fully exchangeable, so indistinguishable in their posterior (other than MCMC error).  Because the population replicates are exchangeable, so we only printed the first for each model.
+
+We can plot some of the simulated data sets along with the original data set to do a visual inspection as suggested by Gelman et al. (2013);  the <code>extract()</code> function has already permuted the posterior draws, so we can just take the initial fifteen for display.
+
+```{r comment=NA}
+df_post <- data.frame(list(dataset = rep("REAL", N),
+                           y = y));
+for (n in 1:15) {
+  df_post <- rbind(df_post,
+                   data.frame(list(dataset = rep(paste("repl ", n), N),
+                                   y = ss_hier_logit$y_rep[n,])));
+}
+post_plot <-
+  ggplot(df_post, aes(y)) +
+  facet_wrap(~ dataset) +
+  stat_count(width=0.8) +
+  scale_x_discrete(limits=c(5, 10, 15, 20)) +
+  scale_y_discrete(name="count", limits=c(0, 2, 4)) +
+  ggtitle("Existing Item Replication (Normal Prior on Log Odds)");
+post_plot;
+```
+
+And now we can do the same thing for the population-level replication; because the code's the same, we do not echo it to the output.
+
+```{r comment=NA, echo=FALSE}
+df_pop_post <- data.frame(list(dataset = rep("REAL", N),
+                               y = y));
+for (n in 1:15) {
+  df_pop_post <- rbind(df_pop_post,
+                       data.frame(list(dataset = rep(paste("repl ", n), N),
+                                        y = ss_hier_logit$y_pop_rep[n,])));
+}
+post_pop_plot <-
+  ggplot(df_pop_post, aes(y)) +
+  facet_wrap(~ dataset) +
+  stat_count(width=0.8) +
+  scale_x_discrete(limits=c(5, 10, 15, 20)) +
+  scale_y_discrete(name="count", limits=c(0, 2, 4)) +
+  ggtitle("New Item Replication (Normal Prior on Log Odds)");
+post_pop_plot;
+```
+
+The posterior simulations are not unreasonable for a binomial likelihood, but are noticeably more spread out than the actual data.  This may actually have more to do with how the data were selected out of all the major league baseball players than the actual data distribution.  Efron and Morris (1975, p 312) write, "This sample was chosen because we wanted between 30 and 50 at bats to assure a satisfactory approximation of the binomial by the normal distribution while leaving the bulk of at bats to be estimated.  We also wanted to include an unusually good hitter (Clemente) to test the method with at least one extreme parameter, a situation expected to be less favorable to Stein's estimator.  Stein's estimator requires equal variances, or in this situation, equal at bats, so the remaining 17 players are all whom either the April 26 or May 3 *New York Times* reported with 45 at bats."
+
+Here are the same plots for the basic hierarchical model.  This time we suppress printing the ggplot code, which is the same as before, and just show the graphs.
+
+```{r comment=NA, echo=FALSE}
+df_post_beta <- data.frame(list(dataset = rep("REAL", N),
+                                y = y));
+for (n in 1:15) {
+  df_post_beta <- rbind(df_post_beta,
+                        data.frame(list(dataset = rep(paste("repl ", n), N),
+                                        y = ss_hier$y_rep[n,])));
+}
+post_plot_beta <-
+  ggplot(df_post_beta, aes(y)) +
+  facet_wrap(~ dataset) +
+  stat_count(width=0.8) +
+  scale_x_discrete(limits=c(5, 10, 15, 20)) +
+  scale_y_discrete(name="count", limits=c(0, 2, 4)) +
+  ggtitle("Existing Item Replication (Beta Prior on Probability)");
+post_plot_beta;
+```
+
+```{r comment=NA, echo=FALSE}
+df_pop_post_beta <- data.frame(list(dataset = rep("REAL", N),
+                               y = y));
+for (n in 1:15) {
+  df_pop_post_beta <- rbind(df_pop_post_beta,
+                            data.frame(list(dataset = rep(paste("repl ", n), N),
+                                             y = ss_hier$y_pop_rep[n,])));
+}
+post_pop_plot_beta <-
+  ggplot(df_pop_post_beta, aes(y)) +
+  facet_wrap(~ dataset) +
+  stat_count(width=0.8) +
+  scale_x_discrete(limits=c(5, 10, 15, 20)) +
+  scale_y_discrete(name="count", limits=c(0, 2, 4)) +
+  ggtitle("New Item Replication (Beta Prior on Probability)");
+post_pop_plot_beta;
+```
+
+The plots for replications of existing items is radicall different with the beta prior, with the replications being much closer to the originally observed values.   The replications for new items look similar.  By eye, it looks like the beta prior is controlling the posterior variance of individual item chance-of-success estimates much better, despite producing wider posterior 80% intervals for chance of success.
+
+### Discussion
+
+A hierarchical model introduces an estimation bias toward the population mean and the stronger the bias, the less variance there is in the estimates for the items.  Exactly how much bias and variance is warranted can be estimated by further calibrating the model and testing where its predictions do not bear out.  In this case, both models yield similar estimates, with the logistic model trading a bit more bias for variance in its estimates.  It is important to keep in mind that both models are consistent in the sense that as the number of trials increases, both models will converge to the empirical chance of success for the ability parameters.
+
+### Exercises
+
+1.  Generate fake data according to the one of the models.  Fit the model and consider the coverage of the posterior 80% intervals.
+
+1.  Extend one of the Stan programs to allow a different number of initial trials for each item.  Simulating data for this situation, what effect does the number of initial trials have on the posterior?
+
+1. How sensitive is the hierarchical model to the priors on the hyperparameters $\kappa, \phi$?  Consider a weakly informative prior on $\phi$ and alternative distributional families for $\kappa$ (e.g., exponential).  
+
+1. Write a Stan model to predict $z_n$ based on the no pooling and complete pooling models and compare those to the predictions based on the hierarchical model.  Which is better calibrated in the sense of having roughly the right number of actual values fall within the prediction intervals?  Then, compare the prediction made from a maximum likelihood point estimate of performance using a binomial predictive likelihood.
+
+1.  Given the hierarchical model, estimate the probability for each player that they have the highest batting ability.  What is the probability that Roberto Clemente will lead these 18 players (given the modeling assumptions)?  Compare that to the probability that each player will end the season with the highest batting average (observed success rate for season).  Write a Stan model to compute both values and fit it.
+
+1.  Lunn et al. (2013) contains a running analysis of pediatric cardiac surgery mortality for 12 hospitals.  Reanalyze their data with Stan using the models in this note.  The models will have to be generalized to allow $K$ to vary by item $n$. The data is available from Stan's example model repository as [BUGS Vol 1 examples: Surgical](https://github.com/stan-dev/example-models/tree/master/bugs_examples/vol1/surgical) and the WinBUGS project hosts the [original example description](http://www.openbugs.net/Examples/Surgical.html) (which has different counts from the data analyzed by Lunn et al.); Lunn et al. analyze slightly different data in the BUGS book than in their on-line example.
+
+1.  How sensitive is the logistic model to the hyperprior?  If we made it much less informative or much more informative, how much do the fitted values differ?  How do the predictions differ?  Evaluate the prior used by Lunn et al. (2013), which is $\mathsf{Uniform}(-100,100)$ for $\mu$ and $\mathsf{Uniform}(0, 100)$ for $\sigma$.  Be sure to add constraints on the declarations of $\mu$ and $\sigma$ to match the constraints.  What happens if the width of the uniform grows much wider or much narrower?
+
+1.  Figure out how to take all the hard-coded output analysis in here and make it dynamic by making better use of knitr.  And take all the cut-and-paste duplicated code and wrap it into functions.
+
+### References
+
+* Betancourt, M. and Girolami, M. (2015) Hamiltonian Monte Carlo for hierarchical models. <i>Current Trends in Bayesian Methodology with Applications</i> <b>79</b>.
+
+* Efron, B. and Morris, C. (1975) Data analysis using Stein's estimator and its generalizations. <i>Journal of the American Statistical Association</i> <b>70</b>(350), 311--319. [ [pdf](http://www.medicine.mcgill.ca/epidemiology/hanley/bios602/MultilevelData/EfronMorrisJASA1975.pdf) ]
+
+* Gelman, A., Carlin, J. B., Stern, H. S., Dunson, D. B., Vehtari, A., and Rubin, D. B. (2013) <i>Bayesian Data Analysis</i> 3rd Edition. Chapman & Hall/CRC Press, London.
+
+* Gelman, A. and Hill, J. (2007) <i>Data Analysis Using Regression and Multilevel-Hierarchical Models</i>. Cambridge University Press, Cambridge, United Kingdom.
+
+* Gelman, A., Hill, J., and Yajima, M. (2012) Why we (usually) don't have to worry about multiple comparisons. <i>Journal of Research on Educational Effectiveness</i> <b>5</b>, 189--211. [ [pdf](http://www.stat.columbia.edu/~gelman/research/published/multiple2f.pdf) ]
+
+* Lunn, D., Jackson, C., Best, N., Thomas, A., and Spiegelhalter, D. (2013) <i>The BUGS Book: A Practical Introduction to Bayesian Analysis</i>.  Chapman & Hall/CRC Press.
