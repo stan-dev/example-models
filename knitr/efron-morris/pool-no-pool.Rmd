@@ -27,9 +27,10 @@ Suppose that for each of $N$ items, we observe $y_n$ successes out of $K_n$ tria
 ### Efron and Morris's Baseball Data
 
 We include the data from Table 1 of (Efron and Morris 1975) as
-<code>data.tsv</code> (it was downloaded 24 Dec 2015 from [here](http://www.swarthmore.edu/NatSci/peverso1/Sports%20Data/JamesSteinData/Efron-Morris%20Baseball/EfronMorrisBB.txt)).  It is drawn from the 1970 Major League Baseball season from both leagues.
+<code>efron-morris-75-data.tsv</code> (it was downloaded 24 Dec 2015 from [here](http://www.swarthmore.edu/NatSci/peverso1/Sports%20Data/JamesSteinData/Efron-Morris%20Baseball/EfronMorrisBB.txt)).  It is drawn from the 1970 Major League Baseball season from both leagues.
+
 ```{r comment=NA}
-df <- read.csv("data.tsv", sep="\t");
+df <- read.csv("efron-morris-75-data.tsv", sep="\t");
 df <- data.frame(FirstName = df$FirstName,
                  LastName = df$LastName,
                  Hits = df$Hits,
@@ -38,21 +39,29 @@ df <- data.frame(FirstName = df$FirstName,
                  RemainingHits = df$SeasonHits - df$Hits);
 print(df);
 ```
-We will only need a few columns of the data, and we know the initial number of at-bats are all the same. 
+
+We will only need a few columns of the data, and only a scalar for the initial number of at-bats, all of which we know to be the same.
+
 ```{r comment=NA}
 N <- dim(df)[1];
-K <- (df$At.Bats)[1]
+K <- df$At.Bats
 y <- df$Hits
+K_new <- df$RemainingAt.Bats;
+y_new <- df$RemainingHits;
 ```
 
-The data separates the outcome from the initial 45 at-bats from the rest of the season.  After running this code, <code>K1</code> is an integer number of at-bats.  Then for each player <code>n</code>, <code>y1[n]</code> is the initial number of hits, <code>K2[n]</code> is the remaining number of at-bats, and <code>y[n]</code> is the total number of hits; the season number of at-bats for player <code>n</code> is thus <code>K1 + K2[n]</code>.
+The data separates the outcome from the initial 45 at-bats from the rest of the season.  After running this code, <code>N</code> is the number of items (players).  Then for each item <code>n</code>, <code>K[n]</code> is the number of initial trials (at-bats), <code>y[n]</code> is the number of initial successes (hits), <code>K_new[n]</code> is the remaining number of trials (remaining at-bats), and <code>y_new[n]</code> is the number of successes in the remaining trials (remaining hits).
 
-In Stan, the initial at-bats for the <code>N</code> players are represented with the following declarations.
+Although we consider many models, the data is coded as follows for all of them. 
+
 ```
 data {
-  int<lower=0> N;               // items
-  int<lower=0> K;               // initial trials
-  int<lower=0, upper=K1> y[N];  // initial successes
+  int<lower=0> N;           // items
+  int<lower=0> K[N];        // initial trials
+  int<lower=0> y[N];        // initial successes
+
+  int<lower=0> K_new[N];    // new trials
+  int<lower=0> y_new[N];    // new successes
 }
 ```
 
@@ -66,44 +75,58 @@ In this section, all three types of pooling models will be fit for the baseball 
 
 
 
-### Model 1: Complete Pooling
+## Model 1: Complete Pooling
 
-The complete pooling model assumes a single parameter $\theta \in (0,1)$ representing the chance of success for all items:
+The complete pooling model assumes a single parameter $\phi$ representing the chance of success for all items.  It is necessary in Stan to declare parameters with constraints corresponding to their support in the model.  Because $\phi$ will be used as a binomial parameter, we must have $\phi \in (0,1)$.  The variable <code>phi</code> must therefore be declared in Stan with the following lower- and upper-bound constraints.
 
 ```
 parameters {
-  real<lower=0, upper=1> theta;   // chance of success
+  real<lower=0, upper=1> phi;  // chance of success (pooled)
 }
 ```
-
-By default, Stan places a uniform prior on all parameters.  Because <code>theta</code> is bounded to lie between 0 and 1, this uniform distribution is proper, and results in the prior
-\[
-p(\theta) = \mathsf{Uniform}(\theta \, | \, 0,1) = 1.
-\]
-This does not need to be explicitly coded in the model as it is the default behavior for a variable constrained to lie in $(0,1)$.
 
 Assuming each player's at-bats are independent Bernoulli trials, the likelihood for each player is modeled as
+
 \[
-p(y_n \, | \, \theta) = \mathsf{Binomial}(y_n \, | \, K, \theta) \propto \theta^{y_n} \, (1 - \theta)^(K - y_n).
-\]
-Assuming each player is independent leads to the data likelihood
-\[
-p(y \, | \, \theta) = \prod_{n=1}^N \mathsf{Binomial}(y_n \, | \, K, \theta).
+p(y_n \, | \, \phi) 
+\ = \
+\mathsf{Binomial}(y_n \, | \, K, \phi) 
+\ \propto \ \phi^{y_n} \, (1 - \phi)^(K - y_n).
 \]
 
-The likelihood is expressed as a vectorized sampling statement in Stan as
+Assuming each player is independent leads to the complete data likelihood
+
+\[
+p(y \, | \, \phi) = \prod_{n=1}^N \mathsf{Binomial}(y_n \, | \, K, \phi).
+\]
+
+We will assume a uniform prior on $\phi$,
+
+\[
+p(\phi) 
+\ = \
+\mathsf{Uniform}(\phi \, | \, 0, 1) 
+\ = \
+1.
+\]
+
+
+By default, Stan places a uniform prior over the values meeting the constraints on a parameter.  Because $\phi$ is constrained to fall in $(0,1)$, there is no need to explicitly specify the uniform prior on $\phi$.  The likelihood is expressed as a vectorized sampling statement in Stan as
+
 ```
 model {
-  y ~ binomial(K, theta);
+  y ~ binomial(K, phi);
 }
 ```
-The vectorized form above is equivalent to, but less efficient than an explicit for loop, as in
+
+The vectorized sampling statement above is equivalent to but more efficient than the following explicit loop.
+
 ```
   for (n in 1:N)  
-    y[n] ~ binomial(K, theta);
+    y[n] ~ binomial(K[n], phi);
 ```
 
-The full Stan program for the simple model with no pooling is in <code>pool.stan</code>:
+The actual Stan program in <code>pool.stan</code> has many more derived quantities that will be used in the rest of this note.
 
 ```{r comment=NA, echo=FALSE, comment=NA}
 file_path <- "pool.stan";
@@ -112,51 +135,87 @@ for (n in 1:length(lines)) cat(lines[n],'\n');
 ```
 
 We start by loading the RStan package.
+
 ```{r results='hide', comment=NA}
 library(rstan);
 ```
 
 The model can be fit as follows, reading the data out of the environment by name (the output result of running Stan are hidden).
+
 ```{r results='hide', comment=NA}
-fit_pool <- stan("pool.stan", data=c("N", "K", "y"));
+fit_pool <- stan("pool.stan", data=c("N", "K", "y", "K_new", "y_new"));
 ss_pool <- extract(fit_pool);
 ```
 
-Then the results can be printed as follows, with quantiles for the median (50% quantile), and boundaries of the central 80% interval (10% and 90% quantiles).
+The posterior sample for <code>phi</code> can be summarized as follows.
+
+
 ```{r comment=NA}
-print(fit_pool, probs=c(0.1, 0.5, 0.9));
+print(fit_pool, c("phi"), probs=c(0.1, 0.5, 0.9));
 ```
-See the Stan manual for more information on the meanings of the columns in the output; briefly they are the posterior mean, MCMC standard error of the mean, posterior standard deviation, quantiles, effective sample size, and R-hat convergence diagnostic.  The first row is for parameter <code>theta</code> and the second for the unnormalized log density (after transform to the unconstrained scale plus the log Jacobian of the inverse transform), written as <code>lp__</code>.  
 
-Both <code>theta</code> and <code>lp__</code> have an Rhat value that is consistent with convergence.
+The summary statistics begin with the posterior mean, the MCMC standard error on the posterior mean, and the posterior standard deviation.  Then there are 0.1, 0.5, and 0.9 quantiles, which provide the posterior median and boundaries of the central 80% interval.  The last two columns are for the effective sample size (MCMC standard error is the posterior standard deviation divided by the square root of the effective sample size) and the $\hat{R}$ convergence diagnostic (its value will be 1 if the chains have all converged to the same posterior mean and variance; see the Stan Manual or Gelman et al. 2013).  The $\hat{R}$ value here is consistent with convergence and the effective sample size is good (roughly half the number of posterior draws; by default Stan uses as many iterations to warmup as it does for drawing the sample).
 
-The result is a posterior mean estimate for $\theta$ of $\bar{\theta} = 0.27$ with an 80% posterior interval of $(0.25, 0.29)$. 
+The result is a posterior mean estimate for $\theta$ of $\hat{\theta} = 0.27$ with an 80% central posterior interval of $(0.25, 0.29)$. 
 
-The complete pooling results are too conservative in that many players exceed 0.30 chance of success of achieving a hit in an at-bat.
+We know from historical data that many players exceed a 0.30 chance of success over their careers with thousands of at-bats, so we have reason to believe the complete pooling results are too conservative.
 
 
-### Model 2: No Pooling
+## Model 2: No Pooling
 
-A model with no pooling assumes a separate chance-of-success parameter $\theta_n \in (0,1)$ for each item $n$.  The Stan program for no pooling only differs in declaring the ability parameters as an $N$-vector rather than a scalar.  
+A model with no pooling involves a separate chance-of-success parameter $\theta_n \in (0,1)$ for each item $n$.  
 
-Formally, the prior assumes $\theta_n$ is uniform,
+The prior on each $\theta_n$ is uniform,
+
 \[
 p(\theta_n) = \mathsf{Uniform}(\theta_n \, | \, 0,1),
 \]
-and that the $\theta_n$ are independent, 
+
+and the $\theta_n$ are assumed to be independent, 
+
 \[
 p(\theta) = \prod_{n=1}^N \mathsf{Uniform}(\theta_n \, | \, 0,1).
 \]
-The likelihood uses each item's number of successes is binomial, 
+
+The likelihood then uses the chance of success $\theta_n$ for item $n$ in modeling the number of successes $y_n$ as
+
 \[
-p(y_n \, | \, \theta_n) = \mathsf{Binomial}(y_n \, | \, K, \theta_n)
+p(y_n \, | \, \theta_n) = \mathsf{Binomial}(y_n \, | \, K, \theta_n).
 \]
-and assumes independence,
+
+Assuming the $y_n$ are independent (conditional on $\theta$), this leads to the total data likelihood
+
 \[
 p(y \, | \, \theta) = \prod_{n=1}^N \mathsf{Binomial}(y_n \, | \, K, \theta_n).
 \]
 
-With the implicit prior and vectorization in the binomial sampling statement, the Stan program for no pooling is in <code>no-pool.stan</code>:
+The Stan program for no pooling only differs in declaring the ability parameters as an $N$-vector rather than a scalar.
+
+```
+parameters {
+  vector<lower=0, upper=1>[N] theta; // chance of success
+}
+```
+
+The constraint applies to each <code>theta[n]</code> and implies an independent uniform prior on each.  
+
+The model block defines the likelihood as binomial, using the efficient vectorized form
+
+```
+model {
+  y ~ binomial(K, theta);  // likelihood
+}
+```
+
+This is equivalent to the less efficient looped form
+
+```
+  for (n in 1:N)
+    y[n] ~ binomial(K[n], theta[n]);
+```
+
+The full Stan program with all of the extra generated quantities, is in <code>no-pool.stan</code>:
+
 ```{r comment=NA, echo=FALSE}
 file_path <- "no-pool.stan";
 lines <- readLines(file_path, encoding="ASCII");
@@ -164,426 +223,267 @@ for (n in 1:length(lines)) cat(lines[n],'\n');
 ```
 
 This model can be fit the same way as the last model.
+
 ```{r  comment=NA, results='hide'}
-fit_no_pool <- stan("no-pool.stan", data=c("N", "K", "y"));
+fit_no_pool <- stan("no-pool.stan", data=c("N", "K", "y", "K_new", "y_new"));
 ss_no_pool <- extract(fit_no_pool);
 ```
+
 Results are displayed the same way.
+
 ```{r comment=NA}
-print(fit_no_pool, probs=c(0.1, 0.5, 0.9));
+print(fit_no_pool, c("theta"), probs=c(0.1, 0.5, 0.9));
 ```
-Now there is a separate line for each item's estimated $\theta_n$.  The posterior mode is the maximum likelihood estimate, but that is not shown here;  the posterior mean and median will be reasonably close to the posterior mode despite the skewness.  
+
+Now there is a separate line for each item's estimated $\theta_n$.  The posterior mode is the maximum likelihood estimate, but that requires running Stan's optimizer to find;  the posterior mean and median will be reasonably close to the posterior mode despite the skewness (the posterior can be shown analytically to be a Beta distribution).
 
 Each 80% interval is much wider than the estimated interval for the population in the complete pooling model;  this is to be expected from the central limit theorem---there are only 45 data items for each parameter here as opposed to 810 in the complete pooling case.  Also, as the estimated chance of success goes up toward 0.5, the 80% intervals gets wider;  this is to be expected for chance of success parameters (the standard deviation of $\mathsf{Binomial}(K, \theta)$ is $\sqrt{\frac{\theta \, (1 - \theta)}{K}}$.  If the items each had different numbers of trials, the intervals would also vary based on size.
   
-The no pooling model model also fits better as indicated by the effective sample size and convergence diagnostics.  
+The no pooling model model provides better MCMC mixing than the pooling model as indicated by the effective sample size and convergence diagnostics; although not in and of itself meaningful, it is often the case that badly misspecified models provide difficult computationally (a result Andrew Gelman has dubbed "[The Folk Theorem](http://andrewgelman.com/2009/05/24/handy_statistic/)").
 
-A little knowledge of baseball in this case shows that we're likely overestimating the high ability estimates and underestimating the lower ability estimates (Ted Williams, 30 years prior to this data, was the last player with a success rate of 40% and 20% is too low for all but a few rare defensive specialists).
+A little knowledge of baseball in this case shows that we're likely overestimating the high ability estimates and underestimating the lower ability estimates (Ted Williams, 30 years prior to the year this data was collected, was the last player with a success rate of 40%, whereas 20% is too low for all but a few rare defensive specialists).
 
-### Model 3: Partial Pooling
+## Model 3: Partial Pooling (Beta Prior on Chance of Success)
 
 Complete pooling provides estimated abilities that are too narrow and removes any chance of modeling population variation.  Estimating each chance of success separately wtihout any pooling provides estimated abilities that are too broad and hence too variable.  Clearly some amount of pooling between these two extremes is called for.  But how much?  
 
 A hierarchical model treats the players as belonging to a population of players.  The properties of this population will be estimated along with player abilities, resulting in an amount of pooling that is estimated.
 
 Mathematically, the hierarchical model places a prior on the abilities with parameters that are themselves estimated.  In this case, we will assume a <a href="https://en.wikipedia.org/wiki/Beta_distribution">beta distribution</a> as the prior as it is scaled to values in $(0, 1)$, 
+
 \[
 p(\theta_n \, | \, \alpha, \beta)
 = \mathsf{Beta}(\theta_n \, | \, \alpha, \beta),
 \]
+
 where $\alpha, \beta > 0$ are the parameters of the prior.  In this simple case, the priors can be interpreted as prior data, with $\alpha - 1$ being the prior number of successes and $\beta - 1$ being the prior number of failures.  Each $\theta_n$ will be modeled as conditionally independent given the prior parameters, so that the complete prior is
+
 \[
 p(\theta \, | \, \alpha, \beta) 
 = \prod_{n=1}^N \mathsf{Beta}(\theta_n \, | \, \alpha, \beta).
 \]
 
 The parameters $\alpha$ and $\beta$ are themselves given priors ($\alpha, \beta$ are sometimes called hyperparameters and their priors called hyperpriors, but this terminology doesn't stand up well for more deeply nested hierarchies).  Rather than parameterize $\alpha$ and $\beta$ directly, we will instead use put priors on $\phi \in (0, 1)$ and $\kappa > 0$, and then define
+
 \[
 \alpha = \kappa \, \phi
 \]
+
 and
+
 \[
 \beta = \kappa \, (1 - \phi).
 \]
-This reparameterization is convenient because 
-$\phi = \alpha / (\alpha + \beta)$ is the mean of 
+
+This reparameterization is convenient because $\phi = \alpha / (\alpha + \beta)$ is the mean of 
 $\mathsf{Beta}(\alpha, \beta)$ and $\kappa = \alpha + \beta$ is the prior count plus 2. 
 
-We will follow Chapter 5 in Gelman et al.'s [<i>Bayesian Data Analysis</i>](http://http://www.stat.columbia.edu/~gelman/book/) (2013) in providing a prior that is uniform on $(\frac{\alpha}{\alpha + \beta}, (\alpha + \beta)^{-1/2})$.  This means that the prior on $\phi$ is uniform, 
+We will follow Gelman et al. (2013, Chapter 5) in providing a prior that is uniform on $(\frac{\alpha}{\alpha + \beta}, (\alpha + \beta)^{-1/2})$.  This means that the prior on $\phi$ is uniform, 
 \[
 p(\phi) = \mathsf{Uniform}(\phi \, | \, 0, 1),
 \]
+
 and the prior on $\kappa$ is a Pareto distribution, 
+
 \[
 p(\kappa) = \mathsf{Pareto}(\kappa \, | \, 1, 1.5) \propto \kappa^{-2.5}
 \]
-The first parameter to the Pareto is a lower bound on outcomes and must be greater than zero to allow normalization of the distribution.  A very weak lower bound of 1 is used, with the constraint $\kappa > 1$ included in the declaration.
 
-The model can coded in Stan as in the file <code>hier.stan</code>:
+The first parameter to the Pareto is a lower bound on outcomes and must be greater than zero to allow normalization of the distribution.  A very weak lower bound of 1 is used, with the constraint $\kappa > 1$ included in the Stan parameter declaration.
+
+The Stan code follows the definitions, with parameters declared with appropriate constraints as follows.
+
+```
+parameters {
+  real<lower=0, upper=1> phi;         // population chance of success
+  real<lower=1> kappa;                // population concentration
+  vector<lower=0, upper=1>[N] theta;  // chance of success 
+}
+```
+
+The lower-bound on $\kappa$ matches the first argument to the Pareto distribution in the hyperprior of the model block.
+
+```
+model {
+  kappa ~ pareto(1, 1.5);                        // hyperprior
+  theta ~ beta(phi * kappa, (1 - phi) * kappa);  // prior
+  y ~ binomial(K, theta);                        // likelihood
+}
+```
+
+The values of $\alpha = \phi \, \kappa$ and $\beta = (1 - \phi) \, \kappa$ are computed in the arguments to the vectorized Beta sampling statment.  The prior on $\phi$ is implicitly uniform, as before.  The prior on $\kappa$ is the coded explicitly, with the first argument providing a lower-bound on $\kappa$ which matches that in the variable declaration in the parameters block.
+
+The full model with all generated quantities can coded in Stan as in the file <code>hier.stan</code>:
+
 ```{r comment=NA, echo=FALSE}
 file_path <- "hier.stan";
 lines <- readLines(file_path, encoding="ASCII");
 for (n in 1:length(lines)) cat(lines[n],'\n');
 ```
 
-Fitting and printing are done as before.
+Fitting in this case adds control parameters which set the initial step size lower than the default and the target acceptance rate (<code>adapt_delta</code>) higher than the default values;  this causes smaller step sizes and helps with arithmetic stability in hierarchical models such as this one.
+
 ```{r  comment=NA, results='hide'}
-fit_hier <- stan("hier.stan", data=c("N", "K", "y"),
+fit_hier <- stan("hier.stan", data=c("N", "K", "y", "K_new", "y_new"),
                  control=list(stepsize=0.01, adapt_delta=0.99));
 ss_hier <- extract(fit_hier);
 ```
-The control parameters are set for an initial stepsize of 0.01 and a target accptance rate of 0.99.  This causes the initial and adapted step sizes to be lower than they would be with the default parameters.  As a result, the Hamiltonian Monte Carlo sampler more accurately simulates the Hamiltonian using only gradient-based steps.  This means fewer or no divergent transition warnings in the output, which arise when there is an arithmetic instability in the simulation.  It also causes sampling to take longer, as each iteration has to take more steps to simulate the Hamiltonian.
 
-The results are print as before.
+
+Summary statistics for the posterior are printed as before.
+
 ```{r comment=NA}
-print(fit_hier, probs=c(0.1, 0.5, 0.9));
+print(fit_hier, c("theta", "kappa", "phi"), probs=c(0.1, 0.5, 0.9));
 ```
 
-The poor effective sample size for <code>kappa</code> is typical of this kind of hierarchical model where the exact concentration of values in the population is not well constrained by only 18 trials of size 45.
+Because the Beta prior is conjugate to the binomial likelihood, the amount of interpolation between the data and the prior in this particular case is easy to quantify.  The data consists of $K$ observations.  The prior will be weighted as if it were $\kappa - 2$ observations (specifically $\phi \, \kappa - 1$ prior successes and $(1 - \phi) \, \kappa - 1$ prior failures).  
 
-Figure 5.3 from (Gelman et al. 2014) plots the fitted values for $\phi$ and $\kappa$ on the unconstrained scale, which for $\phi \in (0,1)$ is $\mathrm{logit}(\phi) = \log(\phi / (1 - \phi))$ and for $\kappa \in (0, \infty)$ is $\log \kappa$.
+
+The parameter $\kappa$ is not well determined by the combination of data and Pareto prior, with a posterior 80% interval of roughly $(25, 225)$.  By the informal discussion above, $\kappa \in (25, 225)$ ranges from weighting the data 2:1 versus the prior to weighting it 1:5.  
+
+The wide posterior interval for $\kappa$ arises because because the exact variance in the population is not well constrained by only 18 trials of size 45.  If there were more items (higher $N$) or even more trials per item (higher $K$), the posterior for $\kappa$ would be more tightly constrained.
+
+It is also evident from the posterior summary that with a $\hat{R}$ measurably greater than 1 and the much lower effective sample size of $\kappa$ relative to other parameters that it is also not mixing well.  This is an example where a poorly constrained parameter leads to reduced computational efficiency (as reflected in the effective sample size).  Such poor mixing is typical of centered parameterizations in hierarchical models (Betancourt and Girolami 2015).  In the next section, we address this problem with an alternative hierarchical prior; it may be possible to create a non-centered parameterization of the Beta prior, but I don't know how to do it.
+
+Figure 5.3 from (Gelman et al. 2014) plots the fitted values for $\phi$ and $\kappa$ on the unconstrained scale, which is the space over which Stan is sampling.  The variable $\phi \in (0,1)$ istransformed to $\mathrm{logit}(\phi) = \log(\phi / (1 - \phi))$ and $\kappa \in (0, \infty)$ is transformed to $\log \kappa$.
+
 ```{r}
 phi_sim <- ss_hier$phi;
 kappa_sim <- ss_hier$kappa;
-df_plot1 <- data.frame(x = log(phi_sim / (1 - phi_sim)),
-                       y = log(kappa_sim));
+df_bda3_fig_5_3 <- data.frame(x = log(phi_sim / (1 - phi_sim)),
+                              y = log(kappa_sim));
 library(ggplot2);
 plot_bda3_fig_5_3 <- 
-  ggplot(df_plot1, aes(x=x, y=y)) +
-  geom_point(shape=19, alpha=0.5) +
+  ggplot(df_bda3_fig_5_3, aes(x=x, y=y)) +
+  geom_point(shape=19, alpha=0.25) +
   xlab("logit(phi) = log(alpha / beta)") +
   ylab("log(kappa) = log(alpha + beta)");
 plot_bda3_fig_5_3;
 ```
 
-From the figure, the clear funnel-like shape of the posterior is evident, with higher $\kappa$ values corresponding to lower variance;  see the Stan manual on reparameterization for examples of how to mitigate this problem for regression models.
+The (upside-down) funnel-like shape of the posterior is evident, with higher $\kappa$ values corresponding to lower variance (hence the upside-downedness) and thus a narrower range of $\phi$ values;  this phenomenon is discussed in the *Stan Reference Manual* and by Betancourt and Girolami (2015).  Running the sampler for more iterations will result in better resolution for scatterplots (though be sure to turn down the alpha blend level).
 
 
-
-Figure 5.4 from (Gelman et al. 2014) plots the observed number of hits $y_n$ for the first $K$ at bats versus the median and 80\% intervals for the estimated chance-of-success parameters $\theta_n$ in the posterior.
-```{r}
-M <- dim(ss_hier$phi);
-
-theta_10_pool <- rep(NA, N);
-theta_50_pool <- rep(NA, N);
-theta_90_pool <- rep(NA, N);
-for (n in 1:N) {
-  theta_10_pool[n] <- sort(ss_pool$theta)[M * 0.1];
-  theta_50_pool[n] <- sort(ss_pool$theta)[M * 0.5];
-  theta_90_pool[n] <- sort(ss_pool$theta)[M * 0.9];
-}
-
-theta_10_no_pool <- rep(NA, N);
-theta_50_no_pool <- rep(NA, N);
-theta_90_no_pool <- rep(NA, N);
-for (n in 1:N) {
-  theta_10_no_pool[n] <- sort(ss_no_pool$theta[,n])[M * 0.1];
-  theta_50_no_pool[n] <- sort(ss_no_pool$theta[,n])[M * 0.5];
-  theta_90_no_pool[n] <- sort(ss_no_pool$theta[,n])[M * 0.9];
-}
-
-theta_10_hier <- rep(NA, N);
-theta_50_hier <- rep(NA, N);
-theta_90_hier <- rep(NA, N);
-for (n in 1:N) {
-  theta_10_hier[n] <- sort(ss_hier$theta[,n])[M * 0.1];
-  theta_50_hier[n] <- sort(ss_hier$theta[,n])[M * 0.5];
-  theta_90_hier[n] <- sort(ss_hier$theta[,n])[M * 0.9];
-}
-
-pop_mean <- sum(y) / (N * K);
-
-df_plot2 <- data.frame(x = rep(y / K, 3),
-                       y = c(theta_50_pool, theta_50_no_pool, theta_50_hier),
-                       model = c(rep("complete pooling", N),
-                                 rep("no pooling", N),
-                                 rep("partial pooling", N)));
-
-plot_bda3_fig_5_4 <-
-  ggplot(df_plot2, aes(x=x, y=y)) +
-  facet_grid(. ~ model) +
-  geom_point(shape=19) +
-  geom_errorbar(aes(ymin=c(theta_10_pool, theta_10_no_pool, theta_10_hier),
-                    ymax=c(theta_90_pool, theta_90_no_pool, theta_90_hier)),
-                width=0.005, colour="darkgray") +
-  coord_fixed() +
-  geom_abline(intercept=0, slope=1, colour="lightskyblue") +
-  geom_hline(aes(yintercept=pop_mean), colour="lightpink") +
-  xlab("observed rate, y[n] / K") +
-  ylab("median and 80% posterior interval for theta[n]");
-plot_bda3_fig_5_4;
-```
-The diagonal blue line has intercept 0 and slope 1, and thus represents where the no-pooling maximum likelihood estimate would fall given an observed rate (the MLE is equal to the observed rate).  The horizontal red line has an intercept equal to the posterior mean of the population chance-of-success parameter $\phi$ (0.268).  
-
-The overlplotting at the same x positions is because there are several observed rates shared by multiple players;  because players with the same observed rates are indistinguishable, any differences in estimates are due to MCMC error.
-
-The choice of likelihood function and parameterization (a single parameter or one parameter per item) makes a huge impact here on the estimated chance of success for each item.  This is true even in non-Bayesian settings---the points are very close to where the maximum likelihood estimates will be and these vary quite dramatically between the complete pooling and no pooling extremes.  The larger point is that it's not just the choice of prior that contributes to the "subjective" modeling of a data set; the choice of likelihood is equally if not more sensitive to modeling assumptions.
-
-In the no pooling case, the posterior can be calculated analytically and shown to be a beta distribution.  The median of a beta distribution (plotted) is greater than the mode of a beta distribution (the blue line, corresponding to the MLE);  this assumes $\alpha, \beta > 1$ (see the [Wikipedia article on the beta distribution](https://en.wikipedia.org/wiki/Beta_distribution#Mean.2C_mode_and_median_relationship) for an explanation).  The reason this is not evident in the complete pooling case is that there is far more data, and with more data, the mean, median, and mode of the beta distribution converge to the same value.
-
-
-## Prediction and Calibration
-
-Efron and Morris's (1975) baseball data includes not only the observed hit rate in the initial 45 at bats, but also includes the data for how the player did for the rest of the season.  The question arises as to how well these Bayesian models predict a player's performance for the rest of the season based on the initial 45 at bats.
-
-The data contains the number of at-bats for a player for the remainder of the season, from which it is possible to predict the number of hits each of 18 players is expected to make based on observing their first 45 at bats.  The number of at bats in the rest of the season for a player is 
-
-```{r comment=NA}
-J <- df$RemainingAt.Bats;
-z <- df$RemainingHits;
-```
-
-
-For each model, if a player's chance of getting a hit in an at-bat is given by $\theta_n$ and the number of remaining at bats is $J_n$, then the number of hits in the remaining at bats will be distributed as
-\[
-p(z_n \, | \, \theta_n) = \mathsf{Binomial}(z_n \, | \, J_n, \theta_n).
-\]
-The posterior predictive distribution for $z_n$, that is, the distribution of $z_n$ conditioned on the observed data, is calculated by marginalizing out the parameter vector $\theta$,
-\[
-p(z_n \, | \, y, K, J)
-= \int_{(0,1)^N}
-  \mathsf{Binomial}(z_n \, | \, J_n, \theta_n)
-  \, p(\theta_n \, | \, y, K)
-  \, \mathrm{d}\theta,
-\]
-with the integral evaluated over the support for the vector $\theta$, i.e., $(0,1)^N$.  
-
-We can use MCMC to generate a sequence of $M$ draws $z_n^{(m)}$ with marginal distributions $p(z_n \, | \, y, K, J)$, and then use those to evaluate posterior means, standard deviations, and quantiles in the usual way.  These values are generated according to
-\[
-z_n^{(m)} \sim \mathsf{Binomial}(J_n, \theta_n^{(m)})
-\]
-where $\theta_n^{(m)}$ is the $m$-th draw from the posterior $p(\theta_n \, | \, y, K)$.
-
-For example, to compute the expectation of $z_n$ (estimate minimizing expected square error), conditioned on the observed data $y$ and constants $K$ and $J$,
-\[
-\mathrm{E}[z_n \, | \, y, K, J]
-\ = \
-\int_{(0,1)^N}
-  z_n 
-  \ \mathsf{Binomial}(z_n \, | \, J_n, \theta_n)
-  \ p(\theta_n \, | \, y, K)
-  \ \mathrm{d}\theta
-\ \approx \
-\sum_{m=1}^M \frac{1}{M} \ z_n^{(m)}.
-\]
-It might seem tempting to calcualte the mean prediction $\theta_n^{(m)} \times J_n$ at each iteration rather than simulating a value rather than simulating a value $z_n^{(m)}$.  That would lead to a tighter (in the sense of less expcted MCMC error) estimate of the mean, but would not capture the uncertainty in the prediction for $z_n$ and would thus not be useful in estimating predictive standard deviations or quantiles or making decisions.
-
-The following Stan program will simulate draws of $z_n$ from the posterior predictive distribution;  it is in <code>hier-pred.stan</code>:
-```{r comment=NA, echo=FALSE}
-file_path <- "hier-pred.stan";
-lines <- readLines(file_path, encoding="ASCII");
-for (n in 1:length(lines)) cat(lines[n],'\n');
-```
-
-The model is then fit as usual
-
-```{r  comment=NA, results='hide'}
-fit_hier_pred <- stan("hier-pred.stan", data=c("N", "K", "y", "J"),
-                      control=list(stepsize=0.01, adapt_delta=0.99));
-ss_hier_pred <- extract(fit_hier_pred);
-```
-
-Only the predictions are printed (the parameter estimates will be the same as before).
-
-```{r comment=NA}
-print(fit_hier_pred, pars=c("z"), probs=c(0.1, 0.5, 0.9));
-```
-
-You can see that the 80% interval for the predicted number of hits for Roberto Clemente ($n=1$) in his remaining at bats is from 93 to 147 (he actually had 127 hits in the rest of the season).  Translating that into a season batting average, $(z_n + y_n) / (K + J_n)$, we get an 80% interval of  $((18 + 93) / (45 + 367), (18 + 147) / (45 + 367)) = (0.269, 0.400)$.  The broad range shown here is an illustration of how poor binary data is for estimating chances of success. 
-
-The posterior produced by the model for the number of hits for the rest of the season is overdispersed compared to a simple binomial model based on a point estimate.  For example, if we take the partially pooled estimate of 0.32 for Roberto Clemente's ability, the prediction for number of hits based on the point estimate would be just $\mathrm{Binomial}(J_1, 0.32)$, which we know analytically has a standard deviation of $\sqrt(n \, \theta_n \, (1 - \theta_n)) = 8.9$, which is quite a bit lower than the posterior standard deviation of 21 in the model for $z_1$.
-
-
-## Event Probabilities
-
-The 80% interval coincidentally shows us that our model estimates a roughly 10% chance of Roberto Clemente batting 0.400 or better for the season based on batting 0.400 in his first 45 at bats.  Not great, but non-trivial.  Rather than fishing for the right quantile and hoping to get lucky, we can write a model to direclty estimate event probabilities, such as Robert Clemente's batting average is 0.400 or better for the season.  
-
-Event probabilities are defined with conditions on parameters and/or data.  For instance, the probability of player $n$'s batting average being 0.400 or better is defined by the event probability
-\[
-\mathrm{Pr}\left[\frac{(y_n + z_n)}{(45 + J_n)} \geq 0.400\right]
-\ = \
-\int_{(0,1)^N}
- \mathrm{I}\left[\frac{(y_n + z_n)}{(45 + J_n)} \geq 0.400\right]
-       \ p(z_n \, | \, \theta_n, J_n)
-       \ p(\theta \, | \, y, K)
-       \ \mathrm{d}\theta.
-\]
-The indicator function applied to an argument, $\mathrm{I}[c]$, evaluates to 1 if the condition $c$ is true and 0 if it is false.  As usual, we can calculate this event probability using MCMC as
-\[
-\mathrm{Pr}\left[\frac{(y_n + z_n)}{(45 + J_n)} \geq 0.400\right]
-\ \approx \
-\frac{1}{M} \sum_{m=1}^M \mathrm{I}\left[\frac{(y_n + z_n^{(m)})}{(45 + J_n)} \geq 0.400\right].
-\]
-
-This event is about the season batting average being greather than 0.400.  What if we care about ability, not observed performance for the rest of the season?  Then we would ask the question of whether $\mathrm{Pr}[\theta_n > 0.4]$.  This is coded as an expectation and computed via MCMC as the previous case.
-\[
-\mathrm{Pr}\left[\theta_n \geq 0.400\right]
-\ = \
-\int_{(0,1)^N}
- \mathrm{I}\left[\theta_n \geq 0.400\right]
-       \ p(z_n \, | \, \theta_n, J_n)
-       \ p(\theta \, | \, y, K)
-       \ \mathrm{d}\theta
-\ \approx \
-\frac{1}{M} \sum_{m=1}^M \mathrm{I}[\theta_n^{(m)} \geq 0.400].
-\]
-Following Gelman et al. (2013), we conflate the notation for random variables and bound variables, using $z_n$ and $\theta_n$ for both the bound and random variables. 
-
-In Stan, we just add the indicators in the generated quantity block, here given in the file <code>hier-event.stan</code>:
-```{r comment=NA, echo=FALSE}
-file_path <- "hier-event.stan";
-lines <- readLines(file_path, encoding="ASCII");
-for (n in 1:length(lines)) cat(lines[n],'\n');
-```
-This model has an unusual <code>0.0 + ...</code> in the fraction computation, the purpose of which is to cast the value to real instead of integers and thus prevent integer division from kicking in and rounding down.
-
-Expectations are computed via MCMC using the usual call to <code>stan()</code>, but with 10K iterations per chain to lower MCMC standard error for the next print,
-```{r  comment=NA, results='hide'}
-fit_hier_event <- stan("hier-event.stan", data=c("N", "K", "y", "J"),
-                       control=list(stepsize=0.01, adapt_delta=0.99),
-                       iter=10000);
-ss_hier_event <- extract(fit_hier_event);
-```
-
-Only the event indicator variables are printed---the parameter estimates will be the same as before,
-```{r comment=NA}
-print(fit_hier_event, pars=c("avg_gt_400", "ability_gt_400"), probs=c(), digits=3);
-```
-The posterior mean (first column after variable name) corresponds to the average over the $M = 4000$ post-warmup draws, and is our estimate of the event probability (with the MCMC standard error of that event probabilty estimate in the next column).  The standard deviation and quantiles are meaningless; the quantiles are supressed through an empty <code>probs</code> argument to <code>print()</code>.  
-
-It is clear from the results that the probabilty of batting 0.400 or better for the season is a different question than asking if the player's ability is 0.400 or better;  for example, there is roughly an estimated 10% chance of Roberto Clemente ($n = 1$) batting 0.400 or better for the season, but only an estimated 8% chance that he has ability greater than 0.400.  
-
-The NaN values in the R-hat column result when every posterior draw is the same;  there is no variance, and hence R-hat is not defined.  
-
-
-## Multiple Comparisons
-
-With traditional significance testing over multiple trials, it is common to adjust for falsely rejecting the null hypothesis (a so-called <a href="https://en.wikipedia.org/wiki/Type_I_and_type_II_errors#Type_I_error">Type I error</a>) by inflating the conventional (and arguably far too low) 5% target for reporting "significance."  
-
-For example, suppose we have our 18 players with ability parameters $\theta_n$ and we have $N$ null hypotheses of the form $H_0^n: \theta_n < 0.350$.  Now suppose we evaluate each of these 18 hypotheses independently at the conventional $p = 0.05$ significance level, giving each a 5% chance of rejecting the null hypothesis in error.  When we run all 18 hypothesis tests, the overall chance of falsely rejecting at least one of the null hypotheses is a whopping $1 - (1 - 0.05)^{18} = 0.60$.
-The traditional solution to this problem is to apply a <a href="https://en.wikipedia.org/wiki/Bonferroni_correction">Bonferroni adjustment</a> to control the false rejection rate;  the typical adjustment is to divide the $p$-value by the number of hypothesis tests in the "family" (that is, the collective test being done).  Here that sets the rate to $p = 0.05/18$, or approximately $p = 0.003$, and results in a slightly less than 5% chance of falsely rejecting a null hypothesis in error.  
-
-Although the Bonferroni correction does reduce the overall chance of falsely rejecting a null hypothesis, it also reduces the statistical power of the test to the same degree.  This means that many null hypotheses will fail to be rejected in error. 
-
-Rather than doing classical multiple comparison adjustments to adjust for false-discovery rate, such as a Bonferroni correction, Gelman et al. (2012) suggest using a hierarchical model to perform partial pooling instead.  As illustrated above, hierarchical models partially pool the data, which pulls estimates toward the population mean with a strength determined by the amount of observed variation in the population (see also Figure 2 of (Gelman et al. 2012)).  This automatically reduces the false-discovery rate, though not in a way that is intrinsically calibrated to false discovery, which is good, because reducing the overall false discovery rate in and of itself reduces the true discovery rate at the same time.
-
-We code the model in Stan using the generated quantities block in file <code>hier-compare.stan</code>.
-```{r comment=NA, echo=FALSE}
-file_path <- "hier-compare.stan";
-lines <- readLines(file_path, encoding="ASCII");
-for (n in 1:length(lines)) cat(lines[n],'\n');
-```
-The generated quantity <code>some_ability_gt_350</code> will be set to 1 if the maximum ability estimate in $\theta$ is greater than 0.35.  And thus the posterior mean of this generated quantity will be the event probability
-\[
-\mathrm{Pr}[\mathrm{max}(\theta) > 0.350]
-\ = \ \int_{(0,1)^N} \mathrm{I}[\mathrm{max}(\theta) > 0.35] \ p(\theta \, | \, y, K) \ \mathrm{d}\theta
-\ \approx \ \frac{1}{M} \ \sum_{m=1}^M \ \mathrm{I}[\mathrm{max}(\theta^{(m)}) > 0.35]
-\]
-where $\theta^{(m)}$ is the sequence of posterior draws for the ability parameter vector.  Stan reports this value as the posterior mean of the generated quantity <code>some_ability_gt_350</code>, which takes on the value $\mathrm{I}[\mathrm{max}(\theta^{(m)}) > 0.35]$ in each iteration. 
-Expectations are computed via MCMC as usual.
-```{r  comment=NA, results='hide'}
-fit_compare <- stan("hier-compare.stan", data=c("N", "K", "y", "J"), 
-                    control=list(stepsize=0.01, adapt_delta=0.99));
-ss_compare <- extract(fit_compare);
-```
-
-Only the event indicator variables are printed---the parameter estimates will be the same as before.
-```{r comment=NA}
-print(fit_compare, pars=c("some_ability_gt_350"), probs=c());
-```
-The probability estimate of there being a player with an ability (chance of success) greater than 0.350 is around 60%.  This number would not indicate "significance" at the conventional level, but does provide an estimate of how likely the result is that is directly interpretable as a probability.  Considering the early figure comparing complete pooling, no pooling, and partial pooling, the complete pooling estimate would estimate a close to zero probability that some player had an ability higher than 0.350, as it would mean all players had an ability that high.  In the no pooling model, the probability is quite high that at least one of the players has an ability of 0.350 or greater;  the model estimates that Roberto Clemente alone is more than 60% likely to have a 0.350 or greater ability and provides 10 players or so for whom 0.350 is in their 80% central posterior interval, giving them a 10% chance or higher of having a 0.350 ability.  In contrast, only four of the players in the partial pooling example have 80% intervals that cross the 0.350 line.
-
-The multiple comparison "adjustment" is being done implicitly through the hierarchical model, which pulls each estimate toward the population average.  There are no adjusted pairwise comparisons, just an overall comparsion.
-
-### Ranking
-
-In addition to multiple comparisons, we can use the simultaneous estimation of the ability parameters to rank the items;  here we are ranking ballplayers by hitting ability.
-
-We code the model in Stan using the generated quantities block in <code>rank.stan</code>:
-```{r comment=NA, echo=FALSE}
-file_path <- "rank.stan";
-lines <- readLines(file_path, encoding="ASCII");
-for (n in 1:length(lines)) cat(lines[n],'\n');
-```
-It is fit, the values are extracted.
-```{r  comment=NA, results='hide'}
-fit_rank <- stan("rank.stan", data=c("N", "K", "y"),
-                 control=list(stepsize=0.01, adapt_delta=0.99));
-ss_rank <- extract(fit_rank);
-```
-We can print just the ranks and the 80% central interval.
-```{r comment=NA}
-print(fit_rank, "rnk", probs=c(0.1, 0.5, 0.9));
-```
-It is clear from the posterior intervals that our uncertainty is very great after only 45 at bats.
-
-In the original Volume I BUGS example (see [OpenBUGS: Surgical example](http://www.openbugs.net/Examples/Surgical.html)) of surgical mortality, the ranks of each hospital was plotted.  We can reproduce that figure here for the baseball data.
-
-```{r comment=NA}
-library(ggplot2);
-df_rank <- data.frame(list(name = rep(as.character(df[[1,2]]), 4000),
-                           rank = ss_rank$rnk[, 1]));
-for (n in 2:N) {
-  df_rank <- rbind(df_rank,
-                   data.frame(list(name = rep(as.character(df[[n,2]]), 4000),
-                              rank = ss_rank$rnk[, n])));
-}
-rank_plot <-
-  ggplot(df_rank, aes(rank)) +
-  stat_count(width=0.8) +
-  scale_x_discrete(limits=c(1, 5, 10, 15)) +
-  scale_y_discrete(name="posterior probability", breaks=c(0, 400, 800),
-                   labels=c("0.0", "0.1", "0.2")) + 
-  facet_wrap(~ name);
-rank_plot;
-```
-
-We have followed the original BUGS presentation where the normalized posterior frequency (i.e., the frequency divided by total count) is reported as a probability on the y axis.
-
-### Changing Parameterizations: Logistic Random Effects
+## Model 4: Partial Pooling (Log Odds Scale)
 
 The previous models all used a direct parameterization of the chance-of-success $\theta_n$ as a value in $(0,1)$.  In this section, we consider a direct parameterization in terms of the log-odds $\alpha_n$, which are defined by the logit transform as
+
 \[
-\alpha_n = \mathrm{logit}(\theta_n) = \log \, \frac{\theta_n}{1 - \theta_n}.
+\alpha_n 
+= \mathrm{logit}(\theta_n) 
+= \log \, \frac{\theta_n}{1 - \theta_n}.
 \]
+
 For example, $\theta_n = 0.25$ corresponds to odds of $.25$ to $.75$ (equivalently, $1$ to $3$), or log-odds of $\log .25 / .75 = -1.1$.  
 
-We will still use a binomial likelihood, only now we have logit as a so-called "link" function.  That is, we take
+We will still use a binomial likelihood, only now we have logit as a so-called "link" function.
+
 \[
 p(y_n \, | \, K, \alpha_n) 
 \ = \ \mathsf{Binomial}(y_n \, | \, K, \mathrm{logit}^{-1}(\alpha_n))
 \]
-where the inverse logit function is the logistic sigmoid from whence logistic regression gets its name,
+
+The inverse logit function is the logistic sigmoid from which logistic regression gets its name,
+
 \[
 \mathrm{logit}^{-1}(\alpha_n) = \frac{1}{1 + \exp(-\alpha_n)} = \theta_n.
 \]
-Stan builds in a binomial with a logit link function and allows the likelihood function to be written as
+
+Stan has a binomial probability function with a built-in logit link function, with wich we can define the likelihood directly as
+
 \[
 p(y_n \, | \, K, \alpha_n) 
 \ = \ \mathsf{BinomialLogit}(y_n \, | \, K, \alpha_n).
+\ = \ \mathsf{Binomial}(y_n \, | \, K, \mathrm{logit}^{-1}(\alpha_n)).
 \]
 
-We can use a simple normal hierarchical prior,
+We use a simple normal hierarchical prior,
+
 \[
 p(\alpha_n \, | \, \mu, \sigma)
 = \mathsf{Normal}(\alpha_n \, | \, \mu, \sigma).
 \]
 
-Then one level up, a weakly informative prior for $\mu$ is
+Then one level up, a weakly informative hyperprior for $\mu$ is
+
 \[
 p(\mu) = \mathsf{Normal}(\mu \, | \, -1, 1),
 \]
-which places 95% of the prior probability for $\mu$ in the interval $(-3, 1)$, which inverse-logit transforms to the interval $(0.05, 0.73)$ with a median 0.27 chance of success.  An even narrower prior is actually motivated here from substantial baseball knowledge.  
+
+which places 95% of the prior probability for $\mu$ in the interval $(-3, 1)$, which inverse-logit transforms to the interval $(0.05, 0.73)$ with a median 0.27 chance of success.  An even narrower prior is actually motivated here from substantial baseball knowledge.  This value should obviously be changed for other applications. 
 
 The prior scale $\sigma$ can be taken to be a half-normal.  
+
 \[
 p(\sigma) = 0.5 \mathsf{Normal}(\sigma \, | \, 0, 1)
 \]
+
 This is a fairly broad prior here, being on the log-odds scale. 
 
-One of the major advantages of casting the problem in terms of log odds is that its now easier to add in fixed effects and other multilevel effects, or even varying intercepts and slopes with multivariate priors.
+One of the major advantages of casting the problem in terms of log odds is that its now easier to add in fixed effects and other multilevel effects, or even varying intercepts and slopes with multivariate priors (see Gelman and Hill (2007) for a range of examples of mixed effects models).
 
-The Stan program for the hierarchical logistic model is in <code>hier-logit.stan</code>:
+#### Non-Centered Parameterization
+
+Betancourt and Girolami (2015) provide a detailed discussion of why the centered parameterization used above is problematic for hierarchical models with small counts per group (here, the 45 initial at bats for each player).  To mitigate the problem, they suggest moving to a non-centered parameterization, as has also been shown to be helpful for Gibbs and random-walk Metropolis samplers. 
+This basically amounts to changing the parameterization over which sampling is done, taking now a standard unit normal prior for a new variable, 
+
+\[
+\alpha^{\mathrm{std}} = \frac{\alpha - \mu}{\sigma}.
+\]
+
+Then we can parameterize in terms of $\alpha^{\mathrm{std}}$, which has a standard-normal distribution
+
+\[
+p(\alpha^{\mathrm{std}}) = \mathsf{Normal}(\alpha^{\mathrm{std}} \, | \, 0, 1).
+\]
+
+We can then define our original $\alpha$ as a derived quantity
+
+\[
+\alpha = \mu + \sigma \, \alpha^{\mathrm{std}}.
+\]
+
+We actually code this implicitly in the Stan model by defining the likelihood as
+
+\[
+p(y_n \, | \, \alpha^{\mathrm{raw}}, \mu, \sigma, K)
+\ = \
+\mathsf{BinomialLogit}(K_n, \mu + \sigma \, \alpha_n).
+\]
+
+This decouples the sampling distribution for $\alpha^{\mathrm{raw}}$ from $\mu$ and $\sigma$, greatly reducing their covariance, converting their funnel-like shape to more of a circle.
+
+The Stan program's parameter declaration and model directly follow the definition.
+
+```
+parameters {
+  real mu;                       // population mean of success log-odds
+  real<lower=0> sigma;           // population sd of success log-odds
+  vector[N] alpha_std;           // success log-odds
+}
+model {
+  mu ~ normal(-1, 1);                             // hyperprior
+  sigma ~ normal(0, 1);                           // hyperprior
+  alpha_std ~ normal(0, 1);                       // prior
+  y ~ binomial_logit(K, mu + sigma * alpha_std);  // likelihood
+}
+```
+
+Because the parameters to the prior for $\sigma$ are constants, the normalization for the half-prior (compared to the full prior) is constant and does not need to be included in the notation.  This only works if the parameters to the density are data or constants; if they are defined as parameters or as quantities depending on parameters, then explicit truncation is required.
+
+For the purposes of comparison, the chance of success $\theta$ is computed as a generated quantity.
+```
+generated quantities {
+  vector[N] theta;  // chance of success
+  ...
+  for (n in 1:N)
+    theta[n] <- inv_logit(mu + sigma * alpha_std[n]);
+  ...
+}
+```
+
+The full Stan program for the hierarchical logistic model is in <code>hier-logit.stan</code>:
+
 ```{r comment=NA, echo=FALSE}
 file_path <- "hier-logit.stan";
 lines <- readLines(file_path, encoding="ASCII");
@@ -591,281 +491,278 @@ for (n in 1:length(lines)) cat(lines[n],'\n');
 ```
 
 It is fit, the values are extracted.
+
 ```{r  comment=NA, results='hide'}
-fit_hier_logit <- stan("hier-logit.stan", data=c("N", "K", "y"),
+fit_hier_logit <- stan("hier-logit.stan", data=c("N", "K", "y", "K_new", "y_new"),
                        control=list(stepsize=0.01, adapt_delta=0.99));
 ss_hier_logit <- extract(fit_hier_logit);
 ```
-We can print just the ranks and the 80% central interval.
+
+We can print as before.
+
 ```{r comment=NA}
-print(fit_hier_logit, probs=c(0.1, 0.5, 0.9));
+print(fit_hier_logit, c("alpha_std", "theta", "mu", "sigma"), probs=c(0.1, 0.5, 0.9));
 ```
+
+It is clear from the wide posteriors for the $\theta_n$ that there is considerable uncertainty in the estimates of chance-of-success on an item-by-item basis.
 
 Compared to the direct Beta priors with uniform and Pareto hyperpriors shown in the first example, the normal model exerts more pull toward the prior.  The posterior means for $\theta$ ranged from 0.22 to 0.32 with the Beta prior, but only range from 0.24 to 0.29 for the normal prior.  Furthermore, the posterior intervals for each values are shrunk compared to the Beta prior.  For example, Roberto Clemente ($n = 1$), has an 80% central posterior interval of $(0.25, 0.35)$ in the logistic model, whereas he had an 80% posterior interval of $(.26, .40)$ with a hierarchical Beta prior.
 
 
-#### Non-Centered Parameterization
+## Observed vs. Estimated Chance of Success
 
-Betancourt and Girolami (2015) provide a detailed discussion of why the centered parameterization used above is problematic for hierarchical models with small counts per group (here, the 45 initial at bats for each player).  To mitigate the problem, they suggest moving to a non-centered parameterization, as has also been shown to be helpful for Gibbs and random-walk Metropolis samplers. 
+Figure 5.4 from (Gelman et al. 2013) plots the observed number of successes $y_n$ for the first $K$ trials versus the median and 80\% intervals for the estimated chance-of-success parameters $\theta_n$ in the posterior.  The following R code reproduces the plot for our data.
 
-The non-centered parameterization of the above Stan program is in <code>hier-logit-non-centered.stan</code>:
-```{r comment=NA, echo=FALSE}
-file_path <- "hier-logit-non-centered.stan";
-lines <- readLines(file_path, encoding="ASCII");
-for (n in 1:length(lines)) cat(lines[n],'\n');
+```{r}
+M <- dim(ss_hier$phi);
+
+ss_quantile <- function(ss, N, q) {
+  result <- rep(NA, N);
+  for (n in 1:N) {
+    result[n] <- sort(ss$theta[,n])[M * q];
+  }
+  return(result);
+}
+
+theta_10_pool <- ss_quantile(ss_pool, N, 0.1);
+theta_50_pool <- ss_quantile(ss_pool, N, 0.5);
+theta_90_pool <- ss_quantile(ss_pool, N, 0.9);
+
+theta_10_no_pool <- ss_quantile(ss_no_pool, N, 0.1);
+theta_50_no_pool <- ss_quantile(ss_no_pool, N, 0.5);
+theta_90_no_pool <- ss_quantile(ss_no_pool, N, 0.9);
+
+theta_10_hier <- ss_quantile(ss_hier, N, 0.1);
+theta_50_hier <- ss_quantile(ss_hier, N, 0.5);
+theta_90_hier <- ss_quantile(ss_hier, N, 0.9);
+
+theta_10_hier_logit <- ss_quantile(ss_hier_logit, N, 0.1);
+theta_50_hier_logit <- ss_quantile(ss_hier_logit, N, 0.5);
+theta_90_hier_logit <- ss_quantile(ss_hier_logit, N, 0.9);
+
+pop_mean <- sum(y) / sum(K);
+
+df_plot2 <- data.frame(x = rep(y / K, 4),
+                       y = c(theta_50_pool, theta_50_no_pool,
+                             theta_50_hier, theta_50_hier_logit),
+                       model = c(rep("complete pooling", N),
+                                 rep("no pooling", N),
+                                 rep("partial pooling", N),
+				 rep("partial pooling logit", N)));
+
+plot_bda3_fig_5_4 <-
+  ggplot(df_plot2, aes(x=x, y=y)) +
+  facet_grid(. ~ model) +
+  geom_point(shape=19) +
+  geom_errorbar(aes(ymin=c(theta_10_pool, theta_10_no_pool, theta_10_hier, theta_10_hier_logit),
+                    ymax=c(theta_90_pool, theta_90_no_pool, theta_90_hier, theta_90_hier_logit)),
+                width=0.005, colour="darkgray") +
+  coord_fixed() +
+  geom_abline(intercept=0, slope=1, colour="lightskyblue") +
+  geom_hline(aes(yintercept=pop_mean), colour="lightpink") +
+  xlab("observed rate, y[n] / K[n]") +
+  ylab("median and 80% posterior interval for theta[n]");
+plot_bda3_fig_5_4;
 ```
-This trick, originally introduced by Matt Hoffman, is to parameterize in terms of a unit normal variable, then scale by $\sigma$ and translate by $\mu$ to get a $\mathsf{Normal}(\mu, \sigma)$ variable.  Because Stan is sampling on the unconstrained scale, this weakens the dependencies among $\alpha$ and $\sigma$ and $\mu$ and transforms the funnel-like posterior into something more circular.
 
-It can be fit, with values extracted as before.
-```{r  comment=NA, results='hide'}
-fit_hier_logit_nc <- stan("hier-logit-non-centered.stan", data=c("N", "K", "y"),
-                          control=list(stepsize=0.001, adapt_delta=0.999));
-ss_hier_logit_nc <- extract(fit_hier_logit_nc);
-```
-And now we see much higher effective sample sizes and R-hat values rounding to 1.
-```{r comment=NA}
-print(fit_hier_logit_nc, c("mu", "sigma", "theta", "lp__"), probs=c(0.1, 0.5, 0.9));
-```
-But the underlying fit hasn't changed.
+The diagonal blue line has intercept 0 and slope 1, and thus represents where the no-pooling maximum likelihood estimate would fall given the observed rate of success (the MLE is equal to the observed rate).  The horizontal red line has an intercept equal to the posterior mean of the population chance-of-success parameter $\phi$ (0.266).  
 
-### Posterior Prediction and Replication
+The overlplotting at the same x positions is because there are several observed rates shared by multiple players;  because players with the same observed rates are indistinguishable, any differences in estimates are due to MCMC error.
 
-It is straightforward to both evaluate the posterior predictive density for new data $y^{\mathrm{new}}$ and to generate replicated data sets $y^{\mathrm{rep}}$ for posterior predictive checks.
+The choice of likelihood function and parameterization (a single parameter or one parameter per item) makes a huge impact here on the estimated chance of success for each item.  This is true even in non-Bayesian settings---the points are very close to where the maximum likelihood estimates will be and these vary quite dramatically between the complete pooling and no pooling extremes.  The larger point is that it's not just the choice of prior that contributes to the "subjective" modeling of a data set; the choice of likelihood is equally if not more sensitive to modeling assumptions.
 
-#### Posterior Predictive Distribution
+In the no pooling and complete pooling cases, the posterior can be calculated analytically and shown to be a Beta distribution.  The median of a beta distribution (plotted) is greater than the mode of a beta distribution (the blue line, corresponding to the MLE);  this assumes $\alpha, \beta > 1$ (see the [Wikipedia article on the beta distribution](https://en.wikipedia.org/wiki/Beta_distribution#Mean.2C_mode_and_median_relationship) for an explanation).  The reason this is not evident in the complete pooling case is that there is far more data, and with more data, the mean, median, and mode of the beta distribution converge to the same value.  
+
+Plotting the transformed $\theta$ values in the logit-based model, there is a clear skew in the posteriors for each parameter away from the population mean.  Overall, the plot makes the amount of pooling toward the prior evident.
+
+
+## Posterior Predictive Distribution
 
 Given data $y$ and a model with parameters $\theta$, the posterior predictive distribution for new data $\tilde{y}$ is
+
 \[
 p(\tilde{y} \, | \, y)
 \ = \
 \int_{\Theta} p(\tilde{y} \, | \, \theta) \ p(\theta \, | \, y) \ \mathrm{d}\theta,
 \]
-where $\Theta$ is the support of the parameters $\theta$.  
 
+where $\Theta$ is the support of the parameters $\theta$.  We can also define the predictive log density as
+ 
+\[
+p(\tilde{y} \, | \, y)
+\ = \
+\int_{\Theta} \left( \log p(\tilde{y} \, | \, \theta) \right) \ p(\theta \, | \, y) \ \mathrm{d}\theta,
+\]
 
-#### Evaluating Posterior Predictions
+#### Evaluating Held-Out Data Predictions
 
-Because the posterior predictive density is defined as an expectation, it can be computed (on the log scale) for new observations $y^{\mathrm{new}}$ via MCMC using the posterior draws $\theta^{(m)}$ as
+Because the posterior predictive log density is formulated as an expectation over the posterior, it is straightforward to compute via MCMC.  Suppose we have new data $y^{\mathrm{new}}$ and want to estimate its log density.  With $M$ draws $\theta^{(m)}$ from the posterior $p(\theta \, | \, y)$, the posterior predictive log density is computed by
+
 \[
 \log p(y^{\mathrm{new}} \, | \, y)
 \ \approx \
-\frac{1}{M} \ \sum_{m=1}^M \log p(y^{\mathrm{new}} \, | \, \theta^{(m)}).
+\frac{1}{M} \, \sum_{m=1}^M \log p(y^{\mathrm{new}} \, | \, \theta^{(m)}).
 \]
-All that is needed is a way to evaluate the likelihood $p(\tilde{y} \, | \, \theta)$ for fixed $\tilde{y}$ and $\theta$.
 
-We now have two models whose posterior predictions can be compared.
+#### Simulating Replicated Data
 
-#### Posterior Predictions: Beta Priors on Chance-of-Success
+It is also straightforward to use forward simulation from the sampling distribution (otherwise known as the likelihood function) to generate replicated data $y^{\mathrm{rep}}$ according to the posterior predictive distribution.  With $M$ draws $\theta^{(m)}$ from the posterior $p(\theta \, | \, y)$, replicated data can be simulated by drawing a sequence of $M$ simulated $y^{\mathrm{rep} \ (m)}$ according to $p(y^{\mathrm{new}} \, | \, \theta^{(m)})$.  This latter computation can usually be done efficiently (both computationally and statistically) by means of forward simulation from the generative model for the likelihood.  Viewed this way around, the likelihood function becomes a sampling distribution for new data.
 
-First we need to extract the new observations---the remaing at bats and hits for each player.
-```{r comment=NA}
-K_new <- df$RemainingAt.Bats;
-y_new <- df$RemainingHits;
+
+## Prediction for New Trials
+
+Efron and Morris's (1975) baseball data includes not only the observed hit rate in the initial 45 at bats, but also includes the data for how the player did for the rest of the season.  The question arises as to how well these models predict a player's performance for the rest of the season based on their initial 45 at bats.
+
+The variables <code>K_new[n]</code> and <code>y_new[n]</code> hold the number of new trials and the number of successes for player <code>n</code>.  To code the evaluation of the held out data in Stan, we declare a generated quantity to hold the result and then define it.
+
 ```
-
-Then we can use them in a Stan model to evaluate the posterior predictive density of the new data, which is in file <code>hier-heldout.stan</code>. 
-```{r comment=NA, echo=FALSE}
-file_path <- "hier-heldout.stan";
-lines <- readLines(file_path, encoding="ASCII");
-for (n in 1:length(lines)) cat(lines[n],'\n');
-```
-
-The model is fit as usual.
-```{r  comment=NA, results='hide'}
-fit_hier_heldout <- stan("hier-heldout.stan", data=c("N", "K", "y", "K_new", "y_new"),
-                       control=list(stepsize=0.01, adapt_delta=0.99));
-ss_hier_heldout <- extract(fit_hier_heldout);
-```
-
-Then we print the predictive density, the mean of which is our MCMC calculation of the posterior predictive density.
-```{r comment=NA}
-print(fit_hier_heldout, "log_p_new", probs=c(0.1, 0.5, 0.9));
-```
-The posterior mean, roughly -120, is the value of $p(y^{\mathrm{new}} \, | \, y)$ --- the predictive density of the new data conditioned on the old (and the model, of course).  Although the mean is the posterior log density, the posterior interval is quite wide, with some parameter values providing much higher density, as is to be expected in a hierarchical model.
-
-Now here is the same exercise for the model with a normal prior on log-odds, starting with the model in <code>hier-logit-heldout.stan</code>,
-```{r comment=NA, echo=FALSE}
-file_path <- "hier-logit-heldout.stan";
-lines <- readLines(file_path, encoding="ASCII");
-for (n in 1:length(lines)) cat(lines[n],'\n');
-```
-
-```{r  comment=NA, results='hide'}
-fit_hier_logit_heldout <- stan("hier-logit-heldout.stan",
-                               data=c("N", "K", "y", "K_new", "y_new"),
-                               control=list(stepsize=0.01, adapt_delta=0.99));
-ss_hier_logit_heldout <- extract(fit_hier_logit_heldout);
-```
-
-```{r comment=NA}
-print(fit_hier_logit_heldout, "log_p_new", probs=c(0.1, 0.5, 0.9));
-```
-Here the posterior log density is only -100 or so, which given that it's 18 players on the log scale, is a fair bit better than the -120 for the model with Beta priors on the chances of success.
-
-#### Simulating Replicated Data Sets
-
-To simulate replicated data sets from the posterior predictive distribution, we can use forward simulation based on the MCMC draws $\theta^{(m)}$.  For each posterior draw $\theta^{(m)}$, a replicated data set can be produced by forward simulation by drawing
-${y^{\mathrm{rep}}}^{(m)}$ according to the likelihood $p(y \, | \, \theta^{(m)})$.  This produces a Markov chain of replicated values which can be analyzed as usual to compute expectations of quantities of interest.
-
-
-#### Model Evaluation and Comparison
-
-We now have two competing models giving us slightly different answers.  So the next thing to do is some posterior predictive checks to see if the models adequately capture the distributione of the data.  Following the advice of Gelman et al. (2013), we will take the fitted parameters of the data set and generate fake data sets. 
-
-As discussed by Gelman et al. (2013, p. 143), there is a choice of which parameters to fix and which to simulate.  We can generate new trials using fitted chance-of-success parameters ($\alpha$), or we can generate new items using the population parameters ($\mu$ and $\sigma$).  We'll provide both in the model below for comparison.  In both cases, we simulate from posterior draws, not from the posterior mean or other point estimates; Stan makes this easy with its generated quantities block.  Then we'll plot several of those versus the real data.
-
-The Stan file is <code>hier-logit-post.stan</code>, which is based on the more efficient non-centered parameterization:
-```{r comment=NA, echo=FALSE}
-file_path <- "hier-logit-post.stan";
-lines <- readLines(file_path, encoding="ASCII");
-for (n in 1:length(lines)) cat(lines[n],'\n');
-```
-The generated quantities block uses random number generators either to generate a new trials or to first generate a new chance of success and then new trials.
-
-The model is fit as usual, only now with the non-centered parameterization, we can get away with default parameters.
-```{r comment=NA, results='hide'}
-fit_hier_logit_post <- stan("hier-logit-post.stan", data=c("N", "K", "y"),
-                            control=list(stepsize=0.01, adapt_delta=0.95));
-ss_hier_logit_post <- extract(fit_hier_logit_post);
-```
-We can now print the replicated values <code>y_rep</code> as usual.
-```{r comment=NA}
-print(fit_hier_logit_post, c("y_rep", "y_pop_rep"), probs=c(0.1, 0.5, 0.9));
-```
-We printed both for comparison.  The variable <code>y_rep</code> is ordered because it's based on the actual items, which were sorted by success count in the original data.  On the other hand, the <code>y_pop_rep</code> values are fully exchangeable, so indistinguishable in their posterior (other than MCMC error).
-
-We can plot some of the simulated data sets along with the original data set to do a visual inspection as suggested by Gelman et al. (2013);  the <code>extract()</code> function has already permuted the posterior draws, so we can just take the initial fifteen for display.
-```{r comment=NA}
-df_post <- data.frame(list(dataset = rep("REAL", N),
-                           y = y));
-for (n in 1:15) {
-  df_post <- rbind(df_post,
-                   data.frame(list(dataset = rep(paste("repl ", n), N),
-                                   y = ss_hier_logit_post$y_rep[n,])));
+generated quantities {
+  ...
+  real log_p_new;  // posterior prediction log density remaining trials
+  ...
+  log_p_new <- 0;
+  for (n in 1:N)
+    log_p_new <- log_p_new + binomial_log(y_new[n], K_new[n], theta[n]);
+  ...
 }
-post_plot <-
-  ggplot(df_post, aes(y)) +
-  facet_wrap(~ dataset) +
-  stat_count(width=0.8) +
-  scale_x_discrete(limits=c(5, 10, 15, 20)) +
-  scale_y_discrete(name="count", limits=c(0, 2, 4)) +
-  ggtitle("Existing Item Replication (Normal Prior on Log Odds)");
-post_plot;
 ```
 
-And now we can do the same thing for the population-level replication; because the code's the same, we do not echo it to the output.
-```{r comment=NA, echo=FALSE}
-df_pop_post <- data.frame(list(dataset = rep("REAL", N),
-                               y = y));
-for (n in 1:15) {
-  df_pop_post <- rbind(df_pop_post,
-                       data.frame(list(dataset = rep(paste("repl ", n), N),
-                                        y = ss_hier_logit_post$y_pop_rep[n,])));
-}
-post_pop_plot <-
-  ggplot(df_pop_post, aes(y)) +
-  facet_wrap(~ dataset) +
-  stat_count(width=0.8) +
-  scale_x_discrete(limits=c(5, 10, 15, 20)) +
-  scale_y_discrete(name="count", limits=c(0, 2, 4)) +
-  ggtitle("New Item Replication (Normal Prior on Log Odds)");
-post_pop_plot;
-```
+This is just a direct coding in Stan of the calculation
 
-The posterior simulations are not unreasonable for a binomial likelihood, but are noticeably more spread out than the actual data.  This may actually have more to do with how the data were selected out of all the major league baseball players than the actual data distribution.  Efron and Morris (1975, p 312) write, "This sample was chosen because we wanted between 30 and 50 at bats to assure a satisfactory approximation of the binomial by the normal distribution while leaving the bulk of at bats to be estimated.  We also wanted to include an unusually good hitter (Clemente) to test the method with at least one extreme parameter, a situation expected to be less favorable to Stein's estimator.  Stein's estimator requires equal variances, or in this situation, equal at bats, so the remaining 17 players are all whom either the April 26 or May 3 *New York Times* reported with 45 at bats."
+\[
+\log p(y^{\mathrm{new}} \, | \, \theta^{(m)})
+= 
+\sum_{n=1}^N \log p(y^{\mathrm{new}}_n \, | \, \theta^{(m)}_n).
+\]
 
-Now to see how posterior replications look for the model with the hierarchical Beta prior.
+This is included in all four of the models we have previously fit.
 
-```{r comment=NA, echo=FALSE}
-file_path <- "hier-post.stan";
-lines <- readLines(file_path, encoding="ASCII");
-for (n in 1:length(lines)) cat(lines[n],'\n');
-```
-Now the generated quantities uses the Beta prior for the population replications.
-
-We fit and print values as before.
-```{r comment=NA, results='hide'}
-fit_hier_post <- stan("hier-post.stan", data=c("N", "K", "y"),
-                      control=list(stepsize=0.01, adapt_delta=0.99));
-ss_hier_post <- extract(fit_hier_post);
-```
-We can now print the replicated values <code>y_rep</code> as usual.
 ```{r comment=NA}
-print(fit_hier_post, c("y_rep", "y_pop_rep"), probs=c(0.1, 0.5, 0.9));
+print(sprintf("%10s  %16s", "MODEL", "log p(y_new | y)"), quote = FALSE);
+print(sprintf("%10s  %16.0f", "pool", mean(ss_pool$log_p_new)), quote=FALSE);
+print(sprintf("%10s  %16.0f", "no pool", mean(ss_no_pool$log_p_new)), quote=FALSE);
+print(sprintf("%10s  %16.0f", "hier", mean(ss_hier$log_p_new)), quote=FALSE);
+print(sprintf("%10s  %16.0f", "hier logit", mean(ss_hier_logit$log_p_new)), quote=FALSE);
 ```
 
-And we can print out the results as before.  This time we suppress printing the ggplot code, which is the same as before, and just show the graphs.
+From a predictive standpoint, the models are ranked by the amount of pooling they do, with complete pooling being the best, and no pooling being the worst predictively. All of these models do predictions by averaging over their posteriors, with the amount of posterior uncertainty also being ranked in reverse order of the amount of pooling they do.
 
-```{r comment=NA, echo=FALSE}
-df_post_beta <- data.frame(list(dataset = rep("REAL", N),
-                                y = y));
-for (n in 1:15) {
-  df_post_beta <- rbind(df_post_beta,
-                        data.frame(list(dataset = rep(paste("repl ", n), N),
-                                        y = ss_hier_post$y_rep[n,])));
+## Predicting New Observations
+
+We showed above that it is straightforward to generate draws from the posterior predictive distribution.  With that capability, we can either generate predictions for new data or we can replicate the data we already have.  Here we let $z_n$ be distributed according to the predictive posterior for number of trialss $K^{\mathrm{new}}_n$.  
+
+The posterior predictions can be declared in Stan as generated quantities.  Their values are determined by calling the binomial pseudorandom number generator, which corresponds to the binomial sampling distribution (likelihood) in this case.
+
+```
+generated quantities {
+  ...
+  int<lower=0> z[N];  // posterior prediction remaining trials
+  ...
+  for (n in 1:N)
+    z[n] <- binomial_rng(K_new[n], theta[n]);
+  ...
 }
-post_plot_beta <-
-  ggplot(df_post_beta, aes(y)) +
-  facet_wrap(~ dataset) +
-  stat_count(width=0.8) +
-  scale_x_discrete(limits=c(5, 10, 15, 20)) +
-  scale_y_discrete(name="count", limits=c(0, 2, 4)) +
-  ggtitle("Existing Item Replication (Beta Prior on Probability)");
-post_plot_beta;
 ```
 
-```{r comment=NA, echo=FALSE}
-df_pop_post_beta <- data.frame(list(dataset = rep("REAL", N),
-                               y = y));
-for (n in 1:15) {
-  df_pop_post_beta <- rbind(df_pop_post_beta,
-                            data.frame(list(dataset = rep(paste("repl ", n), N),
-                                             y = ss_hier_post$y_pop_rep[n,])));
+It might seem tempting to set $z_n^{(m)}$ to its expectation $\theta_n^{(m)} \times K^{\mathrm{new}}$  at each iteration rather than simulating a new value.  Do not succumb to this temptation.  The resulting values would suffice for estimating the posterior mean, but would not capture the uncertainty in the prediction for $y^{\mathrm{new}}_n$ and would thus not be useful in estimating predictive standard deviations or quantiles or making decisions.
+
+These can be shown in all of our models as follows; the number of remaining at-bats $K^{\mathrm{new}}$ was printed out in the original table along with the actual number of hits.
+
+```{r comment=NA}
+print(fit_pool, c("z"), probs=c(0.1, 0.5, 0.9), digits=0);
+print(fit_no_pool, c("z"), probs=c(0.1, 0.5, 0.9), digits=0);
+print(fit_hier, c("z"), probs=c(0.1, 0.5, 0.9), digits=0);
+print(fit_hier_logit, c("z"), probs=c(0.1, 0.5, 0.9), digits=0);
+```
+
+The posterior uncertainty is quite broad, aligning in magnitude with the posterior plots for $\theta_n$ for each model and the number of remaining trials.  For instance, Roberto Clemente ($n = 1$, with the highest initial success rate), has 80% posterior intervals of $(85,110)$ with complete pooling, $(113, 184)$ with no pooling, $(93, 147)$ with the basic hierarchical model, and $(87, 132)$ in the hierarchical logit model;  in reality, he had 127 hits in his remaining at bats, within all the 80% intervals other than that of the complete pooling model.  Basically, the width of these intervals show us that low-count binary data provides a poor basis for estimation chance of success.
+
+The posterior produced by the model for the number of hits for the rest of the season is overdispersed compared to a simple binomial model based on a point estimate.  For example, if we take the partially pooled estimate of 0.32 for Roberto Clemente's ability, the prediction for number of hits based on the point estimate would be just $\mathrm{Binomial}(J_1, 0.32)$, which we know analytically has a standard deviation of $\sqrt(n \, \theta_n \, (1 - \theta_n)) = 8.9$, which is quite a bit lower than the posterior standard deviation of 21 in the hierarchical model for $z_1$.
+Translating that into a season batting average, $(z_n + y_n) / (K_n + K^{\mathrm{new}}_n)$, we get an 80% interval of  
+
+\[
+\left( \frac{18 + 93}{45 + 367}, \frac{18 + 147}{45 + 367} \right) = (0.269, 0.400).
+\]
+
+The broad range shown here is an illustration of how poor binary data on the order of a few dozen observations is for estimating chances of success. 
+
+The summaries provide two point estimates of potential interest.  The posterior mean minimized expected square error and the posterior median (0.5 quantile) minimizes expected absolute error.
+
+<b>[FIXME:  need faceted plot of coverage vs. actual]</b>
+
+
+## Estimating Event Probabilities
+
+The 80% interval in the partial pooling model coincidentally shows us that our model estimates a roughly 10% chance of Roberto Clemente batting 0.400 or better for the season based on batting 0.400 in his first 45 at bats.  Not great, but non-trivial.  Rather than fishing for the right quantile and hoping to get lucky, we can write a model to direclty estimate event probabilities, such as Robert Clemente's batting average is 0.400 or better for the season.  
+
+Event probabilities are defined as expectations of indicator functions over parameters and data. For examplee, the probability of player $n$'s batting average being 0.400 or better is defined by the event probability
+
+\[
+\mathrm{Pr}\left[\frac{(y_n + z_n)}{(45 + K^{\mathrm{new}}_n)} \geq 0.400\right]
+\ = \
+\int_{(0,1)^N}
+ \mathrm{I}\left[\frac{(y_n + z_n)}{(45 + K^{\mathrm{new}}_n)} \geq 0.400\right]
+       \ p(z_n \, | \, \theta_n, J_n)
+       \ p(\theta \, | \, y, K)
+       \ \mathrm{d}\theta.
+\]
+
+The indicator function applied to an argument, $\mathrm{I}[c]$, evaluates to 1 if the condition $c$ is true and 0 if it is false.  Because it is just another expectation with respect to the posterior, e can calculate this event probability using MCMC as
+
+\[
+\mathrm{Pr}\left[\frac{(y_n + z_n)}{(45 + K^{\mathrm{new}}_n)} \geq 0.400\right]
+\ \approx \
+\frac{1}{M} \sum_{m=1}^M \mathrm{I}\left[\frac{(y_n + z_n^{(m)})}{(45 + K^{\mathrm{new}}_n)} \geq 0.400\right].
+\]
+
+This event is about the season batting average being greather than 0.400.  What if we care about ability, not observed performance for the rest of the season?  Then we would ask the question of whether $\mathrm{Pr}[\theta_n > 0.4]$.  This is coded as an expectation and computed via MCMC as the previous case.
+
+\[
+\mathrm{Pr}\left[\theta_n \geq 0.400\right]
+\ = \
+\int_{(0,1)^N}
+ \mathrm{I}\left[\theta_n \geq 0.400\right]
+       \ p(z_n \, | \, \theta_n, K^{\mathrm{new}}_n)
+       \ p(\theta \, | \, y, K)
+       \ \mathrm{d}\theta
+\ \approx \
+\frac{1}{M} \sum_{m=1}^M \mathrm{I}[\theta_n^{(m)} \geq 0.400].
+\]
+
+Following Gelman et al. (2013), we conflate the notation for random variables and bound variables, using $z_n$ and $\theta_n$ for both the bound and random variables. 
+
+In Stan, we just delcare and define the indicators directly in the generated quantities block.  
+
+```
+generated quantities {
+  ...
+  int<lower=0, upper=1> some_ability_gt_350;  // Pr[some theta > 0.35]
+  int<lower=0, upper=1> avg_gt_400[N];        // Pr[season avg of n] >= 0.400
+  int<lower=0, upper=1> ability_gt_400[N];    // Pr[chance-of-success of n] >= 0.400
+  ...
+  some_ability_gt_350 <- (max(theta) > 0.35);
+  for (n in 1:N)
+    avg_gt_400[n] <- (((y[n] + z[n]) / (0.0 + K[n] + K_new[n])) > 0.400);
+  for (n in 1:N)
+    ability_gt_400[n] <- (theta[n] > 0.400);
+  ...
 }
-post_pop_plot_beta <-
-  ggplot(df_pop_post_beta, aes(y)) +
-  facet_wrap(~ dataset) +
-  stat_count(width=0.8) +
-  scale_x_discrete(limits=c(5, 10, 15, 20)) +
-  scale_y_discrete(name="count", limits=c(0, 2, 4)) +
-  ggtitle("New Item Replication (Beta Prior on Probability)");
-post_pop_plot_beta;
+
+The indicator function is not necessary because Stan's boolean operator greater-than returns either 0 or 1.  The only trick to this code is the <code>0.0 + ...</code> in the fraction computation, the purpose of which is to cast the value to real instead of integers and thus prevent integer division from kicking in and rounding down.
+
+As usual, the expectations appear as the posterior means in the summary.  We can summarize for all four models again.
+
+Only the event indicator variables are printed---the parameter estimates will be the same as before.
+
+```{r comment=NA}
+print(fit_pool, pars=c("some_ability_gt_350", "avg_gt_400", "ability_gt_400"), probs=c());
+print(fit_no_pool, pars=c("some_ability_gt_350", "avg_gt_400", "ability_gt_400"), probs=c());
+print(fit_hier, pars=c("some_ability_gt_350", "avg_gt_400", "ability_gt_400"), probs=c());
+print(fit_hier_logit, pars=c("some_ability_gt_350", "avg_gt_400", "ability_gt_400"), probs=c());
 ```
 
-The plots for replications of existing items is radicall different with the beta prior, with the replications being much closer to the originally observed values.   The replications for new items look similar.  By eye, it looks like the beta prior is controlling the posterior variance of individual item chance-of-success estimates much better, despite producing wider posterior 80% intervals for chance of success.
+The standard deviation and quantiles are not useful here and the quantiles are supressed through an empty <code>probs</code> argument to <code>print()</code>; we do want to see a reasonable effective sample size estimate and no evidence of non-convergence in the form for $\hat{R}$ values much greater than 1.
 
-### Discussion
+It is clear from the results that the probabilty of batting 0.400 or better for the season is a different question than asking if the player's ability is 0.400 or better;  for example, with respect to the basic partial pooling model, there is roughly an estimated 10% chance of Roberto Clemente ($n = 1$) batting 0.400 or better for the season, but only an estimated 8% chance that he has ability greater than 0.400.  
 
-A hierarchical model introduces an estimation bias toward the population mean and the stronger the bias, the less variance there is in the estimates for the items.  Exactly how much bias and variance is warranted can be estimated by further calibrating the model and testing where its predictions do not bear out.  In this case, both models yield similar estimates, with the logistic model trading a bit more bias for variance in its estimates.  It is important to keep in mind that both models are consistent in the sense that as the number of trials increases, both models will converge to the empirical chance of success for the ability parameters.
-
-### Exercises
-
-1.  Generate fake data according to the one of the models.  Fit the model and consider the coverage of the posterior 80% intervals.
-
-1.  Extend one of the Stan programs to allow a different number of initial trials for each item.  Simulating data for this situation, what effect does the number of initial trials have on the posterior?
-
-1. How sensitive is the hierarchical model to the priors on the hyperparameters $\kappa, \phi$?  Consider a weakly informative prior on $\phi$ and alternative distributional families for $\kappa$ (e.g., exponential).  
-
-1. Write a Stan model to predict $z_n$ based on the no pooling and complete pooling models and compare those to the predictions based on the hierarchical model.  Which is better calibrated in the sense of having roughly the right number of actual values fall within the prediction intervals?  Then, compare the prediction made from a maximum likelihood point estimate of performance using a binomial predictive likelihood.
-
-1.  Given the hierarchical model, estimate the probability for each player that they have the highest batting ability.  What is the probability that Roberto Clemente will lead these 18 players (given the modeling assumptions)?  Compare that to the probability that each player will end the season with the highest batting average (observed success rate for season).  Write a Stan model to compute both values and fit it.
-
-1.  Lunn et al. (2013) contains a running analysis of pediatric cardiac surgery mortality for 12 hospitals.  Reanalyze their data with Stan using the models in this note.  The models will have to be generalized to allow $K$ to vary by item $n$. The data is available from Stan's example model repository as [BUGS Vol 1 examples: Surgical](https://github.com/stan-dev/example-models/tree/master/bugs_examples/vol1/surgical) and the WinBUGS project hosts the [original example description](http://www.openbugs.net/Examples/Surgical.html) (which has different counts from the data analyzed by Lunn et al.); Lunn et al. analyze slightly different data in the BUGS book than in their on-line example.
-
-1.  How sensitive is the logistic model to the hyperprior?  If we made it much less informative or much more informative, how much do the fitted values differ?  How do the predictions differ?  Evaluate the prior used by Lunn et al. (2013), which is $\mathsf{Uniform}(-100,100)$ for $\mu$ and $\mathsf{Uniform}(0, 100)$ for $\sigma$.  Be sure to add constraints on the declarations of $\mu$ and $\sigma$ to match the constraints.  What happens if the width of the uniform grows much wider or much narrower?
-
-1.  Figure out how to take all the hard-coded output analysis in here and make it dynamic by making better use of knitr.  And take all the cut-and-paste duplicated code and wrap it into functions.
-
-### References
-
-* Betancourt, M. and Girolami, M. (2015) Hamiltonian Monte Carlo for hierarchical models. <i>Current Trends in Bayesian Methodology with Applications</i> <b>79</b>.
-
-* Efron, B. and Morris, C. (1975) Data analysis using Stein's estimator and its generalizations. <i>Journal of the American Statistical Association</i> <b>70</b>(350), 311--319. [ [pdf](http://www.medicine.mcgill.ca/epidemiology/hanley/bios602/MultilevelData/EfronMorrisJASA1975.pdf) ]
-
-* Gelman, A., Carlin, J. B., Stern, H. S., Dunson, D. B., Vehtari, A., and Rubin, D. B. (2013) <i>Bayesian Data Analysis</i> 3rd Edition. Chapman & Hall/CRC Press, London.
-
-* Gelman, A. and Hill, J. (2007) <i>Data Analysis Using Regression and Multilevel-Hierarchical Models</i>. Cambridge University Press, Cambridge, United Kingdom.
-
-* Gelman, A., Hill, J., and Yajima, M. (2012) Why we (usually) don't have to worry about multiple comparisons. <i>Journal of Research on Educational Effectiveness</i> <b>5</b>, 189--211. [ [pdf](http://www.stat.columbia.edu/~gelman/research/published/multiple2f.pdf) ]
-
-* Lunn, D., Jackson, C., Best, N., Thomas, A., and Spiegelhalter, D. (2013) <i>The BUGS Book: A Practical Introduction to Bayesian Analysis</i>.  Chapman & Hall/CRC Press.
+The NaN values in the R-hat column result when every posterior draw is the same;  there is no variance, and hence R-hat is not defined. 
