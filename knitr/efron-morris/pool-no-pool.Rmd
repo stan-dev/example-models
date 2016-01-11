@@ -91,7 +91,7 @@ Assuming each player's at-bats are independent Bernoulli trials, the likelihood 
 p(y_n \, | \, \phi) 
 \ = \
 \mathsf{Binomial}(y_n \, | \, K, \phi) 
-\ \propto \ \phi^{y_n} \, (1 - \phi)^(K - y_n).
+\ \propto \ \phi^{y_n} \ (1 - \phi)^{(K - y_n)}.
 \]
 
 Assuming each player is independent leads to the complete data likelihood
@@ -126,13 +126,7 @@ The vectorized sampling statement above is equivalent to but more efficient than
     y[n] ~ binomial(K[n], phi);
 ```
 
-The actual Stan program in <code>pool.stan</code> has many more derived quantities that will be used in the rest of this note.
-
-```{r comment=NA, echo=FALSE, comment=NA}
-file_path <- "pool.stan";
-lines <- readLines(file_path, encoding="ASCII");
-for (n in 1:length(lines)) cat(lines[n],'\n');
-```
+The actual Stan program in <code>pool.stan</code> has many more derived quantities that will be used in the rest of this note; see Appendix A for the full code.
 
 We start by loading the RStan package.
 
@@ -143,7 +137,9 @@ library(rstan);
 The model can be fit as follows, reading the data out of the environment by name (the output result of running Stan are hidden).
 
 ```{r results='hide', comment=NA}
-fit_pool <- stan("pool.stan", data=c("N", "K", "y", "K_new", "y_new"));
+M <- 10000;
+fit_pool <- stan("pool.stan", data=c("N", "K", "y", "K_new", "y_new"),
+                 iter=(M / 2), chains=4);
 ss_pool <- extract(fit_pool);
 ```
 
@@ -214,18 +210,14 @@ This is equivalent to the less efficient looped form
     y[n] ~ binomial(K[n], theta[n]);
 ```
 
-The full Stan program with all of the extra generated quantities, is in <code>no-pool.stan</code>:
+The full Stan program with all of the extra generated quantities, is in <code>no-pool.stan</code>, which is shown in Appendix B:
 
-```{r comment=NA, echo=FALSE}
-file_path <- "no-pool.stan";
-lines <- readLines(file_path, encoding="ASCII");
-for (n in 1:length(lines)) cat(lines[n],'\n');
-```
 
 This model can be fit the same way as the last model.
 
 ```{r  comment=NA, results='hide'}
-fit_no_pool <- stan("no-pool.stan", data=c("N", "K", "y", "K_new", "y_new"));
+fit_no_pool <- stan("no-pool.stan", data=c("N", "K", "y", "K_new", "y_new"),
+                    iter=(M / 2), chains=4);
 ss_no_pool <- extract(fit_no_pool);
 ```
 
@@ -243,7 +235,7 @@ The no pooling model model provides better MCMC mixing than the pooling model as
 
 A little knowledge of baseball in this case shows that we're likely overestimating the high ability estimates and underestimating the lower ability estimates (Ted Williams, 30 years prior to the year this data was collected, was the last player with a success rate of 40%, whereas 20% is too low for all but a few rare defensive specialists).
 
-## Model 3: Partial Pooling (Beta Prior on Chance of Success)
+## Model 3: Partial Pooling (Chance of Success)
 
 Complete pooling provides estimated abilities that are too narrow and removes any chance of modeling population variation.  Estimating each chance of success separately wtihout any pooling provides estimated abilities that are too broad and hence too variable.  Clearly some amount of pooling between these two extremes is called for.  But how much?  
 
@@ -313,18 +305,13 @@ model {
 
 The values of $\alpha = \phi \, \kappa$ and $\beta = (1 - \phi) \, \kappa$ are computed in the arguments to the vectorized Beta sampling statment.  The prior on $\phi$ is implicitly uniform, as before.  The prior on $\kappa$ is the coded explicitly, with the first argument providing a lower-bound on $\kappa$ which matches that in the variable declaration in the parameters block.
 
-The full model with all generated quantities can coded in Stan as in the file <code>hier.stan</code>:
-
-```{r comment=NA, echo=FALSE}
-file_path <- "hier.stan";
-lines <- readLines(file_path, encoding="ASCII");
-for (n in 1:length(lines)) cat(lines[n],'\n');
-```
+The full model with all generated quantities can coded in Stan as in the file <code>hier.stan</code>; it is displayed in Appendix C.
 
 Fitting in this case adds control parameters which set the initial step size lower than the default and the target acceptance rate (<code>adapt_delta</code>) higher than the default values;  this causes smaller step sizes and helps with arithmetic stability in hierarchical models such as this one.
 
 ```{r  comment=NA, results='hide'}
 fit_hier <- stan("hier.stan", data=c("N", "K", "y", "K_new", "y_new"),
+                 iter=(M / 2), chains=4, 
                  control=list(stepsize=0.01, adapt_delta=0.99));
 ss_hier <- extract(fit_hier);
 ```
@@ -355,16 +342,16 @@ df_bda3_fig_5_3 <- data.frame(x = log(phi_sim / (1 - phi_sim)),
 library(ggplot2);
 plot_bda3_fig_5_3 <- 
   ggplot(df_bda3_fig_5_3, aes(x=x, y=y)) +
-  geom_point(shape=19, alpha=0.25) +
+  geom_point(shape=19, alpha=0.15) +
   xlab("logit(phi) = log(alpha / beta)") +
   ylab("log(kappa) = log(alpha + beta)");
 plot_bda3_fig_5_3;
 ```
 
-The (upside-down) funnel-like shape of the posterior is evident, with higher $\kappa$ values corresponding to lower variance (hence the upside-downedness) and thus a narrower range of $\phi$ values;  this phenomenon is discussed in the *Stan Reference Manual* and by Betancourt and Girolami (2015).  Running the sampler for more iterations will result in better resolution for scatterplots (though be sure to turn down the alpha blend level).
+The (upside-down) funnel-like shape of the posterior is evident, with higher $\kappa$ values corresponding to lower variance (hence the upside-downedness) and thus a narrower range of $\phi$ values;  this phenomenon is discussed in the *Stan Reference Manual* and by Betancourt and Girolami (2015).
 
 
-## Model 4: Partial Pooling (Log Odds Scale)
+## Model 4: Partial Pooling (Log Odds)
 
 The previous models all used a direct parameterization of the chance-of-success $\theta_n$ as a value in $(0,1)$.  In this section, we consider a direct parameterization in terms of the log-odds $\alpha_n$, which are defined by the logit transform as
 
@@ -415,7 +402,7 @@ which places 95% of the prior probability for $\mu$ in the interval $(-3, 1)$, w
 The prior scale $\sigma$ can be taken to be a half-normal.  
 
 \[
-p(\sigma) = 0.5 \mathsf{Normal}(\sigma \, | \, 0, 1)
+p(\sigma) = 0.5 \, \mathsf{Normal}(\sigma \, | \, 0, 1)
 \]
 
 This is a fairly broad prior here, being on the log-odds scale. 
@@ -446,12 +433,12 @@ We can then define our original $\alpha$ as a derived quantity
 We actually code this implicitly in the Stan model by defining the likelihood as
 
 \[
-p(y_n \, | \, \alpha^{\mathrm{raw}}, \mu, \sigma, K)
+p(y_n \, | \, \alpha^{\mathrm{std}}, \mu, \sigma, K)
 \ = \
 \mathsf{BinomialLogit}(K_n, \mu + \sigma \, \alpha_n).
 \]
 
-This decouples the sampling distribution for $\alpha^{\mathrm{raw}}$ from $\mu$ and $\sigma$, greatly reducing their covariance, converting their funnel-like shape to more of a circle.
+This decouples the sampling distribution for $\alpha^{\mathrm{std}}$ from $\mu$ and $\sigma$, greatly reducing their covariance, converting their funnel-like shape to more of a circle.
 
 The Stan program's parameter declaration and model directly follow the definition.
 
@@ -482,18 +469,13 @@ generated quantities {
 }
 ```
 
-The full Stan program for the hierarchical logistic model is in <code>hier-logit.stan</code>:
-
-```{r comment=NA, echo=FALSE}
-file_path <- "hier-logit.stan";
-lines <- readLines(file_path, encoding="ASCII");
-for (n in 1:length(lines)) cat(lines[n],'\n');
-```
+The full Stan program for the hierarchical logistic model is in <code>hier-logit.stan</code> and displayed in Appendix D.
 
 It is fit, the values are extracted.
 
 ```{r  comment=NA, results='hide'}
 fit_hier_logit <- stan("hier-logit.stan", data=c("N", "K", "y", "K_new", "y_new"),
+                       iter=(M / 2), chains=4,
                        control=list(stepsize=0.01, adapt_delta=0.99));
 ss_hier_logit <- extract(fit_hier_logit);
 ```
@@ -514,8 +496,6 @@ Compared to the direct Beta priors with uniform and Pareto hyperpriors shown in 
 Figure 5.4 from (Gelman et al. 2013) plots the observed number of successes $y_n$ for the first $K$ trials versus the median and 80\% intervals for the estimated chance-of-success parameters $\theta_n$ in the posterior.  The following R code reproduces the plot for our data.
 
 ```{r}
-M <- dim(ss_hier$phi);
-
 ss_quantile <- function(ss, N, q) {
   result <- rep(NA, N);
   for (n in 1:N) {
@@ -548,30 +528,43 @@ df_plot2 <- data.frame(x = rep(y / K, 4),
                        model = c(rep("complete pooling", N),
                                  rep("no pooling", N),
                                  rep("partial pooling", N),
-				 rep("partial pooling logit", N)));
+				 rep("partial pooling (log odds)", N)));
 
 plot_bda3_fig_5_4 <-
   ggplot(df_plot2, aes(x=x, y=y)) +
+  geom_hline(aes(yintercept=pop_mean), colour="lightpink") +
+  geom_abline(intercept=0, slope=1, colour="skyblue") +
   facet_grid(. ~ model) +
-  geom_point(shape=19) +
   geom_errorbar(aes(ymin=c(theta_10_pool, theta_10_no_pool, theta_10_hier, theta_10_hier_logit),
                     ymax=c(theta_90_pool, theta_90_no_pool, theta_90_hier, theta_90_hier_logit)),
-                width=0.005, colour="darkgray") +
+                width=0.005, colour="gray60") +
+  geom_point(colour="gray30", size=0.75) +
   coord_fixed() +
-  geom_abline(intercept=0, slope=1, colour="lightskyblue") +
-  geom_hline(aes(yintercept=pop_mean), colour="lightpink") +
+  scale_x_continuous(breaks = c(0.2, 0.3, 0.4)) +
   xlab("observed rate, y[n] / K[n]") +
-  ylab("median and 80% posterior interval for theta[n]");
+  ylab("chance of success, theta[n]");
 plot_bda3_fig_5_4;
 ```
 
-The diagonal blue line has intercept 0 and slope 1, and thus represents where the no-pooling maximum likelihood estimate would fall given the observed rate of success (the MLE is equal to the observed rate).  The horizontal red line has an intercept equal to the posterior mean of the population chance-of-success parameter $\phi$ (0.266).  
+The horizontal axis is the observed rate of success, broken out by player (the overplotting is from players with the same number of successes---they all had the same number of trials in this data).  The dots are the posterior medians with bars extending to cover the central 80% posterior interval.  Players with the same observed rates are indistinguishable, any differences in estimates are due to MCMC error.
 
-The overlplotting at the same x positions is because there are several observed rates shared by multiple players;  because players with the same observed rates are indistinguishable, any differences in estimates are due to MCMC error.
+The horizontal red line has an intercept equal to the overall success rate,
+
+\[
+\frac{\sum_{n=1}^N y_n}{\sum_{n=1}^N K_n}
+\ = \
+\frac{215}{810}
+\ = \ 
+0.266.
+\]
+
+The overall success rate is also the posterior mode (i.e., maximum likelihood estimate) for the complete pooling model.
+
+The diagonal blue line has intercept 0 and slope 1.  Estimates falling on this line make up the maximum likelihood estimates for the no-pooling model.
 
 The choice of likelihood function and parameterization (a single parameter or one parameter per item) makes a huge impact here on the estimated chance of success for each item.  This is true even in non-Bayesian settings---the points are very close to where the maximum likelihood estimates will be and these vary quite dramatically between the complete pooling and no pooling extremes.  The larger point is that it's not just the choice of prior that contributes to the "subjective" modeling of a data set; the choice of likelihood is equally if not more sensitive to modeling assumptions.
 
-In the no pooling and complete pooling cases, the posterior can be calculated analytically and shown to be a Beta distribution.  The median of a beta distribution (plotted) is greater than the mode of a beta distribution (the blue line, corresponding to the MLE);  this assumes $\alpha, \beta > 1$ (see the [Wikipedia article on the beta distribution](https://en.wikipedia.org/wiki/Beta_distribution#Mean.2C_mode_and_median_relationship) for an explanation).  The reason this is not evident in the complete pooling case is that there is far more data, and with more data, the mean, median, and mode of the beta distribution converge to the same value.  
+In the no pooling and complete pooling cases, the posterior can be calculated analytically and shown to be a Beta distribution.  The median of a beta distribution (plotted points in the complete pooling and no pooling cases) is greater than the mode of a beta distribution (the blue line, corresponding to the MLE);  this assumes $\alpha, \beta > 1$ (see the [Wikipedia article on the beta distribution](https://en.wikipedia.org/wiki/Beta_distribution#Mean.2C_mode_and_median_relationship) for an explanation).  The reason this is not evident in the complete pooling case is that there is far more data, and with more data, the mean, median, and mode of the beta distribution converge to the same value.  
 
 Plotting the transformed $\theta$ values in the logit-based model, there is a clear skew in the posteriors for each parameter away from the population mean.  Overall, the plot makes the amount of pooling toward the prior evident.
 
@@ -827,11 +820,11 @@ In the original Volume I BUGS example (see [OpenBUGS: Surgical example](http://w
 
 ```{r comment=NA}
 library(ggplot2);
-df_rank <- data.frame(list(name = rep(as.character(df[[1,2]]), 4000),
+df_rank <- data.frame(list(name = rep(as.character(df[[1,2]]), M),
                            rank = ss_hier$rnk[, 1]));
 for (n in 2:N) {
   df_rank <- rbind(df_rank,
-                   data.frame(list(name = rep(as.character(df[[n,2]]), 4000),
+                   data.frame(list(name = rep(as.character(df[[n,2]]), M),
                               rank = ss_hier$rnk[, n])));
 }
 rank_plot <-
@@ -964,28 +957,43 @@ y_min <- min(y);
 y_max <- max(y);
 y_mean <- mean(y);
 y_sd <- sd(y);
-df_pvals_min <- data.frame(list(test_stat = rep("min", 4000), 
-                                replication = ss_hier$min_y_rep));
-df_pvals_max <- data.frame(list(test_stat = rep("max", 4000), 
-                                replication = ss_hier$max_y_rep));
-df_pvals_mean <- data.frame(list(test_stat = rep("mean", 4000), 
-                                 replication = ss_hier$mean_y_rep));
-df_pvals_sd <- data.frame(list(test_stat = rep("sd", 4000), 
-                               replication = ss_hier$sd_y_rep));
 
-df_pvals <- rbind(df_pvals_min, df_pvals_max, df_pvals_mean, df_pvals_sd);
+pvals_frame <- function(ss, model_name) {
+  df_pvals_min <- data.frame(list(test_stat = rep("min", M), 
+                                  replication = ss$min_y_rep),
+                                  model = rep(model_name, M));
+  df_pvals_max <- data.frame(list(test_stat = rep("max", M), 
+                                  replication = ss$max_y_rep),
+                                  model = rep(model_name, M));
+  df_pvals_mean <- data.frame(list(test_stat = rep("mean", M), 
+                                   replication = ss$mean_y_rep),	
+				   model = rep(model_name, M));
+  df_pvals_sd <- data.frame(list(test_stat = rep("sd", M), 
+                                 replication = ss$sd_y_rep),
+                                 model = rep(model_name, M));
+  return(rbind(df_pvals_min, df_pvals_max, df_pvals_mean, df_pvals_sd));
+}
+
+df_pvals <- rbind(pvals_frame(ss_hier, "partial pooling"),
+                  pvals_frame(ss_hier_logit, "partial pooling (logit)"),
+                  pvals_frame(ss_pool, "complete pooling"),
+                  pvals_frame(ss_no_pool, "no pooling"));
 
 post_test_stat_plot <-
   ggplot(df_pvals, aes(replication)) +
-  facet_wrap(~ test_stat) +
-  geom_histogram(binwidth = 1, colour="black", size = 0.25, fill="white") + 
+  facet_grid(model ~ test_stat) +
+  geom_histogram(binwidth = 0.5, colour="black", size = 0.25, fill="white") + 
+  theme(axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank()) +
+  xlab("value in replicated data set") +
   geom_vline(aes(xintercept = y_val), 
-             data = data.frame(y_val = c(rep(y_min, 4000), rep(y_max, 4000), 
-                                         rep(y_mean, 4000), rep(y_sd, 4000)),
+             data = data.frame(y_val = rep(c(rep(y_min, M), rep(y_max, M), 
+                                             rep(y_mean, M), rep(y_sd, M)), 4),
                                test_stat = df_pvals$test_stat,
                                replication = df_pvals$replication),
-             colour = "blue", size = 0.5) +
-  ggtitle("Posterior p-Values (Beta Prior)");
+             colour = "blue", size = 0.25) +
+  ggtitle("Posterior p-values")
 post_test_stat_plot;
 ```
 
@@ -1133,6 +1141,8 @@ A hierarchical model introduces an estimation bias toward the population mean an
 
 1.  How sensitive is the logistic model to the hyperprior?  If we made it much less informative or much more informative, how much do the fitted values differ?  How do the predictions differ?  Evaluate the prior used by Lunn et al. (2013), which is $\mathsf{Uniform}(-100,100)$ for $\mu$ and $\mathsf{Uniform}(0, 100)$ for $\sigma$.  Be sure to add constraints on the declarations of $\mu$ and $\sigma$ to match the constraints.  What happens if the width of the uniform grows much wider or much narrower?
 
+1. For the no pooling and complete pooling models (fixed priors), derive the analytic posterior and code it using a random-number generator in the generated quantities block.  For the partial pooling models (hierarchical priors), marginalize out the chance-of-success parameters ($\theta$ or $\alpha$) and sample the higher-level parameters for the prior directly.
+
 1.  Figure out how to take all the hard-coded output analysis in here and make it dynamic by making better use of knitr.  And take all the cut-and-paste duplicated code and wrap it into functions.
 
 ### References
@@ -1148,3 +1158,41 @@ A hierarchical model introduces an estimation bias toward the population mean an
 * Gelman, A., Hill, J., and Yajima, M. (2012) Why we (usually) don't have to worry about multiple comparisons. <i>Journal of Research on Educational Effectiveness</i> <b>5</b>, 189--211. [ [pdf](http://www.stat.columbia.edu/~gelman/research/published/multiple2f.pdf) ]
 
 * Lunn, D., Jackson, C., Best, N., Thomas, A., and Spiegelhalter, D. (2013) <i>The BUGS Book: A Practical Introduction to Bayesian Analysis</i>.  Chapman & Hall/CRC Press.
+
+
+## Appendix A:  <code>pool.stan</code>
+
+```{r comment=NA, echo=FALSE, comment=NA}
+file_path <- "pool.stan";
+lines <- readLines(file_path, encoding="ASCII");
+for (n in 1:length(lines)) cat(lines[n],'\n');
+```
+
+## Appendix B:  <code>no-pool.stan</code>
+
+```{r comment=NA, echo=FALSE}
+file_path <- "no-pool.stan";
+lines <- readLines(file_path, encoding="ASCII");
+for (n in 1:length(lines)) cat(lines[n],'\n');
+```
+
+
+## Appendix C:  <code>hier.stan</code>
+
+```{r comment=NA, echo=FALSE}
+file_path <- "hier.stan";
+lines <- readLines(file_path, encoding="ASCII");
+for (n in 1:length(lines)) cat(lines[n],'\n');
+```
+
+
+
+## Appendix D:  <code>hier-logit.stan</code>
+
+```{r comment=NA, echo=FALSE}
+file_path <- "hier-logit.stan";
+lines <- readLines(file_path, encoding="ASCII");
+for (n in 1:length(lines)) cat(lines[n],'\n');
+```
+
+
