@@ -34,8 +34,6 @@ generated quantities {
   int<lower=0, upper=1> avg_gt_400[N];        // Pr[season avg of n] >= 0.400
   int<lower=0, upper=1> ability_gt_400[N];    // Pr[chance-of-success of n] >= 0.400
 
-  int<lower=1, upper=N> rnk[N];   // rnk[n] is rank of player n
-
   int<lower=0> y_rep[N];      // replications for existing items
 
   real<lower=0> min_y_rep;   // posterior predictive min replicated successes
@@ -62,13 +60,6 @@ generated quantities {
     avg_gt_400[n] <- (((y[n] + z[n]) / (0.0 + K[n] + K_new[n])) > 0.400);
   for (n in 1:N)
     ability_gt_400[n] <- (theta[n] > 0.400);
-
-  {
-    int dsc[N];
-    dsc <- sort_indices_desc(theta);
-    for (n in 1:N)
-      rnk[dsc[n]] <- n;
-  }
 
   for (n in 1:N)
     y_rep[n] <- binomial_rng(K[n], theta[n]);
