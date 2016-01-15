@@ -1001,6 +1001,51 @@ averaging over their posteriors, with the amount of posterior
 uncertainty also being ranked in reverse order of the amount of
 pooling they do.
 
+#### Calculating the posterior log density
+
+It's quite a bit more work to properly calculate the posterior
+predictive log density, becuase it's not a simple weighted average.
+Instead, what we're going to do is add the following generated
+quantity and calculation for each of the item's $p(y^{\mathrm{new}}_n
+\, | \, y)$.  
+
+```
+generated quantities {
+  ...
+  vector[N] p_new;  // posterior predictive density for item
+  ...
+  for (n in 1:N)
+    p_new[n] <- exp(binomial_log(y_new[n], K_new[n], theta[n]));
+  ...
+}
+```
+
+Stan only provides the log-scale form of the density functions, so the
+explicitly exponentiation is necessary.  But now the posterior mean of
+the variable <code>p_new[n]</code> will be our estimate for
+$p(y^{\mathrm{new}}_n \, | \, y)$. We can then sum the logs of these
+posterior means in R to calculate the posterior log density.
+
+```{r comment=NA}
+print_new_lp <- function(name, ss) {
+  lp <- 0;
+  for (n in 1:length(ss$p_new[1, ])) {
+    lp <- lp + log(mean(ss$p_new[, n]));
+  }
+  print(sprintf("%25s  %5.1f", name,  lp), quote=FALSE);
+}
+
+print_new_lp("complete pooling", ss_pool); 
+print_new_lp("no pooling", ss_no_pool); 
+print_new_lp("partial pooling", ss_hier); 
+print_new_lp("partial pooling (logit)", ss_hier_logit); 
+```
+
+Now the ranking is different!  The hierarchical logit model appears to
+be making slightly better predictions than the full pooling model,
+which in turn is making slightly better predictions than the basic
+hierarchical model.
+
 ## Predicting New Observations
 
 We showed above that it is straightforward to generate draws from the
