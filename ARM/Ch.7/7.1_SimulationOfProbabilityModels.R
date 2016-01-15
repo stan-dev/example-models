@@ -18,7 +18,7 @@ m + geom_histogram(colour = "black", fill = "white",binwidth=5) + theme_bw()
 ## Accounting for twins
 
 birth.type <- sample (c("fraternal twin", "identical twin", "single birth"),
-  size=400, replace=TRUE, prob=c(1/25, 1/300, 1 - 1/25 - 1/300))
+  size=400, replace=TRUE, prob=c(1/125, 1/300, 1 - 1/125 - 1/300))
 girls <- rep (NA, 400)
 for (i in 1:400){
   if (birth.type[i]=="single birth"){
@@ -36,7 +36,7 @@ n.sims <- 1000
 n.girls <- rep (NA, n.sims)
 for (s in 1:n.sims){
  birth.type <- sample (c("fraternal twin", "identical twin", "single birth"),
-   size=400, replace=TRUE, prob=c(1/25, 1/300, 1 - 1/25 - 1/300))
+   size=400, replace=TRUE, prob=c(1/125, 1/300, 1 - 1/125 - 1/300))
  girls <- rep (NA, 400)
  for (i in 1:400){
   if (birth.type[i]=="single birth"){
