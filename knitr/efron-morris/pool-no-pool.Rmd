@@ -4,7 +4,7 @@ author: "Bob Carpenter"
 date: "4 January 2016"
 output: 
   html_document: 
-    theme: cerulean
+    theme: readable
 ---
 
 ### Abstract
@@ -902,21 +902,22 @@ p(\tilde{y} \, | \, y)
 \int_{\Theta} p(\tilde{y} \, | \, \theta) \ p(\theta \, | \, y) \ \mathrm{d}\theta,
 \]
 
-where $\Theta$ is the support of the parameters $\theta$.  The basic
-form is important here, as it's an expectation over the posterior,
-which always has the form $\int_{\Theta} \ \ldots \  p(\theta \, | \,
-y) \ \mathrm{d}\theta$, which amounts to averaging the $\ldots$ over
-the posterior.
+where $\Theta$ is the support of the parameters $\theta$.  What an
+integral of this form says is that $p(\tilde{y} \, | \, y)$ is defined
+as a weighted average over the legal parameter values $\Theta$ of the
+likelihood function $p(\tilde{y} \, | \, \theta)$, with weights given by
+the posterior, $p(\theta \, | \, y)$.
 
-We can also define the predictive log density as an expectation in the
-same way as
-
+We can also define the weighted average of the log likelihood function
+over the posterior,
  
 \[
-\log p(\tilde{y} \, | \, y)
-\ = \
 \int_{\Theta} \left( \, \log p(\tilde{y} \, | \, \theta) \, \right) \ p(\theta \, | \, y) \ \mathrm{d}\theta.
 \]
+
+Note that this is not the same as $\log p(\tilde{y} \, | \, y)$,
+because logs do not distribute through integrals;  the best we can do
+is get a bound through Jensen's inequality.
 
 #### Evaluating Held-Out Data Predictions
 
@@ -924,12 +925,10 @@ Because the posterior predictive log density is formulated as an
 expectation over the posterior, it is straightforward to compute via
 MCMC.  Suppose we have new data $y^{\mathrm{new}}$ and want to
 estimate its log density.  With $M$ draws $\theta^{(m)}$ from the
-posterior $p(\theta \, | \, y)$, the posterior predictive log density
-is computed by
+posterior $p(\theta \, | \, y)$, the expected posterior log density is
+computed by 
 
 \[
-\log p(y^{\mathrm{new}} \, | \, y)
-\ \approx \
 \frac{1}{M} \, \sum_{m=1}^M \log p(y^{\mathrm{new}} \, | \, \theta^{(m)}).
 \]
 
@@ -943,10 +942,10 @@ distribution when $\theta$ is fixed and the likelihood when $y$ is fixed.)
 
 With $M$ draws $\theta^{(m)}$ from the posterior $p(\theta \, | \,
 y)$, replicated data can be simulated by drawing a sequence of $M$
-simulations $y^{\mathrm{rep} \ (m)}$ according to $p(y^{\mathrm{new}}
-\, | \, \theta^{(m)})$.  This latter computation can usually be done
-efficiently (both computationally and statistically) by means of
-forward simulation from the sampling distribution.
+simulations $y^{\mathrm{rep} \ (m)}$ according to the sampling
+distribution $p(y \, | \, \theta^{(m)})$.  This latter computation can
+usually be done efficiently (both computationally and statistically)
+by means of forward simulation from the sampling distribution.
 
 
 
@@ -959,10 +958,11 @@ how well these models predict a player's performance for the rest of
 the season based on their initial 45 at bats.
 
 The variables <code>K_new[n]</code> and <code>y_new[n]</code> hold the
-number of new trials and the number of successes for player
-<code>n</code>.  To code the evaluation of the held out data in Stan,
-we declare a generated quantity to hold the result and then define it
-as the sum of the log densities of the new observations.
+number of at bats (trials) trials and the number of hits (successes)
+for player (item) <code>n</code>.  To code the evaluation of the held
+out data in Stan, we declare a generated quantity to hold the result
+and then define it as the sum of the log densities of the new
+observations.
 
 ```
 generated quantities {
@@ -976,11 +976,10 @@ generated quantities {
 }
 ```
 
-This is just a direct coding in Stan of the calculation
+This means that the posterior mean for <code>log_p_new</code> will be
+the expectation of the log density in the posterior,
 
 \[
-\log p(y^{\mathrm{new}} \, | \, \theta^{(m)})
-\ = \
 \sum_{n=1}^N \log p(y^{\mathrm{new}}_n \, | \, \theta^{(m)}_n).
 \]
 
@@ -1008,7 +1007,7 @@ We showed above that it is straightforward to generate draws from the
 posterior predictive distribution.  With that capability, we can
 either generate predictions for new data or we can replicate the data
 we already have.  Here we let $z_n$ be distributed according to the
-predictive posterior for number of trialss $K^{\mathrm{new}}_n$.
+predictive posterior for number of trials $K^{\mathrm{new}}_n$.
 
 The posterior predictions can be declared in Stan as generated
 quantities.  Their values are determined by calling the binomial
@@ -1027,12 +1026,12 @@ generated quantities {
 ```
 
 It might seem tempting to set $z_n^{(m)}$ to its expectation
-$\theta_n^{(m)} \times K^{\mathrm{new}}$ at each iteration rather than
-simulating a new value.  Do not succumb to this temptation.  The
-resulting values would suffice for estimating the posterior mean, but
-would not capture the uncertainty in the prediction for
-$y^{\mathrm{new}}_n$ and would thus not be useful in estimating
-predictive standard deviations or quantiles or making decisions.
+$\theta_n^{(m)} \, K^{\mathrm{new}}$ at each iteration rather than
+simulating a new value.  The resulting values would suffice for
+estimating the posterior mean, but would not capture the uncertainty
+in the prediction for $y^{\mathrm{new}}_n$ and would thus not be
+useful in estimating predictive standard deviations or quantiles or
+as the basis for decision making under uncertainty.
 
 These can be shown in all of our models as follows; the number of
 remaining at-bats $K^{\mathrm{new}}$ was printed out in the original
@@ -1040,34 +1039,39 @@ table along with the actual number of hits.
 
 ```{r comment=NA}
 print(fit_pool, c("z"), probs=c(0.1, 0.5, 0.9), digits=0);
-print(fit_no_pool, c("z"), probs=c(0.1, 0.5, 0.9), digits=0);
-print(fit_hier, c("z"), probs=c(0.1, 0.5, 0.9), digits=0);
-print(fit_hier_logit, c("z"), probs=c(0.1, 0.5, 0.9), digits=0);
 ```
 
-The posterior uncertainty is quite broad, aligning in magnitude with
-the posterior plots for $\theta_n$ for each model and the number of
-remaining trials.  For instance, Roberto Clemente ($n = 1$, with the
-highest initial success rate), has 80% posterior intervals of
-$(85,110)$ with complete pooling, $(113, 184)$ with no pooling, $(93,
-147)$ with the basic hierarchical model, and $(87, 132)$ in the
-hierarchical logit model; in reality, he had 127 hits in his remaining
-at bats, within all the 80% intervals other than that of the complete
-pooling model.  Basically, the width of these intervals show us that
-low-count binary data provides a poor basis for estimation chance of
-success.
+For the remaining models, only a selection of <code>z</code> values
+are printed.
+
+```{r comment=NA}
+print(fit_no_pool, c("z[1]", "z[8]", "z[18]"), probs=c(0.1, 0.5, 0.9), digits=0);
+print(fit_hier, c("z[1]", "z[8]", "z[18]"), probs=c(0.1, 0.5, 0.9), digits=0);
+print(fit_hier_logit, c("z[1]", "z[8]", "z[18]"), probs=c(0.1, 0.5, 0.9), digits=0);
+```
+
+The posterior uncertainty in the simulated $z_n$ is even broader than
+for $\theta_n$ because of the additional uncertainty from the
+binomial.  For instance, Roberto Clemente ($n = 1$, with the highest
+initial success rate), has 80% posterior intervals of $(85,110)$ with
+complete pooling, $(113, 184)$ with no pooling, $(93, 147)$ with the
+basic hierarchical model, and $(87, 132)$ in the hierarchical logit
+model; in reality, he had 127 hits in his remaining at bats, within
+all the 80% intervals other than that of the complete pooling model.
 
 The posterior produced by the model for the number of hits for the
 rest of the season is overdispersed compared to a simple binomial
 model based on a point estimate.  For example, if we take the
 partially pooled estimate of 0.32 for Roberto Clemente's ability, the
 prediction for number of hits based on the point estimate would be
-just $\mathrm{Binomial}(J_1, 0.32)$, which we know analytically has a
-standard deviation of $\sqrt(n \, \theta_n \, (1 - \theta_n)) = 8.9$,
+$\mathrm{Binomial}(K^{\mathrm{new}}_1, 0.32)$, which we know analytically has a
+standard deviation of $\sqrt{n \, \theta_n \, (1 - \theta_n)} = 8.9$,
 which is quite a bit lower than the posterior standard deviation of 21
-in the hierarchical model for $z_1$.  Translating that into a season
-batting average, $(z_n + y_n) / (K_n + K^{\mathrm{new}}_n)$, we get an
-80% interval of
+in the hierarchical model for $z_1$.  
+
+Translating the posterior number of hits into a season batting
+average, $(y_n + z_n) / (K_n + K^{\mathrm{new}}_n)$, we get an 80%
+interval of
 
 \[
 \left( \frac{18 + 93}{45 + 367}, \frac{18 + 147}{45 + 367} \right) = (0.269, 0.400).
@@ -1076,11 +1080,6 @@ batting average, $(z_n + y_n) / (K_n + K^{\mathrm{new}}_n)$, we get an
 The broad range shown here is an illustration of how poor binary data
 on the order of a few dozen observations is for estimating chances of
 success.
-
-The summaries provide two point estimates of potential interest.  The
-posterior mean minimized expected square error and the posterior
-median (0.5 quantile) minimizes expected absolute error.
-
 
 
 ## Estimating Event Probabilities
@@ -1094,12 +1093,16 @@ to direclty estimate event probabilities, such as Robert Clemente's
 batting average is 0.400 or better for the season.
 
 Event probabilities are defined as expectations of indicator functions
-over parameters and data. For examplee, the probability of player
-$n$'s batting average being 0.400 or better is defined by the event
-probability
+over parameters and data. For example, the probability of player $n$'s
+batting average being 0.400 or better conditioned on the data $y$ is
+defined by the conditional event probability
 
 \[
-\mathrm{Pr}\left[\frac{(y_n + z_n)}{(45 + K^{\mathrm{new}}_n)} \geq 0.400\right]
+\mathrm{Pr}\left[
+\frac{(y_n + z_n)}{(45 + K^{\mathrm{new}}_n)} \geq 0.400 
+\, \Big| \, 
+y
+\right]
 \ = \
 \int_{(0,1)^N}
  \mathrm{I}\left[\frac{(y_n + z_n)}{(45 + K^{\mathrm{new}}_n)} \geq 0.400\right]
@@ -1108,26 +1111,27 @@ probability
        \ \mathrm{d}\theta.
 \]
 
-The indicator function converts boolean true to 1 and false to 0; that
-is, $\mathrm{I}[c]$, evaluates to 1 if the condition $c$ is true and 0
-if it is false.  Because it is just another expectation with respect
-to the posterior, we can calculate this event probability using MCMC
-as
+The indicator function $\mathrm{I}[c]$ evaluates to 1 if the condition
+$c$ is true and 0 if it is false.  Because it is just another
+expectation with respect to the posterior, we can calculate this event
+probability using MCMC as
 
 \[
-\mathrm{Pr}\left[\frac{(y_n + z_n)}{(45 + K^{\mathrm{new}}_n)} \geq 0.400\right]
+\mathrm{Pr}\left[\frac{(y_n + z_n)}{(45 + K^{\mathrm{new}}_n)} \geq
+0.400 \, \Big| \, y \right]
 \ \approx \
 \frac{1}{M} \sum_{m=1}^M \mathrm{I}\left[\frac{(y_n + z_n^{(m)})}{(45 + K^{\mathrm{new}}_n)} \geq 0.400\right].
 \]
 
 This event is about the season batting average being greather than
-0.400.  What if we care about ability, not observed performance for
-the rest of the season?  Then we would ask the question of whether
-$\mathrm{Pr}[\theta_n > 0.4]$.  This is coded as an expectation and
-computed via MCMC as the previous case.
+0.400.  What if we care about ability (chance of success), not batting
+average (success rate) for the rest of the season?  Then we would ask
+the question of whether $\mathrm{Pr}[\theta_n > 0.4]$.  This is
+defined as a weighted average over the prior and computed via MCMC as
+the previous case.
 
 \[
-\mathrm{Pr}\left[\theta_n \geq 0.400\right]
+\mathrm{Pr}\left[\theta_n \geq 0.400 \, | \, y \right]
 \ = \
 \int_{(0,1)^N}
  \mathrm{I}\left[\theta_n \geq 0.400\right]
@@ -1137,10 +1141,6 @@ computed via MCMC as the previous case.
 \ \approx \
 \frac{1}{M} \sum_{m=1}^M \mathrm{I}[\theta_n^{(m)} \geq 0.400].
 \]
-
-Following Gelman et al. (2013), we conflate the notation for random
-variables and bound variables, using $z_n$ and $\theta_n$ for both the
-bound and random variables.
 
 In Stan, we just declare and define the indicators directly in the
 generated quantities block.
@@ -1164,9 +1164,8 @@ generated quantities {
 The indicator function is not explicitly specified because Stan's
 boolean operator greater-than returns either 0 or 1.  The only trick
 to this code is the <code>0.0 + ...</code> in the fraction
-computation, the purpose of which is to cast the value to real instead
-of integers and thus prevent integer division from kicking in and
-rounding down.
+computation, the purpose of which is to cast the value to real to
+prevent integer division from kicking in and rounding down.
 
 As usual, the expectations appear as the posterior means in the
 summary.  We can summarize for all four models again.
@@ -1175,10 +1174,13 @@ Only the event indicator variables are printed---the parameter
 estimates will be the same as before.
 
 ```{r comment=NA}
-print(fit_pool, pars=c("some_ability_gt_350", "avg_gt_400", "ability_gt_400"), probs=c());
-print(fit_no_pool, pars=c("some_ability_gt_350", "avg_gt_400", "ability_gt_400"), probs=c());
-print(fit_hier, pars=c("some_ability_gt_350", "avg_gt_400", "ability_gt_400"), probs=c());
-print(fit_hier_logit, pars=c("some_ability_gt_350", "avg_gt_400", "ability_gt_400"), probs=c());
+pars_to_print <- c("some_ability_gt_350", 
+    "avg_gt_400[1]","avg_gt_400[5]", "avg_gt_400[10]", 
+    "ability_gt_400[1]", "ability_gt_400[5]", "ability_gt_400[10]");
+print(fit_pool, pars=pars_to_print, probs=c());
+print(fit_no_pool, pars=pars_to_print, probs=c());
+print(fit_hier, pars=pars_to_print, probs=c());
+print(fit_hier_logit, pars=pars_to_print, probs=c());
 ```
 
 The standard deviation and quantiles are not useful here and the
@@ -1265,24 +1267,25 @@ takes on the value $\mathrm{I}[\mathrm{max}(\theta^{(m)}) > 0.35]$ in
 each iteration.
 
 The probability estimate of there being a player with an ability
-(chance of success) greater than 0.350 is basically 0 in the complete
+(chance of success) greater than 0.350 is roughly 0% in the complete
 pooling model, 25% in the hierarchical logit model, 62% in the basic
-hierarchical model, and basically 1 in the no pooling model.  Neither
-of the partially pooled estimates would be considered significant at
-conventional p=0.05 thresholds.  One way to get a handle on this is to
-look at the posterior 80% intervals for chance-of-success estimates in
-the first graph above.
+hierarchical model, and 100% in the no pooling model.  Neither of the
+partially pooled estimates would be considered significant at
+conventional p=0.05 thresholds.  One way to get a handle on what's
+going on is to inspect the posterior 80% intervals for
+chance-of-success estimates in the first graph above.
 
 
 ## Ranking
 
 In addition to multiple comparisons, we can use the simultaneous
-estimation of the ability parameters to rank the items; here we are
-ranking ballplayers by hitting ability.
+estimation of the ability parameters to rank the items.  In this
+section, we rank ballplayers by (estimated) hitting ability.
 
-To code up ranking in Stan, we define a generated quantity to hold the
-ranks, then define them by sorting the chance-of-success parameters
-$\theta$ by index, then assigning ranks.
+To implement ranking in Stan, we define a generated quantity
+<code>rnk</code>to hold the ranks; that is, \code{rnk[2]} is
+the rank from $1$ to $N$ of the second player.  First, we define a
+local variable \code{dsc}, and sort it into descending order.
 
 ```
 generated quantities {
@@ -1299,10 +1302,18 @@ generated quantities {
 }
 ```
 
-In this example, the integer array variable <code>dsc</code> is
-declared as a local variable to hold the sorted indices.  It is
-declared as a local variable so that its values are not saved every
-iteration.
+After the call to <code>sort_indices_desc</code>, <code>dsc[n]</code>
+holds the index of the $n$-th best item.  For example, if <code>rnk[2]
+== 5</code>, so that player with identifier 2 is ranked 5th, then
+<code>dsc[5] == 2</code>, because the fiftth rank player is the player
+with identifier 2.  The final loop just puts the ranks into their
+proper place in the <code>rnk</code> array.
+
+In this example, the nested brackets produce a scope in which the
+integer array variable <code>dsc</code> can be declared as a local
+variable to hold the sorted indices.  Unlike variables declared at the
+top of the generated quantities block, local variables are not saved
+every iteration.
 
 Of course, ranking players by ability makes no sense for the complete
 pooling model, where every player is assumed to have the same ability.
@@ -1318,8 +1329,9 @@ uncertainty is very great after only 45 at bats.
 
 In the original Volume I BUGS example (see [OpenBUGS: Surgical
 example](http://www.openbugs.net/Examples/Surgical.html)) of surgical
-mortality, the ranks of each hospital was plotted.  We can reproduce
-that figure here for the baseball data.
+mortality, the posterior distribution over ranks was plotted for each
+hospital.  It is now straightforward to reproduce that figure here for
+the baseball data.
 
 ```{r comment=NA}
 library(ggplot2);
@@ -1353,7 +1365,7 @@ for item $n$ that the item has the highest chance of success using
 MCMC as
 
 \[
-\mathrm{Pr}[\theta_n = max(\theta)]
+\mathrm{Pr}[\theta_n = \max(\theta)]
 \ = \
 \int_{\Theta} \mathrm{I}[\theta_n = \mathrm{max}(\theta)]
               \ p(\theta \, | \, y, K)
@@ -1362,11 +1374,10 @@ MCMC as
 \frac{1}{M} \ \sum_{n=1}^N \mathrm{I}[\theta^{(m)}_n = \mathrm{max}(\theta^{(m)})].
 \]
 
-Note that this model automatically applies a multiple comparison
-adjustment by averaging the indicator $\mathrm{I}[\theta_n =
-\mathrm{max}(\theta)]$ over the posterior.  Contrast this with an
-approach that does a pairwise significance test and then applies a
-false-discovery correction.
+Like our other models, the partial pooling mitigates the implicit
+multiple comparisons being done to calculate the probabilities of
+rankings.  Contrast this with an approach that does a pairwise
+significance test and then applies a false-discovery correction.
 
 We can compute this straightforwardly using the rank data we have
 already computed or we could compute it directly as above.  Because
@@ -1386,6 +1397,9 @@ generated quantities {
   ...
 }
 ```
+
+This means that <code>is_best[n]</code> will be 1 if player
+<code>n</code> is the best player (in that iteration $m$).
 
 We can then plot the results for the four models.
 
@@ -1414,7 +1428,7 @@ is_best_plot;
 
 The hierarchical plot is simply the first column of each of the
 entries in the previous plot in the order they appear; the other plots
-do the same thing for the no pooling and log-odds hierarchical model.
+repeat the process for the no pooling and log-odds hierarchical model.
 
 This question doesn't even make sense in the complete pooling model,
 because the chance of success parameters are all the same by
@@ -1426,16 +1440,17 @@ player according to the no-pooling, partial pooling, and partial
 pooling of log odds models; the tenth best performing player, Ron
 Swaboda, has an estimated 1%, 2% and 3% chance according to the same
 models.  That is, the probability of being best goes down for high
-performing players with more pooling and vice-versa for low performing
-players.
+performing players with more pooling, whereas it goes up for
+below-average players.
 
 
 ## Posterior p-Values
 
-A test statistic $T$ is a function from data to a real value.  We will
-concentrate on four specific test statistics for repeated binary trial
-data (though the choices we make are general): minimum value, maximum
-value, sample mean, and sample standard deviation.
+A test statistic $T$ is a function from data to a real value.
+Folllowing (Gelman et al. 2013), we will concentrate on four specific
+test statistics for repeated binary trial data (though the choices we
+make are general): minimum value, maximum value, sample mean, and
+sample standard deviation.
 
 Given a test statistic $T$ and data $y$, the Bayesian $p$-value is
 
@@ -1450,7 +1465,7 @@ p_B
 = \int_{\Theta} 
     \mathrm{I}[T(y^{\mathrm{rep}}) \geq T(y)] 
     \ p(\theta \, | \, y)
-    \ mathrm{d}\theta,
+    \ \mathrm{d}\theta,
 \]
 
 leads to the obvious MCMC calculation based on $M$ draws of replicated
@@ -1466,8 +1481,10 @@ p_B
 \]
 
 
-The test statistics are first defined as transformed data for the
-observed data.
+The test statistics are first defined for the observed data.  Because
+they are functions purely of variables defined in the data block, they
+can be defined in the transformed data block so that they will be
+computed only once when the data is read in.
 
 ```
 transformed data {
@@ -1516,8 +1533,11 @@ generated quantities {
 }
 ```
 
-And finally, the actual $p$-value indicators are computed and assigned
-to integer values.
+Finally, the actual $p$-value indicators are computed and assigned to
+integer values.  The calls to <code>to_vector()</code> convert an
+array of integers to an array of real values so that they are
+appropriately typed to be the input to the standard deviation
+calculation.
 
 ```
 generated quantities {
@@ -1580,10 +1600,10 @@ pvals_frame <- function(ss, model_name) {
   return(rbind(df_pvals_min, df_pvals_max, df_pvals_mean, df_pvals_sd));
 }
 
-df_pvals <- rbind(pvals_frame(ss_hier, "partial pooling"),
-                  pvals_frame(ss_hier_logit, "partial pooling (logit)"),
-                  pvals_frame(ss_pool, "complete pooling"),
-                  pvals_frame(ss_no_pool, "no pooling"));
+df_pvals <- rbind(pvals_frame(ss_hier, "partial pool"),
+                  pvals_frame(ss_hier_logit, "partial (logit)"),
+                  pvals_frame(ss_pool, "complete pool"),
+                  pvals_frame(ss_no_pool, "no pool"));
 
 post_test_stat_plot <-
   ggplot(df_pvals, aes(replication)) +
@@ -1643,8 +1663,13 @@ generated quantities {
 
 The random population member generation is put through the
 inverse-logit (logistic sigmoid) function to generate a probability,
-then a replication generated based on the number of trials.  For the
-basic hierarchical model, the population replication is carried out as
+then a replication generated based on the number of trials.  The
+reason we have to go through looping is that Stan hasn't (yet)
+vectorized the binomial RNGs; the reason we have to use the explicit
+inverse-logit formulation is that there is no binomial-logit RNG.
+
+For the basic hierarchical model, the population replication is
+carried out as
 
 ```
   for (n in 1:N)
@@ -1669,14 +1694,14 @@ The variable <code>y_rep</code> is ordered because it's based on the
 actual items, which were sorted by success count in the original data.
 On the other hand, the <code>y_pop_rep</code> values are fully
 exchangeable, so indistinguishable in their posterior (other than MCMC
-error).  Because the population replicates are exchangeable, so we
+error).  Because the population replicates are exchangeable, we
 only printed the first for each model.
 
 We can plot some of the simulated data sets along with the original
 data set to do a visual inspection as suggested by Gelman et
-al. (2013); the <code>extract()</code> function has already permuted
-the posterior draws, so we can just take the initial fifteen for
-display.
+al. (2013).  Conveniently, RStan's <code>extract()</code> function has
+already permuted the posterior draws, so we can just take the initial
+fifteen for display.
 
 ```{r comment=NA}
 df_post <- data.frame(list(dataset = rep("REAL", N),
@@ -1769,7 +1794,7 @@ post_pop_plot_beta <-
 post_pop_plot_beta;
 ```
 
-The plots for replications of existing items is radicall different
+The plots for replications of existing items is radically different
 with the beta prior, with the replications being much closer to the
 originally observed values.  The replications for new items look
 similar.  By eye, it looks like the beta prior is controlling the
@@ -1796,19 +1821,20 @@ of success for the ability parameters.
 
 1. Calculate the Jacobian of the log-odds transform on a chance of
 success and show that it produces the unit logistic
-($\mathsf{Logistic}(0,1)$) distribution.
+(i.e., $\mathsf{Logistic}(0,1)$) distribution.
 
-1.  Generate fake data according to the one of the models.  Fit the
-model and consider the coverage of the posterior 80% intervals.
+1.  Generate fake data according to the pooling, no-pooling, and one
+of the hierarchical models.  Fit the model and consider the coverage
+of the posterior 80% intervals.
 
 1.  By calculating the appropriate Jacobian, show that if $\kappa \sim
 \mathsf{Pareto}(1, 1.5)$ (i.e., $p(\kappa) \propto
 \kappa^{-\frac{5}{2}}$), then $\kappa^{-\frac{1}{2}}$ has a uniform
 distribution. 
 
-1.  Extend one of the Stan programs to allow a different number of
-initial trials for each item.  Simulating data for this situation,
-what effect does the number of initial trials have on the posterior?
+1.  Fit one of the data sets with a different number of initial trials
+for each item.  What effect does the number of initial trials have on
+the posterior?  Is there a way to quantify the effect?
 
 1.  How sensitive is the basic no-pooling model to the choice of
 prior?  Consider using knowledge of baseball (as in the logit example)
@@ -1816,7 +1842,8 @@ to provide a weakly informative prior for $\theta_n$.  How, if at all,
 does this affect posterior inference?
 
 1. Running on the larger baseball data set, how do the posterior means
-and 80% intervals compare for $\kappa$ and $\phi$?
+and 80% intervals compare to those in the smaller data set for
+$\kappa$ and $\phi$?  Is the result inevitable for a larger data set?
 
 1. How sensitive is the hierarchical model to the priors on the
 hyperparameters $\kappa, \phi$?  Consider a weakly informative prior
@@ -1831,15 +1858,8 @@ prediction intervals?  Then, compare the prediction made from a
 maximum likelihood point estimate of performance using a binomial
 predictive likelihood.
 
-1.  Given the hierarchical model, estimate the probability for each
-player that they have the highest batting ability.  What is the
-probability that Roberto Clemente will lead these 18 players (given
-the modeling assumptions)?  Compare that to the probability that each
-player will end the season with the highest batting average (observed
-success rate for season).  Write a Stan model to compute both values
-and fit it.
-
-1.  Why do the plots normalize properly (sum to 1) in both the Rankings and Who's the Best Player plots?
+1.  Why do the plots normalize properly (sum to 1) in both the
+Rankings and Who's the Best Player plots?
 
 1.  Lunn et al. (2013) contains a running analysis of pediatric
 cardiac surgery mortality for 12 hospitals.  Reanalyze their data with
@@ -1864,10 +1884,11 @@ the uniform grows much wider or much narrower?
 
 1. For the no pooling and complete pooling models (fixed priors),
 derive the analytic posterior and code it using a random-number
-generator in the generated quantities block.  For the partial pooling
-models (hierarchical priors), marginalize out the chance-of-success
-parameters ($\theta$ or $\alpha$) and sample the higher-level
-parameters for the prior directly.
+generator in the generated quantities block.  
+
+1. For the partial pooling models (hierarchical priors), marginalize
+out the chance-of-success parameters ($\theta$ or $\alpha$) and sample
+the higher-level parameters for the prior directly.
 
 1.  Generate rankings plot for the other three models; compare and
 contrast to the basic partial pooling model.
@@ -1919,7 +1940,7 @@ cut-and-paste duplicated code and wrap it into functions.
 
 #### Rat tumors (N = 71)
 
-(Tarone 1982) provides a data set of tumor incidence in historical
+Tarone (1982) provides a data set of tumor incidence in historical
 control groups of rats; specifically endometrial stromal polyps in
 female lab rats of type F344.  The data set is taken from the book
 site for (Gelman et al. 2013):
@@ -1931,7 +1952,7 @@ site for (Gelman et al. 2013):
 
 #### Surgical mortality (N = 12)
 
-(Spiegelhalter et al. 1996) provide a data set of mortality rates
+Spiegelhalter et al. (1996) provide a data set of mortality rates
 in 12 hospitals performing cardiac surgery in babies.  We just
 manually entered the data from the paper; it is also available in
 the Stan example models repository in R format.
@@ -1943,7 +1964,7 @@ the Stan example models repository in R format.
 
 #### Baseball hits 1970 (N = 18)
 
-(Efron and Morris 1975) provide a non-random sample of 18 players from
+Efron and Morris (1975) provide a non-random sample of 18 players from
 the 1970 Major League Baseball season.  A web site with the data is
 available:
 
@@ -1954,9 +1975,9 @@ available:
 
 #### Baseball hits 1996 AL (N = 308)
 
-(Carpenter 2009) updates Efron and Morris's (1975) data set for the
-1996 American League season of Major League Baseball.  The data was
-originally downloaded from the
+Carpenter (2009) updates Efron and Morris's (1975) data set for the
+entire set of players for the entire 1996 American League season of
+Major League Baseball.  The data was originally downloaded from the
 [baseball1.com](http://www.baseball1.com/).
 
 * Data: <tt>baseball-hits-1996.csv</tt>
