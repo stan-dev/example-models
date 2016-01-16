@@ -688,25 +688,8 @@ p(y_n \, | \, \alpha^{\mathrm{std}}_n, \mu, \sigma, K)
 \]
 
 This decouples the sampling distribution for $\alpha^{\mathrm{std}}$
-from $\mu$ and $\sigma$, greatly reducing their covariance, converting
-their funnel-like shape to more of a circle.  For comparison, we plot
-the posterior here.
-
-```{r}
-mu_sim <- ss_hier_logit$mu;
-sigma_sim <- ss_hier_logit$sigma;
-df_bda3_fig_5_3_logit <- data.frame(x = mu_sim, 
-                                    y = log(sigma_sim));
-plot_bda3_fig_5_3_logit <- 
-  ggplot(df_bda3_fig_5_3_logit, aes(x=x, y=y)) +
-  geom_point(shape=19, alpha=0.15) +
-  xlab("mu") + 
-  ylab("log sigma")
-plot_bda3_fig_5_3_logit;
-```
-
-<b>[FIXME: Still looks like a funnel.  What's up with that?  Is it
-because the data's consistent with $\sigma=0$?]</b>
+from $\mu$ and $\sigma$, greatly reducing their correlation in the
+posterior.  
 
 The Stan program's parameter declaration and model directly follow the
 definition.
@@ -778,6 +761,27 @@ values are shrunk compared to the beta prior.  For example, Roberto
 Clemente ($n = 1$), has an 80% central posterior interval of $(0.25,
 0.35)$ in the logistic model, whereas he had an 80% posterior interval
 of $(.26, .39)$ with a hierarchical beta prior.
+
+To consider how the reparameterization is working, we plot the
+posterior for the mean and log scale of the hyperprior.
+
+```{r}
+mu_sim <- ss_hier_logit$mu;
+sigma_sim <- ss_hier_logit$sigma;
+df_bda3_fig_5_3_logit <- data.frame(x = mu_sim, 
+                                    y = log(sigma_sim));
+plot_bda3_fig_5_3_logit <- 
+  ggplot(df_bda3_fig_5_3_logit, aes(x=x, y=y)) +
+  geom_point(shape=19, alpha=0.15) +
+  xlab("mu") + 
+  ylab("log sigma")
+plot_bda3_fig_5_3_logit;
+```
+
+<b>[FIXME: Still looks like a funnel.  What's up with that?  Is it
+because the data's consistent with $\sigma=0$?]</b>
+
+
 
 
 ## Observed vs. Estimated Chance of Success
