@@ -17,7 +17,7 @@ items is estimated.  We consider two hierarchical models to estimate
 the partial pooling, one with a beta prior on chance of success and
 another with a normal prior on the log odds of success.  The note
 explains with working examples how to (i) fit models in RStan and plot
-the results in R ussing ggplot2, (ii) estimate event probabilities,
+the results in R using ggplot2, (ii) estimate event probabilities,
 (iii) evaluate posterior predictive densities to compare model
 predictions, (iv) rank items by chance of success, (v) perform
 multiple comparisons in several settings, (vi) replicate new data for
@@ -103,7 +103,7 @@ data {
 }
 ```
 
-As usual, we follow the covnention of naming our program
+As usual, we follow the convention of naming our program
 variables after the variables we use when we write the model out
 mathematically in a paper.  We also choose capital letters for integer
 constants and y for the main observed variable(s).
@@ -382,7 +382,7 @@ was collected, was the last player with a success rate of 40%, whereas
 
 Complete pooling provides estimated abilities that are too narrow and
 removes any chance of modeling population variation.  Estimating each
-chance of success separately wtihout any pooling provides estimated
+chance of success separately without any pooling provides estimated
 abilities that are too broad and hence too variable.  Clearly some
 amount of pooling between these two extremes is called for.  But how
 much?
@@ -487,7 +487,7 @@ model {
 
 The values of $\alpha = \phi \, \kappa$ and $\beta = (1 - \phi) \,
 \kappa$ are computed in the arguments to the vectorized Beta sampling
-statment.  The prior on $\phi$ is implicitly uniform because it is
+statement.  The prior on $\phi$ is implicitly uniform because it is
 explicitly constrained to line in $(0, 1)$.  The prior on $\kappa$ is
 coded following the model definition. 
 
@@ -546,7 +546,7 @@ know how to do it.
 Figure 5.3 from (Gelman et al. 2014) plots the fitted values for
 $\phi$ and $\kappa$ on the unconstrained scale, which is the space
 over which Stan is sampling.  The variable $\phi \in (0,1)$
-istransformed to $\mathrm{logit}(\phi) = \log(\phi / (1 - \phi))$ and
+is transformed to $\mathrm{logit}(\phi) = \log(\phi / (1 - \phi))$ and
 $\kappa \in (0, \infty)$ is transformed to $\log \kappa$.  We
 reproduce that figure here for our running example.
 
@@ -607,7 +607,7 @@ $\mathrm{logit}^{-1}(\alpha_n) \in (0, 1)$; the sigmoid converts
 arbitrary log odds back to the chance-of-success scale.
 
 Stan has a binomial probability function with a built-in logit link
-function, with wich we can define the likelihood directly as
+function, with which we can define the likelihood directly as
 
 \[
 p(y_n \, | \, K, \alpha_n) 
@@ -1006,7 +1006,7 @@ pooling they do.
 #### Calculating the posterior log density
 
 It's quite a bit more work to properly calculate the posterior
-predictive log density, becuase it's not a simple weighted average.
+predictive log density, because it's not a simple weighted average.
 Instead, what we're going to do is add the following generated
 quantity and calculation for each of the item's $p(y^{\mathrm{new}}_n
 \, | \, y)$.  
@@ -1136,7 +1136,7 @@ that our model estimates a roughly 10% chance of Roberto Clemente
 batting 0.400 or better for the season based on batting 0.400 in his
 first 45 at bats.  Not great, but non-trivial.  Rather than fishing
 for the right quantile and hoping to get lucky, we can write a model
-to direclty estimate event probabilities, such as Robert Clemente's
+to directly estimate event probabilities, such as Robert Clemente's
 batting average is 0.400 or better for the season.
 
 Event probabilities are defined as expectations of indicator functions
@@ -1170,7 +1170,7 @@ probability using MCMC as
 \frac{1}{M} \sum_{m=1}^M \mathrm{I}\left[\frac{(y_n + z_n^{(m)})}{(45 + K^{\mathrm{new}}_n)} \geq 0.400\right].
 \]
 
-This event is about the season batting average being greather than
+This event is about the season batting average being greater than
 0.400.  What if we care about ability (chance of success), not batting
 average (success rate) for the rest of the season?  Then we would ask
 the question of whether $\mathrm{Pr}[\theta_n > 0.4]$.  This is
@@ -1209,7 +1209,7 @@ generated quantities {
 ```
 
 The indicator function is not explicitly specified because Stan's
-boolean operator greater-than returns either 0 or 1.  The only trick
+Boolean operator greater-than returns either 0 or 1.  The only trick
 to this code is the <code>0.0 + ...</code> in the fraction
 computation, the purpose of which is to cast the value to real to
 prevent integer division from kicking in and rounding down.
@@ -1231,12 +1231,12 @@ print(fit_hier_logit, pars=pars_to_print, probs=c());
 ```
 
 The standard deviation and quantiles are not useful here and the
-quantiles are supressed through an empty <code>probs</code> argument
+quantiles are suppressed through an empty <code>probs</code> argument
 to <code>print()</code>; we do want to see a reasonable effective
 sample size estimate and no evidence of non-convergence in the form
 for $\hat{R}$ values much greater than 1.
 
-It is clear from the results that the probabilty of batting 0.400 or
+It is clear from the results that the probability of batting 0.400 or
 better for the season is a different question than asking if the
 player's ability is 0.400 or better; for example, with respect to the
 basic partial pooling model, there is roughly an estimated 10% chance
@@ -1352,7 +1352,7 @@ generated quantities {
 After the call to <code>sort_indices_desc</code>, <code>dsc[n]</code>
 holds the index of the $n$-th best item.  For example, if <code>rnk[2]
 == 5</code>, so that player with identifier 2 is ranked 5th, then
-<code>dsc[5] == 2</code>, because the fiftth rank player is the player
+<code>dsc[5] == 2</code>, because the fifth rank player is the player
 with identifier 2.  The final loop just puts the ranks into their
 proper place in the <code>rnk</code> array.
 
@@ -1494,7 +1494,7 @@ below-average players.
 ## Posterior p-Values
 
 A test statistic $T$ is a function from data to a real value.
-Folllowing (Gelman et al. 2013), we will concentrate on four specific
+Following (Gelman et al. 2013), we will concentrate on four specific
 test statistics for repeated binary trial data (though the choices we
 make are general): minimum value, maximum value, sample mean, and
 sample standard deviation.
