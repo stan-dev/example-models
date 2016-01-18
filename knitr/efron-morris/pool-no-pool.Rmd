@@ -2,9 +2,7 @@
 title: "Hierarchical Partial Pooling for Repeated Binary Trials"
 author: "Bob Carpenter"
 date: "4 January 2016"
-output: 
-  html_document: 
-    theme: readable
+output: html_document
 ---
 
 ### Abstract
