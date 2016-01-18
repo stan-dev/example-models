@@ -5,10 +5,10 @@ data {
 }
 
 parameters {
-  real alpha;
-  real beta1;
-  real beta2;
-  real beta3;
+  real<lower=-20,upper=20> alpha;
+  real<lower=-10,upper=10> beta1;
+  real<lower=-10,upper=10> beta2;
+  real<lower=-10,upper=10> beta3;
 }
 
 transformed parameters {

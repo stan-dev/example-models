@@ -30,7 +30,7 @@ model {
   sd_alpha ~ uniform(0, 5);
 
   for (i in 1:nobs)
-    obs[i] ~ poisson_log(log_lambda[obsyear[i]][obssite[i]]);
+    obs[i] ~ poisson_log(log_lambda[obsyear[i], obssite[i]]);
 }
 
 generated quantities {

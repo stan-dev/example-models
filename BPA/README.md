@@ -1,10 +1,10 @@
 # Bayesian Population Analysis using WinBUGS
 
-Models from the book "Bayesian Population Analysis using WinBUGS --- A Hierarchical Perspective" (2012) by Marc Kéry and Michaael Schaub.
+Models from the book "Bayesian Population Analysis using WinBUGS --- A Hierarchical Perspective" (2012) by Marc Kéry and Michael Schaub.
 
-Origical BUGS code and data files are available at [the website of the book](http://www.vogelwarte.ch/de/projekte/publikationen/bpa/complete-code-and-data-files-of-the-book.html).
+Original BUGS code and data files are available at [the website of the book](http://www.vogelwarte.ch/de/projekte/publikationen/bpa/complete-code-and-data-files-of-the-book.html).
 
-Stan translations was done by Hiroki Itô <abies.firma@gmail.com>. I thank Dr. Kéry and Dr. Shaub for permitting to publish Stan translated models.
+Stan translations was done by Hiroki Itô <abies.firma@gmail.com>. I thank Dr. Kéry and Dr. Schaub for permitting to publish Stan translated models. I also thank Dr. Bob Carpenter for reviewing the code.
 
 ## Contents of the book
 
@@ -18,7 +18,7 @@ Stan translations was done by Hiroki Itô <abies.firma@gmail.com>. I thank Dr. K
 * Chapter 8. Estimation of Survival Using Mark-Recovery Data
 * Chapter 9. Estimation of Survival and Movement from Capture-Recapture Data Using Multistate Models
 * Chapter 10. Estimation of Survival, Recruitment, and Population Size from Capture-Recapture Data Using the Jolly-Seber Model
-* Chapter 11. Estimation of Demographic Rates, Population Size, and Projection Matrices from Multiple Data Types Using Integral Population MOdels
+* Chapter 11. Estimation of Demographic Rates, Population Size, and Projection Matrices from Multiple Data Types Using Integral Population Models
 * Chapter 12. Estimation of Abundance from Counts in Metapopulation Design Using the Binomial Mixture Model
 * Chapter 13. Estimation of Occupancy and Species Distributions from Detection/Nondetection Data in Metapopulation Designs Using Site-Occupancy Models
 * Chapter 14. Concluding Remarks
