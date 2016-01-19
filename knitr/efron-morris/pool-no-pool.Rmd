@@ -422,7 +422,7 @@ p(\theta \, | \, \alpha, \beta)
 
 The parameters $\alpha$ and $\beta$ are themselves given priors
 (sometimes called hyperpriors).  Rather than parameterize $\alpha$ and
-$\beta$ directly, we will instead use put priors on $\phi \in (0, 1)$
+$\beta$ directly, we will instead put priors on $\phi \in (0, 1)$
 and $\kappa > 0$, and then define
 
 \[
@@ -435,7 +435,7 @@ and
 \beta = \kappa \, (1 - \phi).
 \]
 
-This reparameterization is convenient because 
+This reparameterization is convenient, because 
 
 * $\phi = \frac{\alpha}{\alpha + \beta}$ is the mean of
 $\mathsf{Beta}(\alpha, \beta)$, and
@@ -491,7 +491,7 @@ statement.  The prior on $\phi$ is implicitly uniform because it is
 explicitly constrained to line in $(0, 1)$.  The prior on $\kappa$ is
 coded following the model definition. 
 
-The full model with all generated quantities can coded in Stan as in
+The full model with all generated quantities can be coded in Stan as in
 the file <code>hier.stan</code>; it is displayed in the appendix.
 
 Fitting in this case adds control parameters which set the initial
