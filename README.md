@@ -6,6 +6,7 @@ This repository holds open source Stan models, data simulators, and real data.  
 
 * [Applied Regression Modeling](https://github.com/stan-dev/example-models/wiki/ARM-Models) (Gelman and Hill 2007)
 * [Bayesian Cognitive Modeling](https://github.com/stan-dev/example-models/tree/master/Bayesian_Cognitive_Modeling) (Lee and Wagenmakers 2014)
+* [Bayesian Population Analysis using WinBUGS: A Hierarchical Perspective](https://github.com/stan-dev/example-models/tree/master/BPA) [Kéry and Schaub]
 
 #### BUGS examples
 
