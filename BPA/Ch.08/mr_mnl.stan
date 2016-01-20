@@ -4,8 +4,8 @@ data {
 }
 
 parameters {
-  real<lower=0,upper=1> mean_s;
-  real<lower=0,upper=1> mean_r;
+  real<lower=0,upper=1> mean_s;           // Mean survival
+  real<lower=0,upper=1> mean_r;           // Mean recovery
 }
 
 transformed parameters {
@@ -15,8 +15,8 @@ transformed parameters {
 
   // Constraints
   for (t in 1:n_occasions) {
-    s[t] <- mean_s;           // Mean survival
-    r[t] <- mean_r;           // Mean recovery
+    s[t] <- mean_s;
+    r[t] <- mean_r;
   }
 
   // Define the cell probabilities of the m-array

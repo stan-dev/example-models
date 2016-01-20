@@ -5,7 +5,7 @@ data {
 }
 
 transformed data {
-  int<lower=0,upper=T> s[M];
+  int<lower=0,upper=T> s[M];    // Totals in each row
   int<lower=0,upper=M> C;       // Size of observed data set
 
   C <- 0;
@@ -35,8 +35,6 @@ transformed parameters {
 }
 
 model {
-  real lp[2];
-
   // Priors
   omega ~ uniform(0, 1);
   mean_p ~ uniform(0, 1);
@@ -52,12 +50,15 @@ model {
       increment_log_prob(bernoulli_log(1, omega) +
                          bernoulli_log(y[i], p[i]));
     } else { // s[i] == 0
+      real lp1;
+      real lp2;
+
       // z[i] == 1
-      lp[1] <- bernoulli_log(1, omega) +
-               bernoulli_log(0, p[i]);
+      lp1 <- bernoulli_log(1, omega) +
+             bernoulli_log(0, p[i]);
       // z[i] == 0
-      lp[2] <- bernoulli_log(0, omega);
-      increment_log_prob(log_sum_exp(lp));
+      lp2 <- bernoulli_log(0, omega);
+      increment_log_prob(log_sum_exp(lp1, lp2));
     }
   }
 }

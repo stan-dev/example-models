@@ -65,8 +65,8 @@ parameters {
 }
 
 transformed parameters {
-  matrix<lower=0,upper=1>[nind, n_occasions - 1] phi;
-  matrix<lower=0,upper=1>[nind, n_occasions - 1] p;
+  matrix<lower=0,upper=1>[nind, n_occasions - 1] phi;   // Survival
+  matrix<lower=0,upper=1>[nind, n_occasions - 1] p;     // Recapture
   matrix<lower=0,upper=1>[nind, n_occasions] chi;
 
   // Constraints

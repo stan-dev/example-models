@@ -5,7 +5,7 @@ data {
 }
 
 transformed data {
-  int<lower=0> s[M];
+  int<lower=0> s[M];            // Totals in each row
   int<lower=0> C;               // Size of observed data set
 
   C <- 0;

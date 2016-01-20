@@ -1,11 +1,11 @@
 data {
-  int<lower=0> M;
-  int<lower=0> T;
-  int<lower=0,upper=1> y[M, T];
+  int<lower=0> M;               // Number of species
+  int<lower=0> T;               // Number of grab occasions
+  int<lower=0,upper=1> y[M, T]; // Grab counts
 }
 
 transformed data {
-  int<lower=0> s[M];            // Detections times for each species
+  int<lower=0> s[M];            // Detection times for each species
   int<lower=0> C;               // Number of observed species
 
   C <- 0;
@@ -17,8 +17,8 @@ transformed data {
 }
 
 parameters {
-  real<lower=0,upper=1> omega;
-  real<lower=0,upper=1> mean_p[T];
+  real<lower=0,upper=1> omega;          // Inclusion probability
+  real<lower=0,upper=1> mean_p[T];      // Mean detection probability
   real gamma;
   real<lower=0,upper=3> sigma;
   real<lower=-16,upper=16> eps[M];

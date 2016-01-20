@@ -8,7 +8,7 @@ data {
 }
 
 transformed data {
-  int<lower=0> s[M];
+  int<lower=0> s[M];            // Totals in each row
 
   for (i in 1:M)
     s[i] <- sum(y[i]);

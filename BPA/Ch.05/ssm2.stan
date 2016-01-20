@@ -13,7 +13,7 @@ parameters {
 }
 
 transformed parameters {
-  vector[T] logN_est;
+  vector[T] logN_est;           // Log population size
 
   // State process
   logN_est[1] <- logN_est1;

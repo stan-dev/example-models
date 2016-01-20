@@ -5,6 +5,12 @@ data {
   vector[nyears] year;          // Year covariates
 }
 
+transformed data {
+  vector[nyears] year_squared;
+
+  year_squared <- year .* year;
+}
+
 parameters {
   real alpha;
   real beta1;
@@ -17,7 +23,7 @@ transformed parameters {
   // Linear predictor
   logit_p <- alpha +
              beta1 * year +
-             beta2 * year .* year;
+             beta2 * year_squared;
 }
 
 model {
