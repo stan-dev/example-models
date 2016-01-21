@@ -1330,9 +1330,9 @@ estimation of the ability parameters to rank the items.  In this
 section, we rank ballplayers by (estimated) hitting ability.
 
 To implement ranking in Stan, we define a generated quantity
-<code>rnk</code>to hold the ranks; that is, \code{rnk[2]} is
+<code>rnk</code>to hold the ranks; that is, <code>rnk[2]</code> is
 the rank from $1$ to $N$ of the second player.  First, we define a
-local variable \code{dsc}, and sort it into descending order.
+local variable <code>dsc</code>, and sort it into descending order.
 
 ```
 generated quantities {
