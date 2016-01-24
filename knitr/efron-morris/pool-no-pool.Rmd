@@ -32,8 +32,8 @@ entire season of baseball hits across players.
 
 ## Repeated Binary Trials
 
-Suppose that for each of $N$ items, we observe $y_n$ successes out of
-$K_n$ trials.  For example, the data may consist of
+Suppose that for each of $N$ items $n \in 1{:}N$, we observe $y_n$
+successes out of $K_n$ trials.  For example, the data may consist of
 
 * rat tumor development, with $y_n$ rats developing tumors of $K_n$ total
   rats in experimental control group $n \in 1{:}N$ (Gelman et al. 2013)
@@ -45,7 +45,7 @@ $K_n$ trials.  For example, the data may consist of
   baseball players $n \in 1{:}N$ (Efron and Morris 1975)
 
 * machine learning system accuracy, with $y_n$ correct classifications
-  out of $K_n$ examples for systems $n \in 1{:}N$ (any ML conference
+  out of $K_n$ examples for systems $n \in 1{:}N$ (ML conference
   proceedings; Kaggle competitions)
 
 #### Baseball Hits (Efron and Morris 1975)
@@ -59,12 +59,10 @@ leagues.
 
 ```{r comment=NA}
 df <- read.csv("efron-morris-75-data.tsv", sep="\t");
-df <- data.frame(FirstName = df$FirstName,
-                 LastName = df$LastName,
-                 Hits = df$Hits,
-                 At.Bats = df$At.Bats,
-                 RemainingAt.Bats = df$RemainingAt.Bats,
-                 RemainingHits = df$SeasonHits - df$Hits);
+df <- with(df, data.frame(FirstName, LastName, 
+                          Hits, At.Bats, 
+                          RemainingAt.Bats,
+                          RemainingHits = SeasonHits - Hits));
 print(df);
 ```
 
@@ -88,6 +86,11 @@ number of items (players).  Then for each item <code>n</code>,
 <code>K_new[n]</code> is the remaining number of trials (remaining
 at-bats), and <code>y_new[n]</code> is the number of successes in the
 remaining trials (remaining hits).
+
+The remaining trial data is useful as it can be used to evaluate the
+predictive performance of our model.  That is, we will "train" on the
+first 45 at bats and see how well our various models do at predicting
+the rest of the season.
 
 Although we consider many models, the data is coded as follows for all
 of them.  
@@ -114,15 +117,18 @@ With *complete pooling*, each item is assumed to have the same chance
 of success.  With *no pooling*, each item is assumed to have a
 completely unrelated chance of success.  With *partial pooling*, each
 item is assumed to have a different chance of success, but the data
-for all of the observed items informs the estimates for each item.  
-Partial pooling with infinite population variance is the same as no
-pooling;  partial pooling with zero population variance leads to
-complete pooling.
+for all of the observed items informs the estimates for each item.
 
-In a hierarchical model, the population of items is directly modeled,
-typically with a mean chance of success for the population and a scale
-of abilities modeling the average member and amount of variation
-within a population.
+Partial pooling is typically accomplished with a hierarchical or
+population model, where the individuals assumed to have been are drawn
+from a population.  In a hierarchical model, the population of items
+is directly modeled, typically with a mean chance of success for the
+population and a scale of abilities modeling the average member and
+amount of variation within a population.
+
+From a population model perspective, no pooling corresponds to
+infinite population variance, whereas complete pooling corresponds to
+zero population variance.
 
 In the following sections, all three types of pooling models will be
 fit for the baseball data.
@@ -134,7 +140,7 @@ The complete pooling model assumes a single parameter $\phi$
 representing the chance of success for all items.  It is necessary in
 Stan to declare parameters with constraints corresponding to their
 support in the model.  Because $\phi$ will be used as a binomial
-parameter, we must have $\phi \in (0,1)$.  The variable
+parameter, we must have $\phi \in [0,1]$.  The variable
 <code>phi</code> must therefore be declared in Stan with the following
 lower- and upper-bound constraints.
 
@@ -146,7 +152,10 @@ parameters {
 
 The consequences for leaving the constraint off is that the program
 may fail during random initialization or during an iteration because
-it will try values for <code>phi</code> outside of $(0,1)$.
+Stan will generate initial values for <code>phi</code> outside of
+$(0,1)$.  Such a specification may appear to work if there are only a
+small number of such variables because Stan tries multiple random
+initial values by default for MCMC.
 
 Assuming each player's at-bats are independent Bernoulli trials, the
 sampling distribution for each player's number of hits $y_n$ is modeled as
@@ -158,10 +167,7 @@ p(y_n \, | \, \phi)
 \]
 
 When viewed as a function of $\phi$ for fixed $y_n$, this is called
-the likelihood function.  The proportional sign $f(x) \propto g(x)$ means
-there is some constant $c$ such that $f(x) = c \, g(x)$.  We consider $K$
-and $y_n$ constants here, so the proportionality is considering the
-likelihood function.
+the likelihood function.  
 
 Assuming each player is independent leads to the complete data
 likelihood
@@ -228,23 +234,23 @@ We start by loading the RStan package.
 library(rstan);
 ```
 
-The model can be fit as follows, reading the data out of the
-environment by name (the output result of running Stan is hidden);
-normally we would prefer to encapsulate the data in a list to avoid
-naming conflicts in the top-level namespace.
+The model can be fit as follows.
 
-```{r results='hide', comment=NA}
+```{r comment=NA}
 M <- 10000;
 fit_pool <- stan("pool.stan", data=c("N", "K", "y", "K_new", "y_new"),
                  iter=(M / 2), chains=4);
 ss_pool <- extract(fit_pool);
 ```
 
-
+Here, we read the data out of the environment by name; normally we
+would prefer to encapsulate the data in a list to avoid naming
+conflicts in the top-level namespace.  We show the default output for
+the <code>stan()</code> function here, but suppress it in subsequent
+calls.
 
 The posterior sample for <code>phi</code> can be summarized as
 follows.
-
 
 ```{r comment=NA}
 print(fit_pool, c("phi"), probs=c(0.1, 0.5, 0.9));
@@ -258,11 +264,11 @@ last two columns are for the effective sample size (MCMC standard
 error is the posterior standard deviation divided by the square root
 of the effective sample size) and the $\hat{R}$ convergence diagnostic
 (its value will be 1 if the chains have all converged to the same
-posterior mean and variance; see the Stan Manual or Gelman et
-al. 2013).  The $\hat{R}$ value here is consistent with convergence
-and the effective sample size is good (roughly half the number of
-posterior draws; by default Stan uses as many iterations to warmup as
-it does for drawing the sample).
+posterior mean and variance; see the Stan Manual (Stan Development
+Team 2015) or (Gelman et al. 2013).  The $\hat{R}$ value here is
+consistent with convergence and the effective sample size is good
+(roughly half the number of posterior draws; by default Stan uses as
+many iterations to warmup as it does for drawing the sample).
 
 The result is a posterior mean for $\theta$ of $0.27$ with an
 80% central posterior interval of $(0.25, 0.29)$.
@@ -461,7 +467,10 @@ $\kappa > 0$ in order for the Pareto distribution to be properly
 normalized, and $\kappa > 1$ is a conservative choice for this
 problem.  The constraint $\kappa > 1$ must therefore be included in
 the Stan parameter declaration, because Stan programs require support
-on the parameter values that satisfy their declared constraints.
+on the parameter values that satisfy their declared constraints.  In
+general, for functions $f$ and $g$, we write $f(x) \propto g(x)$ if
+there is some constant $c$ such that $f(x) = c \, g(x)$.
+
 
 The Stan code follows the definitions, with parameters declared with
 appropriate constraints as follows.
@@ -503,12 +512,66 @@ data sizes).
 
 ```{r  comment=NA, results='hide'}
 fit_hier <- stan("hier.stan", data=c("N", "K", "y", "K_new", "y_new"),
-                 iter=(M / 2), chains=4, 
+                 iter=(M / 2), chains=4,
+                 seed=1234);
+ss_hier <- extract(fit_hier);
+```
+
+Even though we set <code>results='hide'</code> in the knitr R call
+here, the error messages are still printed.  We set the pseudorandom
+number generator seed here to 1234 so that we could discuss what the
+output looks like.  
+
+#### Divergent Transitions and Mitigation Strategies
+
+In this case, there's an error report for a number of what Stan calls
+"divergent transitions" after warmup.  A divergent transition arises
+when there is an arithmetic issue in evaluating a numerical
+expression; this is almost always an overflow or underflow in
+well-specified models, but may simply be arguments out of bounds if
+the proper constraints have not been enforced (for instance, taking an
+unconstrained parameter as the parameter to a Bernoulli distribution,
+which requires arguments in $[0,1]$).
+
+Whenever divergent transitions show up, it introduces a bias in the
+posterior draws away from the region where the divergence happens.
+Therefore, we should try to remove divergent transitions before
+trusting our posterior sample.
+
+The underlying root cause of most divergent transitions is a step size
+that is too large.  The underlying Hamiltonian Monte Carlo algorithm
+is attempting to follow the Hamiltonian using discrete time steps
+corresponding to the step size of the algorithm.  When that step size
+is too large relative to posterior curvature, iteratively taking steps
+in the gradient times the step size provides a poor approximation to
+the posterior curvature.  The problem with a hierarchical model is
+that the curvature in the posterior varies based on position; when the
+hierarchical variance is low, there is high curvature in the
+lower-level parameters around the mean.  Stan then carries out a
+global adaptation to a target acceptance rate, which can lead to too
+large step sizes for highly curved regions of the posterior.  To
+mitigate this problem, we either need to reduce the step size or
+reparameterize.  We firt consider reducing step size, and then in the
+next secton consider reparameterization.  
+
+To reduce the step size of the algorithm, we want to lower the initial
+step size and increase the target acceptance rate.  The former keeps
+the step size low to start; the latter makes sure the adapted step
+size is lower.  So we'll run this again with the same seed, this time
+lowering the step size (<code>stepsize</code>) and increasing the
+target acceptance rate (<code>adapt_delta</code>).
+
+```{r  comment=NA, results='hide'}
+fit_hier <- stan("hier.stan", data=c("N", "K", "y", "K_new", "y_new"),
+                 iter=(M / 2), chains=4,
+                 seed=1234, 
                  control=list(stepsize=0.01, adapt_delta=0.99));
 ss_hier <- extract(fit_hier);
 ```
 
-Summary statistics for the posterior are printed as before.
+Now it runs without divergent translations.
+
+Summary statistics for the posterior are printed as before.  
 
 ```{r comment=NA}
 print(fit_hier, c("theta", "kappa", "phi"), probs=c(0.1, 0.5, 0.9));
@@ -538,10 +601,11 @@ centered hierarchical prior and low data counts.  This is an example
 where a poorly constrained parameter leads to reduced computational
 efficiency (as reflected in the effective sample size).  Such poor
 mixing is typical of centered parameterizations in hierarchical models
-(Betancourt and Girolami 2015).  In the next section, we address this
-problem with an alternative hierarchical prior; it may be possible to
-create a non-centered parameterization of the Beta prior, but I don't
-know how to do it.
+(Betancourt and Girolami 2015).  It is not immediately clear how to
+provide a non-centered analysis of the beta prior, because it isn't
+supplied with a location/scale parameterization on the unconstrained
+scale.  Instead, we consider an alternative parameterization in the
+next section.
 
 Figure 5.3 from (Gelman et al. 2014) plots the fitted values for
 $\phi$ and $\kappa$ on the unconstrained scale, which is the space
@@ -551,6 +615,10 @@ $\kappa \in (0, \infty)$ is transformed to $\log \kappa$.  We
 reproduce that figure here for our running example.
 
 ```{r}
+
+df_bda3_fig_5_3 <- with(ss_hier,
+                        data.frame(x = log(phi / (1 - phi)),
+                                   y = log(kappa)));
 phi_sim <- ss_hier$phi;
 kappa_sim <- ss_hier$kappa;
 df_bda3_fig_5_3 <- data.frame(x = log(phi_sim / (1 - phi_sim)),
@@ -566,9 +634,43 @@ plot_bda3_fig_5_3;
 
 The (upside-down) funnel-like shape of the posterior is evident, with
 higher $\kappa$ values corresponding to lower variance (hence the
-upside-downedness) and thus a narrower range of $\phi$ values; this
-phenomenon is discussed in the *Stan Reference Manual* and by
-Betancourt and Girolami (2015).
+upside-downedness) and thus a narrower range of $\phi$ values.  This
+particular funnel-like posterior plot arises because when the
+population variation is large (i.e., $\kappa$ is small), there is weak
+non-identifiability between the prior mean ($\phi$) and the mean of
+the random effects ($\mathrm{mean}(\theta)$).  
+
+The root problem with the non-centered parameterization, though, is
+the relation between $\kappa$ and the $\theta$.  For example, consider
+the following plot of $\theta_1$ vs. $\kappa$.
+
+```{r}
+inv_logit <- function(u) { 1 / (1 + exp(-u)); }
+theta1_sim <- ss_hier$theta[ , 1];
+kappa_sim <- ss_hier$kappa;
+df_funnel <- data.frame(x = inv_logit(theta1_sim),
+                        y = log(kappa_sim));
+library(ggplot2);
+plot_funnel<- 
+  ggplot(df_funnel, aes(x=x, y=y)) +
+  geom_point(shape=19, alpha=0.15) +
+  xlab("logit(theta[1])") + 
+  ylab("log(kappa)");
+plot_funnel;
+```
+
+We have unconstrained both $\theta_1$ (using $\mathrm{logit}^{-1}$)
+and $\kappa$ (using $\log$), rendering both on the unconstrained scale
+over which sampling is actually carried out in Stan.  This helps in
+diagnosing problems with sampling that may not be as apparent on the
+constrained scale.  All of the transforms used by Stan for constraints
+are detailed in the Stan manual (Stan Development Team 2015).
+
+It is clear here that when $\kappa$ is smaller, there is more latitude
+for $\theta_1$ to move around.  This phenomenon was originally
+discussed by Neal (2003), is covered in the Stan manual (Stan
+Development Team 2015), and analyzed in the context of Hamiltonian
+Monte Carlo by Betancourt and Girolami (2015).
 
 
 ## Model 4: Partial Pooling (Log Odds)
@@ -648,14 +750,86 @@ multilevel effects, or even varying intercepts and slopes with
 multivariate priors (see Gelman and Hill (2007) for a range of
 examples of mixed effects models).
 
+#### Centered Parameterization
+
+We will begin with the natural centered parameterization, but we must point out ahead of time that this is not the optimal way to code this model in Stan.  The centered parameterization directly follows the mathematical presentation, with parameters and model block
+
+```
+parameters {
+  real mu;                       // population mean of success log-odds
+  real<lower=0> sigma;           // population sd of success log-odds
+  vector[N] alpha;               // success log-odds
+}
+model {
+  mu ~ normal(-1, 1);               // hyperprior
+  sigma ~ normal(0, 1);             // hyperprior
+  alpha ~ normal(mu, sigma);        // prior (hierarchical)
+  y ~ binomial_logit(K, alpha);     // likelihood
+}
+```
+
+The full model may be found in `hier-logit-centered.stan`;  it is not included in this document directly.
+
+
+```{r  comment=NA, results='hide'}
+fit_hier_logit_centered <- 
+  stan("hier-logit-centered.stan", data=c("N", "K", "y"),
+       iter=(M / 2), chains=4,
+       seed=1234);
+ss_hier_logit_centered <- extract(fit_hier_logit_centered);
+```
+
+```{r comment=NA}
+print(fit_hier_logit_centered, 
+      c("sigma", "theta[1]", "theta[10]", "alpha[1]", "alpha[10]",
+        "mu", "sigma", "lp__"), probs=c(0.1, 0.5, 0.9));
+```
+
+With the centered parameterization and Stan's defalt stepsize and
+target acceptance rate, there are many divergent transitions.  Even
+with 10,000 posterior draws, the effective sample size for the
+population scale $\sigma$ is in the low hundreds, with $\hat{R} >
+1.01$.  This is a case where the chains not properly converging means
+that Stan's effective sample size estimate will be much lower than
+that from packages such as Coda (Plummer 2006), which analyze each
+chain's effective sample size separately (Gelman et al. 2013; Stan
+Development Team 2016).
+
+```{r}
+alpha_1_centered <- ss_hier_logit_centered$alpha[, 1];
+funnel_centered_df <-  
+  with(ss_hier_logit,
+       data.frame(x = alpha_1_centered,
+                  y = log(sigma)));
+funnel_centered <-
+  ggplot(funnel_centered_df, aes(x=x, y=y)) +
+  geom_point(shape=19, alpha=0.1) +
+  xlab("player 1 log odds of success: alpha[1]") + 
+  ylab("log population scale: log sigma") +
+  ggtitle("Centered Hierarchical Funnel Plot");
+funnel_centered;
+```
+
+The important feature of this plot is the reduced range possible for
+$\alpha_1$ as $\sigma$ approaches zero (i.e., $\log \sigma$ approaches
+negative infinity).  Neal (2003) refers to the prior for the
+non-centered model as a "funnel".  With more data, the funnel shape
+becomes less pronounced and this centered parameterization is actually
+more efficient than the non-centered parameterization we discuss in
+the next section (Betancourt and Girolami 2015).
+
+
 #### Non-Centered Parameterization
 
 Betancourt and Girolami (2015) provide a detailed discussion of why
-the centered parameterization used above is problematic for
-hierarchical models with small counts per group (here, the 45 initial
-at bats for each player).  To mitigate the problem, they suggest
-moving to a non-centered parameterization, as has also been shown to
-be helpful for Gibbs and random-walk Metropolis samplers.  This
+the centered parameterization described in the previous section is
+challenging for MCMC methods to sample when there are small counts per
+group (here, the players are the groups and each has only 45 at bats
+observed).
+
+To mitigate the problem, they suggest moving to a non-centered
+parameterization, as has also been shown to be helpful for Gibbs and
+random-walk Metropolis samplers (Papaspiliopoulos et al. 2003).  This
 basically amounts to changing the parameterization over which sampling
 is done, taking now a standard unit normal prior for a new variable,
 
@@ -764,10 +938,9 @@ To consider how the reparameterization is working, we plot the
 posterior for the mean and log scale of the hyperprior.
 
 ```{r}
-mu_sim <- ss_hier_logit$mu;
-sigma_sim <- ss_hier_logit$sigma;
-df_bda3_fig_5_3_logit <- data.frame(x = mu_sim, 
-                                    y = log(sigma_sim));
+df_bda3_fig_5_3_logit <- with(ss_hier_logit,
+                              data.frame(x = mu,
+                                         y = log(sigma)));
 plot_bda3_fig_5_3_logit <- 
   ggplot(df_bda3_fig_5_3_logit, aes(x=x, y=y)) +
   geom_point(shape=19, alpha=0.15) +
@@ -776,8 +949,24 @@ plot_bda3_fig_5_3_logit <-
 plot_bda3_fig_5_3_logit;
 ```
 
-<b>[FIXME: Still looks like a funnel.  What's up with that?  Is it
-because the data's consistent with $\sigma=0$?]</b>
+As before, we see that the prior location ($\mu$) and scale ($\sigma$) are coupled in the posterior.  For comparison, here's the scatterplot of the posterior sample values for log scale and the first transformed parameter.
+
+```{r}
+df_bda3_fig_5_3_funnel <-  
+  with(ss_hier_logit,
+       data.frame(x = alpha_std[, 1],
+                  y = log(sigma)));
+plot_bda3_fig_5_3_funnel <-
+  ggplot(df_bda3_fig_5_3_funnel, aes(x=x, y=y)) +
+  geom_point(shape=19, alpha=0.15) +
+  xlab("player 1 log odds of success (standardized): alpha[1]") + 
+  ylab("log population scale: log sigma") +
+  ggtitle("Non-Centered Hierarchical Funnel Plot");
+plot_bda3_fig_5_3_funnel;
+```
+
+Compared to the earlier plot of $\log \kappa$ versus $\mathrm{logit}(\theta_1)$ in the direct hierarcical model on chance of success, there is much less of a dependency between the variables;  this can be seen because the variation is along the axes, not in a weak banana shape as in the first example.  But it still has the long-tail problem as $\sigma$ approaches zero (and $\log \sigma$ becomes more negative).
+
 
 
 
@@ -836,7 +1025,8 @@ plot_bda3_fig_5_4 <-
   coord_fixed() +
   scale_x_continuous(breaks = c(0.2, 0.3, 0.4)) +
   xlab("observed rate, y[n] / K[n]") +
-  ylab("chance of success, theta[n]");
+  ylab("chance of success, theta[n]") +
+  ggtitle("Posterior Medians and 80% intervals\n(red line: population mean;  blue line: MLE)")
 plot_bda3_fig_5_4;
 ```
 
@@ -895,8 +1085,16 @@ toward the prior evident.
 
 ## Posterior Predictive Distribution
 
+After we have fit a model using some "training" data, we are usually
+interested in the predictions of the fitted model for new data, which
+we can use to both literally make predictions for new data points and
+to validate our model fit to our existing data by generating simulated
+data.  With full Bayesian inference, we do not make a point estimate
+of parameters and use those prediction---we use a weighted average of
+predictions over the posterior.
+
 Given data $y$ and a model with parameters $\theta$, the posterior
-predictive distribution for new data $\tilde{y}$ is
+predictive distribution for new data $\tilde{y}$ is defined by
 
 \[
 p(\tilde{y} \, | \, y)
@@ -906,9 +1104,13 @@ p(\tilde{y} \, | \, y)
 
 where $\Theta$ is the support of the parameters $\theta$.  What an
 integral of this form says is that $p(\tilde{y} \, | \, y)$ is defined
-as a weighted average over the legal parameter values $\Theta$ of the
-likelihood function $p(\tilde{y} \, | \, \theta)$, with weights given by
-the posterior, $p(\theta \, | \, y)$.
+as a weighted average over the legal parameter values $\theta \in
+\Theta$ of the likelihood function $p(\tilde{y} \, | \, \theta)$, with
+weights given by the posterior, $p(\theta \, | \, y)$.  While we do
+not want to get sidetracked with the notational and mathematical
+subtleties of expectations here, the posterior predictive density
+reduces to the expectation of $p(\tilde{y} \, | \, \theta)$
+conditioned on $y$.
 
 We can also define the weighted average of the log likelihood function
 over the posterior,
@@ -918,21 +1120,32 @@ over the posterior,
 \]
 
 Note that this is not the same as $\log p(\tilde{y} \, | \, y)$,
-because logs do not distribute through integrals;  the best we can do
-is get a bound through Jensen's inequality.
+because logs do not distribute through integrals; the best we can do
+is get a bound through Jensen's inequality (using the convex function $-\log u$), 
+
+\[
+\int_{\Theta} \left( \, \log p(\tilde{y} \, | \, \theta) \, \right) \ p(\theta \, | \, y) \ \mathrm{d}\theta
+\leq 
+\log \int_{\Theta} p(\tilde{y} \, | \, \theta) \ p(\theta \, | \, y) \ \mathrm{d}\theta.
+\]
+
+Given the posteiror predictive density
 
 #### Evaluating Held-Out Data Predictions
 
-Because the posterior predictive log density is formulated as an
-expectation over the posterior, it is straightforward to compute via
-MCMC.  Suppose we have new data $y^{\mathrm{new}}$ and want to
-estimate its log density.  With $M$ draws $\theta^{(m)}$ from the
-posterior $p(\theta \, | \, y)$, the expected posterior log density is
-computed by 
+Because the posterior predictive density is formulated as an
+expectation over the posterior, it is possible to compute via MCMC.
+With $M$ draws $\theta^{(m)}$ from the posterior $p(\theta \, | \,
+y)$, the expected posterior log density is computed by
 
 \[
-\frac{1}{M} \, \sum_{m=1}^M \log p(y^{\mathrm{new}} \, | \, \theta^{(m)}).
+\frac{1}{M} \, \sum_{m=1}^M p(y^{\mathrm{new}} \, | \, \theta^{(m)}).
 \]
+
+In practice, this requires care to prevent underflow in the ealuations
+of $p(y^{\mathrm{new}} \, | \, \theta^{(m)})$.  A relatively safe
+evaluation method is provided below.
+
 
 #### Simulating Replicated Data
 
@@ -957,14 +1170,58 @@ Efron and Morris's (1975) baseball data includes not only the observed
 hit rate in the initial 45 at bats, but also includes the data for how
 the player did for the rest of the season.  The question arises as to
 how well these models predict a player's performance for the rest of
-the season based on their initial 45 at bats.
+the season based on their initial 45 at bats.  
 
-The variables <code>K_new[n]</code> and <code>y_new[n]</code> hold the
-number of at bats (trials) trials and the number of hits (successes)
-for player (item) <code>n</code>.  To code the evaluation of the held
-out data in Stan, we declare a generated quantity to hold the result
-and then define it as the sum of the log densities of the new
+After evaluating posterior predictive densities for new data, we
+consider how well the model actually fit the data with which it is
+estimated.
+
+
+#### Calibration
+
+A well calibrated statistical model is one in which the uncertainy in
+the predictions matches the uncertainty in further data.  That is, if
+I create posterior 50% intervals for predictions on new data (here,
+number of hits in the rest of the season for each player), roughly 50%
+of their results should fall in the 50% intervals.  If the model is
+true in the sense of correctly describing the generative process of
+the data, then Bayesian inference is guaranteed to be well calibrated.
+Given that our models are almost always crude approximations of some
+quantities of interest, in practice we are concerned with testing
+their calibration on quantities of interest.
+
+#### Precision
+
+Given two well calibrated models, the one that makes the more precise
+predictions in the sense of having narrower intervals is going to be
+better.  This is because we would rather have a well-calibrated
+prediction that there's a 90% chance the number of hits for a player
+in the rest of the season will fall in $(120, 130)$ than a 90%
+prediction that the number of hits will fall in $(100, 150)$.
+
+#### Predictive Posterior Density
+
+The predictive posterior density directly measures the probability of
+seeing the new data.  The higher the probability assigned to the new
+data, the better the model.  This notion is related to the notion of
+precision discussed in the previous section, because if the new
+observations have higher predictive densities, they're probably within
+narrower posterior intervals.
+
+
+#### Computing Expectated Log Density
+
+First we consider the simple calculation for the expectation of the
+log density. 
+
+The integer variables <code>K_new[n]</code> and <code>y_new[n]</code>
+declared in the data block hold the number of at bats (trials) trials
+and the number of hits (successes) for player (item) <code>n</code>.
+To code the evaluation of the held out data in Stan, we declare a
+generated quantities variable (<code>log_p_new</code>) to hold the
+result and then define it as the sum of the log densities of the new
 observations.
+
 
 ```
 generated quantities {
@@ -985,6 +1242,12 @@ the expectation of the log density in the posterior,
 \sum_{n=1}^N \log p(y^{\mathrm{new}}_n \, | \, \theta^{(m)}_n).
 \]
 
+As noted earlier, this is not the smae as the log of expected density
+of the posterior, and it is the latter we most care about, because it
+is a properly normalized density with a standard probabilistic
+interpretation (one of the exercises is to prove it is properly
+normalized).  
+
 This calculation is included in all four of the models we have
 previously fit and can be displayed directly as follows.
 
@@ -1003,7 +1266,7 @@ averaging over their posteriors, with the amount of posterior
 uncertainty also being ranked in reverse order of the amount of
 pooling they do.
 
-#### Calculating the posterior log density
+#### Calculating posterior log density
 
 It's quite a bit more work to properly calculate the posterior
 predictive log density, because it's not a simple weighted average.
@@ -1047,6 +1310,7 @@ Now the ranking is different!  The hierarchical logit model appears to
 be making slightly better predictions than the full pooling model,
 which in turn is making slightly better predictions than the basic
 hierarchical model.
+
 
 ## Predicting New Observations
 
@@ -1493,30 +1757,69 @@ below-average players.
 
 ## Posterior p-Values
 
+We can simulate data from the predictive distribution and compare it
+to the original data used for fitting the model.  If they are not
+consistent, then either our model is not capturing the aspects of the
+data we are probing with test statistics or the measurement we made is
+highly unlikely.  That is, extreme $p$-values lead us to suspect there
+is something wrong with our model that deserves further exploration.
+
+In some cases, we are willing to work with models that are wrong in
+some measurable aspects, but accurately capture quantities of interest
+for an application.  That is, it's possible for a model to capture
+some, but not all, aspects of a data set, and still be useful.
+
+
+#### Test Statistics and Bayesian $p$-Values
+
 A test statistic $T$ is a function from data to a real value.
 Following (Gelman et al. 2013), we will concentrate on four specific
-test statistics for repeated binary trial data (though the choices we
-make are general): minimum value, maximum value, sample mean, and
+test statistics for repeated binary trial data (though these choices
+are fairly general): minimum value, maximum value, sample mean, and
 sample standard deviation.
 
-Given a test statistic $T$ and data $y$, the Bayesian $p$-value is
+Given a test statistic $T$ and data $y$, the Bayesian $p$-value has a
+direct definition as a probability,
 
 \[
 p_B = \mathrm{Pr}[T(y^{\mathrm{rep}}) \geq T(y) \, | \, y].
 \]
 
-Expanding this as an expectation of an indicator function, 
+Bayesian $p$-values, like their traditional counterparts, are
+probabilities, but not probabilities that a model is true.  They
+simply measure discrepancies between the observed data and what we
+would expect if the model is true.
+
+Values of Bayesian $p$-values near 0 or 1 indicate that the data $y$
+used to estimate the model is unlikely to have been generated by the
+estimated model.  As with other forms of full Bayesian inference, our
+estimate is the full posterior, not just a point estimate.
+
+ 
+
+As with other Bayesain inferences, we average over the posterior
+rather than working from a point estimate of the parameters.
+Expanding this as an expectation of an indicator function,
 
 \[
 p_B 
-= \int_{\Theta} 
-    \mathrm{I}[T(y^{\mathrm{rep}}) \geq T(y)] 
+\ = \ 
+  \int_{\Theta, Y^{\mathrm{rep}}} 
+    \mathrm{I}[T(y^{\mathrm{rep}}) \geq T(y)]  
+    \ p(y^{\mathrm{rep}} \, | \, \theta)
     \ p(\theta \, | \, y)
     \ \mathrm{d}\theta,
 \]
 
-leads to the obvious MCMC calculation based on $M$ draws of replicated
-data $y^{\mathrm{rep}}$,
+We treat $y^{\mathrm{rep}}$ as a parameter in parallel with $\theta$,
+integrating over possible values $y^{\mathrm{rep}} \in
+Y^{\mathrm{rep}}$.  As usual, we use the integration sign in a general
+way intended to include summation, as with the discrete variable
+$y^{\mathrm{rep}}$.
+
+The formualation as an expectation leads to the obvious MCMC
+calculation based on posterior draws $y^{\mathrm{rep} (m)}$ for
+$m \in 1{:}M$,
 
 \[
 p_B
@@ -1528,10 +1831,12 @@ p_B
 \]
 
 
-The test statistics are first defined for the observed data.  Because
-they are functions purely of variables defined in the data block, they
-can be defined in the transformed data block so that they will be
-computed only once when the data is read in.
+In Stan, the test statistics are first defined for the observed data.
+Because they are functions purely of variables defined in the data
+block, they can be defined in the transformed data block so that they
+will be computed only once when the data is read in.  In general, it
+is much more efficient to define variables as transformed data if at
+all possible.
 
 ```
 transformed data {
@@ -1892,6 +2197,11 @@ does this affect posterior inference?
 and 80% intervals compare to those in the smaller data set for
 $\kappa$ and $\phi$?  Is the result inevitable for a larger data set?
 
+1. Recreate the results presented in (Betancourt and Girolami 2015) by
+simulating data according to the hierarchical logit model of
+increasing size per group and compare how the centered and
+non-centered parameterizations perform in terms of convergence and effective sample size. 
+
 1. How sensitive is the hierarchical model to the priors on the
 hyperparameters $\kappa, \phi$?  Consider a weakly informative prior
 on $\phi$ and alternative distributional families for $\kappa$ (e.g.,
@@ -1933,6 +2243,9 @@ the uniform grows much wider or much narrower?
 derive the analytic posterior and code it using a random-number
 generator in the generated quantities block.  
 
+1.  Show that the posterior predictive distribution $p(\tilde{y} \, |
+\, y)$ is a properly normalized density.  
+
 1. For the partial pooling models (hierarchical priors), marginalize
 out the chance-of-success parameters ($\theta$ or $\alpha$) and sample
 the higher-level parameters for the prior directly.
@@ -1940,48 +2253,94 @@ the higher-level parameters for the prior directly.
 1.  Generate rankings plot for the other three models; compare and
 contrast to the basic partial pooling model.
 
+1.  What are some other test statistics that might be used to evaluate
+our model fit to data using Bayesian $p$-Values$?  Code some up and
+evaluate on one of the data sets given here or on simulated data.
+
+1.  Discuss why the lack of an alternative hypotehsis makes it
+impossible to perform power calculations with Bayesian $p$-values.
+What are the implications for hypothesis testing for model fit?
+
+1.  Show why posterior $p$-values are expected to have a
+$\mathsf{Uniform}(0,1)$ distribution if a model is perfectly
+calibrated.  Can you perform simulations to show that this is true in
+a particular case?
+
 1.  Figure out how to take all the hard-coded output analysis in here
 and make it dynamic by making better use of knitr.  And take all the
 cut-and-paste duplicated code and wrap it into functions.
 
+1.  Discuss the difference between batting average and on-base percentage as random variables.  Consider particularly the denominator (at-bat versus plate appearance).  Is the denominator in these kinds of problems always a random variable itself?  Why might this be important in inference?
+
+## Acknowledgements
+
+This presentation derives directly from four sources: *Bayesian Data
+Analysis* (Gelman et al. 2013), *BUGS 0.5 Examples* (Spiegelhalter et
+al. 1996), *The BUGS Book* (Lunn et al. 2014), and Daniel Lee's
+hands-on Stan tutorial for a short-course we taught (with Andrew Gelman) in
+2015.
+
+I'd like to thank Jiqiang Guo, Aki Vehtari, Michael Betancourt, and
+Jonah Gabry for comments on everything from the math to the R code.
+Andrew Gelman objected to my using batting-average data as being not
+very useful for baseball (compared to, say, on-base percentage); I
+hope the exercise addressing his concerns and the additional data sets
+partially make up for my choice.
 
 ## References
 
 * Betancourt, M. and Girolami, M. (2015) Hamiltonian Monte Carlo for
-  hierarchical models. <i>Current Trends in Bayesian Methodology with
-  Applications</i> <b>79</b>.
+  hierarchical models. *Current Trends in Bayesian Methodology with
+  Applications* **79**.
 
 * Efron, B. and Morris, C. (1975) Data analysis using Stein's
-  estimator and its generalizations. <i>Journal of the American
-  Statistical Association</i> <b>70</b>(350), 311--319. [
+  estimator and its generalizations. *Journal of the American
+  Statistical Association* **70**(350), 311--319. [
   [pdf](http://www.medicine.mcgill.ca/epidemiology/hanley/bios602/MultilevelData/EfronMorrisJASA1975.pdf)
   ]
 
 * Gelman, A., Carlin, J. B., Stern, H. S., Dunson, D. B., Vehtari, A.,
-  and Rubin, D. B. (2013) <i>Bayesian Data Analysis</i> 3rd
+  and Rubin, D. B. (2013) *Bayesian Data Analysis*, 3rd
   Edition. Chapman & Hall/CRC Press, London.
 
-* Gelman, A. and Hill, J. (2007) <i>Data Analysis Using Regression and
-  Multilevel-Hierarchical Models</i>. Cambridge University Press,
+* Gelman, A. and Hill, J. (2007) *Data Analysis Using Regression and
+  Multilevel-Hierarchical Models*. Cambridge University Press,
   Cambridge, United Kingdom.
 
 * Gelman, A., Hill, J., and Yajima, M. (2012) Why we (usually) don't
-  have to worry about multiple comparisons. <i>Journal of Research on
-  Educational Effectiveness</i> <b>5</b>, 189--211. [
+  have to worry about multiple comparisons. *Journal of Research on
+  Educational Effectiveness* **5**, 189--211. [
   [pdf](http://www.stat.columbia.edu/~gelman/research/published/multiple2f.pdf)
   ]
 
 * Lunn, D., Jackson, C., Best, N., Thomas, A., and Spiegelhalter,
-  D. (2013) <i>The BUGS Book: A Practical Introduction to Bayesian
-  Analysis</i>.  Chapman & Hall/CRC Press.
+  D. (2013) *The BUGS Book: A Practical Introduction to Bayesian
+  Analysis*.  Chapman & Hall/CRC Press.
+
+* Neal, R. M. (2003) Slice sampling. *Annals of Statistics*
+  **31**(3):705--767.
+
+* Papaspiliopoulos, O., Roberts, G. O., and Skold, M. (2003)
+  Non-centered parameterisations for hierarchical models and data
+  augmentation. In *Bayesian Statistics 7: Proceedings of the Seventh
+  Valencia International Meeting*, edited by Bernardo, J. M., Bayarri,
+  M. J., Berger, J. O., Dawid, A. P., Heckerman, D., Smith, A. F. M.,
+  and West, M. Oxford University Press, Chicago.
+
+* Plummer, M., Best, N., Cowles, K., & Vines, K. (2006). CODA:
+  Convergence diagnosis and output analysis for MCMC. *R News*,
+  **6**(1), 7--11.
 
 * Spiegelhalter, D., Thomas, A., Best, N., & Gilks, W. (1996) BUGS 0.5
   Examples. MRC Biostatistics Unit, Institute of Public health,
   Cambridge, UK.
 
+* Stan Development Team (2015) *Stan Modeling Language User's Guide
+  and Reference Manual*.  [ [web page]
+  ](http://mc-stan.org/documentation/)
+
 * Tarone, R. E. (1982) The use of historical control information in
-  testing for a trend in proportions. <i>Biometrics</i>
-  <b>38</b>(1):215--220.
+  testing for a trend in proportions. *Biometrics* **38**(1):215--220.
 
 ## Data Sets Included
 
