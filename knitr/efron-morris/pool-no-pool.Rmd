@@ -1292,11 +1292,8 @@ $p(y^{\mathrm{new}}_n \, | \, y)$. We can then sum the logs of these
 posterior means in R to calculate the posterior log density.
 
 ```{r comment=NA}
-print_new_lp <- function(name, ss) {
-  lp <- 0;
-  for (n in 1:length(ss$p_new[1, ])) {
-    lp <- lp + log(mean(ss$p_new[, n]));
-  }
+print_new_lp <- function(name, ss) {  
+  lp <- sum(log(colMeans(ss$p_new)))
   print(sprintf("%25s  %5.1f", name,  lp), quote=FALSE);
 }
 
@@ -1306,11 +1303,21 @@ print_new_lp("partial pooling", ss_hier);
 print_new_lp("partial pooling (logit)", ss_hier_logit); 
 ```
 
-Now the ranking is different!  The hierarchical logit model appears to
-be making slightly better predictions than the full pooling model,
-which in turn is making slightly better predictions than the basic
-hierarchical model.
+Now the ranking is different!  As expected, the values here are lower
+than the expectation of the log density due to Jensen's inequality.
+The hierarchical logit model appears to be making slightly better
+predictions than the full pooling model, which in turn is making
+slightly better predictions than the basic hierarchical model.
 
+The fancy column means one-liner for defining <code>lp</code> is
+equivalent to this loopy version:
+
+```
+  lp <- 0;
+  for (n in 1:length(ss$p_new[1, ])) {
+    lp <- lp + log(mean(ss$p_new[, n]));
+  }
+```
 
 ## Predicting New Observations
 
@@ -1391,6 +1398,24 @@ interval of
 The broad range shown here is an illustration of how poor binary data
 on the order of a few dozen observations is for estimating chances of
 success.
+
+#### Data Splitting and Cross-Validation
+
+Not all data sets come with a convenient train/test (observe/predict)
+split.  One obvious way around that problem is to break them yourself
+if the data's exchangeable, as we are assuming it is for this repeated
+trial data (that is, each trial's chance of success is the same).  We
+can even do the splits into sizes that we care about.
+
+This process can be repeated, leading to cross-validation.  A typical
+approach is to divide the data up into ten sections and for each
+section, estimate based on the remaining nine sections and then
+evaluate on the given section.  Each section is referred to as a
+"fold" and dividing into $N$ subsets is known as $N$-fold
+cross-validation.  In the limit, we can leave out one observation and
+train on the rest; this is known as "leave-one-out cross-validation"
+(LOO).  See (Gelman et al. 2013) for a discussion of LOO and its
+relation to (Bayesian) information criteria such as WAIC.
 
 
 ## Estimating Event Probabilities
