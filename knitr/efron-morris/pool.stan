@@ -26,8 +26,7 @@ model {
 generated quantities {
   vector<lower=0, upper=1>[N] theta;  // chance-of-success
 
-  real log_p_new;   // posterior predictive log density remaining trials
-  vector[N] p_new;  // posterior predictive density for item
+  real log_p_new;      // posterior predictive log density remaining trials
 
   int<lower=0> z[N];  // posterior prediction remaining trials
 
@@ -52,8 +51,6 @@ generated quantities {
   log_p_new <- 0;
   for (n in 1:N)
     log_p_new <- log_p_new + binomial_log(y_new[n], K_new[n], theta[n]);
-  for (n in 1:N)
-    p_new[n] <- exp(binomial_log(y_new[n], K_new[n], theta[n]));
 
   for (n in 1:N)
     z[n] <- binomial_rng(K_new[n], theta[n]);
