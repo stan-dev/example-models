@@ -1014,50 +1014,32 @@ intervals for the estimated chance-of-success parameters $\theta_n$ in
 the posterior.  The following R code reproduces a similar plot for our data.
 
 ```{r}
-ss_quantile <- function(ss, N, q) {
-  result <- rep(NA, N);
-  for (n in 1:N) {
-    result[n] <- sort(ss$theta[,n])[M * q];
-  }
-  return(result);
+ss_quantiles <- function(ss) {
+  apply(ss$theta, 2, quantile, probs = c(0.1, 0.5, 0.9));
 }
+theta_pool <- ss_quantiles(ss_pool);
+theta_no_pool <- ss_quantiles(ss_no_pool);
+theta_hier <- ss_quantiles(ss_hier);
+theta_hier_logit <- ss_quantiles(ss_hier_logit);
 
-theta_10_pool <- ss_quantile(ss_pool, N, 0.1);
-theta_50_pool <- ss_quantile(ss_pool, N, 0.5);
-theta_90_pool <- ss_quantile(ss_pool, N, 0.9);
-
-theta_10_no_pool <- ss_quantile(ss_no_pool, N, 0.1);
-theta_50_no_pool <- ss_quantile(ss_no_pool, N, 0.5);
-theta_90_no_pool <- ss_quantile(ss_no_pool, N, 0.9);
-
-theta_10_hier <- ss_quantile(ss_hier, N, 0.1);
-theta_50_hier <- ss_quantile(ss_hier, N, 0.5);
-theta_90_hier <- ss_quantile(ss_hier, N, 0.9);
-
-theta_10_hier_logit <- ss_quantile(ss_hier_logit, N, 0.1);
-theta_50_hier_logit <- ss_quantile(ss_hier_logit, N, 0.5);
-theta_90_hier_logit <- ss_quantile(ss_hier_logit, N, 0.9);
+models <- c("complete pooling", "no pooling", "partial pooling", 
+            "partial pooling \n(log odds)")
+df_plot2 <- data.frame(x = rep(y / K, 4),
+                       y = c(theta_pool["50%",], theta_no_pool["50%",],
+                             theta_hier["50%",], theta_hier_logit["50%",]),
+                       ymin = c(theta_pool["10%",], theta_no_pool["10%",],
+                             theta_hier["10%",], theta_hier_logit["10%",]),
+                       ymax = c(theta_pool["90%",], theta_no_pool["90%",],
+                             theta_hier["90%",], theta_hier_logit["90%",]),
+                       model = rep(models, each = N));
 
 pop_mean <- sum(y) / sum(K);
-
-df_plot2 <- data.frame(x = rep(y / K, 4),
-                       y = c(theta_50_pool, theta_50_no_pool,
-                             theta_50_hier, theta_50_hier_logit),
-                       model = c(rep("complete pooling", N),
-                                 rep("no pooling", N),
-                                 rep("partial pooling", N),
-				 rep("partial pooling (log odds)", N)));
-
 plot_bda3_fig_5_4 <-
-  ggplot(df_plot2, aes(x=x, y=y)) +
-  geom_hline(aes(yintercept=pop_mean), colour="lightpink") +
+  ggplot(df_plot2, aes(x=x, y=y, ymin=ymin, ymax=ymax)) +
+  geom_hline(yintercept=pop_mean, colour="lightpink") +
   geom_abline(intercept=0, slope=1, colour="skyblue") +
   facet_grid(. ~ model) +
-  geom_errorbar(aes(ymin=c(theta_10_pool, theta_10_no_pool,
-                           theta_10_hier, theta_10_hier_logit),
-                    ymax=c(theta_90_pool, theta_90_no_pool,
-                           theta_90_hier, theta_90_hier_logit)),
-                width=0.005, colour="gray60") +
+  geom_errorbar(width=0.005, colour="gray60") +
   geom_point(colour="gray30", size=0.75) +
   coord_fixed() +
   scale_x_continuous(breaks = c(0.2, 0.3, 0.4)) +
