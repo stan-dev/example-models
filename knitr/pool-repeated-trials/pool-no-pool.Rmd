@@ -643,15 +643,20 @@ reproduce that figure here for our running example.
 
 ```{r}
 library(ggplot2);
+bda_plot <- function(df, x_lab, y_lab) {
+  ggplot(df, aes(x=x, y=y)) +
+    geom_point(shape=19, alpha=0.15) +
+    xlab(x_lab) +
+    ylab(y_lab);
+}
 
 df_bda3_fig_5_3 <- with(ss_hier,
                         data.frame(x = log(phi / (1 - phi)),
                                    y = log(kappa)));
 plot_bda3_fig_5_3 <- 
-  ggplot(df_bda3_fig_5_3, aes(x=x, y=y)) +
-  geom_point(shape=19, alpha=0.15) +
-  xlab("logit(phi) = log(alpha / beta)") +
-  ylab("log(kappa) = log(alpha + beta)");
+  bda_plot(df_bda3_fig_5_3, 
+           x_lab = expression(paste(logit(phi), " = ", log(alpha/beta))), 
+           y_lab = expression(paste(log(kappa), " = ", log(alpha+beta))));
 plot_bda3_fig_5_3;
 ```
 
@@ -672,12 +677,10 @@ inv_logit <- function(u) { 1 / (1 + exp(-u)); }
 df_funnel <- with(ss_hier, 
                   data.frame(x = inv_logit(theta[,1]), 
                              y = log(kappa)))
-library(ggplot2);
-plot_funnel<- 
-  ggplot(df_funnel, aes(x=x, y=y)) +
-  geom_point(shape=19, alpha=0.15) +
-  xlab("logit(theta[1])") + 
-  ylab("log(kappa)");
+plot_funnel <- 
+  bda_plot(df_funnel, 
+           x_lab = expression(paste(logit(theta[1]))), 
+           y_lab = expression(paste(log(kappa))));
 plot_funnel;
 ```
 
@@ -836,11 +839,10 @@ funnel_centered_df <-
   with(ss_hier_logit_centered,
        data.frame(x = alpha[, 1],
                   y = log(sigma)));
-funnel_centered <-
-  ggplot(funnel_centered_df, aes(x=x, y=y)) +
-  geom_point(shape=19, alpha=0.1) +
-  xlab("player 1 log odds of success: alpha[1]") + 
-  ylab("log population scale: log sigma") +
+funnel_centered <- 
+  bda_plot(funnel_centered_df, 
+           x_lab = expression(paste("player 1 log odds of success ", alpha[1])), 
+           y_lab = expression(paste("log population scale ", log(sigma)))) + 
   ggtitle("Centered Hierarchical Funnel Plot");
 funnel_centered;
 ```
@@ -977,10 +979,9 @@ df_bda3_fig_5_3_logit <- with(ss_hier_logit,
                               data.frame(x = mu,
                                          y = log(sigma)));
 plot_bda3_fig_5_3_logit <- 
-  ggplot(df_bda3_fig_5_3_logit, aes(x=x, y=y)) +
-  geom_point(shape=19, alpha=0.15) +
-  xlab("mu") + 
-  ylab("log sigma")
+  bda_plot(df_bda3_fig_5_3_logit, 
+           x_lab = expression(mu), 
+           y_lab = expression(log(sigma)))
 plot_bda3_fig_5_3_logit;
 ```
 
@@ -992,10 +993,9 @@ df_bda3_fig_5_3_funnel <-
        data.frame(x = alpha_std[, 1],
                   y = log(sigma)));
 plot_bda3_fig_5_3_funnel <-
-  ggplot(df_bda3_fig_5_3_funnel, aes(x=x, y=y)) +
-  geom_point(shape=19, alpha=0.15) +
-  xlab("player 1 log odds of success (standardized): alpha[1]") + 
-  ylab("log population scale: log sigma") +
+  bda_plot(df_bda3_fig_5_3_funnel, 
+           x_lab = expression(paste("player 1 log odds (standardized), ", alpha[1])), 
+           y_lab = expression(paste("log population scale, ", log(sigma)))) + 
   ggtitle("Non-Centered Hierarchical Funnel Plot");
 plot_bda3_fig_5_3_funnel;
 ```
@@ -1043,8 +1043,8 @@ plot_bda3_fig_5_4 <-
   geom_point(colour="gray30", size=0.75) +
   coord_fixed() +
   scale_x_continuous(breaks = c(0.2, 0.3, 0.4)) +
-  xlab("observed rate, y[n] / K[n]") +
-  ylab("chance of success, theta[n]") +
+  xlab(expression(paste("observed rate ", y[n] / K[n]))) +
+  ylab(expression(paste("chance of success ", theta[n]))) +
   ggtitle("Posterior Medians and 80% intervals\n(red line: population mean;  blue line: MLE)")
 plot_bda3_fig_5_4;
 ```
