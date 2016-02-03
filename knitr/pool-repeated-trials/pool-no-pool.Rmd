@@ -642,15 +642,11 @@ $\kappa \in (0, \infty)$ is transformed to $\log \kappa$.  We
 reproduce that figure here for our running example.
 
 ```{r}
+library(ggplot2);
 
 df_bda3_fig_5_3 <- with(ss_hier,
                         data.frame(x = log(phi / (1 - phi)),
                                    y = log(kappa)));
-phi_sim <- ss_hier$phi;
-kappa_sim <- ss_hier$kappa;
-df_bda3_fig_5_3 <- data.frame(x = log(phi_sim / (1 - phi_sim)),
-                              y = log(kappa_sim));
-library(ggplot2);
 plot_bda3_fig_5_3 <- 
   ggplot(df_bda3_fig_5_3, aes(x=x, y=y)) +
   geom_point(shape=19, alpha=0.15) +
