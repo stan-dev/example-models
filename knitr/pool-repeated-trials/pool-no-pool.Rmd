@@ -669,10 +669,9 @@ the following plot of $\theta_1$ vs. $\kappa$.
 
 ```{r}
 inv_logit <- function(u) { 1 / (1 + exp(-u)); }
-theta1_sim <- ss_hier$theta[ , 1];
-kappa_sim <- ss_hier$kappa;
-df_funnel <- data.frame(x = inv_logit(theta1_sim),
-                        y = log(kappa_sim));
+df_funnel <- with(ss_hier, 
+                  data.frame(x = inv_logit(theta[,1]), 
+                             y = log(kappa)))
 library(ggplot2);
 plot_funnel<- 
   ggplot(df_funnel, aes(x=x, y=y)) +
@@ -833,10 +832,9 @@ assume complete mixing in their effective sample size calculations and
 thus overestimate their performance when there is not good mixing.
 
 ```{r}
-alpha_1_centered <- ss_hier_logit_centered$alpha[, 1];
 funnel_centered_df <-  
   with(ss_hier_logit_centered,
-       data.frame(x = alpha_1_centered,
+       data.frame(x = alpha[, 1],
                   y = log(sigma)));
 funnel_centered <-
   ggplot(funnel_centered_df, aes(x=x, y=y)) +
