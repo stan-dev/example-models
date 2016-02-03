@@ -1565,7 +1565,7 @@ plot_post_pred;
 
 We choose 50% posterior intervals as they are a good single point for
 checking calibration (see the exercises).  Rather than plotting the
-number of at bats on the vertical axis, we have standardized all the
+number of hits on the vertical axis, we have standardized all the
 predictions and outcomes to a success rate (aka batting average, in
 the baseball case).  Because each item (player) has a different number
 of subsequent trials (at bats), the posterior intervals are relatively
