@@ -33,11 +33,12 @@ transformed parameters {
   
   matrix[nsubjs,nparams] deltahat; 
   deltahat <- (diag_pre_multiply(sigma, L_Omega) * deltahat_tilde)'; 
-    
+  
+  vector[nsubjs] deltachat;
+  vector[nsubjs] deltarhat;
+  vector[nsubjs] deltauhat;
+
   for (i in 1:nsubjs) {
-    vector[nsubjs] deltachat;
-    vector[nsubjs] deltarhat;
-    vector[nsubjs] deltauhat;
     
     deltachat[i] <- deltahat[i,1];
     deltarhat[i] <- deltahat[i,2];

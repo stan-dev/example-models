@@ -37,10 +37,11 @@ transformed parameters {
   vector<lower=0,upper=1>[nsubjs] r;
   vector<lower=0,upper=1>[nsubjs] u;
     
+  vector[nsubjs] deltachat;
+  vector[nsubjs] deltarhat;
+  vector[nsubjs] deltauhat;
+  
   for (i in 1:nsubjs) {
-    vector[nsubjs] deltachat;
-    vector[nsubjs] deltarhat;
-    vector[nsubjs] deltauhat;
     
     deltachat[i] <- deltahat[i,1];
     deltarhat[i] <- deltahat[i,2];
