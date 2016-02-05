@@ -37,10 +37,11 @@ transformed parameters {
   vector<lower=0,upper=1>[nsubjs] u;
   matrix[nparams,nparams] rho;
 		
+  vector[nsubjs] deltachat;
+  vector[nsubjs] deltarhat;
+  vector[nsubjs] deltauhat;
+
 	for (i in 1:nsubjs) {
-    vector[nsubjs] deltachat;
-    vector[nsubjs] deltarhat;
-    vector[nsubjs] deltauhat;
     
 		deltachat[i] <- deltahat[i,1];
 		deltarhat[i] <- deltahat[i,2];
@@ -129,6 +130,7 @@ samples_1 <- stan(model_code=model,
                   chains=3, 
                   thin=1,
                   warmup=mywarmup,  # Stands for burn-in; Default = iter/2
+                  control = list(adapt_delta = 0.999, stepsize = 0.001, max_treedepth = 20)
                   # seed=123  # Setting seed; Default is random seed
 )
 
@@ -144,7 +146,7 @@ samples_2 <- stan(fit=samples_1,
                   chains=3, 
                   thin=1,
                   warmup=mywarmup,  # Stands for burn-in; Default = iter/2
-                  # seed=123  # Setting seed; Default is random seed
+                  control = list(adapt_delta = 0.999, stepsize = 0.001, max_treedepth = 20)
 )
 
 k <- response_6
@@ -159,7 +161,7 @@ samples_6 <- stan(fit=samples_1,
                   chains=3, 
                   thin=1,
                   warmup=mywarmup,  # Stands for burn-in; Default = iter/2
-                  # seed=123  # Setting seed; Default is random seed
+                  control = list(adapt_delta = 0.999, stepsize = 0.001, max_treedepth = 20)
 )
 # Now the values for the monitored parameters are in the "samples" object, 
 # ready for inspection.

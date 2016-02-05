@@ -5,10 +5,12 @@ models should be programmed in Stan using HMC. Some features of the original
 hierarchical implementation were specifically added to allow for a better 
 convergence using Gibbs sampling such as implemented in JAGS or Bugs. These 
 features do not help the model for the HMC sampler used by Stan and in fact, the 
-model shows convergence issues with divergent transitions that are difficult to
-deal with. 
+model shows convergence issues with divergent transitions that can only be 
+handeled by relatively strongly changing the stan samplers default settings. 
+And even when removing the divergent transitions the final samples still show
+problematic signs.
 
-The new implementations avoid those features. Specifically, these 
+The new implementations avoid the Gibbs specific features. Specifically, these 
 implementations do not use the Wishart as prior for the correlation matrix and 
 do not use the parameter expansion, but can neverthless handle the divergent 
 transitions. We include three implementations which follow the three 
