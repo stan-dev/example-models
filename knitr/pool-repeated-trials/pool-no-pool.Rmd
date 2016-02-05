@@ -2417,11 +2417,8 @@ is very little we can do to gain sharp inferences other than provide
 more informative priors, which is well worth doing when prior
 information is available.  On the other hand, with more data, the
 models provide similar results (see the exericses), and in the limit,
-they all of the models (other than complete pooling) converge to
-posteriors that are delta functions around the maximum likelihood
-estimate.  It is important to keep in mind that with increasing
-amounts of data, all of the models (aside from complete pooling) will
-converge to posteriors with delta functions at the empirical chance of
+all of the models (other than complete pooling) converge to
+posteriors that are delta functions around the empirical chance of
 success (i.e., the maximum likelihood estimate).  Meanwhile, 
 Bayesian inference is allowing us to make more accurate predictions
 with the data available before we hit that asymptotic regime.
