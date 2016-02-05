@@ -1372,7 +1372,7 @@ We'll then write that last expression as
         \ \log p(y^{\mathrm{new}} \, | \, \theta^{(m)})
 \]
 
-We can compute $mathrm{log\_sum\_exp}$ stably by subtracting the max value.
+We can compute $\mathrm{log\_sum\_exp}$ stably by subtracting the max value.
 Suppose $u = u_1, \ldots, u_M$, and $\max(u)$ is the largest $u_m$.
 We can calculate
 
