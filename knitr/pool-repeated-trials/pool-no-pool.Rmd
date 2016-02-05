@@ -2488,7 +2488,7 @@ Rankings and Who's the Best Player plots?
 1.  If a model is well calibrated, what is the expected distribution
 of observed items in the 50% posterior predictive interval?  How would
 this support a hypothesis test for model calibration?  Could such a
-test be formulated in terms f Bayesian posterior $p$-values?
+test be formulated in terms of Bayesian posterior $p$-values?
 
 1.  If the inverse CDFs of the marginal posteriors were available (or
 approximated via sorting MCMC draws), what is the expected
