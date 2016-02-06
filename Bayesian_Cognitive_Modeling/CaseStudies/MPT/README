@@ -32,7 +32,7 @@ parameter sigma. Whereas this again noticably increases the speed of
 optimization it does still requires tweaking of the sampler setting to converge
 without problems and the final fit is not completely well behaved.
 
-3. MPT_4_Stan.R:
+3. MPT_5_Stan.R:
 This contains a further reparametrization of the multivariate normal 
 distribution using a univariate normal distribtuion and basically solves the 
 remaining issues. Specifically, this uses a non-centered parametrization of the 
