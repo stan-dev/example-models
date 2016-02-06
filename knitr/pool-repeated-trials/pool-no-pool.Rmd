@@ -1114,7 +1114,7 @@ we can use to
 many hits will Roberto Clemente get in the rest of the season,
 
 * evaluate predictions against observed future data; e.g., how well
-did we predict how many hits Roberto Clement actually got in the rest
+did we predict how many hits Roberto Clemente actually got in the rest
 of the season, and
 
 * generate new simulated data to validate our model fits.
