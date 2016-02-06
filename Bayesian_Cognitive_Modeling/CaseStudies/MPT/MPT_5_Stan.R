@@ -6,7 +6,7 @@ rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 
 # model without parameter expansion
-# model with 3. coding section 6.12
+# model with 3. coding section 6.12 (non-centered parameterization)
 model <- "
 // Multinomial Processing Tree with Latent Traits
 data { 
@@ -32,11 +32,11 @@ transformed parameters {
   vector<lower=0,upper=1>[nsubjs] u;
   
   matrix[nsubjs,nparams] deltahat; 
-  deltahat <- (diag_pre_multiply(sigma, L_Omega) * deltahat_tilde)'; 
-  
   vector[nsubjs] deltachat;
   vector[nsubjs] deltarhat;
   vector[nsubjs] deltauhat;
+
+  deltahat <- (diag_pre_multiply(sigma, L_Omega) * deltahat_tilde)'; 
 
   for (i in 1:nsubjs) {
     
@@ -120,11 +120,12 @@ samples_1 <- stan(model_code=model,
                   iter=myiterations, 
                   chains=3, 
                   thin=1,
-                  warmup=mywarmup  # Stands for burn-in; Default = iter/2
+                  warmup=mywarmup,  # Stands for burn-in; Default = iter/2
+                  control = list(adapt_delta = 0.9)  # increase adapt_delta/decrease stepsize to get rid of divergent transitions
 )
 
 samples_1
-traceplot(samples_1, pars = c("Omega", "sigma", "lp__"))
+traceplot(samples_1, pars = c("muc", "mur", "muu", "Omega", "sigma", "lp__"))
 
 
 k <- response_2
@@ -138,10 +139,11 @@ samples_2 <- stan(fit=samples_1,
                   iter=myiterations, 
                   chains=3, 
                   thin=1,
-                  warmup=mywarmup  # Stands for burn-in; Default = iter/2
+                  warmup=mywarmup,  # Stands for burn-in; Default = iter/2
+                  control = list(adapt_delta = 0.9)  # increase adapt_delta/decrease stepsize to get rid of divergent transitions
 )
 samples_2
-traceplot(samples_2, pars = c("Omega", "sigma", "lp__"))
+traceplot(samples_2, pars = c("muc", "mur", "muu", "Omega", "sigma", "lp__"))
 
 k <- response_6
 nsubjs <- nrow(k) 	 	# Number of word pairs per participant	
@@ -154,10 +156,11 @@ samples_6 <- stan(fit=samples_1,
                   iter=myiterations, 
                   chains=3, 
                   thin=1,
-                  warmup=mywarmup  # Stands for burn-in; Default = iter/2
+                  warmup=mywarmup,  # Stands for burn-in; Default = iter/2
+                  control = list(adapt_delta = 0.9)  # increase adapt_delta/decrease stepsize to get rid of divergent transition
 )
 samples_6
-traceplot(samples_6, pars = c("Omega", "sigma", "lp__"))
+traceplot(samples_6, pars = c("muc", "mur", "muu", "Omega", "sigma", "lp__"))
 
 # Now the values for the monitored parameters are in the "samples" object, 
 # ready for inspection.
