@@ -398,8 +398,7 @@ size.
 As the estimated chance of success goes up toward 0.5, the 80%
 intervals gets wider.  This is to be expected for chance of success
 parameters, because the standard deviation of a random variable
-distributed as $\mathsf{Binomial}(K, \theta)$ is $\sqrt{\frac{\theta
-\, (1 - \theta)}{K}}$.
+distributed as $\mathsf{Binomial}(K, \theta)$ is $\sqrt{\theta (1 - \theta) K}$.
   
 The no pooling model model provides better MCMC mixing than the
 complete pooling model as indicated by the effective sample size and
