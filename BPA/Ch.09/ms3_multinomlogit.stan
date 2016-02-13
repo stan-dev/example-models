@@ -12,11 +12,35 @@
 // -------------------------------------------------
 
 functions {
+  /**
+   * Return an integer value denoting occasion of first capture.
+   * This function is derived from Stan Modeling Language
+   * User's Guide and Reference Manual.
+   *
+   * @param y         Observed values
+   * @return Occasion of first capture
+   */
   int first_capture(int[] y_i) {
     for (k in 1:size(y_i))
       if (y_i[k] != 4)
         return k;
     return 0;
+  }
+
+  /**
+   * Return a simplex such as follows (thanks to Bob Carpenter):
+   * p[1] <- exp(lp[1]) / (1.0 + exp(lp[1]) + exp(lp[2]));
+   * p[2] <- exp(lp[2]) / (1.0 + exp(lp[1]) + exp(lp[2]));
+   * p[3] <- 1.0 - p[1] - p[2];
+   *
+   * @param lp   N-dimension vector
+   * @return (N+1)-simplex of given vector and 0
+   */
+  vector softmax_0(vector lp) {
+    vector[num_elements(lp) + 1] lp_temp;
+    lp_temp[1:num_elements(lp)] <- lp;
+    lp_temp[num_elements(lp) + 1] <- 0;
+    return softmax(lp_temp);
   }
 }
 
@@ -53,15 +77,9 @@ transformed parameters {
   simplex[4] po[4, nind, n_occasions-1];
 
   // Constrain the transitions such that their sum is < 1
-  for (i in 1:2) {
-    psiA[i] <- exp(lpsiA[i]) / (1.0 + exp(lpsiA[1]) + exp(lpsiA[2]));
-    psiB[i] <- exp(lpsiB[i]) / (1.0 + exp(lpsiB[1]) + exp(lpsiB[2]));
-    psiC[i] <- exp(lpsiC[i]) / (1.0 + exp(lpsiC[1]) + exp(lpsiC[2]));
-  }
-  // Calculate the last transition probability
-  psiA[3] <- 1.0 - psiA[1] - psiA[2];
-  psiB[3] <- 1.0 - psiB[1] - psiB[2];
-  psiC[3] <- 1.0 - psiC[1] - psiC[2];
+  psiA <- softmax_0(lpsiA);
+  psiB <- softmax_0(lpsiB);
+  psiC <- softmax_0(lpsiC);
 
   // Define state-transition and observation matrices 	
   for (i in 1:nind) {
@@ -129,7 +147,7 @@ model {
   for (i in 1:nind) {
     if (first[i] > 0) {
       for (k in 1:4)
-        gamma[first[i], k] <- if_else(y[i, first[i]] == k, 1.0, 0.0);
+        gamma[first[i], k] <- (y[i, first[i]] == k);
       
       for (t in (first[i] + 1):n_occasions) {
         for (k in 1:4) {

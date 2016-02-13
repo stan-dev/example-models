@@ -11,6 +11,14 @@
 // -------------------------------------------------
 
 functions {
+  /**
+   * Return an integer value denoting occasion of first capture.
+   * This function is derived from Stan Modeling Language
+   * User's Guide and Reference Manual.
+   *
+   * @param y         Observed values
+   * @return Occasion of first capture
+   */
   int first_capture(int[] y_i) {
     for (k in 1:size(y_i))
       if (y_i[k] != 3)
@@ -107,9 +115,8 @@ model {
   // User's Guide  and Reference Manual
   for (i in 1:nind) {
     if (first[i] > 0) {
-      gamma[first[i], 1] <- 1.0;
-      for (k in 2:4)
-        gamma[first[i], k] <- 0.0;
+      for (k in 1:4)
+        gamma[first[i], k] <- (k == y[i, first[i]]);
       
       for (t in (first[i] + 1):n_occasions) {
         for (k in 1:4) {

@@ -11,6 +11,14 @@
 // -------------------------------------------------
 
 functions {
+  /**
+   * Return an integer value denoting occasion of first capture.
+   * This function is derived from Stan Modeling Language
+   * User's Guide and Reference Manual.
+   *
+   * @param y         Observed values
+   * @return Occasion of first capture
+   */
   int first_capture(int[] y_i) {
     for (k in 1:size(y_i))
       if (y_i[k] != 3)
@@ -27,9 +35,27 @@ data {
 
 transformed data {
   int<lower=0,upper=n_occasions> first[nind];
+  simplex[3] po[4, nind, n_occasions-1];
 
-  for (i in 1:nind)
+  for (i in 1:nind) {
     first[i] <- first_capture(y[i]);
+
+    for (t in 1:(n_occasions - 1)) {
+      // Define probabilities of O(t) given S(t)
+      po[1, i, t, 1] <- 1.0;
+      po[1, i, t, 2] <- 0.0;
+      po[1, i, t, 3] <- 0.0;
+      po[2, i, t, 1] <- 0.0;
+      po[2, i, t, 2] <- 1.0;
+      po[2, i, t, 3] <- 0.0;
+      po[3, i, t, 1] <- 0.0;
+      po[3, i, t, 2] <- 0.0;
+      po[3, i, t, 3] <- 1.0;
+      po[4, i, t, 1] <- 0.0;
+      po[4, i, t, 2] <- 0.0;
+      po[4, i, t, 3] <- 1.0;
+    }
+  }
 }
 
 parameters {
@@ -44,7 +70,6 @@ transformed parameters {
   simplex[3] psiV; // Transitions from vegetative
   simplex[3] psiF; // Transitions from flowering
   simplex[4] ps[4, nind, n_occasions-1];
-  simplex[3] po[4, nind, n_occasions-1];
 
   // Constraints
   for (i in 1:3){
@@ -73,20 +98,6 @@ transformed parameters {
       ps[4, i, t, 2] <- 0.0;
       ps[4, i, t, 3] <- 0.0;
       ps[4, i, t, 4] <- 1.0;
-
-      // Define probabilities of O(t) given S(t)
-      po[1, i, t, 1] <- 1.0;
-      po[1, i, t, 2] <- 0.0;
-      po[1, i, t, 3] <- 0.0;
-      po[2, i, t, 1] <- 0.0;
-      po[2, i, t, 2] <- 1.0;
-      po[2, i, t, 3] <- 0.0;
-      po[3, i, t, 1] <- 0.0;
-      po[3, i, t, 2] <- 0.0;
-      po[3, i, t, 3] <- 1.0;
-      po[4, i, t, 1] <- 0.0;
-      po[4, i, t, 2] <- 0.0;
-      po[4, i, t, 3] <- 1.0;
     } //t
   } //i
 }
@@ -110,7 +121,7 @@ model {
   for (i in 1:nind) {
     if (first[i] > 0) {
       for (k in 1:4)
-        gamma[first[i], k] <- if_else(y[i, first[i]] == k, 1.0, 0.0);
+        gamma[first[i], k] <- (y[i, first[i]] == k);
       
       for (t in (first[i] + 1):n_occasions) {
         for (k in 1:4) {
