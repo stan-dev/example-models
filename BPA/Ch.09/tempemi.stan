@@ -9,6 +9,14 @@
 // ---------------------------------
 
 functions {
+  /**
+   * Return an integer value denoting occasion of first capture.
+   * This function is derived from Stan Modeling Language
+   * User's Guide and Reference Manual.
+   *
+   * @param y         Observed values
+   * @return Occasion of first capture
+   */
   int first_capture(int[] y_i) {
     for (k in 1:size(y_i))
       if (y_i[k] == 1)
@@ -90,12 +98,11 @@ model {
 
   // Likelihood
   // Forward algorithm derived from Stan Modeling Language
-  // User's Guide  and Reference Manual
+  // User's Guide and Reference Manual.
   for (i in 1:nind) {
     if (first[i] > 0) {
-      gamma[first[i], 1] <- 1.0;
-      gamma[first[i], 2] <- 0.0;
-      gamma[first[i], 3] <- 0.0;
+      for (k in 1:3)
+        gamma[first[i], k] <- (k == y[i, first[i]]);
       
       for (t in (first[i] + 1):n_occasions) {
         for (k in 1:3) {
