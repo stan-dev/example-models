@@ -3,7 +3,7 @@ rm(list=ls())
 
 library(rstan)
 
-data <- read_rdump("Rate_2,3.data.R")  # to be passed on to Stan
+data <- read_rdump("Rate_2.data.R")  # to be passed on to Stan
 
 myinits <- list(
   list(theta1=0.1, theta2=0.9))
@@ -13,7 +13,7 @@ parameters <- c("delta", "theta1", "theta2")
 
 # The following command calls Stan with specific options.
 # For a detailed description type "?stan".
-samples <- stan(file="Rate_2_model.stan",   
+samples <- stan(file="Rate_2.stan",   
                 data=data, 
                 init=myinits,  # If not specified, gives random inits
                 pars=parameters,
