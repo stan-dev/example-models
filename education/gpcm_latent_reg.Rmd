@@ -11,7 +11,6 @@ output:
 bibliography: bibliography.bib
 ---
 
-
 <!-- 
 (Title:)  Generalized partial credit model with latent regression
 
@@ -23,6 +22,10 @@ Abstract:  This case study documents a Stan model for the generalized partial cr
 
 Keywords:  education, IRT, GPCM. 
 --> 
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(tidy = TRUE, cache = TRUE)
+```
 
 
 # Model
@@ -64,17 +67,18 @@ Parameters:
 
 ## **Stan** program
 
-A few aspects of the **Stan** program for the generalized partial credit model bear mentioning. First, the program begins with the creation of a user-specified function `gpcm_probs()`, which accepts values for `theta` and `alpha` and a vector of parameters `beta` for one item. With these inputs, it returns a vector of model-predicted probabilities for each possible response. Later, in the model block, `gpcm_probs()` is used to get the likelihood of the observed item responses.
+A few aspects of the **Stan** program for the generalized partial credit model bear mentioning. First, the prediction for person ability is calculated and temporarily stored in `mu` in the model block. This is done for efficiency and readability of the code.
 
-Second, the encoding of item responses are modified such that the lowest response category is one instead of zero. This modification takes place in the transformed data block, in which a new variable `r` is created for this purpose. The adjustment is necessary for compatibility with the `categorical()` function.
+Second, the program begins with the creation of a user-specified function `gpcm_probs()`, which accepts values for `theta`, `mu`, and `alpha` and a vector of parameters `beta` for one item. With these inputs, it returns a vector of model-predicted probabilities for each possible response. Later, in the model block, `gpcm_probs()` is used to get the likelihood of the observed item responses.
 
-Third, the variables `m` and `pos` are also created in the transformed data block. These are needed to pick out the vector of item parameters for a single item from the vector of all item parameters `beta`. `pos` indicates the position of the first parameter for a given item, while `m` indicates the count of parameters for an item. 
+Third, the encoding of item responses are modified such that the lowest response category is one instead of zero. This modification takes place in the transformed data block, in which a new variable `r` is created for this purpose. The adjustment is necessary for compatibility with the `categorical()` function.
 
-Fourth, a constraint is placed on the item difficulties for model identification. This is accomplished by creating `beta_free`, which is the vector of unconstrained item parameters, in the parameters block. Then in the transformed parameters block, `beta` is created to be identical to `beta_free` except for one additional element that is the constrained item difficulty. As a result of this constraint, the mean of `beta` will be zero.
+Fourth, the variables `m` and `pos` are also created in the transformed data block. These are needed to pick out the vector of item parameters for a single item from the vector of all item parameters `beta`. `pos` indicates the position of the first parameter for a given item, while `m` indicates the count of parameters for an item. 
 
-Lastly, the prediction for person ability is calculated and temporarily stored in `mu` in the model block. This is done for efficiency and readability of the code.
+Lastly, a constraint is placed on the item difficulties for model identification. This is accomplished by creating `beta_free`, which is the vector of unconstrained item parameters, in the parameters block. Then in the transformed parameters block, `beta` is created to be identical to `beta_free` except for one additional element that is the constrained item difficulty. As a result of this constraint, the mean of `beta` will be zero.
 
-```{r stan_code, tidy = TRUE, comment="", echo=FALSE}
+
+```{r stan_code, comment="", echo=FALSE}
 cat(readLines("gpcm_latent_reg.stan"), sep = "\n")
 ```
 
@@ -91,12 +95,13 @@ library(ggplot2)
 
 The **R** code that follows simulates a dataset conforming to the model. The **Stan** model will be evaluated in terms of its ability to recover the generating values of the parameters when fit to this dataset.
 
-```{r sim_data, cache=TRUE, results='hide', warning=FALSE, message=FALSE, tidy = TRUE}
+```{r sim_data}
 # Person covariates and abilities
 J <- 500
 lambda <- c(.5, .5, .5)
 W <- cbind(1, rnorm(J, 0, 1), rnorm(J, 0, 1))
-theta <-  W %*% matrix(lambda) + rnorm(J, 0, 1)
+mu <- W %*% matrix(lambda)
+theta <- rnorm(J, 0, 1)
 
 # Item parameters
 I <- 20
@@ -117,8 +122,8 @@ data_list <- list(I = I,
                   W = W)
 
 # Function to simulate responses
-simulate_response <- function(theta, alpha, beta) {
-  unsummed <- c(0, alpha*(theta - beta))
+simulate_response <- function(theta, mu, alpha, beta) {
+  unsummed <- c(0, alpha*theta + mu - beta)
   numerators <- exp(cumsum(unsummed))
   denominator <- sum(numerators)
   response_probs <- numerators/denominator
@@ -131,6 +136,7 @@ simulate_response <- function(theta, alpha, beta) {
 data_list$y <- numeric(data_list$N)
 for(n in 1:data_list$N) {
   data_list$y[n] <- simulate_response(theta[data_list$jj[n]],
+                                      mu[data_list$jj[n]],
                                       alpha[data_list$ii[n]],
                                       Beta_centered[data_list$ii[n], ])
 }
@@ -138,15 +144,15 @@ for(n in 1:data_list$N) {
 
 The simulated data consists of `r I` items, each with `r ncol(Beta_uncentered) + 1` categories, and `r J` persons. The latent regression includes an intercept and `r length(lambda) - 1` person-related covariates, which are standard normal variables. Next, the model is fit to the simulated dataset with **Stan**.
 
-```{r sim_fit, cache=TRUE, results='hide', warning=FALSE, message=FALSE, tidy = TRUE}
+```{r sim_fit}
 #Fit model to simulated data
 sim_fit <- stan(file = "gpcm_latent_reg.stan", 
-                data = data_list, chains = 4, iter = 1000)
+                data = data_list, chains = 4, iter = 500)
 ```
 
 Before interpreting the results, it is necessary to check that the chains have converged. **Stan** provides the $\hat{R}$ statistic for the model parameters and log posterior. These are provided in the following figure. All values for $\hat{R}$ should be less than 1.1.
 
-```{r sim_converge, tidy=TRUE, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the simulation. All values should be less than 1.1 to infer convergence."}
+```{r sim_converge, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the simulation. All values should be less than 1.1 to infer convergence."}
 # Plot of convergence statistics
 sim_monitor <- as.data.frame(monitor(sim_fit, print = FALSE))
 sim_monitor$Parameter <- as.factor(gsub("\\[.*]", "", rownames(sim_monitor)))
@@ -158,7 +164,7 @@ ggplot(sim_monitor) +
 
 The **Stan** model is evaluated in terms of its ability to recover the generating values of the parameters. The R code below prepares a plot in which the points indicate the difference between the posterior means and generating values for the parameters of main interest. This difference is referred to as discrepancy. The lines indicate the 95% posterior intervals for the difference. Ideally, (nearly) all the 95% posterior intervals would include zero.
 
-```{r sim_plot, tidy=TRUE, fig.height=8, fig.cap="Discrepancies between estimated and generating parameters for the simulation. Points indicate the difference between the posterior means and generating values for a parameter, and horizontal lines indicate 95% posterior intervals for the difference. Most of the discrepancies are about zero, indicating that **Stan** successfully recovers the true parameters."}
+```{r sim_plot, fig.height=8, fig.cap="Discrepancies between estimated and generating parameters for the simulation. Points indicate the difference between the posterior means and generating values for a parameter, and horizontal lines indicate 95% posterior intervals for the difference. Most of the discrepancies are about zero, indicating that **Stan** successfully recovers the true parameters."}
 # Make vector of wanted parameter names
 wanted_pars <- c(paste0("alpha[", 1:length(alpha), "]"), 
                  paste0("beta[", 1:length(beta), "]"), 
@@ -192,7 +198,7 @@ ggplot(sim_df) +
 
 The example data are from the TIMSS 2011 mathematics assessment [@mullis2012timss] of Australian and Taiwanese students. For convenience, a subset of 500 students is used. The subsetted data is then divided into a person covariate matrix and an item response matrix.
 
-```{r example_start, tidy = TRUE}
+```{r example_start}
 # Attach the example dataset. The TAM package is required.
 data(data.timssAusTwn.scored, package = "TAM")
 
@@ -215,7 +221,7 @@ The person covariate matrix `w_mat` has columns representing an intercept and th
 
 Before fitting the model, some descriptive statistics are considered. First, a frequency table for the person covariates is created.
 
-```{r example_descriptives_1, tidy = TRUE}
+```{r example_descriptives_1}
 # Customized version of table() that does not omit missing categories. Specify
 # expected categories with key.
 consec_table <- function(x, key) {
@@ -232,7 +238,7 @@ t(apply(w_mat, 2, consec_table, key = 0:1))
 
 Next, a frequency table for item responses is considered.
 
-```{r example_descriptives_2, tidy = TRUE}
+```{r example_descriptives_2}
 # Frequency table for item responses
 item_freqs <- t(apply(y_mat, 2, consec_table, key = 0:2))
 item_freqs
@@ -240,9 +246,9 @@ item_freqs
 
 The table shows that the data are a mixture of dichotomous item and polytomous items with three responses categories. The first and second items are dichotomous, while the third and fourth are polytomous, for example. Consequently, the first and second items will have one step parameter each, while the third and fourth will have two each. *If* this table indicated there were no 0 or 1 responses for one of the polytomous items, responses for that item would need to be recoded.
 
-Because all item parameters are stored in one vector, `beta`, some care is required in understanding which elements of `beta` correspond to which items. The following **R** code produces a table that maps each element in `beta` corresponds to its associated item and step.
+Because all item parameters are stored in one vector, `beta`, some care is required in understanding which elements of `beta` correspond to which items. The following **R** code produces a table that maps each element in `beta` to its associated item and step.
 
-```{r example_beta_key, tidy = TRUE}
+```{r example_beta_key}
 # Make a table mapping elements of beta to items/steps
 x <- item_freqs[,-1] > 0
 beta_key_trans <- t(matrix(NA, ncol = ncol(x), nrow = nrow(x)))
@@ -268,12 +274,12 @@ ex_list <- list(I = ncol(y_mat),
 
 # Run Stan model
 ex_fit <- stan(file = "gpcm_latent_reg.stan",
-               data = ex_list, chains = 4, iter = 1000)
+               data = ex_list, chains = 4, iter = 500)
 ```
 
 As discussed above, convergence of the chains is assessed for every parameter, and also the log posterior density, using $\hat{R}$.
 
-```{r ex_converge, tidy=TRUE, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the example. All values should be less than 1.1 to infer convergence."}
+```{r ex_converge, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the example. All values should be less than 1.1 to infer convergence."}
 # Plot of convergence statistics
 ex_monitor <- as.data.frame(monitor(ex_fit, print = FALSE))
 ex_monitor$Parameter <- as.factor(gsub("\\[.*]", "", rownames(ex_monitor)))
@@ -285,14 +291,14 @@ ggplot(ex_monitor) +
 
 Next we view summaries of the parameter posteriors.
 
-```{r example_print, tidy = TRUE}
+```{r example_print}
 # View table of parameter posteriors
 print(ex_fit, pars = c("alpha", "beta", "lambda"))
 ```
 
 If person covariates are unavailable, or their inclusion unwanted, the model may be fit restricting the matrix of person covariates to an intercept only. In this case, the vector `lambda` contains only one element, which will represent the mean of the ability distribution. The code below is an example of how to structure the data for **Stan** for this purpose.
 
-```{r example_noreg, tidy = TRUE, eval=FALSE}
+```{r example_noreg, eval=FALSE}
 noreg_list <- list(I = ncol(y_mat),
                 J = nrow(y_mat),
                 N = length(y_mat),

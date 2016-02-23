@@ -74,7 +74,7 @@ First, the necessary **R** packages are loaded.
 # Load R packages
 library(rstan)
 rstan_options(auto_write = TRUE)
-#options(mc.cores = parallel::detectCores())
+options(mc.cores = parallel::detectCores())
 library(ggplot2)
 ```
 

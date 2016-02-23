@@ -43,7 +43,7 @@ transformed parameters {
 model {
   vector[J] mu;
   mu <- W*lambda;
-  theta ~ normal(W*lambda, 1);
+  theta ~ normal(0, 1);
   alpha ~ lognormal(1, 1);
   beta_free ~ normal(0, 5);
   for (n in 1:N)
