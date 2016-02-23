@@ -173,7 +173,7 @@ sat <- key2binary(SAT12,
     key = c(1,4,5,2,3,1,2,1,3,1,2,4,2,1,5,3,4,4,1,4,3,3,4,1,3,5,1,3,1,5,4,5))
 ```
 
-`r nrow(sat)` students responded to `r ncol(sat)` dichotomously scored items. Non-responses were scored as incorrect, so the data contain no missing values. The scored response matrix is converted to list form and fit with **Stan**.
+`r nrow(sat)` students responded to `r ncol(sat)` dichotomously scored items. Non-responses were scored as incorrect, so the data contain no missing values. The scored response matrix is converted to list form and fit with **Stan**. Because no person covariates are available, the covariate matrix `W` contains only an intercept term.
 
 ```{r example_fit, cache=TRUE, results='hide', warning=FALSE, message=FALSE, tidy = TRUE}
 # Assemble data list and fit model
