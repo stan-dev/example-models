@@ -6,11 +6,13 @@ author:
   - name: Seung Yeon Lee
   - name: Joon-Ho Lee
   - name: Sophia Rabe-Hesketh
-bibliography: ../bibliography.bib
 output:
   html_document:
     toc: true
     number_sections: true
+    fig_caption: true
+    css: styles.css
+bibliography: bibliography.bib
 ---
 
 This tutorial is organized into four sections: (1) an introduction which describes the two-parameter logistic (2PL) model and the example data used in the tutorial, (2) a walkthrough for fitting and interpreting the model using the **edstan** package for **R** (3) a more technical section on fitting, extending, and checking the model using the **Stan** directly via the **rstan** package, and (4) a section on troubleshooting in the event of convergence difficulties. Researchers who are less familiar with **R** or Bayesian methods may benefit more from the second section, while researchers who already have some familiarity with these topics may be drawn to the third section. In any case, the second, third, and fourth sections may be read independently of one another.

@@ -7,8 +7,8 @@ output:
     toc: true
     number_sections: true
     fig_caption: true
-    css: ../styles.css
-bibliography: ../bibliography.bib
+    css: styles.css
+bibliography: bibliography.bib
 ---
 
 <!-- 
