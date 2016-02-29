@@ -80,8 +80,8 @@ model {
     for (t in 2:n_occasions) {
       for (k in 1:3) {
         for (j in 1:3)
-          acc[j] <- gam[t - 1, j] * ps[j, i, t - 1, k] *
-            po[k, i, t - 1, y[i, t]];
+          acc[j] <- gam[t - 1, j] * ps[j, i, t - 1, k]
+            * po[k, i, t - 1, y[i, t]];
         gam[t, k] <- sum(acc);
       }
     }
@@ -126,12 +126,8 @@ generated quantities {
     } //t
 
     for (i in 1:M) {
-      for (t in 2:n_occasions) {
-        if (z[i, t] == 2)
-          al[i, t - 1] <- 1;
-        else
-          al[i, t - 1] <- 0;
-      } //t
+      for (t in 2:n_occasions)
+        al[i, t - 1] <- (z[i, t] == 2);
       for (t in 1:(n_occasions - 1)) {
         if (z[i, t] - al[i, t] == 0)
           d[i, t] <- 1;
@@ -145,12 +141,8 @@ generated quantities {
       N[t] <- sum(al[1:M, t]);
       B[t] <- sum(d[1:M, t]);
     } //t
-    for (i in 1:M) {
-      if (alive[i] == 0)
-        w[i] <- 0;
-      else
-        w[i] <- 1;
-    } //i
+    for (i in 1:M)
+      w[i] <- (alive[i] != 0);
     Nsuper <- sum(w);
   }
 }

@@ -119,8 +119,7 @@ model {
   mean_phi ~ uniform(0, 1);
   mean_p ~ uniform(0, 1);
   gamma ~ uniform(0, 1);
-  for (t in 1:(n_occasions - 1))
-    epsilon[t] ~ normal(0, sigma);
+  epsilon ~ normal(0, sigma);
   sigma ~ uniform(0, 5);
 
   // Likelihood
@@ -137,20 +136,20 @@ model {
         vector[first[i]] lp;
 
         // Entered at 1st occasion
-        lp[1] <- bernoulli_log(1, gamma[1]) +
-                 bernoulli_log(1, prod(qp[1:(first[i] - 1)])) +
-                 bernoulli_log(1, prod(phi[i, 1:(first[i] - 1)])) +
-                 bernoulli_log(1, p[i, first[i]]);
+        lp[1] <- bernoulli_log(1, gamma[1])
+          + bernoulli_log(1, prod(qp[1:(first[i] - 1)]))
+          + bernoulli_log(1, prod(phi[i, 1:(first[i] - 1)]))
+          + bernoulli_log(1, p[i, first[i]]);
         // Entered at t-th occasion (1 < t < first[i])
         for (t in 2:(first[i] - 1))
-          lp[t] <- bernoulli_log(1, prod(qgamma[1:(t - 1)])) +
-                   bernoulli_log(1, gamma[t]) +
-                   bernoulli_log(1, prod(qp[t:(first[i] - 1)])) +
-                   bernoulli_log(1, prod(phi[i, t:(first[i] - 1)])) +
-                   bernoulli_log(1, p[i, first[i]]);
-        lp[first[i]] <- bernoulli_log(1, prod(qgamma[1:(first[i] - 1)])) +
-                        bernoulli_log(1, gamma[first[i]]) +
-                        bernoulli_log(1, p[i, first[i]]);
+          lp[t] <- bernoulli_log(1, prod(qgamma[1:(t - 1)]))
+            + bernoulli_log(1, gamma[t])
+            + bernoulli_log(1, prod(qp[t:(first[i] - 1)]))
+            + bernoulli_log(1, prod(phi[i, t:(first[i] - 1)]))
+            + bernoulli_log(1, p[i, first[i]]);
+        lp[first[i]] <- bernoulli_log(1, prod(qgamma[1:(first[i] - 1)]))
+          + bernoulli_log(1, gamma[first[i]])
+          + bernoulli_log(1, p[i, first[i]]);
         increment_log_prob(log_sum_exp(lp));
       }
       // Until last capture
@@ -164,15 +163,15 @@ model {
       vector[n_occasions+1] lp;
 
       // Entered at 1st occasion, but never captured
-      lp[1] <- bernoulli_log(1, gamma[1]) +
-               bernoulli_log(0, p[i, 1]) +
-               bernoulli_log(1, chi[i, 1]);
+      lp[1] <- bernoulli_log(1, gamma[1])
+        + bernoulli_log(0, p[i, 1])
+        + bernoulli_log(1, chi[i, 1]);
       // Entered at t-th occasion, but never captured
       for (t in 2:n_occasions)
-        lp[t] <- bernoulli_log(1, prod(qgamma[1:(t - 1)])) +
-                 bernoulli_log(1, gamma[t]) +
-                 bernoulli_log(0, p[i, t]) +
-                 bernoulli_log(1, chi[i, t]);
+        lp[t] <- bernoulli_log(1, prod(qgamma[1:(t - 1)]))
+          + bernoulli_log(1, gamma[t])
+          + bernoulli_log(0, p[i, t])
+          + bernoulli_log(1, chi[i, t]);
       // Never entered
       lp[n_occasions + 1] <- bernoulli_log(1, prod(qgamma));
       increment_log_prob(log_sum_exp(lp));
@@ -197,8 +196,8 @@ generated quantities {
     z[i, 1] <- bernoulli_rng(gamma[1]);
     for (t in 2:n_occasions) {
       q[t - 1] <- 1 - z[i, t - 1];
-      mu2 <- phi[i, t - 1] * z[i, t - 1] +
-             gamma[t] * prod(q[1:(t - 1)]);
+      mu2 <- phi[i, t - 1] * z[i, t - 1]
+        + gamma[t] * prod(q[1:(t - 1)]);
       z[i, t] <- bernoulli_rng(mu2);
     }
   }
@@ -232,7 +231,7 @@ generated quantities {
     }
     for (i in 1:M) {
       Nind[i] <- sum(z[i]);
-      Nalive[i] <- int_step(Nind[i]);
+      Nalive[i] <- (Nind[i] > 0);
     }
     Nsuper <- sum(Nalive);
   }

@@ -90,7 +90,7 @@ parameters {
   real<lower=0,upper=1> mean_p;               // Mean capture
   real<lower=0,upper=1> psi;                  // Inclusion probability
   vector<lower=0>[n_occasions] beta;
-  vector<lower=-15,upper=15>[M] epsilon;
+  vector[M] epsilon;
   real<lower=0,upper=5> sigma;
 }
 
@@ -131,8 +131,7 @@ model {
   // Priors
   mean_phi ~ uniform(0, 1);
   mean_p ~ uniform(0, 1);
-  for (i in 1:M)
-    epsilon[i] ~ normal(0, sigma);
+  epsilon ~ normal(0, sigma);
   sigma ~ uniform(0, 5);
   psi ~ uniform(0, 1);
   beta ~ gamma(1, 1);
@@ -154,20 +153,20 @@ model {
         vector[first[i]] lp;
 
         // Entered at 1st occasion
-        lp[1] <- bernoulli_log(1, nu[1]) +
-                 bernoulli_log(1, prod(qp[1:(first[i] - 1)])) +
-                 bernoulli_log(1, prod(phi[i, 1:(first[i] - 1)])) +
-                 bernoulli_log(1, p[i, first[i]]);
+        lp[1] <- bernoulli_log(1, nu[1])
+          + bernoulli_log(1, prod(qp[1:(first[i] - 1)]))
+          + bernoulli_log(1, prod(phi[i, 1:(first[i] - 1)]))
+          + bernoulli_log(1, p[i, first[i]]);
         // Entered at t-th occasion (1 < t < first[i])
         for (t in 2:(first[i] - 1))
-          lp[t] <- bernoulli_log(1, prod(qnu[1:(t - 1)])) +
-                   bernoulli_log(1, nu[t]) +
-                   bernoulli_log(1, prod(qp[t:(first[i] - 1)])) +
-                   bernoulli_log(1, prod(phi[i, t:(first[i] - 1)])) +
-                   bernoulli_log(1, p[i, first[i]]);
-        lp[first[i]] <- bernoulli_log(1, prod(qnu[1:(first[i] - 1)])) +
-                        bernoulli_log(1, nu[first[i]]) +
-                        bernoulli_log(1, p[i, first[i]]);
+          lp[t] <- bernoulli_log(1, prod(qnu[1:(t - 1)]))
+            + bernoulli_log(1, nu[t])
+            + bernoulli_log(1, prod(qp[t:(first[i] - 1)]))
+            + bernoulli_log(1, prod(phi[i, t:(first[i] - 1)]))
+            + bernoulli_log(1, p[i, first[i]]);
+        lp[first[i]] <- bernoulli_log(1, prod(qnu[1:(first[i] - 1)]))
+          + bernoulli_log(1, nu[first[i]])
+          + bernoulli_log(1, p[i, first[i]]);
         increment_log_prob(log_sum_exp(lp));
       }
       // Until last capture
@@ -181,17 +180,17 @@ model {
       vector[n_occasions+1] lp;
 
       // Entered at 1st occasion, but never captured
-      lp[1] <- bernoulli_log(1, psi) +
-               bernoulli_log(1, nu[1]) +
-               bernoulli_log(0, p[i, 1]) +
-               bernoulli_log(1, chi[i, 1]);
+      lp[1] <- bernoulli_log(1, psi)
+        + bernoulli_log(1, nu[1])
+        + bernoulli_log(0, p[i, 1])
+        + bernoulli_log(1, chi[i, 1]);
       // Entered at t-th occation (t > 1), but never captured
       for (t in 2:n_occasions)
-        lp[t] <- bernoulli_log(1, psi) +
-                 bernoulli_log(1, prod(qnu[1:(t - 1)])) +
-                 bernoulli_log(1, nu[t]) +
-                 bernoulli_log(0, p[i, t]) +
-                 bernoulli_log(1, chi[i, t]);
+        lp[t] <- bernoulli_log(1, psi)
+          + bernoulli_log(1, prod(qnu[1:(t - 1)]))
+          + bernoulli_log(1, nu[t])
+          + bernoulli_log(0, p[i, t])
+          + bernoulli_log(1, chi[i, t]);
       // Never captured
       lp[n_occasions + 1] <- bernoulli_log(0, psi);
       increment_log_prob(log_sum_exp(lp));
@@ -240,7 +239,7 @@ generated quantities {
     for (i in 1:M) {
       recruit[i, 1] <- u[i, 1];
       for (t in 2:n_occasions)
-        recruit[i,t] <- (1 - u[i, t - 1]) * u[i, t];
+        recruit[i, t] <- (1 - u[i, t - 1]) * u[i, t];
     } //i
     for (t in 1:n_occasions) {
       N[t] <- sum(u[1:M, t]);
@@ -248,7 +247,7 @@ generated quantities {
     } //t
     for (i in 1:M) {
       Nind[i] <- sum(u[i]);
-      Nalive[i] <- 1 - (Nind[i] == 0);
+      Nalive[i] <- (Nind[i] > 0);
     } //i
     Nsuper <- sum(Nalive);
   }
