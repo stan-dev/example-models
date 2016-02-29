@@ -8,8 +8,8 @@ output:
     toc_depth: 2
     number_sections: true
     fig_caption: true
-    css: styles.css
-bibliography: bibliography.bib
+    css: ../styles.css
+bibliography: ../bibliography.bib
 ---
 
 
