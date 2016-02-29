@@ -1,5 +1,5 @@
 ---
-title: "Rating scale model with latent regression"
+title: "Generalized rating scale model with latent regression"
 author: "Daniel C. Furr"
 date: "`r gsub('(^.* )(0)([0-9], .*)', '\\1\\3', format(Sys.time(), '%B %d, %Y'))`"
 output:
@@ -14,17 +14,16 @@ output:
 bibliography: bibliography.bib
 ---
 
-
 <!-- 
-(Title:)  Rating scale model with latent regression
+(Title:)  Generalized rating scale model with latent regression
 
 Author:  Daniel C. Furr
 
 Date:  2016
 
-Abstract:  This case study documents a Stan model for the rating scale model (RSM) with latent regression. The latent regression portion of the model may be restricted to an intercept only, yielding a standard RSM. A brief simulation indicates that the Stan model successfully recovers the generating parameters. An example using a survey of public perceptions of science and technology is provided.
+Abstract:  This case study documents a Stan model for the generalized rating scale model (GRSM) with latent regression. The latent regression portion of the model may be restricted to an intercept only, yielding a standard GRSM A brief simulation indicates that the Stan model successfully recovers the generating parameters. An example using a survey of public perceptions of science and technology is provided.
 
-Keywords:  education, IRT, RSM. 
+Keywords:  education, IRT, GRSM. 
 --> 
 
 ```{r, include = FALSE}
@@ -36,20 +35,20 @@ knitr::opts_chunk$set(tidy = TRUE, cache = TRUE)
 
 ## Overview
 
-The rating scale model [@andrich1978rating] is appropriate for item response data that involves Likert scale responses. The version presented includes a latent regression. However, the latent regression part of the model may be restricted to an intercept only, resulting in the standard partial credit model.
+The generalized rating scale model is appropriate for item response data that involves Likert scale responses. The version presented includes a latent regression. However, the latent regression part of the model may be restricted to an intercept only, resulting in the standard partial credit model. Also, we use the item-intercept parameterization of the model and separate the latent regression from the product of the ability and discrimination parameters for better performance.
 
 $$
-\Pr(Y_{ij} = y,~y > 0 | \theta_j, \beta_i, \kappa_s) =
-\frac{\exp \sum_{s=1}^y (\theta_j - \beta_i - \kappa_s)}
-     {1 + \sum_{k=1}^{m} \exp \sum_{s=1}^k (\theta_j - \beta_i - \kappa_s)}
+\mathrm{logit} [ \Pr(Y_{ij} = y,~y > 0 | \theta_j, \lambda, \alpha_i, \beta_i, \kappa_s) ] =
+\frac{\exp \sum_{s=1}^y (\alpha_i \theta_j + w_{j}' \lambda - \beta_i - \kappa_s)}
+     {1 + \sum_{k=1}^{m} \exp \sum_{s=1}^k (\alpha_i \theta_j + w_{j}' \lambda - \beta_i - \kappa_s)}
 $$
 $$
-\Pr(Y_{ij} = y,~y = 0 | \theta_j, \beta_i, \kappa_s) =
+\mathrm{logit} [ \Pr(Y_{ij} = y,~y = 0 | \theta_j, \lambda, \alpha_i, \beta_i, \kappa_s) ] =
 \frac{1}
-     {1 + \sum_{k=1}^{m} \exp \sum_{s=1}^k (\theta_j - \beta_i - \kappa_s)}
+     {1 + \sum_{k=1}^{m} \exp \sum_{s=1}^k (\alpha_i \theta_j + w_{j}' \lambda - \beta_i - \kappa_s)}
 $$
 $$
-\theta_j \sim \mathrm{N}(w_{j}' \lambda, \sigma^2)
+\theta_j \sim \mathrm{N}(0, \sigma^2)
 $$
 
 Variables:
@@ -57,11 +56,12 @@ Variables:
 * $i = 1 \ldots I$ indexes items
 * $j = 1 \ldots J$ indexes persons
 * $y_{ij} \in \{ 0 \ldots m_i \}$ is the response of person $j$ to item $i$
-* $m$ is simulataneously the maximum score and number of step difficulty parameters per item
+* $m$ is simulataneously the maximum score and number of step difficulty parameters
 * $w_{j}$ is the vector of covariates for person $j$
 
 Parameters:
 
+* $\alpha_i$ is the item-specific discrimination for item $i$
 * $\beta_i$ is the item-specific difficulty for item $i$
 * $\kappa_s$ is the $s$-th step difficulty, constant across items
 * $\theta_j$ is the ability for person $j$
@@ -71,14 +71,16 @@ Parameters:
 
 ## **Stan** program
 
-A few aspects of the **Stan** program for the partial credit model bear mentioning. First, the program begins with the creation of a user-specified function `rsm_probs()`, which accepts a value for `theta` and `beta` as well as a vector for `kappa`. With these inputs, it returns a vector of model-predicted probabilities for each possible response. Later, in the model block, `rsm_probs()` is used to get the likelihood of the observed item responses.
+A few aspects of the **Stan** program for the partial credit model bear mentioning. First, the prediction for person ability is calculated and temporarily stored in `mu` in the model block. This is done for efficiency and readability of the code.
 
-Second, the encoding of item responses are modified such that the lowest response category is one instead of zero. This modification takes place in the transformed data block, in which a new variable `r` is created for this purpose. The adjustment is necessary for compatibility with the `categorical()` function.
+Second, the program involves a user-specified function `grsm_probs()`, which accepts a value for `theta`, `mu` and `beta` as well as a vector for `kappa`. With these inputs, it returns a vector of model-predicted probabilities for each possible response. Later, in the model block, `grsm_probs()` is used to get the likelihood of the observed item responses.
+
+Third, the encoding of item responses are modified such that the lowest response category is one instead of zero. This modification takes place in the transformed data block, in which a new variable `r` is created for this purpose. The adjustment is necessary for compatibility with the `categorical()` function.
 
 Lastly, a constraint is placed on both `beta` and `kappa` for model identification. For `beta`, this is accomplished by creating `beta_free`, which is the vector of unconstrained item parameters, in the parameters block. Then in the transformed parameters block, `beta` is created to be identical to `beta_free` except for one additional element that is the constrained item difficulty. As a result of this constraint, the mean of `beta` will be zero. In a parallel way, `kappa` includes one constrained item parameter not found in `kappa_free`.
 
 ```{r stan_code, comment="", echo=FALSE}
-cat(readLines("rsm_latent_reg.stan"), sep = "\n")
+cat(readLines("grsm_latent_reg.stan"), sep = "\n")
 ```
 
 
@@ -86,11 +88,11 @@ cat(readLines("rsm_latent_reg.stan"), sep = "\n")
 
 First, the necessary **R** packages are loaded.
 
-```{r load_packages, message=FALSE, warning=FALSE, results="hide"}
+```{r, message=FALSE, warning=FALSE, results="hide"}
 # Load R packages
 library(rstan)
-rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
 library(ggplot2)
 ```
 
@@ -99,14 +101,15 @@ The **R** code that follows simulates a dataset conforming to the model. The **S
 ```{r sim_data}
 # Person covariates and abilities
 J <- 500
-sigma <- 1
 lambda <- c(.5, .5, .5)
 W <- cbind(1, rnorm(J, 0, 1), rnorm(J, 0, 1))
-theta <-  W %*% matrix(lambda) + rnorm(J, 0, sigma)
+mu <- W %*% matrix(lambda)
+theta <- rnorm(J, 0, 1)
 
 # Item parameters
 I <- 20
 S <- 5
+alpha <- rep(c(.8, 1, 1.2), length.out = I)
 beta_uncentered <- seq(from = -1, to = 1, length.out = I)
 beta <- beta_uncentered - mean(beta_uncentered)
 kappa <- seq(from = -1, to = 1, length.out = S - 1)
@@ -121,8 +124,8 @@ sim_data <- list(I = I,
                  W <- W)
 
 # Function to simulate responses
-simulate_response <- function(theta, beta, kappa) {
-  unsummed <- c(0, theta - beta - kappa)
+simulate_response <- function(theta, mu, alpha, beta, kappa) {
+  unsummed <- c(0, alpha*theta + mu - beta - kappa)
   numerators <- exp(cumsum(unsummed))
   denominator <- sum(numerators)
   response_probs <- numerators/denominator
@@ -135,17 +138,19 @@ simulate_response <- function(theta, beta, kappa) {
 sim_data$y <- numeric(sim_data$N)
 for(n in 1:sim_data$N) {
   sim_data$y[n] <- simulate_response(theta[sim_data$jj[n]],
-                                      beta[sim_data$ii[n]],
-                                      kappa)
+                                     mu[sim_data$jj[n]],
+                                     alpha[sim_data$ii[n]],
+                                     beta[sim_data$ii[n]],
+                                     kappa)
 }
 ```
 
-The simulated data consists of `r I` items, each with `r S` response categories, and `r J` persons. The simulated dataset is next fit with **Stan**.
+The simulated data consists of `r I` items, each with `r S` categories, and `r J` persons. The latent regression includes an intercept and `r length(lambda) - 1` person-related covariates, which are standard normal variables. Next, the model is fit to the simulated dataset with **Stan**.
 
-```{r sim_fit, cache=TRUE, results='hide', warning=FALSE, message=FALSE, tidy = TRUE}
+```{r sim_fit, results='hide'}
 #Fit model to simulated data
-sim_fit <- stan(file = "rsm_latent_reg.stan",
-                data = sim_data, chains = 4, iter = 300)
+sim_fit <- stan(file = "grsm_latent_reg.stan",
+                data = sim_data, chains = 4, iter = 1000)
 ```
 
 Before interpreting the results, it is necessary to check that the chains have converged. **Stan** provides the $\hat{R}$ statistic for the model parameters and log posterior. These are provided in the following figure. All values for $\hat{R}$ should be less than 1.1.
@@ -162,15 +167,16 @@ ggplot(sim_monitor) +
 
 The **Stan** model is evaluated in terms of its ability to recover the generating values of the parameters. The R code below prepares a plot in which the points indicate the difference between the posterior means and generating values for the parameters of main interest. This difference is referred to as discrepancy. The lines indicate the 95% posterior intervals for the difference. Ideally, (nearly) all the 95% posterior intervals would include zero.
 
-```{r sim_plot, tidy = TRUE, fig.height=6, fig.cap="Discrepancies between estimated and generating parameters. Points indicate the difference between the posterior means and generating values for a parameter, and horizontal lines indicate 95% posterior intervals for the difference. Most of the discrepancies are about zero, indicating that **Stan** successfully recovers the true parameters."}
+```{r sim_plot, fig.height=8, fig.cap="Discrepancies between estimated and generating parameters. Points indicate the difference between the posterior means and generating values for a parameter, and horizontal lines indicate 95% posterior intervals for the difference. Most of the discrepancies are about zero, indicating that **Stan** successfully recovers the true parameters."}
 # Make vector of wanted parameter names
-wanted_pars <- c(paste0("beta[", 1:length(beta), "]"),
+wanted_pars <- c(paste0("alpha[", 1:length(alpha), "]"),
+                 paste0("beta[", 1:length(beta), "]"),
                  paste0("kappa[", 1:length(kappa), "]"),
-                 paste0("lambda[", 1:ncol(W), "]"),
-                 "sigma")
+                 paste0("lambda[", 1:ncol(W), "]"))
 
 # Get estimated and generating values for wanted parameters
-generating_values = c(beta, kappa, lambda, sigma)
+generating_values = c(alpha, beta, kappa, lambda)
+sim_monitor <- monitor(sim_fit, probs = c(.025, .975), print = FALSE)
 estimated_values <- sim_monitor[wanted_pars, c("mean", "2.5%", "97.5%")]
 
 # Assesmble a data frame to pass to ggplot()
@@ -219,7 +225,7 @@ freqs
 
 The data are now formatted into a list and fit with **Stan**.
 
-```{r example_fit, tidy = TRUE, cache = TRUE, results='hide', warning=FALSE, message=FALSE}
+```{r example_fit, results='hide'}
 # Assemble data list for Stan
 ex_list <- list(I = ncol(M),
                 J = nrow(M),
@@ -231,13 +237,13 @@ ex_list <- list(I = ncol(M),
                 W = matrix(1, nrow = nrow(M), ncol = 1))
 
 # Run Stan model
-ex_fit <- stan(file = "rsm_latent_reg.stan",
-               data = ex_list, chains = 4, iter = 300)
+ex_fit <- stan(file = "grsm_latent_reg.stan",
+               data = ex_list, chains = 4, iter = 1000)
 ```
 
 As discussed above, convergence of the chains is assessed for every parameter, and also the log posterior density, using $\hat{R}$.
 
-```{r ex_converge, tidy=TRUE, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the example. All values should be less than 1.1 to infer convergence."}
+```{r ex_converge, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the example. All values should be less than 1.1 to infer convergence."}
 # Plot of convergence statistics
 ex_monitor <- as.data.frame(monitor(ex_fit, print = FALSE))
 ex_monitor$Parameter <- as.factor(gsub("\\[.*]", "", rownames(ex_monitor)))
@@ -249,9 +255,9 @@ ggplot(ex_monitor) +
 
 Next we view a summary of the parameter posteriors.
 
-```{r example_print, tidy = TRUE}
+```{r example_print}
 # View table of parameter posteriors
-print(ex_fit, pars = c("beta", "kappa", "lambda", "sigma"))
+print(ex_fit, pars = c("alpha", "beta", "kappa", "lambda"))
 ```
 
 

@@ -4,11 +4,13 @@ author: "Daniel C. Furr"
 date: "`r gsub('(^.* )(0)([0-9], .*)', '\\1\\3', format(Sys.time(), '%B %d, %Y'))`"
 output:
   html_document:
+    self_contained: false
     toc: true
-    toc_depth: 2
     number_sections: true
     fig_caption: true
     css: styles.css
+    includes:
+      after_body: copyright.html
 bibliography: bibliography.bib
 ---
 
@@ -189,7 +191,7 @@ ggplot(sim_df) +
 
 The example data are from the TIMSS 2011 mathematics assessment [@mullis2012timss] of Australian and Taiwanese students. For convenience, a subset of 500 students is used. The subsetted data is then divided into a person covariate matrix and an item response matrix.
 
-```{r example_start, tidy = TRUE}
+```{r example_subset_data}
 # Attach the example dataset. The TAM package is required.
 data(data.timssAusTwn.scored, package = "TAM")
 
@@ -197,15 +199,23 @@ data(data.timssAusTwn.scored, package = "TAM")
 select <- floor(seq(from = 1, to = nrow(data.timssAusTwn.scored), 
                     length.out = 500))
 subsetted_df <- data.timssAusTwn.scored[select, ]
+str(subsetted_df)
+```
 
+
+The dataset is next divided into an item response matrix and a matrix of student covariates.
+
+```{r example_separate_matrices}
 # Make a matrix of person predictors
 w_mat <- cbind(intercept = rep(1, times = nrow(subsetted_df)),
                taiwan = as.numeric(subsetted_df$IDCNTRY == 158),
                female = as.numeric(subsetted_df$ITSEX == 2),
                book14 = as.numeric(subsetted_df$IDBOOK == 14))
+head(w_mat)
 
 # Make a matrix of item responses
 y_mat <- as.matrix(subsetted_df[, grep("^M", names(subsetted_df))])
+head(y_mat)
 ```
 
 The person covariate matrix `w_mat` has columns representing an intercept and three indicator variables for being in Taiwan (versus Australia), being female (versus male), and being assigned test booklet 14 (instead of booklet 1). The item response matrix `y_mat` contains `r ncol(y_mat)` items. Neither the response matrix or person covariates contain missing data.
@@ -289,15 +299,10 @@ print(ex_fit, pars = c("beta", "lambda", "sigma"))
 
 If person covariates are unavailable, or their inclusion unwanted, the model may be fit restricting the matrix of person covariates to an intercept only. In this case, the vector `lambda` contains only one element, which will represent the mean of the ability distribution. The code below is an example of how to structure the data for **Stan** for this purpose.
 
-```{r example_noreg, tidy = TRUE, eval=FALSE}
-noreg_list <- list(I = ncol(y_mat),
-                J = nrow(y_mat),
-                N = length(y_mat),
-                ii = rep(1:ncol(y_mat), each = nrow(y_mat)),
-                jj = rep(1:nrow(y_mat), times = ncol(y_mat)),
-                y = as.vector(y_mat),
-                K = 1,
-                W = matrix(1, nrow = nrow(M), ncol = 1))
+```{r example_noreg, eval=FALSE}
+noreg_list <- ex_list
+noreg_list$K <- 1
+noreg_list$W <- matrix(1, nrow = nrow(M), ncol = 1)
 
 noreg_fit <- stan(file = "pcm_latent_reg.stan",
                 data = noreg_list, chains = 4, iter = 300)
