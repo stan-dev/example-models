@@ -8,15 +8,10 @@ output:
     toc: true
     number_sections: true
     fig_caption: true
-<<<<<<< HEAD:education/hierarchical_2pl/hierarchical_2pl.Rmd
     css: ../styles.css
-bibliography: ../bibliography.bib
-=======
-    css: styles.css
     includes:
-      after_body: copyright.html
-bibliography: bibliography.bib
->>>>>>> 3bd1f0ba99f6590c190cec689fdec25ba41f6297:education/hierarchical_2pl.Rmd
+      after_body: ../copyright.html
+bibliography: ../bibliography.bib
 ---
 
 
