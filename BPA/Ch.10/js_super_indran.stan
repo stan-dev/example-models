@@ -91,7 +91,7 @@ parameters {
   real<lower=0,upper=1> psi;                  // Inclusion probability
   vector<lower=0>[n_occasions] beta;
   vector[M] epsilon;
-  real<lower=0,upper=5> sigma;
+  real<lower=0,upper=20> sigma;
 }
 
 transformed parameters {
@@ -132,7 +132,7 @@ model {
   mean_phi ~ uniform(0, 1);
   mean_p ~ uniform(0, 1);
   epsilon ~ normal(0, sigma);
-  sigma ~ uniform(0, 5);
+  sigma ~ uniform(0, 20);
   psi ~ uniform(0, 1);
   beta ~ gamma(1, 1);
 

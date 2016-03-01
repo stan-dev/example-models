@@ -17,8 +17,8 @@ params <- c("sigma2", "psi", "mean_p", "mean_phi",
             "N", "Nsuper", "b", "B")
 
 ## MCMC settings
-ni <- 6000
-nt <- 4
+ni <- 8000
+nt <- 6
 nb <- 2000
 nc <- 4
 
