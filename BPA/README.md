@@ -4,7 +4,7 @@ Models from the book "Bayesian Population Analysis using WinBUGS --- A Hierarchi
 
 Original BUGS code and data files are available at [the website of the book](http://www.vogelwarte.ch/de/projekte/publikationen/bpa/complete-code-and-data-files-of-the-book.html).
 
-Stan translations was done by Hiroki Itô <abies.firma@gmail.com>. I thank Dr. Kéry and Dr. Schaub for permitting to publish Stan translated models. I also thank Dr. Bob Carpenter for reviewing the code.
+Stan translations was done by Hiroki Itô <abies.firma@gmail.com>. I thank Dr. Kéry and Dr. Schaub for permitting to publish Stan translated models. I also thank Dr. Keiichi Fukaya for helpful advice, and Dr. Bob Carpenter for reviewing the code.
 
 ## Contents of the book
 
@@ -23,4 +23,4 @@ Stan translations was done by Hiroki Itô <abies.firma@gmail.com>. I thank Dr. K
 * Chapter 13. Estimation of Occupancy and Species Distributions from Detection/Nondetection Data in Metapopulation Designs Using Site-Occupancy Models
 * Chapter 14. Concluding Remarks
 
-Stan-translation is now completed to Chapter 9.
+Stan-translation is now completed to Chapter 10.
