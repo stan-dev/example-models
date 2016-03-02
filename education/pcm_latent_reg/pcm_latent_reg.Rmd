@@ -8,10 +8,10 @@ output:
     toc: true
     number_sections: true
     fig_caption: true
-    css: styles.css
+    css: ../styles.css
     includes:
-      after_body: copyright.html
-bibliography: bibliography.bib
+      after_body: ../copyright.html
+bibliography: ../bibliography.bib
 ---
 
 
