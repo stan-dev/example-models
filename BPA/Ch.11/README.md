@@ -1,0 +1,1 @@
+Note: The original BUGS models in Chapter 11 treat population sizes as real values. For compatibility with OpenBUGS, the Stan-translated models define two functions, real\_poisson\_log() and real\_binomial\_log(). The latter will throw exceptions during samplings. In addition, the models may generate divergent transitions,
