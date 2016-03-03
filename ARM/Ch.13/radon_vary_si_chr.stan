@@ -12,7 +12,6 @@ parameters {
   real<lower=0,upper=100> sigma_a1;
   real<lower=0,upper=100> sigma_a2;
   real<lower=0,upper=100> sigma_y;
-  real mu_a;
 }
 transformed parameters {
   vector[85] a1;
