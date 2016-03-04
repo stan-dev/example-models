@@ -4,13 +4,10 @@ author: "Daniel C. Furr"
 date: "`r gsub('(^.* )(0)([0-9], .*)', '\\1\\3', format(Sys.time(), '%B %d, %Y'))`"
 output:
   html_document:
-    self_contained: false
     toc: true
     number_sections: true
     fig_caption: true
     css: ../styles.css
-    includes:
-      after_body: ../copyright.html
 bibliography: ../bibliography.bib
 ---
 
@@ -37,40 +34,45 @@ knitr::opts_chunk$set(tidy = TRUE, cache = TRUE)
 
 The two-parameter logistic model (2PL) [@swaminathan1985bayesian] is an item response theory model that includes parameters for both the difficulty and discrimination of dichotomous items. 
 The version presented includes a latent regression. However, the latent regression part of the model may be restricted to an intercept only, resulting in a regular 2PL.
-Also, we use the item-intercept parameterization of the model and separate the latent regression from the product of the ability and discrimination parameters for better performance.
 
 $$
   \mathrm{logit} [ \Pr(y_{ij} = 1 | \alpha_i, \beta_i, \theta_j, \lambda) ] =
-  \alpha_i \theta_j + w_j' \lambda - \beta_i
+  \alpha_i (\theta_j + w_j' \lambda - \beta_i)
 $$
 $$
   \theta_j \sim \mathrm{N}(0, 1)
 $$
 
-
-
 Variables:
 
-* $i = 1 \ldots I$ indexes items
-* $j = 1 \ldots J$ indexes persons
-* $y_{ij} \in \{ 0 \ldots m_i \}$ is the response of person $j$ to item $i$
-* $w_{j}$ is the vector of covariates for person $j$
+* $i = 1 \ldots I$ indexes items.
+* $j = 1 \ldots J$ indexes persons.
+* $y_{ij} \in \{ 0 , 1 \}$ is the response of person $j$ to item $i$.
+* $w_{j}$ is the vector of covariates for person $j$, which will in general include an intercept term.
 
 Parameters:
 
-* $\alpha_i$ is the discrimination for item $i$
-* $\beta_i$ is the difficulty for item $i$
-* $\theta_j$ is the ability for person $j$
-* $\lambda$ is the vector of latent regression parameters
+* $\alpha_i$ is the discrimination for item $i$.
+* $\beta_i$ is the difficulty for item $i$.
+* $\theta_j$ is the ability for person $j$.
+* $\lambda$ is the vector of latent regression parameters.
+
+Constraints:
+
+* The last item difficulty is constrained to be the negative sum of the other difficulties, $\beta_I = -\sum_{i}^{(I-1)} \beta_i$, resulting in the average item difficulty being zero.
+
+Priors:
+
+* $\alpha_i \sim \mathrm{log~N}(1, 1)$ is weakly informative, except that positive discrimination parameters are assumed.
+* $\beta_1 \ldots \beta_{I-1} \sim \mathrm{N}(0, 5)$ is weakly informative, and no prior is needed for the contrained difficulty $\beta_I$.
+* A uniform prior is chosen for $\lambda$ because the scale of the person covariates will vary depending on the application.
 
 
 ## **Stan** program
 
-The **Stan** program is nearly a direct translation of the notation above, with two exceptions. First, a constraint is placed on the item difficulties for model identification. This is accomplished by creating `beta_free`, which is the vector of unconstrained item parameters, in the parameters block. Then in the transformed parameters block, `beta` is created to be identical to `beta_free` except for one additional element that is the constrained item difficulty. As a result of this constraint, the mean of `beta` will be zero.
+The **Stan** program is presented below. The constraint is placed on the last item difficulty by creating `beta_free`, which is the vector of unconstrained item parameters, in the parameters block. Then in the transformed parameters block, `beta` is created to be identical to `beta_free` except for one additional element that is the constrained item difficulty.
 
-Second, the prediction for person ability is calculated and temporarily stored in `mu` in the model block. This is done for efficiency and readability of the code.
-
-Third, positive discrimination parameters are assumed for identifiability.
+No priors are specified for `lambda`, the regression coefficients, because the scale of the person covariates may very greatly depending on the application. In the absence of a specified prior, **Stan** will assign the uniform prior. Readers should consider adding appropriate priors for `lambda` to the **Stan** program according to their knowledge of the problem.
 
 ```{r stan_code, comment="", echo=FALSE}
 cat(readLines("2pl_latent_reg.stan"), sep = "\n")
@@ -78,6 +80,8 @@ cat(readLines("2pl_latent_reg.stan"), sep = "\n")
 
 
 # Simulation
+
+The **Stan** model is fit to a simulated dataset to evaluate it's ability to recover the generating parameter values. The simulation is conducted in **R** and analysis proceeds using the **rstan** implementation of **Stan**.
 
 First, the necessary **R** packages are loaded.
 
@@ -89,7 +93,7 @@ options(mc.cores = parallel::detectCores())
 library(ggplot2)
 ```
 
-The **R** code that follows simulates a dataset conforming to the model. The **Stan** model will be evaluated in terms of its ability to recover the generating values of the parameters when fit to this dataset.
+The **R** code that follows simulates a dataset conforming to the model.
 
 ```{r sim_data}
 # Set paramters for the simulated data
@@ -111,16 +115,16 @@ sim_data <- list(I = I,
                  J = J,
                  N = I*J,
                  ii = rep(1:I, times = J),
-                 jj = rep(1:J, each = I))
+                 jj = rep(1:J, each = I),
+                 K = ncol(W),
+                 W = W)
 eta <- alpha[sim_data$ii]*theta[sim_data$jj] + mu[sim_data$jj] - beta[sim_data$ii]
 sim_data$y <- as.numeric(boot::inv.logit(eta) > runif(sim_data$N))
-sim_data$K <- ncol(W)
-sim_data$W <- W
 ```
 
 The simulated data consists of `r I` dichotomous items and `r J` persons. The latent regression includes an intercept and `r length(lambda) - 1` person-related covariates, which are standard normal variables. The simulated dataset is next fit with **Stan**.
 
-```{r sim_fit}
+```{r sim_fit, result="hide"}
 # Fit model to simulated data
 sim_fit <- stan(file = "2pl_latent_reg.stan",
                 data = sim_data, chains = 4, iter = 1000)
@@ -206,7 +210,7 @@ head(W)
 
 `r nrow(W)` students responded to `r ncol(W)` dichotomously scored items. The data contain no missing values. The two matrices are converted to a list suitable for the **Stan** model.
 
-```{r example_fit}
+```{r example_fit, , result="hide"}
 # Assemble data list and fit model
 ex_list <- list(I = ncol(response_matrix),
                 J = nrow(response_matrix),

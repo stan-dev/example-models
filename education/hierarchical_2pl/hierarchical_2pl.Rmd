@@ -4,13 +4,10 @@ author: "Daniel C. Furr"
 date: "`r gsub('(^.* )(0)([0-9], .*)', '\\1\\3', format(Sys.time(), '%B %d, %Y'))`"
 output:
   html_document:
-    self_contained: false
     toc: true
     number_sections: true
     fig_caption: true
     css: ../styles.css
-    includes:
-      after_body: ../copyright.html
 bibliography: ../bibliography.bib
 ---
 
@@ -120,7 +117,7 @@ data_list$y <- as.numeric(boot::inv.logit(eta) > runif(data_list$N))
 
 The simulated data consists of `r I` items and `r J` persons. The log discriminations have mean `r mu[1]` and standard deviation `r tau[1]`. The difficulties have mean `r mu[2]` and standard deviation `r tau[2]`. The correlation between the log discrimination residuals and difficulty residuals is `r Omega[1,2]`. The simulated dataset is fit with **Stan**.
 
-```{r sim_fit, results='hide', warning=FALSE, message=FALSE}
+```{r sim_fit, results='hide'}
 # Fit model to simulated data
 sim_fit <- stan(file = "hierarchical_2pl.stan", 
                 data = data_list, chains = 4, iter = 1000)
@@ -180,7 +177,7 @@ sat <- key2binary(SAT12,
 
 The example data [@testfact4] are from a grade 12 science assessment. `r nrow(sat)` students responded to `r ncol(sat)` dichotomously scored items. Non-responses were scored as incorrect, so the data contain no missing values. The scored response matrix is converted to list form and fit with **Stan**.
 
-```{r example_fit, cache=TRUE, results='hide', warning=FALSE, message=FALSE}
+```{r example_fit, , result="hide"}
 # Assemble data list and fit model
 sat_list <- list(I = ncol(sat),
                  J = nrow(sat),
