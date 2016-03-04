@@ -4,13 +4,10 @@ author: "Daniel C. Furr"
 date: "`r gsub('(^.* )(0)([0-9], .*)', '\\1\\3', format(Sys.time(), '%B %d, %Y'))`"
 output:
   html_document:
-    self_contained: false
     toc: true
     number_sections: true
     fig_caption: true
     css: ../styles.css
-    includes:
-      after_body: ../copyright.html
 bibliography: ../bibliography.bib
 ---
 
@@ -155,7 +152,7 @@ sim_fit <- stan(file = "grsm_latent_reg.stan",
 
 Before interpreting the results, it is necessary to check that the chains have converged. **Stan** provides the $\hat{R}$ statistic for the model parameters and log posterior. These are provided in the following figure. All values for $\hat{R}$ should be less than 1.1.
 
-```{r sim_converge, tidy=TRUE, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the simulation. All values should be less than 1.1 to infer convergence."}
+```{r sim_converge, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the simulation. All values should be less than 1.1 to infer convergence."}
 # Plot of convergence statistics
 sim_monitor <- as.data.frame(monitor(sim_fit, print = FALSE))
 sim_monitor$Parameter <- as.factor(gsub("\\[.*]", "", rownames(sim_monitor)))
@@ -203,7 +200,7 @@ ggplot(sim_df) +
 
 The example data are from the Consumer Protection and Perceptions of Science and Technology section of the 1992 Euro-Barometer Survey [@Karlheinz1992]. Because these data do not include person covariates, the latent regression aspect of the model will include an intercept only.
 
-```{r example_data, tidy = TRUE}
+```{r example_data}
 # Attach the example dataset. The ltm package is required.
 data(Science, package = "ltm")
 
@@ -216,7 +213,7 @@ The dataset contains `r ncol(Science)` items and `r nrow(Science)` persons with 
 
 Before fitting the model, the response frequencies for each item are considered.
 
-```{r example_freqs, tidy = TRUE}
+```{r example_freqs}
 # Frequencies for each item
 freqs <- t(apply(M, 2, table))
 rownames(freqs) <- names(Science)

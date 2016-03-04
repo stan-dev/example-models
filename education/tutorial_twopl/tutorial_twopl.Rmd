@@ -8,13 +8,10 @@ author:
   - name: Sophia Rabe-Hesketh
 output:
   html_document:
-    self_contained: false
     toc: true
     number_sections: true
     fig_caption: true
     css: ../styles.css
-    includes:
-      after_body: ../copyright.html
 bibliography: ../bibliography.bib
 ---
 

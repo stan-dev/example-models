@@ -27,6 +27,10 @@ Abstract:  This case study documents a Stan model for the partial credit model (
 Keywords:  education, IRT, PCM. 
 --> 
 
+```{r knitr_opts, include = FALSE}
+knitr::opts_chunk$set(tidy = TRUE, cache = TRUE)
+```
+
 
 # Model
 
@@ -74,7 +78,7 @@ Third, the variables `m` and `pos` are also created in the transformed data bloc
 
 Lastly, a constraint is placed on the item difficulties for model identification. This is accomplished by creating `beta_free`, which is the vector of unconstrained item parameters, in the parameters block. Then in the transformed parameters block, `beta` is created to be identical to `beta_free` except for one additional element that is the constrained item difficulty. As a result of this constraint, the mean of `beta` will be zero.
 
-```{r stan_code, tidy = TRUE, comment="", echo=FALSE}
+```{r stan_code, comment="", echo=FALSE}
 cat(readLines("pcm_latent_reg.stan"), sep = "\n")
 ```
 
@@ -93,7 +97,7 @@ library(ggplot2)
 
 The **R** code that follows simulates a dataset conforming to the model. The **Stan** model will be evaluated in terms of its ability to recover the generating values of the parameters when fit to this dataset.
 
-```{r sim_data, cache=TRUE, results='hide', warning=FALSE, message=FALSE, tidy = TRUE}
+```{r sim_data}
 # Generate person-related parameters and predictors
 J <- 500
 sigma <- 1
@@ -136,7 +140,7 @@ data_list$W <- W
 
 The simulated data consists of `r I` items, each with `r ncol(Beta_centered) + 1` response categories, and `r J` persons. The simulated dataset is next fit with **Stan**.
 
-```{r sim_fit, cache=TRUE, results='hide', warning=FALSE, message=FALSE, tidy = TRUE}
+```{r sim_fit, result="hide"}
 #Fit model to simulated data
 sim_fit <- stan(file = "pcm_latent_reg.stan", 
                 data = data_list, chains = 4, iter = 200)
@@ -144,7 +148,7 @@ sim_fit <- stan(file = "pcm_latent_reg.stan",
 
 Before interpreting the results, it is necessary to check that the chains have converged. **Stan** provides the $\hat{R}$ statistic for the model parameters and log posterior. These are provided in the following figure. All values for $\hat{R}$ should be less than 1.1.
 
-```{r sim_converge, tidy=TRUE, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the simulation. All values should be less than 1.1 to infer convergence."}
+```{r sim_converge, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the simulation. All values should be less than 1.1 to infer convergence."}
 # Plot of convergence statistics
 sim_monitor <- as.data.frame(monitor(sim_fit, print = FALSE))
 sim_monitor$Parameter <- as.factor(gsub("\\[.*]", "", rownames(sim_monitor)))
@@ -156,7 +160,7 @@ ggplot(sim_monitor) +
 
 The **Stan** model is evaluated in terms of its ability to recover the generating values of the parameters. The R code below prepares a plot in which the points indicate the difference between the posterior means and generating values for the parameters of main interest. This difference is referred to as discrepancy. The lines indicate the 95% posterior intervals for the difference. Ideally, (nearly) all the 95% posterior intervals would include zero.
 
-```{r sim_plot, tidy = TRUE, fig.height=8, fig.cap="Discrepancies between estimated and generating parameters. Points indicate the difference between the posterior means and generating values for a parameter, and horizontal lines indicate 95% posterior intervals for the difference. Most of the discrepancies are about zero, indicating that **Stan** successfully recovers the true parameters."}
+```{r sim_plot, fig.height=8, fig.cap="Discrepancies between estimated and generating parameters. Points indicate the difference between the posterior means and generating values for a parameter, and horizontal lines indicate 95% posterior intervals for the difference. Most of the discrepancies are about zero, indicating that **Stan** successfully recovers the true parameters."}
 # Make vector of wanted parameter names
 beta <- as.vector(t(Beta_centered))
 wanted_pars <- c(paste0("beta[", 1:length(beta), "]"), 
@@ -222,7 +226,7 @@ The person covariate matrix `w_mat` has columns representing an intercept and th
 
 Before fitting the model, some descriptive statistics are considered. First, a frequency table for the person covariates is created.
 
-```{r example_descriptives_1, tidy = TRUE}
+```{r example_descriptives_1}
 # Customized version of table() that does not omit missing categories. Specify
 # expected categories with key.
 consec_table <- function(x, key) {
@@ -239,7 +243,7 @@ t(apply(w_mat, 2, consec_table, key = 0:1))
 
 Next, a frequency table for item responses is considered.
 
-```{r example_descriptives_2, tidy = TRUE}
+```{r example_descriptives_2}
 # Frequency table for item responses
 item_freqs <- t(apply(y_mat, 2, consec_table, key = 0:2))
 item_freqs
@@ -249,7 +253,7 @@ The table shows that the data are a mixture of dichotomous item and polytomous i
 
 Because all item parameters are stored in one vector, `beta`, some care is required in understanding which elements of `beta` correspond to which items. The following **R** code produces a table that maps each element in `beta` corresponds to its associated item and step.
 
-```{r example_beta_key, tidy = TRUE}
+```{r example_beta_key}
 # Make a table mapping elements of beta to items/steps
 x <- item_freqs[,-1] > 0
 beta_key_trans <- t(matrix(NA, ncol = ncol(x), nrow = nrow(x)))
@@ -262,7 +266,7 @@ beta_key
 
 The data are now formatted into a list and fit with **Stan**.
 
-```{r example_fit, tidy = TRUE, cache = TRUE, results='hide', warning=FALSE, message=FALSE}
+```{r example_fit, result="hide"}
 # Assemble data list for Stan
 ex_list <- list(I = ncol(y_mat),
                 J = nrow(y_mat),
@@ -280,7 +284,7 @@ ex_fit <- stan(file = "pcm_latent_reg.stan",
 
 As discussed above, convergence of the chains is assessed for every parameter, and also the log posterior density, using $\hat{R}$.
 
-```{r ex_converge, tidy=TRUE, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the example. All values should be less than 1.1 to infer convergence."}
+```{r ex_converge, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the example. All values should be less than 1.1 to infer convergence."}
 # Plot of convergence statistics
 ex_monitor <- as.data.frame(monitor(ex_fit, print = FALSE))
 ex_monitor$Parameter <- as.factor(gsub("\\[.*]", "", rownames(ex_monitor)))
@@ -292,7 +296,7 @@ ggplot(ex_monitor) +
 
 Next we view a summary of the parameter posteriors.
 
-```{r example_print, tidy = TRUE}
+```{r example_print}
 # View table of parameter posteriors
 print(ex_fit, pars = c("beta", "lambda", "sigma"))
 ```
