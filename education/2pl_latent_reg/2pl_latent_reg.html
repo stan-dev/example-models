@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+
+<meta charset="utf-8">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="pandoc" />
+
+<meta name="author" content="Daniel C. Furr" />
+
+
+<title>Two-parameter logistic model with latent regression</title>
+
+<script src="2pl_latent_reg_files/jquery-1.11.0/jquery.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="2pl_latent_reg_files/bootstrap-3.3.1/css/cerulean.min.css" rel="stylesheet" />
+<script src="2pl_latent_reg_files/bootstrap-3.3.1/js/bootstrap.min.js"></script>
+<script src="2pl_latent_reg_files/bootstrap-3.3.1/shim/html5shiv.min.js"></script>
+<script src="2pl_latent_reg_files/bootstrap-3.3.1/shim/respond.min.js"></script>
+
+<style type="text/css">code{white-space: pre;}</style>
+<link rel="stylesheet"
+      href="2pl_latent_reg_files/highlight/default.css"
+      type="text/css" />
+<script src="2pl_latent_reg_files/highlight/highlight.js"></script>
+<style type="text/css">
+  pre:not([class]) {
+    background-color: white;
+  }
+</style>
+<script type="text/javascript">
+if (window.hljs && document.readyState && document.readyState === "complete") {
+   window.setTimeout(function() {
+      hljs.initHighlighting();
+   }, 0);
+}
+</script>
+
+
+<link rel="stylesheet" href="..\styles.css" type="text/css" />
+
+</head>
+
+<body>
+
+<style type = "text/css">
+.main-container {
+  max-width: 940px;
+  margin-left: auto;
+  margin-right: auto;
+}
+code {
+  color: inherit;
+  background-color: rgba(0, 0, 0, 0.04);
+}
+img { 
+  max-width:100%; 
+  height: auto; 
+}
+</style>
+<div class="container-fluid main-container">
+
+
+<div id="header">
+<h1 class="title">Two-parameter logistic model with latent regression</h1>
+<h4 class="author"><em>Daniel C. Furr</em></h4>
+<h4 class="date"><em>March 2, 2016</em></h4>
+</div>
+
+<div id="TOC">
+<ul>
+<li><a href="#model"><span class="toc-section-number">1</span> Model</a><ul>
+<li><a href="#overview"><span class="toc-section-number">1.1</span> Overview</a></li>
+<li><a href="#stan-program"><span class="toc-section-number">1.2</span> <strong>Stan</strong> program</a></li>
+</ul></li>
+<li><a href="#simulation"><span class="toc-section-number">2</span> Simulation</a></li>
+<li><a href="#example-application"><span class="toc-section-number">3</span> Example application</a></li>
+<li><a href="#references"><span class="toc-section-number">4</span> References</a></li>
+</ul>
+</div>
+
+<!-- 
+(Title:)  Two-parameter logistic model with latent regression
+
+Author:  Daniel C. Furr
+
+Date:  2016
+
+Abstract:  This case study documents a Stan model for the two-parameter logistic model (2PL) with latent regression. The latent regression portion of the model may be restricted to an intercept only, yielding a standard 2PL. A brief simulation indicates that the Stan model successfully recovers the generating parameters. An example using a grade 12 science assessment is provided.
+
+Keywords:  education, IRT, 2PL. 
+-->
+<div id="model" class="section level1">
+<h1><span class="header-section-number">1</span> Model</h1>
+<div id="overview" class="section level2">
+<h2><span class="header-section-number">1.1</span> Overview</h2>
+<p>The two-parameter logistic model (2PL) <span class="citation">(Swaminathan and Gifford 1985)</span> is an item response theory model that includes parameters for both the difficulty and discrimination of dichotomous items. The version presented includes a latent regression. However, the latent regression part of the model may be restricted to an intercept only, resulting in a regular 2PL. Also, we use the item-intercept parameterization of the model and separate the latent regression from the product of the ability and discrimination parameters for better performance.</p>
+<p><span class="math">\[
+  \mathrm{logit} [ \Pr(y_{ij} = 1 | \alpha_i, \beta_i, \theta_j, \lambda) ] =
+  \alpha_i (\theta_j + w_j&#39; \lambda - \beta_i)
+\]</span> <span class="math">\[
+  \theta_j \sim \mathrm{N}(0, 1)
+\]</span></p>
+<p>Variables:</p>
+<ul>
+<li><span class="math">\(i = 1 \ldots I\)</span> indexes items</li>
+<li><span class="math">\(j = 1 \ldots J\)</span> indexes persons</li>
+<li><span class="math">\(y_{ij} \in \{ 0 , 1 \}\)</span> is the response of person <span class="math">\(j\)</span> to item <span class="math">\(i\)</span></li>
+<li><span class="math">\(w_{j}\)</span> is the vector of covariates for person <span class="math">\(j\)</span>, which must include an intercept term</li>
+</ul>
+<p>Parameters:</p>
+<ul>
+<li><span class="math">\(\alpha_i\)</span> is the discrimination for item <span class="math">\(i\)</span></li>
+<li><span class="math">\(\beta_i\)</span> is the difficulty for item <span class="math">\(i\)</span></li>
+<li><span class="math">\(\theta_j\)</span> is the ability for person <span class="math">\(j\)</span></li>
+<li><span class="math">\(\lambda\)</span> is the vector of latent regression parameters</li>
+</ul>
+<p>Constraints:</p>
+<ul>
+<li><span class="math">\(\beta_I = -\frac{1}{I-1} \sum_{i}^{(I-1)} \beta_i\)</span></li>
+</ul>
+</div>
+<div id="stan-program" class="section level2">
+<h2><span class="header-section-number">1.2</span> <strong>Stan</strong> program</h2>
+<p>The <strong>Stan</strong> program is nearly a direct translation of the notation above, with two exceptions. First, a constraint is placed on the item difficulties for model identification. This is accomplished by creating <code>beta_free</code>, which is the vector of unconstrained item parameters, in the parameters block. Then in the transformed parameters block, <code>beta</code> is created to be identical to <code>beta_free</code> except for one additional element that is the constrained item difficulty. As a result of this constraint, the mean of <code>beta</code> will be zero.</p>
+<p>Second, the prediction for person ability is calculated and temporarily stored in <code>mu</code> in the model block. This is done for efficiency and readability of the code.</p>
+<p>Third, positive discrimination parameters are assumed for identifiability.</p>
+<pre><code>data {
+  int&lt;lower=1&gt; I;               // # questions
+  int&lt;lower=1&gt; J;               // # persons
+  int&lt;lower=1&gt; N;               // # observations
+  int&lt;lower=1, upper=I&gt; ii[N];  // question for n
+  int&lt;lower=1, upper=J&gt; jj[N];  // person for n
+  int&lt;lower=0, upper=1&gt; y[N];   // correctness for n
+  int&lt;lower=1&gt; K;               // # person covariates
+  matrix[J,K] W;                // person covariate matrix
+}
+parameters {
+  vector&lt;lower=0&gt;[I] alpha;
+  vector[I-1] beta_free;
+  vector[J] theta;
+  vector[K] lambda;
+}
+transformed parameters {
+  vector[I] beta;
+  beta &lt;- append_row(beta_free, rep_vector(-1*sum(beta_free), 1));
+}
+model {
+  vector[J] mu;
+  mu &lt;- W*lambda;
+  alpha ~ lognormal(1, 1);
+  beta_free ~ normal(0, 5);
+  theta ~ normal(0, 1);
+  y ~ bernoulli_logit(alpha[ii].*(theta[jj] + mu[jj] - beta[ii]));
+}</code></pre>
+</div>
+</div>
+<div id="simulation" class="section level1">
+<h1><span class="header-section-number">2</span> Simulation</h1>
+<p>First, the necessary <strong>R</strong> packages are loaded.</p>
+<pre class="r"><code># Load R packages
+library(rstan)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+library(ggplot2)</code></pre>
+<p>The <strong>R</strong> code that follows simulates a dataset conforming to the model. The <strong>Stan</strong> model will be evaluated in terms of its ability to recover the generating values of the parameters when fit to this dataset.</p>
+<pre class="r"><code># Set paramters for the simulated data
+I &lt;- 20
+J &lt;- 500
+sigma &lt;- 1
+lambda &lt;- c(0.5, 0.5, 0.5)
+W &lt;- cbind(1, rnorm(J, 0, 1), rnorm(J, 0, 1))
+alpha &lt;- rep(c(0.8, 1, 1.2, 1.4), length.out = I)
+beta_free &lt;- seq(from = -2, to = 2, length.out = I - 1)
+
+# Calculate or sample remaining paramters
+theta &lt;- rnorm(J, 0, sigma)
+mu &lt;- W %*% matrix(lambda)
+beta &lt;- c(beta_free, -1 * sum(beta_free))
+
+# Assemble data and simulate response
+sim_data &lt;- list(I = I, J = J, N = I * J, ii = rep(1:I, times = J), jj = rep(1:J, 
+    each = I))
+eta &lt;- alpha[sim_data$ii] * theta[sim_data$jj] + mu[sim_data$jj] - beta[sim_data$ii]
+sim_data$y &lt;- as.numeric(boot::inv.logit(eta) &gt; runif(sim_data$N))
+sim_data$K &lt;- ncol(W)
+sim_data$W &lt;- W</code></pre>
+<p>The simulated data consists of 20 dichotomous items and 500 persons. The latent regression includes an intercept and 2 person-related covariates, which are standard normal variables. The simulated dataset is next fit with <strong>Stan</strong>.</p>
+<pre class="r"><code># Fit model to simulated data
+sim_fit &lt;- stan(file = &quot;2pl_latent_reg.stan&quot;, data = sim_data, chains = 4, iter = 1000)</code></pre>
+<p>Before interpreting the results, it is necessary to check that the chains have converged. <strong>Stan</strong> provides the <span class="math">\(\hat{R}\)</span> statistic for the model parameters and log posterior. These are provided in the following figure. All values for <span class="math">\(\hat{R}\)</span> should be less than 1.1.</p>
+<pre class="r"><code># Plot of convergence statistics
+sim_monitor &lt;- as.data.frame(monitor(sim_fit, print = FALSE))
+sim_monitor$Parameter &lt;- as.factor(gsub(&quot;\\[.*]&quot;, &quot;&quot;, rownames(sim_monitor)))
+ggplot(sim_monitor) + aes(x = Parameter, y = Rhat, color = Parameter) + geom_jitter(height = 0, 
+    width = 0.5, show.legend = FALSE) + ylab(expression(hat(italic(R))))</code></pre>
+<div class="figure">
+<img src="2pl_latent_reg_files/figure-html/sim_converge-1.png" alt="Convergence statistics ($\hat{R}$) by parameter for the simulation. All values should be less than 1.1 to infer convergence."  />
+<p class="caption">
+Convergence statistics (<span class="math">\(\hat{R}\)</span>) by parameter for the simulation. All values should be less than 1.1 to infer convergence.
+</p>
+</div>
+<p>The <strong>Stan</strong> model is evaluated in terms of its ability to recover the generating values of the parameters. The R code below prepares a plot in which the points indicate the difference between the posterior means and generating values for the parameters of main interest. This difference is referred to as discrepancy. The lines indicate the 95% posterior intervals for the difference. Ideally, (nearly) all the 95% posterior intervals would include zero.</p>
+<pre class="r"><code># Make vector of wanted parameter names
+wanted_pars &lt;- c(paste0(&quot;alpha[&quot;, 1:sim_data$I, &quot;]&quot;), paste0(&quot;beta[&quot;, 1:sim_data$I, 
+    &quot;]&quot;), paste0(&quot;lambda[&quot;, 1:sim_data$K, &quot;]&quot;))
+
+# Get estimated and generating values for wanted parameters
+generating_values = c(alpha, beta, lambda)
+estimated_values &lt;- sim_monitor[wanted_pars, c(&quot;mean&quot;, &quot;2.5%&quot;, &quot;97.5%&quot;)]
+
+# Assesmble a data frame to pass to ggplot()
+sim_df &lt;- data.frame(parameter = factor(wanted_pars, rev(wanted_pars)), row.names = NULL)
+sim_df$middle &lt;- estimated_values[, &quot;mean&quot;] - generating_values
+sim_df$lower &lt;- estimated_values[, &quot;2.5%&quot;] - generating_values
+sim_df$upper &lt;- estimated_values[, &quot;97.5%&quot;] - generating_values
+
+# Plot the discrepancy
+ggplot(sim_df) + aes(x = parameter, y = middle, ymin = lower, ymax = upper) + 
+    scale_x_discrete() + labs(y = &quot;Discrepancy&quot;, x = NULL) + geom_abline(intercept = 0, 
+    slope = 0, color = &quot;white&quot;) + geom_linerange() + geom_point(size = 2) + 
+    theme(panel.grid = element_blank()) + coord_flip()</code></pre>
+<div class="figure">
+<img src="2pl_latent_reg_files/figure-html/sim_plot-1.png" alt="Discrepancies between estimated and generating parameters for the simulation. Points indicate the difference between the posterior means and generating values for a parameter, and horizontal lines indicate 95% posterior intervals for the difference. Most of the discrepancies are about zero, indicating that **Stan** successfully recovers the true parameters."  />
+<p class="caption">
+Discrepancies between estimated and generating parameters for the simulation. Points indicate the difference between the posterior means and generating values for a parameter, and horizontal lines indicate 95% posterior intervals for the difference. Most of the discrepancies are about zero, indicating that <strong>Stan</strong> successfully recovers the true parameters.
+</p>
+</div>
+</div>
+<div id="example-application" class="section level1">
+<h1><span class="header-section-number">3</span> Example application</h1>
+<p>The example data are from the The First International Mathematics Study <span class="citation">(Husen and others 1967; Postlethwaite 1967)</span>. The data include information about student gender and country (Australia or Japan). For convenience, only a subset of the full data are used.</p>
+<pre class="r"><code># Attach the example dataset. The TAM package is required.
+data(data.fims.Aus.Jpn.scored, package = &quot;TAM&quot;)
+
+# Subset the full data
+select &lt;- floor(seq(from = 1, to = nrow(data.fims.Aus.Jpn.scored), length.out = 500))
+subsetted_df &lt;- data.fims.Aus.Jpn.scored[select, ]
+str(subsetted_df)</code></pre>
+<pre><code>## &#39;data.frame&#39;:    500 obs. of  16 variables:
+##  $ SEX    : int  1 1 2 2 1 1 2 2 2 1 ...
+##  $ M1PTI1 : num  1 1 1 0 0 1 1 1 1 1 ...
+##  $ M1PTI2 : num  0 0 0 0 0 1 1 1 1 1 ...
+##  $ M1PTI3 : num  1 1 1 0 1 1 0 1 1 0 ...
+##  $ M1PTI6 : num  1 0 0 1 0 0 0 1 1 0 ...
+##  $ M1PTI7 : num  0 0 0 0 0 1 0 0 0 0 ...
+##  $ M1PTI11: num  1 0 0 0 0 0 1 1 1 0 ...
+##  $ M1PTI12: num  0 0 0 0 0 1 0 0 1 1 ...
+##  $ M1PTI14: num  0 0 1 0 0 1 0 1 1 1 ...
+##  $ M1PTI17: num  1 0 0 0 0 1 0 1 1 0 ...
+##  $ M1PTI18: num  0 0 1 1 0 0 1 1 0 1 ...
+##  $ M1PTI19: num  0 0 0 0 0 1 0 0 0 0 ...
+##  $ M1PTI21: num  0 0 0 0 0 0 0 0 0 0 ...
+##  $ M1PTI22: num  0 0 0 0 0 1 0 0 0 0 ...
+##  $ M1PTI23: num  1 1 1 1 0 1 1 1 0 0 ...
+##  $ country: int  1 1 1 1 1 1 1 1 1 1 ...</code></pre>
+<p>The dataset is next divided into an item response matrix and a matrix of student covariates.</p>
+<pre class="r"><code># Extract the response matrix
+response_matrix &lt;- as.matrix(subsetted_df[, grepl(&quot;^M1&quot;, names(subsetted_df))])
+head(response_matrix)</code></pre>
+<pre><code>##    M1PTI1 M1PTI2 M1PTI3 M1PTI6 M1PTI7 M1PTI11 M1PTI12 M1PTI14 M1PTI17
+## 1       1      0      1      1      0       1       0       0       1
+## 13      1      0      1      0      0       0       0       0       0
+## 26      1      0      1      0      0       0       0       1       0
+## 39      0      0      0      1      0       0       0       0       0
+## 52      0      0      1      0      0       0       0       0       0
+## 64      1      1      1      0      1       0       1       1       1
+##    M1PTI18 M1PTI19 M1PTI21 M1PTI22 M1PTI23
+## 1        0       0       0       0       1
+## 13       0       0       0       0       1
+## 26       1       0       0       0       1
+## 39       1       0       0       0       1
+## 52       0       0       0       0       0
+## 64       0       1       0       1       1</code></pre>
+<pre class="r"><code># Assemble a matrix of person covariates
+male &lt;- as.numeric(subsetted_df$SEX == 2)
+japan &lt;- as.numeric(subsetted_df$country == 2)
+W = cbind(intercept = 1, male = male, japan = japan, interact = male * japan)
+head(W)</code></pre>
+<pre><code>##      intercept male japan interact
+## [1,]         1    0     0        0
+## [2,]         1    0     0        0
+## [3,]         1    1     0        0
+## [4,]         1    1     0        0
+## [5,]         1    0     0        0
+## [6,]         1    0     0        0</code></pre>
+<p>500 students responded to 4 dichotomously scored items. The data contain no missing values. The two matrices are converted to a list suitable for the <strong>Stan</strong> model.</p>
+<pre class="r"><code># Assemble data list and fit model
+ex_list &lt;- list(I = ncol(response_matrix), J = nrow(response_matrix), N = length(response_matrix), 
+    ii = rep(1:ncol(response_matrix), each = nrow(response_matrix)), jj = rep(1:nrow(response_matrix), 
+        times = ncol(response_matrix)), y = as.vector(response_matrix), K = ncol(W), 
+    W = W)
+ex_fit &lt;- stan(file = &quot;2pl_latent_reg.stan&quot;, data = ex_list, chains = 4, iter = 1000)</code></pre>
+<p>As discussed above, convergence of the chains is assessed for every parameter, and also the log posterior density, using <span class="math">\(\hat{R}\)</span>.</p>
+<pre class="r"><code># Plot of convergence statistics
+ex_monitor &lt;- as.data.frame(monitor(ex_fit, print = FALSE))
+ex_monitor$Parameter &lt;- as.factor(gsub(&quot;\\[.*]&quot;, &quot;&quot;, rownames(ex_monitor)))
+ggplot(ex_monitor) + aes(x = Parameter, y = Rhat, color = Parameter) + geom_jitter(height = 0, 
+    width = 0.5, show.legend = FALSE) + ylab(expression(hat(italic(R))))</code></pre>
+<div class="figure">
+<img src="2pl_latent_reg_files/figure-html/example_converge-1.png" alt="Convergence statistics ($\hat{R}$) by parameter for the example. All values should be less than 1.1 to infer convergence."  />
+<p class="caption">
+Convergence statistics (<span class="math">\(\hat{R}\)</span>) by parameter for the example. All values should be less than 1.1 to infer convergence.
+</p>
+</div>
+<p>Next we view summaries of the parameter posteriors.</p>
+<pre class="r"><code># View table of parameter posteriors
+print(ex_fit, pars = c(&quot;alpha&quot;, &quot;beta&quot;, &quot;lambda&quot;))</code></pre>
+<pre><code>## Inference for Stan model: 2pl_latent_reg.
+## 4 chains, each with iter=1000; warmup=500; thin=1; 
+## post-warmup draws per chain=500, total post-warmup draws=2000.
+## 
+##            mean se_mean   sd  2.5%   25%   50%   75% 97.5% n_eff Rhat
+## alpha[1]   0.68    0.00 0.14  0.43  0.59  0.68  0.77  0.96  1271 1.00
+## alpha[2]   1.45    0.01 0.22  1.05  1.29  1.43  1.59  1.92  1424 1.00
+## alpha[3]   1.12    0.01 0.19  0.78  0.99  1.12  1.24  1.51  1375 1.00
+## alpha[4]   1.21    0.00 0.16  0.91  1.09  1.20  1.31  1.54  2000 1.00
+## alpha[5]   1.82    0.01 0.26  1.34  1.62  1.81  2.00  2.37  1301 1.00
+## alpha[6]   1.37    0.01 0.22  1.00  1.22  1.36  1.51  1.84  1461 1.00
+## alpha[7]   0.44    0.00 0.10  0.24  0.37  0.44  0.51  0.65  1028 1.00
+## alpha[8]   0.27    0.00 0.09  0.12  0.22  0.27  0.33  0.45  1289 1.00
+## alpha[9]   1.19    0.00 0.17  0.88  1.07  1.18  1.29  1.53  2000 1.00
+## alpha[10]  0.64    0.00 0.12  0.43  0.55  0.63  0.71  0.88  2000 1.00
+## alpha[11]  2.13    0.01 0.35  1.52  1.88  2.11  2.36  2.90   965 1.00
+## alpha[12]  0.18    0.00 0.06  0.09  0.14  0.18  0.22  0.32   408 1.00
+## alpha[13]  1.26    0.00 0.18  0.93  1.14  1.26  1.38  1.64  1776 1.00
+## alpha[14]  1.37    0.01 0.20  1.02  1.23  1.36  1.49  1.78  1380 1.00
+## beta[1]   -2.71    0.01 0.45 -3.75 -2.97 -2.65 -2.40 -2.02   992 1.00
+## beta[2]   -1.63    0.01 0.22 -2.11 -1.76 -1.61 -1.47 -1.27   335 1.01
+## beta[3]   -2.40    0.01 0.30 -3.05 -2.59 -2.37 -2.20 -1.89   692 1.00
+## beta[4]   -0.83    0.01 0.20 -1.28 -0.94 -0.81 -0.69 -0.50   271 1.01
+## beta[5]    0.98    0.01 0.22  0.49  0.83  0.99  1.13  1.39   300 1.01
+## beta[6]   -1.80    0.01 0.23 -2.29 -1.94 -1.77 -1.63 -1.41   375 1.01
+## beta[7]    1.39    0.02 0.51  0.59  1.06  1.33  1.63  2.63   822 1.00
+## beta[8]    0.90    0.02 0.60  0.04  0.51  0.81  1.17  2.40   819 1.00
+## beta[9]    0.58    0.01 0.22  0.10  0.44  0.60  0.74  0.97   328 1.01
+## beta[10]  -1.13    0.01 0.24 -1.63 -1.29 -1.11 -0.95 -0.70   468 1.00
+## beta[11]   0.71    0.01 0.21  0.25  0.59  0.73  0.86  1.08   249 1.01
+## beta[12]   6.18    0.13 2.04  3.28  4.69  5.80  7.24 11.21   260 1.01
+## beta[13]   1.17    0.01 0.24  0.66  1.02  1.17  1.34  1.64   410 1.00
+## beta[14]  -1.41    0.01 0.20 -1.87 -1.54 -1.39 -1.27 -1.06   339 1.01
+## lambda[1] -0.82    0.01 0.20 -1.26 -0.94 -0.79 -0.69 -0.50   267 1.01
+## lambda[2]  0.07    0.00 0.13 -0.19 -0.01  0.07  0.17  0.33   775 1.00
+## lambda[3]  1.23    0.01 0.16  0.90  1.12  1.24  1.34  1.54   809 1.00
+## lambda[4] -0.32    0.01 0.23 -0.75 -0.47 -0.32 -0.17  0.15   795 1.00
+## 
+## Samples were drawn using NUTS(diag_e) at Wed Mar 02 20:36:39 2016.
+## For each parameter, n_eff is a crude measure of effective sample size,
+## and Rhat is the potential scale reduction factor on split chains (at 
+## convergence, Rhat=1).</code></pre>
+<p>A 2PL without the latent regression could be fit by changing the person covariate matrix to include only an intercept term. Shown below is how this may be done for the example data.</p>
+<pre class="r"><code># Assemble data list and fit model
+noreg_list &lt;- ex_list
+noreg_list$W &lt;- matrix(1, nrow = ex_list$J, ncol = 1)
+noreg_list$K &lt;- 1
+noreg_fit &lt;- stan(file = &quot;2pl_latent_reg.stan&quot;, data = noreg_list, chains = 4, 
+    iter = 1000)</code></pre>
+</div>
+<div id="references" class="section level1">
+<h1><span class="header-section-number">4</span> References</h1>
+<!-- This comment causes section to be numbered -->
+<div class="references">
+<p>Husen, Torsten, and others. 1967. “International Study of Achievement in Mathematics, a Comparison of Twelve Countries, Volume I.” ERIC.</p>
+<p>Postlethwaite, Neville. 1967. <em>School Organization and Student Achievement</em>. Stockholm: Almqvist &amp; Wiksell.</p>
+<p>Swaminathan, Hariharan, and Janice A Gifford. 1985. “Bayesian Estimation in the Two-Parameter Logistic Model.” <em>Psychometrika</em> 50 (3). Springer: 349–64.</p>
+</div>
+</div>
+
+<hr>
+
+<p> Copyright (c) 2016, the author(s). All rights reserved. </p>
+
+<p> Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met: </p>
+
+<p> 1. Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer. </p>
+
+<p> 2. Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution. </p>
+
+<p> 3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission. </p>
+
+<p> THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. </p>
+
+</div>
+
+<script>
+
+// add bootstrap table styles to pandoc tables
+$(document).ready(function () {
+  $('tr.header').parent('thead').parent('table').addClass('table table-condensed');
+});
+
+</script>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

@@ -9,6 +9,7 @@ output:
     number_sections: true
     fig_caption: true
     css: ../styles.css
+    theme: cerulean
     includes:
       after_body: ../copyright.html
 bibliography: ../bibliography.bib
@@ -41,20 +42,18 @@ Also, we use the item-intercept parameterization of the model and separate the l
 
 $$
   \mathrm{logit} [ \Pr(y_{ij} = 1 | \alpha_i, \beta_i, \theta_j, \lambda) ] =
-  \alpha_i \theta_j + w_j' \lambda - \beta_i
+  \alpha_i (\theta_j + w_j' \lambda - \beta_i)
 $$
 $$
   \theta_j \sim \mathrm{N}(0, 1)
 $$
 
-
-
 Variables:
 
 * $i = 1 \ldots I$ indexes items
 * $j = 1 \ldots J$ indexes persons
-* $y_{ij} \in \{ 0 \ldots m_i \}$ is the response of person $j$ to item $i$
-* $w_{j}$ is the vector of covariates for person $j$
+* $y_{ij} \in \{ 0 , 1 \}$ is the response of person $j$ to item $i$
+* $w_{j}$ is the vector of covariates for person $j$, which must include an intercept term
 
 Parameters:
 
@@ -62,6 +61,10 @@ Parameters:
 * $\beta_i$ is the difficulty for item $i$
 * $\theta_j$ is the ability for person $j$
 * $\lambda$ is the vector of latent regression parameters
+
+Constraints:
+
+* $\beta_I = -\frac{1}{I-1} \sum_{i}^{(I-1)} \beta_i$
 
 
 ## **Stan** program
@@ -120,7 +123,7 @@ sim_data$W <- W
 
 The simulated data consists of `r I` dichotomous items and `r J` persons. The latent regression includes an intercept and `r length(lambda) - 1` person-related covariates, which are standard normal variables. The simulated dataset is next fit with **Stan**.
 
-```{r sim_fit}
+```{r sim_fit, result="hide"}
 # Fit model to simulated data
 sim_fit <- stan(file = "2pl_latent_reg.stan",
                 data = sim_data, chains = 4, iter = 1000)
@@ -206,7 +209,7 @@ head(W)
 
 `r nrow(W)` students responded to `r ncol(W)` dichotomously scored items. The data contain no missing values. The two matrices are converted to a list suitable for the **Stan** model.
 
-```{r example_fit}
+```{r example_fit, , result="hide"}
 # Assemble data list and fit model
 ex_list <- list(I = ncol(response_matrix),
                 J = nrow(response_matrix),

@@ -4,10 +4,4 @@
 *.rda
 *_cache
 *_files
-rsm_latent_reg.html
-rasch_latent_reg.html
-hierarchical_2pl.html
-gpcm_latent_reg.html
-pcm_latent_reg.html
-2pl_latent_reg.html
-grsm_latent_reg.html
+
