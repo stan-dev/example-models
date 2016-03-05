@@ -3,10 +3,10 @@
 functions {
   /**
    * Return log probability of Poisson distribution.
-   * Outcome n may be a real value; for compatibility with OpenBUGS.
+   * Outcome n may be a real value; for compatibility with Win/OpenBUGS.
    *
    * @param n      Outcome
-   * @theta lambda Mean
+   * @param lambda Mean
    *
    * @return Log probability
    */
@@ -25,11 +25,11 @@ functions {
 
   /**
    * Return log probability of binomial distribution.
-   * Outcome n may be a real value; for compatibility with OpenBUGS.
+   * Outcome n may be a real value; for compatibility with Win/OpenBUGS.
    *
    * @param n     Outcome
    * @param N     Size
-   * @theta theta Probability
+   * @param theta Probability
    *
    * @return Log probability
    */
@@ -47,6 +47,61 @@ functions {
         + n * log(theta) + (N - n) * log(1.0 - theta);
     }
     return negative_infinity();
+  }
+
+  /**
+   * Return m-array
+   *
+   * @param nyears Number of years
+   * @param sjuv   Survival probability of juveniles
+   * @param sad    Survival probability of adults
+   * @param p      Recapture probability
+   *
+   * @return m-array
+   */
+  vector[] marray(int nyears, vector sjuv, vector sad, vector p) {
+    vector[nyears] pr[2*(nyears-1)];
+    vector[nyears-1] q;
+
+    q <- 1.0 - p;
+
+    // m-array cell probabilities for juveniles
+    for (t in 1:(nyears - 1)) {
+      // Main diagonal
+      pr[t, t] <- sjuv[t] * p[t];
+
+      // Above main diagonal
+      for (j in (t + 1):(nyears - 1))
+        pr[t, j] <- sjuv[t] * prod(sad[(t + 1):j])
+          * prod(q[t:(j - 1)]) * p[j];
+
+      // Below main diagonal
+      for (j in 1:(t - 1))
+        pr[t, j] <- 0.0;
+
+      // Last column: probability of non-recapture
+      pr[t,nyears] <- 1.0 - sum(pr[t, 1:(nyears - 1)]);
+    } //t
+
+      // m-array cell probabilities for adults
+    for (t in 1:(nyears - 1)) {
+
+      // Main diagonal
+      pr[t + nyears - 1, t] <- sad[t] * p[t];
+      // Above main diagonal
+      for (j in (t + 1):(nyears - 1))
+        pr[t + nyears - 1, j] <- prod(sad[t:j])
+          * prod(q[t:(j - 1)]) * p[j];
+
+      // Below main diagonal
+      for (j in 1:(t - 1))
+        pr[t + nyears - 1, j] <- 0.0;
+
+      // Last column
+      pr[t + nyears - 1, nyears] <- 1.0
+        - sum(pr[t + nyears - 1, 1:(nyears - 1)]);
+    } //t
+    return pr;
   }
 }
 
@@ -89,48 +144,8 @@ transformed parameters {
   for (t in 1:nyears)
     Ntot[t] <- Nad[t] + N1[t];
 
-  { // m-array
-      vector[nyears-1] q;
-
-      q <- 1.0 - p;
-
-      // m-array cell probabilities for juveniles
-      for (t in 1:(nyears - 1)) {
-        // Main diagonal
-        pr[t, t] <- sjuv[t] * p[t];
-
-        // Above main diagonal
-        for (j in (t + 1):(nyears - 1))
-          pr[t, j] <- sjuv[t] * prod(sad[(t + 1):j])
-            * prod(q[t:(j - 1)]) * p[j];
-
-        // Below main diagonal
-        for (j in 1:(t - 1))
-          pr[t, j] <- 0.0;
-
-        // Last column: probability of non-recapture
-        pr[t,nyears] <- 1.0 - sum(pr[t, 1:(nyears - 1)]);
-      } //t
-
-      // m-array cell probabilities for adults
-      for (t in 1:(nyears - 1)) {
-
-        // Main diagonal
-        pr[t + nyears - 1, t] <- sad[t] * p[t];
-        // Above main diagonal
-        for (j in (t + 1):(nyears - 1))
-          pr[t + nyears - 1, j] <- prod(sad[t:j])
-            * prod(q[t:(j - 1)]) * p[j];
-
-        // Below main diagonal
-        for (j in 1:(t - 1))
-          pr[t + nyears - 1, j] <- 0.0;
-
-        // Last column
-        pr[t + nyears - 1, nyears] <- 1.0
-          - sum(pr[t + nyears - 1, 1:(nyears - 1)]);
-      } //t
-  }
+  // m-array
+  pr <- marray(nyears, sjuv, sad, p);
 
   // Productivity
   for (t in 1:(nyears - 1))
@@ -144,9 +159,8 @@ model {
   N1[1] ~ normal(100, 100);
   Nad[1] ~ normal(100, 100);
 
-  mean_sjuv ~ uniform(0, 1);
-  mean_sad ~ uniform(0, 1);
-  mean_p ~ uniform(0, 1);
+  // Proper flat prios [0, 1] are implicitly use on mean_sjuv, mean_sad
+  // and mean_p.
   // Improper flat priors are implicitly used on sigma_y and mean_fec.
 
   // Likelihood for population population count data (state-space model)

@@ -3,10 +3,10 @@
 functions {
   /**
    * Return log probability of Poisson distribution.
-   * outcome n may be a real value; for compatibility with OpenBUGS.
+   * outcome n may be a real value; for compatibility with Win/OpenBUGS.
    *
    * @param n      Outcome
-   * @theta lambda Mean
+   * @param lambda Mean
    *
    * @return Log probability
    */
@@ -25,11 +25,11 @@ functions {
 
   /**
    * Return log probability of binomial distribution.
-   * outcome n may be a real value; for compatibility with OpenBUGS.
+   * outcome n may be a real value; for compatibility with Win/OpenBUGS.
    *
    * @param n     Outcome
    * @param N     Size
-   * @theta theta Probability
+   * @param theta Probability
    *
    * @return Log probability
    */
@@ -47,6 +47,77 @@ functions {
         + n * log(theta) + (N - n) * log(1.0 - theta);
     }
     return negative_infinity();
+  }
+
+  /**
+   * Return m-array of juveniles
+   *
+   * @param nyears Number of years
+   * @param phij   Survival probability
+   * @param p      Recapture probability
+   *
+   * @return m-array
+   */
+  vector[] marray_juveniles(int nyears, vector phij, vector phia, vector p) {
+    vector[nyears] pr_j[nyears - 1];
+    vector[nyears-1] q;
+
+    q <- 1.0 - p;
+
+    // m-array cell probabilities for juveniles
+    for (t in 1:(nyears - 1)) {
+
+      // Main diagonal
+      pr_j[t, t] <- phij[t] * p[t];
+
+      // Above main diagonal
+      for (j in (t + 1):(nyears - 1))
+        pr_j[t, j] <- phij[t] * prod(phia[(t + 1):j])
+          * prod(q[t:(j - 1)]) * p[j];
+
+      // Below main diagonal
+      for (j in 1:(t - 1))
+        pr_j[t, j] <- 0.0;
+
+      // Last column: probability of non-recapture
+      pr_j[t, nyears] <- 1.0 - sum(pr_j[t, 1:(nyears - 1)]);
+    } //t
+    return pr_j;
+  }
+
+  /**
+   * Return m-array of adults
+   *
+   * @param nyears Number of years
+   * @param phia   Survival probability
+   * @param p      Recapture probability
+   *
+   * @return m-array
+   */
+  vector[] marray_adults(int nyears, vector phia, vector p) {
+    vector[nyears] pr_a[nyears - 1];
+    vector[nyears-1] q;
+
+    q <- 1.0 - p;
+
+    // m-array cell probabilities for adults
+    for (t in 1:(nyears - 1)) {
+
+      // Main diagonal
+      pr_a[t, t] <- phia[t] * p[t];
+
+      // Above main diagonal
+      for (j in (t + 1):(nyears - 1))
+        pr_a[t, j] <- prod(phia[t:j]) * prod(q[t:(j - 1)]) * p[j];
+
+      // Below main diagonal
+      for (j in 1:(t - 1))
+        pr_a[t, j] <- 0.0;
+
+      // Last column
+      pr_a[t, nyears] <- 1.0 - sum(pr_a[t, 1:(nyears - 1)]);
+    } //t
+    return pr_a;
   }
 }
 
@@ -68,10 +139,10 @@ parameters {
   real l_mfec;
   real l_mim;
   real l_p;
-  vector[nyears-1] epsilon_phij;
-  vector[nyears-1] epsilon_phia;
-  vector[nyears-1] epsilon_fec;
-  vector[nyears-1] epsilon_im;
+  vector[nyears-1] epsilon_phij_raw;
+  vector[nyears-1] epsilon_phia_raw;
+  vector[nyears-1] epsilon_fec_raw;
+  vector[nyears-1] epsilon_im_raw;
   real<lower=0> sig_phij;
   real<lower=0> sig_phia;
   real<lower=0> sig_fec;
@@ -79,6 +150,10 @@ parameters {
 }
 
 transformed parameters {
+  vector[nyears-1] epsilon_phij;
+  vector[nyears-1] epsilon_phia;
+  vector[nyears-1] epsilon_fec;
+  vector[nyears-1] epsilon_im;
   vector<lower=0,upper=1>[nyears-1] phij;  // Juv. apparent survival
   vector<lower=0,upper=1>[nyears-1] phia;  // Adult apparent survival
   vector<lower=0>[nyears-1]         f;     // Productivity
@@ -88,6 +163,12 @@ transformed parameters {
   vector<lower=0>[nyears-1] rho;
   simplex[nyears] pr_j[nyears-1];
   simplex[nyears] pr_a[nyears-1];
+
+  // Distribution of error terms
+  epsilon_phij <- sig_phij * epsilon_phij_raw;
+  epsilon_phia <- sig_phia * epsilon_phia_raw;
+  epsilon_fec <- sig_fec * epsilon_fec_raw;
+  epsilon_im <- sig_im * epsilon_im_raw;
 
   // Constrain parameters
   for (t in 1:(nyears - 1)) {
@@ -101,48 +182,9 @@ transformed parameters {
   // Total number of individuals
   Ntot <- NadSurv + Nadimm + N1;
 
-  { // m-array
-      vector[nyears-1] q;
-
-      q <- 1.0 - p;
-
-      // m-array cell probabilities for juveniles
-      for (t in 1:(nyears - 1)) {
-
-        // Main diagonal
-        pr_j[t, t] <- phij[t] * p[t];
-
-        // Above main diagonal
-        for (j in (t + 1):(nyears - 1))
-          pr_j[t, j] <- phij[t] * prod(phia[(t + 1):j])
-            * prod(q[t:(j - 1)]) * p[j];
-
-        // Below main diagonal
-        for (j in 1:(t - 1))
-          pr_j[t, j] <- 0.0;
-
-        // Last column: probability of non-recapture
-        pr_j[t, nyears] <- 1.0 - sum(pr_j[t, 1:(nyears - 1)]);
-      } //t
-
-      // m-array cell probabilities for adults
-      for (t in 1:(nyears - 1)) {
-
-        // Main diagonal
-        pr_a[t, t] <- phia[t] * p[t];
-
-        // Above main diagonal
-        for (j in (t + 1):(nyears - 1))
-          pr_a[t, j] <- prod(phia[t:j]) * prod(q[t:(j - 1)]) * p[j];
-
-        // Below main diagonal
-        for (j in 1:(t - 1))
-          pr_a[t, j] <- 0.0;
-
-        // Last column
-        pr_a[t, nyears] <- 1.0 - sum(pr_a[t, 1:(nyears - 1)]);
-      } //t
-  }
+  // m-array
+  pr_j <- marray_juveniles(nyears, phij, phia, p);
+  pr_a <- marray_adults(nyears, phia, p);
 
   // Productivity
   for (t in 1:(nyears - 1))
@@ -167,11 +209,11 @@ model {
   // Improper flat priors are implicitly used on
   // scale parameters, sig_phij, sig_phia, sig_fec and sig_im.
 
-  // Distribution of error terms
-  epsilon_phij ~ normal(0, sig_phij);
-  epsilon_phia ~ normal(0, sig_phia);
-  epsilon_fec ~ normal(0, sig_fec);
-  epsilon_im ~ normal(0, sig_im);
+  // Efficient form of priors
+  epsilon_phij_raw ~ normal(0, 1);
+  epsilon_phia_raw ~ normal(0, 1);
+  epsilon_fec_raw ~ normal(0, 1);
+  epsilon_im_raw ~ normal(0, 1);
 
   // Likelihood for population population count data (state-space model)
   // System process
