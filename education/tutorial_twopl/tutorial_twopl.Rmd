@@ -38,20 +38,9 @@ library(gridExtra) # Also for the posterior predictive model checking example
 In addition, the **edstan** package is required. This package is still in development and so is not available on CRAN. Instead, it may installed directly from Github.
 
 ```{r install_edstan, message=FALSE, warning=FALSE}
-# Determine status of edstan installation
-edstan_installed <- require(edstan)
-edstan_compare <- -1
-if(edstan_installed) {
-  edstan_version <- as.character(packageVersion("edstan"))
-  edstan_compare <- compareVersion(edstan_version, "0.108")
-}
-
-# Install edstan if necessary
-if(edstan_compare == -1) {
-  library(devtools) # Required for install_github()
-  install_github("danielcfurr/edstan")
-}
-
+# Install and load edstan
+library(devtools) # Required for install_github()
+install_github("danielcfurr/edstan")
 library(edstan)
 ```
 
@@ -576,7 +565,7 @@ Note that new values $\theta_{j}^{rep}$ are drawn from their prior rather than u
 
 **Stan** provides an efficient way to generate replicated datasets. We can implement from **Step 1** to **Step 3** by simply adding a `generated quantities` program block at the end of the original [2PL Stan program](#twoplstancode). The **R** code below shows how the `generated quantities` block is defined. 
 
-```{r}
+```{r, tidy = FALSE}
 # Define generated_quantities program block  
 generated_quantities <- "
 generated quantities {

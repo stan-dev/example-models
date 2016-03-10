@@ -11,17 +11,6 @@ output:
 bibliography: ../bibliography.bib
 ---
 
-<!-- 
-(Title:)  Two-parameter logistic model with latent regression
-
-Author:  Daniel C. Furr
-
-Date:  2016
-
-Abstract:  This case study documents a Stan model for the two-parameter logistic model (2PL) with latent regression. The latent regression portion of the model may be restricted to an intercept only, yielding a standard 2PL. A brief simulation indicates that the Stan model successfully recovers the generating parameters. An example using a grade 12 science assessment is provided.
-
-Keywords:  education, IRT, 2PL. 
---> 
 
 ```{r knitr_opts, include = FALSE}
 knitr::opts_chunk$set(tidy = TRUE, cache = TRUE)
