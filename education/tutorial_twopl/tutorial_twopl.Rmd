@@ -8,15 +8,17 @@ author:
   - name: Sophia Rabe-Hesketh
 output:
   html_document:
-    self_contained: false
     toc: true
     number_sections: true
     fig_caption: true
     css: ../styles.css
-    includes:
-      after_body: ../copyright.html
 bibliography: ../bibliography.bib
 ---
+
+```{r knitr_opts, include = FALSE}
+knitr::opts_chunk$set(tidy = TRUE, cache = TRUE)
+```
+
 
 This tutorial is organized into four sections: (1) an introduction which describes the two-parameter logistic (2PL) model and the example data used in the tutorial, (2) a walkthrough for fitting and interpreting the model using the **edstan** package for **R** (3) a more technical section on fitting, extending, and checking the model using the **Stan** directly via the **rstan** package, and (4) a section on troubleshooting in the event of convergence difficulties. Researchers who are less familiar with **R** or Bayesian methods may benefit more from the second section, while researchers who already have some familiarity with these topics may be drawn to the third section. In any case, the second, third, and fourth sections may be read independently of one another.
 
@@ -24,8 +26,10 @@ This tutorial is organized into four sections: (1) an introduction which describ
 
 The 2PL model is appropriate for dichotomously scored item response data in which items are expected to load differently on the underlying latent trait. This tutorial requires the following R packages:
 
-```{r libraries, message=FALSE, warning=FALSE, tidy=TRUE}
+```{r libraries, message=FALSE, warning=FALSE}
 library(rstan)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
 library(reshape2)  # For switching between long-form and wide-form data
 library(ggplot2)   # For the posterior predictive model checking example
 library(gridExtra) # Also for the posterior predictive model checking example
@@ -33,21 +37,10 @@ library(gridExtra) # Also for the posterior predictive model checking example
 
 In addition, the **edstan** package is required. This package is still in development and so is not available on CRAN. Instead, it may installed directly from Github.
 
-```{r install_edstan, message=FALSE, warning=FALSE, tidy=TRUE}
-# Determine status of edstan installation
-edstan_installed <- require(edstan)
-edstan_compare <- -1
-if(edstan_installed) {
-  edstan_version <- as.character(packageVersion("edstan"))
-  edstan_compare <- compareVersion(edstan_version, "0.108")
-}
-
-# Install edstan if necessary
-if(edstan_compare == -1) {
-  library(devtools) # Required for install_github()
-  install_github("danielcfurr/edstan")
-}
-
+```{r install_edstan, message=FALSE, warning=FALSE}
+# Install and load edstan
+library(devtools) # Required for install_github()
+install_github("danielcfurr/edstan")
 library(edstan)
 ```
 
@@ -74,7 +67,7 @@ The priors for $\alpha_i$ and $\beta_i$ are non-informative, although it is assu
 
 The example dataset is from a study [@Thissen1993] that examined student spelling performance on four words: _infidelity_, _panoramic_, _succumb_, and _girder_. The sample includes 284 male and 374 female undergraduate students from the University of Kansas. Each item was scored as either correct or incorrect. The commands below extract the response matrix and then show some example rows from it.
 
-```{r wide_data, tidy=TRUE}
+```{r wide_data}
 # The data set is available from the edstan package.
 x <- as.matrix(spelling[, 2:5])
 head(unique(x))
@@ -82,7 +75,7 @@ head(unique(x))
 
 Before fitting a model, we summarize the data with some descriptive statistics. We make a histogram of the raw score distribution and a bar graph of the proportion of correct responses by item. This provides summary information aggregating over the person-side and over the item-side of the response matrix.
 
-```{r descriptives, tidy=TRUE, fig.show='hold', fig.keep='last'}
+```{r descriptives, fig.show='hold', fig.keep='last'}
 # Record existing plot presets and prepare to make side-by-side pots
 par_bkp <- par(no.readonly = TRUE)
 par(mfrow = c(1, 2))
@@ -123,7 +116,7 @@ Item-response data typically are available in either "wide form" or "long form."
 
 The 2PL model may be fit to either data format using the `twopl_stan()` wrapper from the **edstan** package. First, we show how to proceed with wide-form data. In the **R** code below, the argument `response_matrix = x` indicates that the function should expect wide-form data. 
 
-```{r fit_1, cache=TRUE, results='hide', message=FALSE, warning=FALSE, tidy=TRUE}
+```{r fit_1, results='hide', message=FALSE, warning=FALSE}
 myfit <- twopl_stan(response_matrix = x, 
                     iter = 200, 
                     chains = 4)
@@ -133,7 +126,7 @@ In addition, the number of iterations and number of chains are provided in the f
 
 If the data are in long-form, we call `twopl_stan()` using a different set of arguments. To illustrate, we convert the response matrix to long-form.
 
-```{r long_data, message=FALSE, tidy=TRUE}
+```{r long_data, message=FALSE}
 wide <- as.data.frame(x)
 # Attach a person ID number to each row.
 wide$id <- 1:nrow(wide)
@@ -146,7 +139,7 @@ head(long)
 
 With the long-form data, the `twopl_stan()` function is called by assigning the columns of the long-form data to the relevant arguments. The same choices for `iter` and `chains` are provided.
 
-```{r fit_2, eval=FALSE, tidy=TRUE}
+```{r fit_2, eval=FALSE}
 myfit2 <- twopl_stan(id = long$id,
                      item = long$item,
                      response = long$response,
@@ -164,7 +157,7 @@ The `twopl_stan()` function return a *twopl_stanfit* Reference Class, which may 
 
 We start with the `$show()` method, which provides formatted output regarding the estimated parameters.
 
-```{r show_method, tidy=TRUE}
+```{r show_method}
 myfit$show()
 ```
 
@@ -172,7 +165,7 @@ The output is separated into three tables: the first two provide estimates and c
 
 The method `$parameters()` provides the estimation results as a data frame instead of formatted output. This is useful, for example, for extracting the (fully Bayesian) expected a posteriori (EAP) estimates for $\theta_j$.
 
-```{r parameters_method, tidy=TRUE, results='hold'}
+```{r parameters_method, results='hold'}
 # Store summary for all parameters
 all_estimates <- myfit$parameters()
 # Store only the person parameters
@@ -204,7 +197,7 @@ myfit$icc("panoramic")
 
 A single item characteristic curve by itself may not be interesting, so we show an example of what might be done with this method. In the code below, item characteristic curves are placed on the same plot by looping over the the item names stored in `myfit$item_names`. Setting the option `new = FALSE` in the `$icc()` method allows the item characteristic curves to be added to the current plot rather than generating a new plot for each.
 
-```{r multiple_icc, tidy=TRUE, fig.show='hold'}
+```{r multiple_icc, fig.show='hold'}
 icc_colors <- rainbow(length(myfit$item_names))
 plot(0, .5, 
      ylim = c(0, 1), 
@@ -233,12 +226,12 @@ In this section, we introduce how to use **Stan** directly without the **edstan*
 
 In order to use **Stan**, we first need to specify the model in the **Stan** modeling language. The model may be coded in a text file (typically with suffix `.stan`), or written with a character string in R. 
 For the former case, we load the **Stan** program file by using the `file` argument of the `stan()` function as follows:
-```{r, eval=FALSE, tidy=TRUE}
+```{r, eval=FALSE}
 # Do not run the following code yet. This is an example code to illustrate how to use the Stan program file. 
 fit1 <- stan(file = 'twopl.stan', ...)      
 ```
 For the latter case, we specify the **Stan** program by using the `model_code` argument as follows:
-```{r, eval=FALSE, tidy=TRUE}
+```{r, eval=FALSE}
 # Do not run the following code yet. This is an example code to illustrate how to use the Stan program file.
 twopl.code <- cat(paste(readLines('twopl.stan'), collapse = '\n'),'\n')
 fit2 <- stan(model_code = twopl.code, ...)
@@ -344,14 +337,14 @@ for (n in 1:N)
 The next step is preparing the data for the model. We specify the data in the `data` argument of the `stan()` function. We may use an object of class *list* or *environment*, or a vector of character strings for all the names of variables that already exist as objects in the working space. 
 
 Let's revisit the [spelling data](#spellingdata) and create a *list* of data variables defined in the data block! 
-```{r, message=FALSE, tidy=TRUE}
+```{r, message=FALSE}
 head(long)
 ```
 
 There are some restrictions on data to be used in function `stan()`. First, Stan cannot handle missing values automatically so the data should not include any missing values. Second, identifiers for students and items must be consecutive integers starting with 1. 
 
 In the spelling data, there are no missing values, and student id numbers (in the first column) are consecutive integers starting with 1. However, the items are coded as strings--_infidelity, panoramic, succumb, girder_--so we need to define a numeric identifier for items consisting of integers 1 to 4. This can be done by the following R command: 
-```{r, message=FALSE, tidy=TRUE}
+```{r, message=FALSE}
 key <- 1:length(unique(long$item))
 names(key) <- unique(long$item)
 long$item.id <- key[long$item]
@@ -360,7 +353,7 @@ head(long)
 A new column `item.id` includes integers assigned to each item: 1 for infidelity, 2 for panoramic, 3 for succumb, and 4 for girder. 
 
 Now, we are ready to create a list of the variables needed for the `data` block of the **Stan** program. We can use the following R command (Note that the element names in the list must match the variable names specified in the **Stan** `model` block.):
-```{r, message=FALSE, tidy=TRUE}
+```{r, message=FALSE}
 stan_data <- list(
     I  = max(long$item.id),
     J  = max(long$id),
@@ -370,7 +363,7 @@ stan_data <- list(
     y  = long$response )
 ```
 
-```{r, message=FALSE, tidy=TRUE}
+```{r, message=FALSE}
 stan_data$I
 stan_data$J
 stan_data$N
@@ -380,7 +373,7 @@ With the list `'stan_data'`, the variables in the **Stan** `data` block will hav
 
 ### Sample from the posterior distribution
 Finally, we can call function `stan()` to draw posterior samples:
-```{r, eval=FALSE, tidy=TRUE}
+```{r, eval=FALSE}
 #This code will work when the 'twopl.stan' file exists under the working directory. 
 twopl.fit <- stan(file = 'twopl.stan', data = stan_data, iter = 200, chains = 4)
 ```
@@ -436,13 +429,13 @@ for (j in 1:J)
 ```
 
 We define `'reg_centered.stan'` for the modified **Stan** program:
-```{r reg_centered_code, comment="",message=FALSE, cache=TRUE, echo=FALSE, warning=FALSE, tidy=FALSE}
+```{r reg_centered_code, comment="",message=FALSE, echo=FALSE, warning=FALSE, tidy=FALSE}
 cat(readLines("reg_centered.stan"), sep = "\n")
 ```
 
 To include the covariate x in the regression model, we need to prepare the data again by extracting a dummy variable for being male from the spelling data and adding this to the list.
 
-```{r, message=FALSE, tidy=TRUE}
+```{r, message=FALSE}
 # extract a dummy for male.
 male <- as.vector(spelling[, 1])
 # make a list of the variables needed for the data block
@@ -457,14 +450,14 @@ stan_data_reg <- list(
 ```  
 
 Finally, we run **Stan** with the updated **Stan** program `'reg_centered.stan'` and data `'stan_data_reg'`.
-```{r latent_reg, cache=TRUE, results='hide', message=FALSE, warning=FALSE, tidy=TRUE}
+```{r latent_reg, results='hide', message=FALSE, warning=FALSE}
 twopl.reg.centered <- stan(file = 'reg_centered.stan',
                          data = stan_data_reg,
                          iter = 200,
                          chains = 4)
 ```
 
-```{r latent_reg_print, cache=TRUE, echo=FALSE, message=FALSE, warning=FALSE, tidy=TRUE}
+```{r latent_reg_print, echo=FALSE, message=FALSE, warning=FALSE}
 print(twopl.reg.centered,pars=c("alpha","beta","gamma")) 
 ```
 
@@ -479,7 +472,7 @@ for (j in 1:J)
 ```
 
 The **Stan** program using the non-centered parameterization is:
-```{r reg_noncentered_code, comment="",message=FALSE, cache=TRUE, echo=FALSE, warning=FALSE, tidy=FALSE}
+```{r reg_noncentered_code, comment="",message=FALSE, echo=FALSE, warning=FALSE, tidy=FALSE}
 cat(readLines("reg_noncentered.stan"), sep = "\n")
 ```
 
@@ -517,13 +510,13 @@ for (n in 1:N)
 ```
 
 We define `'reg_dif.stan'` for the modified **Stan** program:
-```{r difcode, comment="",message=FALSE, cache=TRUE, echo=FALSE, warning=FALSE, tidy=FALSE}
+```{r difcode, comment="",message=FALSE, echo=FALSE, warning=FALSE, tidy=FALSE}
 cat(readLines("reg_dif.stan"), sep = "\n")
 ```
 
 Since we now include a dummy variable for male and a dummy variable for item $k$ in the model, we need to prepare the data again. Here, as an example, we investigate DIF for the *girder* item for which item.id is 4. We extract a dummy variable for being male from the spelling data (*male*) and an indicator variable for item 4 (*Ik*), and add them in the list.  
 
-```{r, message=FALSE, tidy=TRUE}
+```{r, message=FALSE}
 # extract a dummy for male.
 male <- as.vector(spelling[, 1])
 # Indicator for item k
@@ -541,14 +534,14 @@ stan_data_dif <- list(
 ```
 
 Finally, we run **Stan** with the updated **Stan** program `'reg_dif.stan'` and data `'stan_data_dif'`.
-```{r dif, cache=TRUE, results='hide', message=FALSE, warning=FALSE, tidy=TRUE}
+```{r dif, results='hide', message=FALSE, warning=FALSE}
 twopl.dif.fit <- stan(file='reg_dif.stan',
                          data = stan_data_dif,
                          iter = 200,
                          chains = 4)
 ```
 
-```{r dif_print, cache=TRUE, echo=FALSE, message=FALSE, warning=FALSE, tidy=TRUE}
+```{r dif_print, echo=FALSE, message=FALSE, warning=FALSE}
 print(twopl.dif.fit,pars=c("alpha","beta","gamma","delta")) 
 ```
 
@@ -572,7 +565,7 @@ Note that new values $\theta_{j}^{rep}$ are drawn from their prior rather than u
 
 **Stan** provides an efficient way to generate replicated datasets. We can implement from **Step 1** to **Step 3** by simply adding a `generated quantities` program block at the end of the original [2PL Stan program](#twoplstancode). The **R** code below shows how the `generated quantities` block is defined. 
 
-```{r}
+```{r, tidy = FALSE}
 # Define generated_quantities program block  
 generated_quantities <- "
 generated quantities {
@@ -592,7 +585,7 @@ The replication `y_rep[n]` here represents a new replicated response vector $y_{
 
 In the **R** code below, the `generated_quantities` block is appended at the end of the original `twopl.stan` code, the model is run, and `y_rep[n]` is extracted from `stanfit` object. `get_stancode()` is a **rstan** function that gets the **Stan** code for the fitted model from `stanfit` object. `extract()` is also a **rstan** function that gets the samples for all chains for specified parameters from `stanfit` object.
 
-```{r, cache=TRUE, message=FALSE, warning=FALSE, results='hide'}
+```{r, message=FALSE, warning=FALSE, results='hide'}
 # Extract original twopl.stan code from previous analysis
 twopl_code <- get_stancode(myfit$fit)
 
@@ -627,7 +620,7 @@ For the spelling data, let $NC_s$ denote the number of persons having raw score 
 The preferable way to compare the observed and replicated score distributions is to use graphical plots. We will first plot the observed raw score distribution along with the entire replicated raw score distributions. Strong departure may be observed if the model does not predict the observed score distribution well. The **R** code below indicates how the observed and replicated raw score distributions are calculated and saved as data frames for later use. 
 
 
-```{r, tidy=TRUE}
+```{r}
 # (1) Compute the observed raw score distribution 
 score.obs <- tapply(long$response, long$id, sum)  
 observed <- data.frame(table(score.obs))          
@@ -658,7 +651,7 @@ print(df)
 Using these data frames, we can graphically compare the observed and replicated score distributions. The **R** code below shows a procedure to build the plot layer by layer using _ggplot2_. For each possible score in the test (any integer from 0 to 4), a violin plot depicts the posterior predictive distribution of the number of examinees obtaining that particular raw score along with all the jittered data points. Posterior predictive medians are overlayed on the violin plot as hollow triangles connected by dashed lines with dotted lines indicating 5% and 95% quantiles. Then the corresponding observed proportions of examinees having each score is added with solid ellipses connected by a solid line. The resulting figure shows that the 2PL model performs respectably in predicting the observed raw score distribution. The observed proportions of examinees lie within 5% and 95% quantiles of posterior predictive distributions, and are close to the posterior predictive medians. 
 
 
-```{r, tidy=TRUE}
+```{r}
 # (1) Basic settings of plot
 p <- ggplot(df, aes(x = score + 1, y = obs)) + theme_bw() + 
       labs(x = "Raw score", y = "Number of examinees", 
@@ -695,7 +688,7 @@ $$ PPP = p(\chi_{NC^{rep}}^{2} \ge \chi_{NC}^{2}|NC_s) $$
 In words, the PPP-value is the proportion of replicated datasets whose function values $\chi_{NC^{rep}}^{2}$ exceed that of the $\chi_{NC}^{2}$ applied to the observed data. The **R** code below shows how these statistics are computed in our example.
 
 
-```{r, tidy=TRUE}
+```{r}
 # (1) Generate a function for vectorized chi2 test
 # The argument "scores" is a vector of (NC0, NC1, NC2, NC3, NC4)'
 # The argument "expected" is a vector of (E(NC0), E(NC1), ..., E(NC4))'
@@ -822,7 +815,7 @@ grid.arrange(or, ppp, ncol=2)
 ## Troubleshooting example 1
 
 <!-- This chunk is hidden and then revealed at end of section -->
-```{r modify_data, echo = FALSE, evaluate = TRUE, tidy=TRUE}
+```{r modify_data, echo = FALSE, evaluate = TRUE}
 # Recode item 4: 0 -> 1 and 1 -> 0
 modified_data <- stan_data
 is_item_4 <- modified_data$ii == 4
@@ -831,7 +824,7 @@ modified_data$y[is_item_4] <- 1 - modified_data$y[is_item_4]
 
 We will explore the question of what to do when models fail to converge by way of two examples. We will work with a modified version of the spelling data, `modified_data`, that is set up to fail. The changes to the original data will be provided at the end of this section, but for now let us pretend to be naive. We fit the 2PL to the altered data in the same way as before.
 
-```{r, results = "hide", cache = TRUE, tidy=TRUE}
+```{r, results = "hide", cache = TRUE}
 twopl_file <- file.path(path.package("edstan", quiet = TRUE), "extdata",
                         "twopl.stan")
 troubleshoot_fit1a <- stan(file = twopl_file, data = modified_data, chains = 4,
@@ -840,20 +833,20 @@ troubleshoot_fit1a <- stan(file = twopl_file, data = modified_data, chains = 4,
 
 Next we observe the table of results.
 
-```{r, tidy=TRUE}
+```{r}
 print(troubleshoot_fit1a, pars = c("alpha", "beta"))
 ```
 
 We immediately see that the values for *Rhat* are too high, meaning that the chains have not converged. There is no way to know for sure beforehand how many iterations per chain will be sufficient. Perhaps 200 was too few, so we try a much larger number.
 
-```{r, results = "hide", cache = TRUE, tidy=TRUE}
+```{r, results = "hide", cache = TRUE}
 troubleshoot_fit1b <- stan(file = twopl_file, data = modified_data, chains = 4,
                           iter = 1000)
 ```
 
 We check the results for the new fit.
 
-```{r, tidy=TRUE}
+```{r}
 print(troubleshoot_fit1b, pars = c("alpha", "beta"))
 ```
 
@@ -861,8 +854,8 @@ The values of *Rhat* are acceptable now, though just barely for some. We may be 
 
 So far we have neglected to look at the parameter posteriors. Looking at the output tables again, we see that `alpha[4]` has a very small, positive posterior mean. We plot a kernal density of the posterior for this parameter with a vertical line at zero.
 
-```{r, tidy=TRUE, message=FALSE}
-stan_hist(troubleshoot_fit1b, pars = "alpha[4]") + geom_vline()
+```{r, message=FALSE}
+stan_hist(troubleshoot_fit1b, pars = "alpha[4]") + geom_vline(xintercept = 0)
 ```
 
 We see that the posterior for the parameter tends to be near zero. Remembering that the model constrains the discrimination parameters to be positive, we begin to understand the problem. The log normal prior distribution has weak support for values very close to zero and no support for zero itself. Meanwhile, `alpha[4]` "wants" to be negative. There is a mismatch between the data and the prior.
@@ -877,7 +870,7 @@ The R code below reveals how the dataset `modified_data` was constructed; we sim
 
 Next we try a **Stan** model that allows for negative discrimination parameters. We take the original 2PL **Stan** model and change the prior on the discriminations.
 
-```{r, warning=FALSE, tidy=TRUE}
+```{r, warning=FALSE}
 twopl_code <- readLines(twopl_file)
 new_code <- gsub("vector<lower=0>.*$", "vector[I] alpha;", twopl_code)
 new_code <- gsub("alpha ~.*$", "alpha ~ normal(0,10);", new_code)
@@ -886,7 +879,7 @@ cat(new_code, sep = "\n")
 
 We fit the modified **Stan** model, supplying starting values. Normally we let **Stan** generate random starting values, but we deviate from standard practice here to make a point. Later we will discuss the purpose of these particular starting values.
 
-```{r, tidy=TRUE, cache=TRUE, results="hide"}
+```{r, results="hide"}
 # Create a set of initial values
 set.seed(1291)
 myinits <- list()

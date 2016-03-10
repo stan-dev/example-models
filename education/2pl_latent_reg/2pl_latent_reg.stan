@@ -24,5 +24,5 @@ model {
   alpha ~ lognormal(1, 1);
   beta_free ~ normal(0, 5);
   theta ~ normal(0, 1);
-  y ~ bernoulli_logit(alpha[ii].*theta[jj] + mu[jj] - beta[ii]);
+  y ~ bernoulli_logit(alpha[ii].*(theta[jj] + mu[jj] - beta[ii]));
 }
