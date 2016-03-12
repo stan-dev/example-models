@@ -1,0 +1,73 @@
+// Site-occupancy models with covariates
+
+data {
+  int<lower=1> R;                 // Number of sites
+  int<lower=1> T;                 // Number of temporal replications
+  int<lower=0,upper=1> y[R, T];   // Observation
+  vector[R] X;                    // Covariate
+}
+
+transformed data {
+  int<lower=0,upper=T> sum_y[R];  // Number of occupation for each site
+  int<lower=0,upper=R> occ_obs;   // Number of observed occupied sites
+
+  occ_obs <- 0;
+  for (i in 1:R) {
+    sum_y[i] <- sum(y[i]);
+    if (sum_y[i])
+      occ_obs <- occ_obs + 1;
+  }
+}
+
+parameters {
+  real alpha_occ;
+  real beta_occ;
+  real alpha_p;
+  real beta_p;
+}
+
+transformed parameters {
+  vector[R] logit_psi;            // Logit occupancy probability
+  matrix[R, T] logit_p;           // Logit detection probability
+
+  logit_psi <- alpha_occ + beta_occ * X;
+  for (j in 1:T)
+    logit_p[1:R, j] <- alpha_p + beta_p * X;
+}
+
+model {
+  // Priors
+  // Improper flat priors are implicitly used on
+  // alpha_occ, beta_occ, alpha_p and beta_p.
+
+  // Likelihood
+  for (i in 1:R) {
+    if (sum_y[i]) {    // Occurred and observed
+      1 ~ bernoulli_logit(logit_psi[i]);
+      y[i] ~ bernoulli_logit(logit_p[i]);
+    } else {
+      real lp[2];
+
+      lp[1] <- bernoulli_logit_log(1, logit_psi[i])   // Occurred
+        + bernoulli_logit_log(0, logit_p[i]);         // and not observed
+      lp[2] <- bernoulli_logit_log(0, logit_psi[i]);  // Not occurred
+      increment_log_prob(log_sum_exp(lp[1], lp[2]));
+    }
+  }
+}
+
+generated quantities {
+  int<lower=0> occ_fs;    // Number of occupied sites
+  int z[R];
+
+  // This code fully simulate the states without condition of
+  // observed y, so that the result will disperse wider than
+  // that of the book.
+  for (i in 1:R) {
+    real psi;
+
+    psi <- inv_logit(logit_psi[i]);
+    z[i] <- bernoulli_rng(psi);
+  }
+  occ_fs <- sum(z);
+}
