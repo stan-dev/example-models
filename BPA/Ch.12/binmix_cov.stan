@@ -22,13 +22,12 @@ parameters {
 }
 
 transformed parameters {
-  vector[R] log_lambda;
-  matrix[R, T] logit_p;
+  vector[R] log_lambda; // Log population size
+  matrix[R, T] logit_p; // Logit detection probability
 
   log_lambda <- alpha0 + alpha1 * X;
-  for (i in 1:R)
-    for (j in 1:T)
-      logit_p[i, j] <- beta0 + beta1 * X[i];
+  for (j in 1:T)
+    logit_p[1:R, j] <- beta0 + beta1 * X;
 }
 
 model {

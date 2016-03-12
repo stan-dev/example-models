@@ -20,8 +20,10 @@ parameters {
 
 model {
   // Priors
-  lambda ~ gamma(0.005, 0.005);
-  // An implicit flat prior [0, 1] is used for p.
+  // A half Cauchy prior is used on lambda, instead of
+  // gamma(0.005, 0.005) or uniform(0, 10) proposed in the book.
+  lambda ~ cauchy(0, 10);
+  // A flat prior [0, 1] is implicitly used on p.
 
   // Likelihood
   for (i in 1:R) {
