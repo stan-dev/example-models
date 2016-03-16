@@ -31,8 +31,7 @@ transformed parameters {
   matrix[R, T] logit_p;           // Logit detection probability
 
   logit_psi <- alpha_occ + beta_occ * X;
-  for (j in 1:T)
-    logit_p[1:R, j] <- alpha_p + beta_p * X;
+  logit_p <- rep_matrix(alpha_p + beta_p * X, T);
 }
 
 model {
@@ -46,12 +45,11 @@ model {
       1 ~ bernoulli_logit(logit_psi[i]);
       y[i] ~ bernoulli_logit(logit_p[i]);
     } else {
-      real lp[2];
-
-      lp[1] <- bernoulli_logit_log(1, logit_psi[i])   // Occurred
-        + bernoulli_logit_log(0, logit_p[i]);         // and not observed
-      lp[2] <- bernoulli_logit_log(0, logit_psi[i]);  // Not occurred
-      increment_log_prob(log_sum_exp(lp[1], lp[2]));
+                                     // Occurred and not observed
+      increment_log_prob(log_sum_exp(bernoulli_logit_log(1, logit_psi[i])
+                                     + bernoulli_logit_log(0, logit_p[i]),
+                                     // Not occurred
+                                     bernoulli_logit_log(0, logit_psi[i])));
     }
   }
 }

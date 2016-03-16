@@ -33,12 +33,11 @@ model {
       1 ~ bernoulli(psi);
       y[i] ~ bernoulli(p);
     } else {
-      real lp[2];
-
-      lp[1] <- bernoulli_log(1, psi)          // Occurred
-        + bernoulli_log(0, p) * T;            // and not observed
-      lp[2] <- bernoulli_log(0, psi);         // Not occurred
-      increment_log_prob(log_sum_exp(lp[1], lp[2]));
+                                     // Occurred and not observed
+      increment_log_prob(log_sum_exp(bernoulli_log(1, psi)
+                                     + bernoulli_log(0, p) * T,
+                                     // Not occurred
+                                     bernoulli_log(0, psi)));
     }
   }
 }
