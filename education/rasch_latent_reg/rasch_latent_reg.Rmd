@@ -11,18 +11,6 @@ output:
 bibliography: ../bibliography.bib
 ---
 
-<!-- 
-(Title:)  Rasch model with latent regression
-
-Author:  Daniel C. Furr
-
-Date:  2016
-
-Abstract:  This case study documents a Stan model for the Rasch model with latent regression. The latent regression portion of the model may be restricted to an intercept only, yielding a standard Rasch model. A brief simulation indicates that the Stan model successfully recovers the generating parameters. An example using a grade 12 science assessment is provided.
-
-Keywords:  education, IRT, Rasch model, 1PL. 
---> 
-
 ```{r, include = FALSE}
 knitr::opts_chunk$set(tidy = TRUE, cache = TRUE)
 ```
@@ -44,22 +32,32 @@ $$
 
 Variables:
 
-* $i = 1 \ldots I$ indexes items
-* $j = 1 \ldots J$ indexes persons
-* $y_{ij} \in \{ 0 \ldots m_i \}$ is the response of person $j$ to item $i$
-* $w_{j}$ is the vector of covariates for person $j$
+* $i = 1 \ldots I$ indexes items.
+* $j = 1 \ldots J$ indexes persons.
+* $y_{ij} \in \{ 0, 1 \}$ is the response of person $j$ to item $i$.
+* $w_{j}$ is the vector of covariates for person $j$, which will in general include an intercept term.
 
 Parameters:
 
-* $\beta_i$ is the difficulty for item $i$
-* $\theta_j$ is the ability for person $j$
-* $\lambda$ is the vector of latent regression parameters
-* $\sigma^2$ is the variance for the ability distribution
+* $\beta_i$ is the difficulty for item $i$.
+* $\theta_j$ is the ability for person $j$.
+* $\lambda$ is the vector of latent regression parameters.
+* $\sigma^2$ is the variance for the ability distribution.
+
+Constraints:
+
+* The last item difficulty is constrained to be the negative sum of the other difficulties, $\beta_I = -\sum_{i}^{(I-1)} \beta_i$, resulting in the average item difficulty being zero.
+
+Priors:
+
+* $\beta_1 \ldots \beta_{I-1} \sim \mathrm{N}(0, 5)$ is weakly informative, and no prior is needed for the contrained difficulty $\beta_I$.
+* $\sigma \sim \mathrm{Exp}(.1)$ is weakly informative.
+* A uniform prior is chosen for $\lambda$ because the scale of the person covariates will vary depending on the application.
 
 
 ## **Stan** program
 
-The **Stan** program is nearly a direct translation of the notation above. The sole exception is a constraint placed on the item difficulties for model identification. This is done by creating `beta_free`, which is the vector of unconstrained item parameters, in the parameters block. Then in the transformed parameters block, `beta` is created to be identical to `beta_free` except for one additional element that is the constrained item difficulty. As a result of this constraint, the mean of `beta` will be zero.
+The **Stan** program is nearly a direct translation of the notation above. The constraint placed on the item difficulties is enacted by creating `beta_free`, which contains the $I-1$ unconstrained item parameters, in the parameters block. Then in the transformed parameters block, `beta` is created to be identical to `beta_free` except for one additional element that is the constrained item difficulty. As a result of this constraint, the mean of `beta` will be zero.
 
 ```{r stan_code, tidy = TRUE, comment="", echo=FALSE}
 cat(readLines("rasch_latent_reg.stan"), sep = "\n")
@@ -117,7 +115,8 @@ Before interpreting the results, it is necessary to check that the chains have c
 
 ```{r sim_converge, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the simulation. All values should be less than 1.1 to infer convergence."}
 # Plot of convergence statistics
-sim_monitor <- as.data.frame(monitor(sim_fit, print = FALSE))
+sim_draws <- extract(sim_fit, permuted = FALSE, inc_warmup = TRUE)
+sim_monitor <- as.data.frame(monitor(sim_draws, print = FALSE))
 sim_monitor$Parameter <- as.factor(gsub("\\[.*]", "", rownames(sim_monitor)))
 ggplot(sim_monitor) +
   aes(x = Parameter, y = Rhat, color = Parameter) +
@@ -213,7 +212,8 @@ As discussed above, convergence of the chains is assessed for every parameter, a
 
 ```{r example_converge, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the example. All values should be less than 1.1 to infer convergence."}
 # Plot of convergence statistics
-ex_monitor <- as.data.frame(monitor(ex_fit, print = FALSE))
+ex_draws <- extract(ex_fit, permuted = FALSE, inc_warmup = TRUE)
+ex_monitor <- as.data.frame(monitor(ex_draws, print = FALSE))
 ex_monitor$Parameter <- as.factor(gsub("\\[.*]", "", rownames(ex_monitor)))
 ggplot(ex_monitor) +
   aes(x = Parameter, y = Rhat, color = Parameter) +
@@ -231,7 +231,7 @@ print(ex_fit, pars = c("beta", "lambda", "sigma"))
 A Rasch model without the latent regression could be fit by changing the person covariate matrix to include only an intercept term. Shown below is how this may be done for the example data.
 
 ```{r example_noreg, eval = FALSE}
-# Assemble data list and fit model
+# Fit the example data without latent regression
 noreg_list <- ex_list
 noreg_list$W <- matrix(1, nrow = ex_list$J, ncol = 1)
 noreg_list$K <- 1

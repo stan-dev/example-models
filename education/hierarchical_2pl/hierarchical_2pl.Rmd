@@ -11,19 +11,6 @@ output:
 bibliography: ../bibliography.bib
 ---
 
-
-<!-- 
-(Title:)  Hierarchical two-parameter logistic item response model
-
-Author:  Daniel C. Furr
-
-Date:  2016
-
-Abstract:  This case study documents a Stan model for the two-parameter logistic model (2PL) with hierarchical priors. A brief simulation indicates that the Stan model successfully recovers the generating parameters. An example using a grade 12 science assessment is provided.
-
-Keywords:  education, IRT, 2PL, hierarchical prior. 
---> 
-
 ```{r knitr_opts, include = FALSE}
 knitr::opts_chunk$set(tidy = TRUE, cache = TRUE)
 ```
@@ -63,10 +50,18 @@ Parameters:
 * $\mu_2$ is the mean for $\beta_i$
 * $\Sigma$ is the covariance matrix for $\log \alpha_i$ and $\beta_i$
 
+Priors:
+
+* $\mu_1 \sim \mathrm{N}(0,1)$ is a weakly informative prior for the mean of the log discrimination parameters.
+* $\mu_2 \sim \mathrm{N}(0,9)$ is a weakly informative prior for the mean of the difficulty parameters.
+* Let $\tau_1^2 = \Sigma_{1,1}$ be the variance of the log discrimination parameters. Then $\tau \sim \mathrm{Exp}(.1)$ is a weakly informative prior for the standard deviation.
+* Let $\tau_2^2 = \Sigma_{2,2}$ be the variance of the difficulty parameters. Then $\tau_2 \sim \mathrm{Exp}(.1)$ is a weakly informative prior for the standard deviation.
+* A weakly informative prior is placed on the covariance, $\Sigma_{1,2} = \Sigma_{2,1}$, shrinking the posterior towards zero. This is described in more detail in the next section.
+
 
 ## **Stan** program
 
-The **Stan** program for the model is given in *hierarchical_twopl.stan*. It differs from the above in that it is written in terms of the Cholesky decomposition of the correlation matrix for better efficiency. This matrix is named `L_Omega`; `Omega` because it is the correlation rather than covariance matrix, and `L` because it is a Cholesky decomposition. The vector `tau` contains the standard deviations that would be the (square root of the) diagonal of the covariance matrix. (The standard deviations are invariant whether or not the the Cholesky decomposition is used.) In the `model` block, `L_Omega` is converted to its covariance equivalent `L_Sigma`, and item parameter pairs `xi[i]` are sampled from `L_Sigma`. The first element of vector `xi[i]` is the log discrimination for item `i`, and the second is the difficulty for item `i`.
+The **Stan** program for the model is provided below. It differs from the notation above in that it is written in terms of the Cholesky decomposition of the correlation matrix for better efficiency. This matrix is named `L_Omega`; `Omega` because it is the correlation rather than covariance matrix, and `L` because it is a Cholesky decomposition. The vector `tau` contains the standard deviations that would be the (square root of the) diagonal of the covariance matrix. (The standard deviations are invariant whether or not the the Cholesky decomposition is used.) In the `model` block, `L_Omega` is converted to its covariance equivalent `L_Sigma`, and item parameter pairs `xi[i]` are sampled from `L_Sigma`. The first element of vector `xi[i]` is the log discrimination for item `i`, and the second is the difficulty for item `i`.
 
 Weakly informative normal priors are placed on `mu`, and weakly informative truncated normal priors are placed on `tau`. The prior placed on `L_Omega` using `lkj_corr_cholesky()` is weakly informative and slightly favors a correlation of zero. See the **Stan** manual for details.
 
@@ -84,6 +79,7 @@ First, the necessary **R** packages are loaded.
 ```{r, message=FALSE, warning=FALSE, results="hide"}
 # Load R packages
 library(rstan)
+rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 library(ggplot2)
 ```
@@ -117,16 +113,17 @@ data_list$y <- as.numeric(boot::inv.logit(eta) > runif(data_list$N))
 
 The simulated data consists of `r I` items and `r J` persons. The log discriminations have mean `r mu[1]` and standard deviation `r tau[1]`. The difficulties have mean `r mu[2]` and standard deviation `r tau[2]`. The correlation between the log discrimination residuals and difficulty residuals is `r Omega[1,2]`. The simulated dataset is fit with **Stan**.
 
-```{r sim_fit, results='hide'}
+```{r sim_fit, results="hide"}
 # Fit model to simulated data
 sim_fit <- stan(file = "hierarchical_2pl.stan", 
-                data = data_list, chains = 4, iter = 1000)
+                data = data_list, chains = 4, iter = 500)
 ```
 
 Before interpreting the results, it is necessary to check that the chains have converged. **Stan** provides the $\hat{R}$ statistic for the model parameters and log posterior. These are provided in the following figure. All values for $\hat{R}$ should be less than 1.1.
 
 ```{r sim_converge, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the simulation. All values should be less than 1.1 to infer convergence."}
-sim_monitor <- as.data.frame(monitor(sim_fit, print = FALSE))
+sim_draws <- extract(sim_fit, permuted = FALSE, inc_warmup = TRUE)
+sim_monitor <- as.data.frame(monitor(sim_draws, print = FALSE))
 sim_monitor$Parameter <- as.factor(gsub("\\[.*]", "", rownames(sim_monitor)))
 ggplot(subset(sim_monitor, !is.nan(Rhat))) +
   aes(x = Parameter, y = Rhat, color = Parameter) +
@@ -177,7 +174,7 @@ sat <- key2binary(SAT12,
 
 The example data [@testfact4] are from a grade 12 science assessment. `r nrow(sat)` students responded to `r ncol(sat)` dichotomously scored items. Non-responses were scored as incorrect, so the data contain no missing values. The scored response matrix is converted to list form and fit with **Stan**.
 
-```{r example_fit, , result="hide"}
+```{r example_fit, results="hide"}
 # Assemble data list and fit model
 sat_list <- list(I = ncol(sat),
                  J = nrow(sat),
@@ -186,13 +183,14 @@ sat_list <- list(I = ncol(sat),
                  jj = rep(1:nrow(sat), times = ncol(sat)),
                  y = as.vector(sat))
 sat_fit <- stan(file = "hierarchical_2pl.stan", 
-                data = sat_list, chains = 4, iter = 1000)
+                data = sat_list, chains = 4, iter = 500)
 ```
 
 As discussed above, convergence of the chains is assessed for every parameter, and also the log posterior, using $\hat{R}$.
 
 ```{r example_converge, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the SAT data. All values should be less than 1.1 to infer convergence."}
-sat_monitor <- as.data.frame(monitor(sat_fit, print = FALSE))
+sat_draws <- extract(sat_fit, permuted = FALSE, inc_warmup = TRUE)
+sat_monitor <- as.data.frame(monitor(sat_draws, print = FALSE))
 sat_monitor$Parameter <- as.factor(gsub("\\[.*]", "", rownames(sat_monitor)))
 ggplot(subset(sat_monitor, !is.nan(Rhat))) +
   aes(x = Parameter, y = Rhat, color = Parameter) +

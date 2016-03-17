@@ -11,19 +11,6 @@ output:
 bibliography: ../bibliography.bib
 ---
 
-
-<!-- 
-(Title:)  Rating scale model with latent regression
-
-Author:  Daniel C. Furr
-
-Date:  2016
-
-Abstract:  This case study documents a Stan model for the rating scale model (RSM) with latent regression. The latent regression portion of the model may be restricted to an intercept only, yielding a standard RSM. A brief simulation indicates that the Stan model successfully recovers the generating parameters. An example using a survey of public perceptions of science and technology is provided.
-
-Keywords:  education, IRT, RSM. 
---> 
-
 ```{r, include = FALSE}
 knitr::opts_chunk$set(tidy = TRUE, cache = TRUE)
 ```
@@ -51,19 +38,31 @@ $$
 
 Variables:
 
-* $i = 1 \ldots I$ indexes items
-* $j = 1 \ldots J$ indexes persons
-* $y_{ij} \in \{ 0 \ldots m_i \}$ is the response of person $j$ to item $i$
-* $m$ is simulataneously the maximum score and number of step difficulty parameters per item
-* $w_{j}$ is the vector of covariates for person $j$
+* $i = 1 \ldots I$ indexes items.
+* $j = 1 \ldots J$ indexes persons.
+* $y_{ij} \in \{ 0 \ldots m \}$ is the response of person $j$ to item $i$
+* $m$ is simulataneously the maximum score and number of step difficulty parameters per item.
+* $w_{j}$ is the vector of covariates for person $j$, which will in general include an intercept term.
 
 Parameters:
 
-* $\beta_i$ is the item-specific difficulty for item $i$
-* $\kappa_s$ is the $s$-th step difficulty, constant across items
-* $\theta_j$ is the ability for person $j$
-* $\lambda$ is the vector of latent regression parameters
-* $\sigma^2$ is the variance for the ability distribution
+* $\beta_i$ is the item-specific difficulty for item $i$.
+* $\kappa_s$ is the $s$-th step difficulty, constant across items.
+* $\theta_j$ is the ability for person $j$.
+* $\lambda$ is the vector of latent regression parameters.
+* $\sigma^2$ is the variance for the ability distribution.
+
+Constraints:
+
+* The last item-specific difficulty is constrained to be the negative sum of the other item-specific difficulties, $\beta_I = -\sum_{i}^{(I-1)} \beta_i$, resulting in the average item difficulty being zero.
+* The last step difficulty is likewise constrained to be the negative sum of the other step difficulties, $\kappa_m = -\sum_{s}^{(m-1)} \kappa_s$, resulting in the average step difficulty being zero.
+
+Priors:
+
+* $\beta_1 \ldots \beta_{I-1} \sim \mathrm{N}(0, 5)$ is weakly informative, and no prior is needed for the contrained difficulty $\beta_I$.
+* $\kappa_1 \ldots \kappa_{m-1} \sim \mathrm{N}(0, 5)$ is weakly informative, and no prior is needed for the contrained difficulty $\kappa_m$.
+* $\sigma \sim \mathrm{Exp}(.1)$ is weakly informative.
+* A uniform prior is chosen for $\lambda$ because the scale of the person covariates will vary depending on the application.
 
 
 ## **Stan** program
@@ -149,7 +148,8 @@ Before interpreting the results, it is necessary to check that the chains have c
 
 ```{r sim_converge, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the simulation. All values should be less than 1.1 to infer convergence."}
 # Plot of convergence statistics
-sim_monitor <- as.data.frame(monitor(sim_fit, print = FALSE))
+sim_draws <- extract(sim_fit, permuted = FALSE, inc_warmup = TRUE)
+sim_monitor <- as.data.frame(monitor(sim_draws, print = FALSE))
 sim_monitor$Parameter <- as.factor(gsub("\\[.*]", "", rownames(sim_monitor)))
 ggplot(sim_monitor) +
   aes(x = Parameter, y = Rhat, color = Parameter) +
@@ -236,7 +236,8 @@ As discussed above, convergence of the chains is assessed for every parameter, a
 
 ```{r ex_converge, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the example. All values should be less than 1.1 to infer convergence."}
 # Plot of convergence statistics
-ex_monitor <- as.data.frame(monitor(ex_fit, print = FALSE))
+ex_draws <- extract(ex_fit, permuted = FALSE, inc_warmup = TRUE)
+ex_monitor <- as.data.frame(monitor(ex_draws, print = FALSE))
 ex_monitor$Parameter <- as.factor(gsub("\\[.*]", "", rownames(ex_monitor)))
 ggplot(ex_monitor) +
   aes(x = Parameter, y = Rhat, color = Parameter) +

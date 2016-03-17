@@ -11,18 +11,6 @@ output:
 bibliography: ../bibliography.bib
 ---
 
-<!-- 
-(Title:)  Generalized partial credit model with latent regression
-
-Author:  Daniel C. Furr
-
-Date:  2016
-
-Abstract:  This case study documents a Stan model for the generalized partial credit model (GPCM) with latent regression. The latent regression portion of the model may be restricted to an intercept only, yielding a standard GPCM. A brief simulation indicates that the Stan model successfully recovers the generating parameters. An example using the TIMSS 2011 mathematics assessment is provided.
-
-Keywords:  education, IRT, GPCM. 
---> 
-
 ```{r, include = FALSE}
 knitr::opts_chunk$set(tidy = TRUE, cache = TRUE)
 ```
@@ -37,12 +25,14 @@ The generalized partial credit model [@muraki1992generalized] is appropriate for
 $$
 \mathrm{logit} [ \Pr(Y_{ij} = y,~y > 0 | \theta_j, \alpha_i, \beta_i) ] =
 \frac{\exp \sum_{s=1}^y (\alpha_i \theta_j + w_{j}' \lambda - \beta_{is})}
-     {1 + \sum_{k=1}^{m_i} \exp \sum_{s=1}^k (\alpha_i \theta_j + w_{j}' \lambda - \beta_{is})}
+     {1 + \sum_{k=1}^{m_i} \exp \sum_{s=1}^k 
+       \alpha_i (\theta_j + w_{j}' \lambda - \beta_{is})}
 $$
 $$
 \mathrm{logit} [ \Pr(Y_{ij} = y,~y = 0 | \theta_j, \alpha_i, \beta_i) ] =
 \frac{1}
-     {1 + \sum_{k=1}^{m_i} \exp \sum_{s=1}^k (\alpha_i \theta_j + w_{j}' \lambda - \beta_{is})}
+     {1 + \sum_{k=1}^{m_i} \exp \sum_{s=1}^k 
+       \alpha_i (\theta_j + w_{j}' \lambda - \beta_{is})}
 $$
 $$
 \theta_j \sim \mathrm{N}(0, 1)
@@ -50,18 +40,28 @@ $$
 
 Variables:
 
-* $i = 1 \ldots I$ indexes items
-* $j = 1 \ldots J$ indexes persons
+* $i = 1 \ldots I$ indexes items.
+* $j = 1 \ldots J$ indexes persons.
 * $y_{ij} \in \{ 0 \ldots m_i \}$ is the response of person $j$ to item $i$
-* $m_i$ is simulataneously the maximum score and number of step difficulty parameters for item $i$
-* $w_{j}$ is the vector of covariates for person $j$
+* $m_i$ is simulataneously the maximum score and number of step difficulty parameters for item $i$.
+* $w_{j}$ is the vector of covariates for person $j$, which will in general include an intercept term.
 
 Parameters:
 
-* $\alpha_i$ is the discrimination for item $i$
-* $\beta_{is}$ is the $s$-th step difficulty for item $i$
-* $\theta_j$ is the ability for person $j$
-* $\lambda$ is the vector of latent regression parameters
+* $\alpha_i$ is the discrimination for item $i$.
+* $\beta_{is}$ is the $s$-th step difficulty for item $i$.
+* $\theta_j$ is the ability for person $j$.
+* $\lambda$ is the vector of latent regression parameters.
+
+Constraints:
+
+* The last difficulty parameter is constrained to be the negative sum of the other difficulties, resulting in the average difficulty parameter being zero.
+
+Priors:
+
+* $\alpha_i \sim \mathrm{log~N}(1, 1)$ is weakly informative, except that positive discrimination parameters are assumed.
+* $\beta_1 \ldots \beta_{I-1} \sim \mathrm{N}(0, 5)$ is weakly informative, and no prior is needed for the contrained difficulty $\beta_I$.
+* A uniform prior is chosen for $\lambda$ because the scale of the person covariates will vary depending on the application.
 
 
 ## **Stan** program
@@ -122,7 +122,7 @@ data_list <- list(I = I,
 
 # Function to simulate responses
 simulate_response <- function(theta, mu, alpha, beta) {
-  unsummed <- c(0, alpha*theta + mu - beta)
+  unsummed <- c(0, alpha*(theta + mu - beta))
   numerators <- exp(cumsum(unsummed))
   denominator <- sum(numerators)
   response_probs <- numerators/denominator
@@ -144,7 +144,7 @@ for(n in 1:data_list$N) {
 The simulated data consists of `r I` items, each with `r ncol(Beta_uncentered) + 1` categories, and `r J` persons. The latent regression includes an intercept and `r length(lambda) - 1` person-related covariates, which are standard normal variables. Next, the model is fit to the simulated dataset with **Stan**.
 
 ```{r sim_fit, result="hide"}
-#Fit model to simulated data
+# Fit model to simulated data
 sim_fit <- stan(file = "gpcm_latent_reg.stan", 
                 data = data_list, chains = 4, iter = 500)
 ```
@@ -153,7 +153,8 @@ Before interpreting the results, it is necessary to check that the chains have c
 
 ```{r sim_converge, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the simulation. All values should be less than 1.1 to infer convergence."}
 # Plot of convergence statistics
-sim_monitor <- as.data.frame(monitor(sim_fit, print = FALSE))
+sim_draws <- extract(sim_fit, permuted = FALSE, inc_warmup = TRUE)
+sim_monitor <- as.data.frame(monitor(sim_draws, print = FALSE))
 sim_monitor$Parameter <- as.factor(gsub("\\[.*]", "", rownames(sim_monitor)))
 ggplot(sim_monitor) +
   aes(x = Parameter, y = Rhat, color = Parameter) +
@@ -288,7 +289,8 @@ As discussed above, convergence of the chains is assessed for every parameter, a
 
 ```{r ex_converge, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the example. All values should be less than 1.1 to infer convergence."}
 # Plot of convergence statistics
-ex_monitor <- as.data.frame(monitor(ex_fit, print = FALSE))
+ex_draws <- extract(ex_fit, permuted = FALSE, inc_warmup = TRUE)
+ex_monitor <- as.data.frame(monitor(ex_draws, print = FALSE))
 ex_monitor$Parameter <- as.factor(gsub("\\[.*]", "", rownames(ex_monitor)))
 ggplot(ex_monitor) +
   aes(x = Parameter, y = Rhat, color = Parameter) +
@@ -306,12 +308,12 @@ print(ex_fit, pars = c("alpha", "beta", "lambda"))
 If person covariates are unavailable, or their inclusion unwanted, the model may be fit restricting the matrix of person covariates to an intercept only. In this case, the vector `lambda` contains only one element, which will represent the mean of the ability distribution. The code below is an example of how to structure the data for **Stan** for this purpose.
 
 ```{r example_noreg, eval=FALSE}
+# Fit the example data without latent regression
 noreg_list <- ex_list
 noreg_list$K <- 1
 noreg_list$W <- matrix(1, nrow = nrow(M), ncol = 1)
-
 noreg_fit <- stan(file = "gpcm_latent_reg.stan",
-                data = noreg_list, chains = 4, iter = 1000)
+                data = noreg_list, chains = 4, iter = 500)
 ```
 
 

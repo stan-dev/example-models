@@ -11,7 +11,6 @@ output:
 bibliography: ../bibliography.bib
 ---
 
-
 ```{r knitr_opts, include = FALSE}
 knitr::opts_chunk$set(tidy = TRUE, cache = TRUE)
 ```
@@ -92,7 +91,7 @@ sigma <- 1
 lambda <- c(.5, .5, .5)
 W <- cbind(1, rnorm(J, 0, 1), rnorm(J, 0, 1))
 alpha <- rep(c(.8, 1, 1.2, 1.4),  length.out = I)
-beta_free <- seq(from = -2, to = 2, length.out = I-1)
+beta_free <- seq(from = -1.5, to = 1.5, length.out = I-1)
 
 # Calculate or sample remaining paramters
 theta <-  rnorm(J, 0, sigma)
@@ -107,7 +106,7 @@ sim_data <- list(I = I,
                  jj = rep(1:J, each = I),
                  K = ncol(W),
                  W = W)
-eta <- alpha[sim_data$ii]*theta[sim_data$jj] + mu[sim_data$jj] - beta[sim_data$ii]
+eta <- alpha[sim_data$ii]*(theta[sim_data$jj] + mu[sim_data$jj] - beta[sim_data$ii])
 sim_data$y <- as.numeric(boot::inv.logit(eta) > runif(sim_data$N))
 ```
 
@@ -116,14 +115,15 @@ The simulated data consists of `r I` dichotomous items and `r J` persons. The la
 ```{r sim_fit, result="hide"}
 # Fit model to simulated data
 sim_fit <- stan(file = "2pl_latent_reg.stan",
-                data = sim_data, chains = 4, iter = 1000)
+                data = sim_data, chains = 4, iter = 500)
 ```
 
 Before interpreting the results, it is necessary to check that the chains have converged. **Stan** provides the $\hat{R}$ statistic for the model parameters and log posterior. These are provided in the following figure. All values for $\hat{R}$ should be less than 1.1.
 
 ```{r sim_converge, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the simulation. All values should be less than 1.1 to infer convergence."}
 # Plot of convergence statistics
-sim_monitor <- as.data.frame(monitor(sim_fit, print = FALSE))
+sim_draws <- extract(sim_fit, permuted = FALSE, inc_warmup = TRUE)
+sim_monitor <- as.data.frame(monitor(sim_draws, print = FALSE))
 sim_monitor$Parameter <- as.factor(gsub("\\[.*]", "", rownames(sim_monitor)))
 ggplot(sim_monitor) +
   aes(x = Parameter, y = Rhat, color = Parameter) +
@@ -210,14 +210,15 @@ ex_list <- list(I = ncol(response_matrix),
                 K = ncol(W),
                 W = W)
 ex_fit <- stan(file = "2pl_latent_reg.stan", 
-                data = ex_list, chains = 4, iter = 1000)
+                data = ex_list, chains = 4, iter = 500)
 ```
 
 As discussed above, convergence of the chains is assessed for every parameter, and also the log posterior density, using $\hat{R}$.
 
 ```{r example_converge, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the example. All values should be less than 1.1 to infer convergence."}
 # Plot of convergence statistics
-ex_monitor <- as.data.frame(monitor(ex_fit, print = FALSE))
+ex_draws <- extract(ex_fit, permuted = FALSE, inc_warmup = TRUE)
+ex_monitor <- as.data.frame(monitor(ex_draws, print = FALSE))
 ex_monitor$Parameter <- as.factor(gsub("\\[.*]", "", rownames(ex_monitor)))
 ggplot(ex_monitor) +
   aes(x = Parameter, y = Rhat, color = Parameter) +
@@ -235,12 +236,12 @@ print(ex_fit, pars = c("alpha", "beta", "lambda"))
 A 2PL without the latent regression could be fit by changing the person covariate matrix to include only an intercept term. Shown below is how this may be done for the example data.
 
 ```{r example_noreg, eval = FALSE}
-# Assemble data list and fit model
+# Fit the example data without latent regression
 noreg_list <- ex_list
 noreg_list$W <- matrix(1, nrow = ex_list$J, ncol = 1)
 noreg_list$K <- 1
 noreg_fit <- stan(file = "2pl_latent_reg.stan", 
-                  data = noreg_list, chains = 4, iter = 1000)
+                  data = noreg_list, chains = 4, iter = 500)
 ```
 
 
