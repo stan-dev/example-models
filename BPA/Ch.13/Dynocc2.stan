@@ -16,7 +16,7 @@ parameters {
   real<lower=0,upper=1> psi1;
   real<lower=0,upper=1> p;
   simplex[2] ps[2, nyear-1];    // Transition probability
-  // This is euqivalent to follows.
+  // This is euqivalent to the following.
   //  ps[1, t, 1] <- phi[t];
   //  ps[1, t, 2] <- 1.0 - phi[t];
   //  ps[2, t, 1] <- gamma[t];

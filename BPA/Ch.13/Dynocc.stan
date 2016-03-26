@@ -25,7 +25,7 @@ parameters {
   real<lower=0,upper=1> psi1;
   vector<lower=0,upper=1>[nyear] p;
   simplex[2] ps[2, nyear-1];     // Transition probability
-  // This is equivalent to follows.
+  // This is equivalent to the following.
   //  ps[1, t, 1] <- phi[t];
   //  ps[1, t, 2] <- 1.0 - phi[t];
   //  ps[2, t, 1] <- gamma[t];
