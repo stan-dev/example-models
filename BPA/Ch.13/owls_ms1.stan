@@ -56,10 +56,10 @@ model {
       for (t in 1:T) {
         if (y[s, t])
           lp[k] <- lp[k] + categorical_log(y[s, t], p[k, t]);
-      } //t
-    } //k
+      }
+    }
     increment_log_prob(log_sum_exp(lp));
-  } //i
+  }
 }
 
 generated quantities {

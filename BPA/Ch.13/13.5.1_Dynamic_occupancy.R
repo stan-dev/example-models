@@ -35,8 +35,6 @@ nc <- 4
 ## Initial values
 inits <- lapply(1:nc, function(i)
     list(psi1 = runif(1, 0, 1),
-         phi = runif(stan_data$nyear - 1, 0, 1),
-         gamma = runif(stan_data$nyear - 1, 0, 1),
          p = runif(stan_data$nyear, 0, 1)))
 
 ## Call Stan from R

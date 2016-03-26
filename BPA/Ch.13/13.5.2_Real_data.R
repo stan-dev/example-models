@@ -35,8 +35,6 @@ nc <- 4
 ## Initial values
 inits <- lapply(1:nc, function(i)
     list(psi1 = runif(1, 0, 1),
-         phi = runif(stan_data$nyear - 1, 0, 1),
-         gamma = runif(stan_data$nyear - 1, 0, 1),
          p = runif(1, 0, 1)))
 
 ## Call Stan from R
@@ -50,4 +48,4 @@ out2 <- stan("Dynocc2.stan",
 print(out2, digits = 3)
 
 ## Note: the original BUGS model in the BPA book is incorrect.
-##       see errata in the website of the book.
+##       See errata in the website of the book.

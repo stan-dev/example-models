@@ -23,21 +23,18 @@ transformed data {
 
 parameters {
   real<lower=0,upper=1> psi1;
-  vector<lower=0,upper=1>[nyear-1] phi;
-  vector<lower=0,upper=1>[nyear-1] gamma;
   vector<lower=0,upper=1>[nyear] p;
+  simplex[2] ps[2, nyear-1];     // Transition probability
+  // This is equivalent to follows.
+  //  ps[1, t, 1] <- phi[t];
+  //  ps[1, t, 2] <- 1.0 - phi[t];
+  //  ps[2, t, 1] <- gamma[t];
+  //  ps[2, t, 2] <- 1.0 - gamma[t];
 }
 
 transformed parameters {
-  simplex[2] ps[2, nyear-1];     // Transition probability
-  simplex[nrep+1] po[2, nyear];  // Emission probability
+  simplex[nrep+1] po[2, nyear];  // Log emission probability
 
-  for (t in 1:(nyear - 1)) {
-    ps[1, t, 1] <- phi[t];
-    ps[1, t, 2] <- 1.0 - phi[t];
-    ps[2, t, 1] <- gamma[t];
-    ps[2, t, 2] <- 1.0 - gamma[t];
-  }
   for (t in 1:nyear) {
     for (r in 1:(nrep + 1)) {
       po[1, t, r] <- exp(binomial_log(r - 1, nrep, p[t]));
@@ -48,14 +45,11 @@ transformed parameters {
 
 model {
   // Priors
-  psi1 ~ uniform(0, 1);
-  phi ~ uniform(0, 1);
-  gamma ~ uniform(0, 1);
-  p ~ uniform(0, 1);
+  // Flat priros Uniform(0, 1) are implicitly used on psi1, p and ps.
 
   // Likelihood
-  // Forward algorithm derived from Stan Modeling Language
-  // User's Guide  and Reference Manual
+  // This implementation of the forward algorithm is derived from
+  // Stan Modeling Language User's Guide and Reference Manual.
   for (i in 1:nsite) {
     real acc[2];
     vector[2] gam[nyear];
@@ -78,12 +72,18 @@ model {
 
 generated quantities {
   // Sample and population occupancy, growth rate and turnover
-  vector[nyear] psi;                        // Occupancy probability
+  vector<lower=0,upper=1>[nyear] psi;       // Occupancy probability
+  vector<lower=0,upper=1>[nyear - 1] phi;   // Survival probability
+  vector<lower=0,upper=1>[nyear - 1] gamma; // Colonization probability
   int<lower=0,upper=1> z[nsite, nyear];     // Latent state of occurrence
   int<lower=0,upper=nsite> n_occ[nyear];    // Number of occupancy
   vector[nyear-1] growthr;                  // Population growth rate
   vector[nyear-1] turnover;                 // Turnover rate
 
+  for (k in 1:(nyear - 1)) {
+    phi[k] <- ps[1, k, 1];
+    gamma[k] <- ps[2, k, 1];
+  }
   psi[1] <- psi1;
   for (k in 2:nyear)
     psi[k] <- psi[k - 1] * phi[k - 1] + (1 - psi[k - 1]) * gamma[k - 1];
