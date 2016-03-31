@@ -1,4 +1,16 @@
+##
+# Generalized Additive Model : y ~ s(X)
+# using cubic splines with negative binomial and log-link
+# The spline design matrix is centered and augmented with an intercept
+# Author: Yannick G Spill
+# References:
+# - Generalized Additive Models: an introduction with R, Simon N. Wood, CRC press (2006)
+# - Eilers and Marx, Stat Sci, 1996
+# This work is licensed under a Creative Commons Attribution-ShareAlike 4.0 International License
+##
+
 library(data.table)
+library(parallel)
 library(rstan)
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
@@ -18,25 +30,26 @@ generate_data = function(fun=sin, xmin=0, xmax=1, npoints=100, sd=1) {
 
 stan_matrix_to_datatable = function(opt, x) {
   vals=data.table(opt)
-  vals[,x:=x]
   melt(data.table(vals), id.vars="x")
 }
 
 
-
-
 #plot initial data
 data=generate_data(fun=function(x){3+2*sin(5*x)+3*x}, sd=100, xmin=0,xmax=3, npoints=1000)
-data[,pos:=x]
-data[,x:=x*1e5/3.+35400000]
 ggplot(data)+geom_point(aes(x,y))+geom_line(aes(x,f))#+scale_y_log10()
+
+##make dump
+#N=data[,.N]
+#K=10
+#y=data[,y]
+#x=data[,x]
+#dump(c("N","K","y","x"), file="gam_one.data.R")
 
 #fit it with stan
 smf="gam_one_centered_design.stan"
 sm = stan_model(file = smf)
-op = optimizing(sm, data = list(N=data[,.N], K=10, y=data[,y], x=data[,x]),
-                as_vector=F, hessian=F, iter=10000)
-#sf = stan(file=smf, data = list(N=data[,.N], K=10, y=data[,y], x=data[,x]))
+op = optimizing(sm, data = standata, as_vector=F, hessian=F, iter=10000)
+#sf = stan(file=smf, data = standata, iter = 1000)
 #launch_shinystan(sf)
 
 #statistics

@@ -1,6 +1,12 @@
 ////
-// GAM : y ~ s(X) using cubic splines with negative binomial and log-link
+// Generalized Additive Model : y ~ s(X)
+// using cubic splines with negative binomial and log-link
 // The spline design matrix is centered and augmented with an intercept
+// Author: Yannick G Spill
+// References:
+// - Generalized Additive Models: an introduction with R, Simon N. Wood, CRC press (2006)
+// - Eilers and Marx, Stat Sci, 1996
+// This work is licensed under a Creative Commons Attribution-ShareAlike 4.0 International License
 ////
 functions {
   vector range(int imin, int imax) {
