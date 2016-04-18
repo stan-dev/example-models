@@ -70,7 +70,7 @@ img {
 
 <div id="abstract" class="section level3">
 <h3>Abstract</h3>
-<p>One of the unfortunate properties of maximum likelihood estimators is that they are sensitive to parameterization. Bayesian estimators, on the other hand, being based on posterior expectations, are not sensitive to parameterization. This point is often confused, because of misunderstandings concerning Jacobian adjustments and probabilistic modeling. In this note, we contrast three simple binomial models, varying by parameterization, (a) direct probability parameterization, (b) log odds parameterization, (c) log odds parameterization with Jacobian adjustment. Models (a) and (b) provide the same MLE, whereas models (a) and (c) provide the same Bayesian estimates.</p>
+<p>When changing variables, a Jacobian adjustment needs to be provided to preserve the probability distributions of quantities of interest, incuding Bayesian posteriors. With appropriate Jacobians, Bayesian inference is invariant to the parameterization. In contrast, applying the appropriate Jacobian adjustment leads to different maximum likelihood estimates, whereas skipping the Jacobians leaves them unchanged. In this note, we contrast three simple repeated binary trial models, varying only by parameterization: (a) direct probability parameterization, (b) log odds parameterization without Jacobian adjustment, (c) log odds parameterization with Jacobian adjustment. Models (a) and (b) provide the same MLE, whereas model (c) has a different MLE. In contrast, models (a) and (c) provide the same Bayesian posterior, whereas model (b) differs.</p>
 </div>
 <div id="binary-trial-data" class="section level2">
 <h2>Binary Trial Data</h2>
@@ -85,7 +85,7 @@ y;</code></pre>
 <pre class="r"><code>theta_star &lt;- sum(y) / N;
 theta_star;</code></pre>
 <pre><code>## [1] 0.4</code></pre>
-<p>Don’t worry that <code>theta_star</code> isn’t the same as <code>theta</code>; discrepancies arise due to sampling variation. Try several runs of the binomial generation and look at <code>sum(y)</code> to get a feeling for the variation due to sampling. If you want to know how to derive this, differentiate the log density <span class="math inline">\(\log p(y | N, \theta)\)</span> with the data set <span class="math inline">\(y\)</span> fixed and set it equal to zero; the solution is <span class="math inline">\(\theta^*\)</span> as defined above (hint: convert it to binomial form using the sum of <span class="math inline">\(y\)</span> as a sufficient statistic).</p>
+<p>Don’t worry that <code>theta_star</code> isn’t the same as <code>theta</code>; discrepancies arise due to sampling variation. Try several runs of the binomial generation and look at <code>sum(y)</code> to get a feeling for the variation due to sampling. If you want to know how to derive this, differentiate the log density <span class="math inline">\(\log p(y \, | \, N, \theta)\)</span> with the data set <span class="math inline">\(y\)</span> fixed and set it equal to zero; the solution is <span class="math inline">\(\theta^*\)</span> as defined above (hint: convert it to binomial form using the sum of <span class="math inline">\(y\)</span> as a sufficient statistic).</p>
 </div>
 <div id="model-1-probability-parameterization" class="section level2">
 <h2>Model 1: Probability Parameterization</h2>
@@ -165,9 +165,9 @@ Chain 1, Iteration: 1400 / 2000 [ 70%]  (Sampling)
 Chain 1, Iteration: 1600 / 2000 [ 80%]  (Sampling)
 Chain 1, Iteration: 1800 / 2000 [ 90%]  (Sampling)
 Chain 1, Iteration: 2000 / 2000 [100%]  (Sampling)# 
-#  Elapsed Time: 0.008485 seconds (Warm-up)
-#                0.009498 seconds (Sampling)
-#                0.017983 seconds (Total)
+#  Elapsed Time: 0.009488 seconds (Warm-up)
+#                0.007309 seconds (Sampling)
+#                0.016797 seconds (Total)
 # 
 
 SAMPLING FOR MODEL 'prob' NOW (CHAIN 2).
@@ -184,9 +184,9 @@ Chain 2, Iteration: 1400 / 2000 [ 70%]  (Sampling)
 Chain 2, Iteration: 1600 / 2000 [ 80%]  (Sampling)
 Chain 2, Iteration: 1800 / 2000 [ 90%]  (Sampling)
 Chain 2, Iteration: 2000 / 2000 [100%]  (Sampling)# 
-#  Elapsed Time: 0.00814 seconds (Warm-up)
-#                0.006383 seconds (Sampling)
-#                0.014523 seconds (Total)
+#  Elapsed Time: 0.006943 seconds (Warm-up)
+#                0.006693 seconds (Sampling)
+#                0.013636 seconds (Total)
 # 
 
 SAMPLING FOR MODEL 'prob' NOW (CHAIN 3).
@@ -203,9 +203,9 @@ Chain 3, Iteration: 1400 / 2000 [ 70%]  (Sampling)
 Chain 3, Iteration: 1600 / 2000 [ 80%]  (Sampling)
 Chain 3, Iteration: 1800 / 2000 [ 90%]  (Sampling)
 Chain 3, Iteration: 2000 / 2000 [100%]  (Sampling)# 
-#  Elapsed Time: 0.006966 seconds (Warm-up)
-#                0.007703 seconds (Sampling)
-#                0.014669 seconds (Total)
+#  Elapsed Time: 0.007135 seconds (Warm-up)
+#                0.006631 seconds (Sampling)
+#                0.013766 seconds (Total)
 # 
 
 SAMPLING FOR MODEL 'prob' NOW (CHAIN 4).
@@ -222,9 +222,9 @@ Chain 4, Iteration: 1400 / 2000 [ 70%]  (Sampling)
 Chain 4, Iteration: 1600 / 2000 [ 80%]  (Sampling)
 Chain 4, Iteration: 1800 / 2000 [ 90%]  (Sampling)
 Chain 4, Iteration: 2000 / 2000 [100%]  (Sampling)# 
-#  Elapsed Time: 0.008864 seconds (Warm-up)
-#                0.006504 seconds (Sampling)
-#                0.015368 seconds (Total)
+#  Elapsed Time: 0.006956 seconds (Warm-up)
+#                0.006538 seconds (Sampling)
+#                0.013494 seconds (Total)
 # </code></pre>
 <pre class="r"><code>print(fit_bayes_prob, probs=c(0.1, 0.9));</code></pre>
 <pre><code>Inference for Stan model: prob.
@@ -235,10 +235,18 @@ post-warmup draws per chain=1000, total post-warmup draws=4000.
 theta  0.42    0.00 0.14  0.24  0.61  1245    1
 lp__  -8.69    0.02 0.76 -9.62 -8.16  1236    1
 
-Samples were drawn using NUTS(diag_e) at Mon Apr 18 15:31:29 2016.
+Samples were drawn using NUTS(diag_e) at Mon Apr 18 16:32:54 2016.
 For each parameter, n_eff is a crude measure of effective sample size,
 and Rhat is the potential scale reduction factor on split chains (at 
 convergence, Rhat=1).</code></pre>
+<p>The posterior mean is 0.42, not 0.4. The reason for this is that the posterior is not symmetric around its mode, but rather skewed to the right. In the case of this simple Bernoulli example with uniform prior, the posterior is conjugate, with form <span class="math display">\[
+p(\theta \, | \, y) = \mathsf{Beta}(\theta \, | \, 1 + \mathrm{sum}(y), 1 + N -
+\mathrm{sum}(y))
+\]</span> where <span class="math inline">\(\mathrm{sum}(y) = \sum_{n=1}^N y_n\)</span>. In our case, with <span class="math inline">\(N = 10\)</span> and <span class="math inline">\(\mathrm{sum}(y) = 4\)</span>, we get a posterior distribution <span class="math inline">\(p(\theta \, | \, y) = \mathsf{Beta}(\theta \, | \, 5, 7)\)</span>, and we know that if <span class="math inline">\(\theta \sim \mathsf{Beta}(5, 7)\)</span>, then <span class="math inline">\(\theta\)</span> has a mean of<span class="math display">\[
+\bar{\theta} = \frac{5}{5 + 7} = 0.41\bar{6} \approx 0.42,
+\]</span> and a mode of <span class="math display">\[
+\theta^{*} = \frac{5 - 1}{5 + 7 - 2} = 0.40.
+\]</span></p>
 </div>
 </div>
 <div id="model-2-log-odds-parameterization" class="section level2">
@@ -317,9 +325,9 @@ Chain 1, Iteration: 1400 / 2000 [ 70%]  (Sampling)
 Chain 1, Iteration: 1600 / 2000 [ 80%]  (Sampling)
 Chain 1, Iteration: 1800 / 2000 [ 90%]  (Sampling)
 Chain 1, Iteration: 2000 / 2000 [100%]  (Sampling)# 
-#  Elapsed Time: 0.011573 seconds (Warm-up)
-#                0.00904 seconds (Sampling)
-#                0.020613 seconds (Total)
+#  Elapsed Time: 0.011558 seconds (Warm-up)
+#                0.00937 seconds (Sampling)
+#                0.020928 seconds (Total)
 # 
 
 SAMPLING FOR MODEL 'logodds' NOW (CHAIN 2).
@@ -336,9 +344,9 @@ Chain 2, Iteration: 1400 / 2000 [ 70%]  (Sampling)
 Chain 2, Iteration: 1600 / 2000 [ 80%]  (Sampling)
 Chain 2, Iteration: 1800 / 2000 [ 90%]  (Sampling)
 Chain 2, Iteration: 2000 / 2000 [100%]  (Sampling)# 
-#  Elapsed Time: 0.009111 seconds (Warm-up)
-#                0.008843 seconds (Sampling)
-#                0.017954 seconds (Total)
+#  Elapsed Time: 0.010019 seconds (Warm-up)
+#                0.009396 seconds (Sampling)
+#                0.019415 seconds (Total)
 # 
 
 SAMPLING FOR MODEL 'logodds' NOW (CHAIN 3).
@@ -355,9 +363,9 @@ Chain 3, Iteration: 1400 / 2000 [ 70%]  (Sampling)
 Chain 3, Iteration: 1600 / 2000 [ 80%]  (Sampling)
 Chain 3, Iteration: 1800 / 2000 [ 90%]  (Sampling)
 Chain 3, Iteration: 2000 / 2000 [100%]  (Sampling)# 
-#  Elapsed Time: 0.009781 seconds (Warm-up)
-#                0.012424 seconds (Sampling)
-#                0.022205 seconds (Total)
+#  Elapsed Time: 0.009787 seconds (Warm-up)
+#                0.009712 seconds (Sampling)
+#                0.019499 seconds (Total)
 # 
 
 SAMPLING FOR MODEL 'logodds' NOW (CHAIN 4).
@@ -374,9 +382,9 @@ Chain 4, Iteration: 1400 / 2000 [ 70%]  (Sampling)
 Chain 4, Iteration: 1600 / 2000 [ 80%]  (Sampling)
 Chain 4, Iteration: 1800 / 2000 [ 90%]  (Sampling)
 Chain 4, Iteration: 2000 / 2000 [100%]  (Sampling)# 
-#  Elapsed Time: 0.010044 seconds (Warm-up)
-#                0.0123 seconds (Sampling)
-#                0.022344 seconds (Total)
+#  Elapsed Time: 0.00971 seconds (Warm-up)
+#                0.012168 seconds (Sampling)
+#                0.021878 seconds (Total)
 # </code></pre>
 <p>and jump straight to printing the fit.</p>
 <pre class="r"><code>print(fit_bayes_logodds, probs=c(0.1, 0.9));</code></pre>
@@ -389,14 +397,42 @@ alpha -0.44    0.02 0.67 -1.29  0.41  1154    1
 theta  0.40    0.00 0.15  0.22  0.60  1173    1
 lp__  -7.24    0.02 0.74 -8.15 -6.74  1547    1
 
-Samples were drawn using NUTS(diag_e) at Mon Apr 18 15:31:29 2016.
+Samples were drawn using NUTS(diag_e) at Mon Apr 18 16:32:54 2016.
 For each parameter, n_eff is a crude measure of effective sample size,
 and Rhat is the potential scale reduction factor on split chains (at 
 convergence, Rhat=1).</code></pre>
 </div>
+</div>
+<div id="jacobian-adjustments" class="section level2">
+<h2>Jacobian Adjustments</h2>
+<p>The Jacobian for a univariate transform is the absolute derivative of the inverse of the transform; it’s called “Jacobian” because in the general multivariate case, it’s the absolute determinant of the Jacobian matrix of the transform). More concretely, suppose I have a variable <span class="math inline">\(\theta\)</span> distributed as <span class="math inline">\(p(\theta)\)</span>, and I want to consider the distribution of a variable <span class="math inline">\(\alpha = f(\theta)\)</span>. Basic calculus on density functions shows that the distribution of <span class="math inline">\(\alpha\)</span> will be <span class="math display">\[
+p(\alpha) 
+\ = \
+p(f^{-1}(\alpha))
+\,
+\left|  
+\frac{d}{d\alpha} f^{-1}(\alpha)
+\right|,
+\]</span> where the absolute value term is the Jacobian adjustment.</p>
+<p>In our particular case, where <span class="math inline">\(f = \mathrm{logit}\)</span>, the Jacobian adjustment is <span class="math display">\[
+\left|
+\frac{d}{d\alpha} \mathrm{logit}^{-1}(\alpha)
+\right|
+\ = \
+\mathrm{logit}^{-1}(\alpha) \, (1 - \mathrm{logit}^{-1}(\alpha)).
+\]</span> Writing it out in full, <span class="math display">\[
+p(\alpha) 
+\ = \
+p(\mathrm{logit}^{-1}(\alpha))
+\, \mathrm{logit}^{-1}(\alpha)
+\, (1 - \mathrm{logit}^{-1}(\alpha)).
+\]</span></p>
+</div>
+<div id="model-3-log-odds-with-jacobian-adjustment" class="section level2">
+<h2>Model 3: Log Odds with Jacobian Adjustment</h2>
 <div id="stan-model-3-logodds-jac.stan" class="section level4">
 <h4>Stan Model 3: <tt>logodds-jac.stan</tt></h4>
-<p>The last model we consider is the version of Model 2 with the appropriate Jacobian correction so that <span class="math inline">\(\theta\)</span> and <span class="math inline">\(\mathrm{logit}^{-1}(\alpha)\)</span> have the same distribution.</p>
+<p>The last model we consider is the version of Model 2 with the appropriate Jacobian correction so that <span class="math inline">\(\theta\)</span> and <span class="math inline">\(\mathrm{logit}^{-1}(\alpha)\)</span> have the same distribution. The Jacobian was derived in the previous section, and is coded up directly in Stan.</p>
 <pre><code>data { 
   int&lt;lower=0&gt; N; 
   int&lt;lower=0, upper=1&gt; y[N]; 
@@ -413,12 +449,12 @@ generated quantities {
   real&lt;lower=0, upper=1&gt; theta; 
   theta &lt;- inv_logit(alpha); 
 } </code></pre>
+<p>This is not the most efficient Stan model; the likelihood may be implemented with <code>bernoulli_logit</code> rather than an explicit application of <code>inv_logit</code>, the likelihood may be vectorized, and the efficient and stable <code>log_inv_logit<code> and <code>log1m_inv_logit</code> may be used for the Jacobian calculation.</p>
 </div>
-<div id="fitting-model-2-1" class="section level4">
-<h4>Fitting Model 2</h4>
-<p>Same steps as before.</p>
+<div id="fitting-model-3" class="section level4">
+<h4>Fitting Model 3</h4>
+<p>The steps are exactly the same as before.</p>
 <pre class="r"><code>model_logodds_jac &lt;- stan_model(&quot;logodds-jac.stan&quot;);</code></pre>
-<p>With a compiled model, we can fit it using maximum likelihood given the names of the data variables.</p>
 <pre class="r"><code>fit_mle_logodds_jac &lt;- optimizing(model_logodds_jac, data=c(&quot;N&quot;, &quot;y&quot;));</code></pre>
 <pre><code>STAN OPTIMIZATION COMMAND (LBFGS)
 init = random
@@ -443,7 +479,7 @@ $value
 [1] -8.150319</code></pre>
 <pre class="r"><code>inv_logit(fit_mle_logodds_jac$par[[&quot;alpha&quot;]])</code></pre>
 <pre><code>[1] 0.4166669</code></pre>
-<p>Note that the answer is again the same as from the analytic calculation after the inverse logit transform back to the probabilty scale. But now consider what happens in the Bayesian setting (we skip echoing the output here):</p>
+<p>Note that the answer is again the same as from the analytic calculation after the inverse logit transform back to the probabilty scale. But now consider what happens in the Bayesian setting.</p>
 <pre><code>
 SAMPLING FOR MODEL 'logodds-jac' NOW (CHAIN 1).
 
@@ -459,9 +495,9 @@ Chain 1, Iteration: 1400 / 2000 [ 70%]  (Sampling)
 Chain 1, Iteration: 1600 / 2000 [ 80%]  (Sampling)
 Chain 1, Iteration: 1800 / 2000 [ 90%]  (Sampling)
 Chain 1, Iteration: 2000 / 2000 [100%]  (Sampling)# 
-#  Elapsed Time: 0.011147 seconds (Warm-up)
-#                0.009036 seconds (Sampling)
-#                0.020183 seconds (Total)
+#  Elapsed Time: 0.010863 seconds (Warm-up)
+#                0.013502 seconds (Sampling)
+#                0.024365 seconds (Total)
 # 
 
 SAMPLING FOR MODEL 'logodds-jac' NOW (CHAIN 2).
@@ -478,9 +514,9 @@ Chain 2, Iteration: 1400 / 2000 [ 70%]  (Sampling)
 Chain 2, Iteration: 1600 / 2000 [ 80%]  (Sampling)
 Chain 2, Iteration: 1800 / 2000 [ 90%]  (Sampling)
 Chain 2, Iteration: 2000 / 2000 [100%]  (Sampling)# 
-#  Elapsed Time: 0.01001 seconds (Warm-up)
-#                0.012455 seconds (Sampling)
-#                0.022465 seconds (Total)
+#  Elapsed Time: 0.013064 seconds (Warm-up)
+#                0.019275 seconds (Sampling)
+#                0.032339 seconds (Total)
 # 
 
 SAMPLING FOR MODEL 'logodds-jac' NOW (CHAIN 3).
@@ -497,9 +533,9 @@ Chain 3, Iteration: 1400 / 2000 [ 70%]  (Sampling)
 Chain 3, Iteration: 1600 / 2000 [ 80%]  (Sampling)
 Chain 3, Iteration: 1800 / 2000 [ 90%]  (Sampling)
 Chain 3, Iteration: 2000 / 2000 [100%]  (Sampling)# 
-#  Elapsed Time: 0.018569 seconds (Warm-up)
-#                0.009444 seconds (Sampling)
-#                0.028013 seconds (Total)
+#  Elapsed Time: 0.009732 seconds (Warm-up)
+#                0.009412 seconds (Sampling)
+#                0.019144 seconds (Total)
 # 
 
 SAMPLING FOR MODEL 'logodds-jac' NOW (CHAIN 4).
@@ -516,11 +552,10 @@ Chain 4, Iteration: 1400 / 2000 [ 70%]  (Sampling)
 Chain 4, Iteration: 1600 / 2000 [ 80%]  (Sampling)
 Chain 4, Iteration: 1800 / 2000 [ 90%]  (Sampling)
 Chain 4, Iteration: 2000 / 2000 [100%]  (Sampling)# 
-#  Elapsed Time: 0.0094 seconds (Warm-up)
-#                0.012543 seconds (Sampling)
-#                0.021943 seconds (Total)
+#  Elapsed Time: 0.009659 seconds (Warm-up)
+#                0.012341 seconds (Sampling)
+#                0.022 seconds (Total)
 # </code></pre>
-<p>and jump straight to printing the fit.</p>
 <pre class="r"><code>print(fit_bayes_logodds_jac, probs=c(0.1, 0.9));</code></pre>
 <pre><code>Inference for Stan model: logodds-jac.
 4 chains, each with iter=2000; warmup=1000; thin=1; 
@@ -531,7 +566,7 @@ alpha -0.37    0.02 0.60 -1.13  0.36  1341    1
 theta  0.42    0.00 0.13  0.24  0.59  1354    1
 lp__  -8.65    0.02 0.71 -9.48 -8.16  1941    1
 
-Samples were drawn using NUTS(diag_e) at Mon Apr 18 15:31:29 2016.
+Samples were drawn using NUTS(diag_e) at Mon Apr 18 16:32:55 2016.
 For each parameter, n_eff is a crude measure of effective sample size,
 and Rhat is the potential scale reduction factor on split chains (at 
 convergence, Rhat=1).</code></pre>
@@ -543,7 +578,7 @@ convergence, Rhat=1).</code></pre>
 <table>
 <thead>
 <tr class="header">
-<th align="left">Model</th>
+<th align="left">Parameterization</th>
 <th align="left">Posterior Mode</th>
 <th align="left">Posterior Mean</th>
 </tr>
