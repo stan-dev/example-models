@@ -22,5 +22,3 @@ Stan translations was done by Hiroki Itô <abies.firma@gmail.com>. I thank Dr. K
 * Chapter 12. Estimation of Abundance from Counts in Metapopulation Design Using the Binomial Mixture Model
 * Chapter 13. Estimation of Occupancy and Species Distributions from Detection/Nondetection Data in Metapopulation Designs Using Site-Occupancy Models
 * Chapter 14. Concluding Remarks
-
-Stan-translation is now completed to Chapter 11.
