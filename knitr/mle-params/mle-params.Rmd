@@ -1,0 +1,249 @@
+---
+title: "MLE, Bayesian Posteriors, and Reparameterization"
+author: "Bob Carpenter"
+date: "18 April 2016"
+output: 
+  html_document: 
+    theme: cerulean
+---
+
+### Abstract
+
+One of the unfortunate properties of maximum likelihood estimators is
+that they are sensitive to parameterization.  Bayesian estimators, on
+the other hand, being based on posterior expectations, are not
+sensitive to parameterization. This point is often confused, because
+of misunderstandings concerning Jacobian adjustments and probabilistic
+modeling. In this note, we contrast three simple binomial models,
+varying by parameterization, (a) direct probability parameterization,
+(b) log odds parameterization, (c) log odds parameterization with
+Jacobian adjustment.  Models (a) and (b) provide the same MLE, whereas
+models (a) and (c) provide the same Bayesian estimates.
+
+## Binary Trial Data
+
+We will assume a very simple data set $y_1,\ldots,y_N$, consisting of $N$ repeated binary trials with a chance $\theta \in [0, 1]$ of success.  Let's start by creating a data set of $N = 100$ observations.
+
+```{r}
+set.seed(123);
+theta <- 0.3;
+N <- 10;
+y <- rbinom(N, 1, theta);
+y;
+```
+
+Now the maximum likelihood estimate $\theta^*$ for $\theta$ in this
+case is easy to compute, being just the proportion of successes.
+
+```{r}
+theta_star <- sum(y) / N;
+theta_star;
+```
+
+Don't worry that `theta_star` isn't the same as `theta`; discrepancies
+arise due to sampling variation.  Try several runs of the binomial
+generation and look at `sum(y)` to get a feeling for the variation due
+to sampling.  If you want to know how to derive this, differentiate
+the log density $\log p(y | N, \theta)$ with the data set $y$ fixed
+and set it equal to zero; the solution is $\theta^*$ as defined above
+(hint: convert it to binomial form using the sum of $y$ as a
+sufficient statistic).
+
+## Model 1: Probability Parameterization
+
+The first model involves a direct parameterization of the joint
+density,
+\[
+p(\theta, y \, | \, N) 
+\ \propto \
+p(y \, | \, \theta, N) \, p(\theta)
+\]
+where the likelihood is defined by independent Bernoulli draws,
+\[
+p(y \, | \, \theta, N)
+\ = \
+\prod_{n=1}^N
+\mathsf{Bernoulli}(y_n \, | \, \theta)
+\]
+and where the prior is assumed to be uniform, 
+\[
+p(\theta) 
+\ = \
+\mathsf{Uniform}(\theta \, | \, 0, 1) 
+\ = \
+1.
+\]
+Note that number of observations $N$, because it is not modeled,
+remains on the right-side of the conditioning bar in the equations.
+
+#### Stan Model 1: <tt>prob.stan</tt>
+
+```{r comment=NA, echo=FALSE}
+file_path <- "prob.stan";
+lines <- readLines(file_path, encoding="ASCII");
+for (n in 1:length(lines)) cat(lines[n],'\n');
+```
+
+#### Fitting the Model
+
+First, we have to load the <code>rstan</code> package,
+
+```{r comment=NA}
+library(rstan);
+```
+
+Then we can compile the model as follows.
+
+```{r comment=NA}
+model_prob <- stan_model("prob.stan");
+```
+
+With a compiled model, we can fit it using maximum likelihood given
+the names of the data variables.
+
+```{r comment=NA}
+fit_mle_prob <- optimizing(model_prob, data=c("N", "y"));
+fit_mle_prob;
+```
+
+Note that the answer is the same as from the analytic calculation.
+
+Next, we can fit the same model using Stan's default MCMC algorithm for
+Bayesian posteriors. 
+
+```{r comment=NA}
+fit_bayes_prob <- sampling(model_prob, data=c("N", "y"));
+print(fit_bayes_prob, probs=c(0.1, 0.9));
+```
+
+
+
+## Model 2: Log Odds Parameterization
+
+Model 1 parameterized the chance of success directly as a parameter
+$\theta \in [0, 1]$ representing the chance of success.  Another
+popular parameterization, because it leads directly to the use of
+predictors in logistic regression, involves the log odds.  The
+log odds, or logit, function is defined for $\theta \in (0, 1)$ by
+\[
+ \mathrm{logit}(\theta) 
+\ = \
+\log \frac{\theta}{1 - \theta},
+\]
+with inverse defined for all $\alpha \in \mathbb{R}$ by
+\[
+\mathrm{logit}^{-1}(\alpha)
+\ = \
+\frac{1}{1 + \exp(-\alpha)}.
+\]
+So $\mathrm{logit} : (0, 1) \rightarrow \mathbb{R}$ and
+$\mathrm{logit}^{-1} : \mathbb{R} \rightarrow (0, 1)$.
+
+These functions are built into Stan as <code>logit</code> and
+<code>inv_logit</code>.  The log odds version of the model is as
+follows.  
+
+#### Stan Model 2: <tt>logodds.stan</tt>
+
+```{r comment=NA, echo=FALSE}
+file_path <- "logodds.stan";
+lines <- readLines(file_path, encoding="ASCII");
+for (n in 1:length(lines)) cat(lines[n],'\n');
+```
+
+#### Fitting Model 2
+
+Same steps as before.
+
+```{r comment=NA}
+model_logodds <- stan_model("logodds.stan");
+```
+
+With a compiled model, we can fit it using maximum likelihood given
+the names of the data variables.
+
+```{r comment=NA}
+fit_mle_logodds <- optimizing(model_logodds, data=c("N", "y"));
+fit_mle_logodds;
+inv_logit <- function(alpha) 1 / (1 + exp(-alpha));
+inv_logit(fit_mle_logodds$par[["alpha"]])
+```
+
+Note that the answer is again the same as from the analytic
+calculation after the inverse logit transform back to the probabilty
+scale.  But now consider what happens in the Bayesian setting (we skip
+echoing the output here):
+
+```{r comment=NA, echo=FALSE}
+fit_bayes_logodds <- sampling(model_logodds, data=c("N", "y"));
+```
+
+and jump straight to printing the fit.
+
+```{r comment=NA}
+print(fit_bayes_logodds, probs=c(0.1, 0.9));
+```
+
+
+#### Stan Model 3: <tt>logodds-jac.stan</tt>
+
+The last model we consider is the version of Model 2 with the
+appropriate Jacobian correction so that $\theta$ and
+$\mathrm{logit}^{-1}(\alpha)$ have the same distribution.
+
+```{r comment=NA, echo=FALSE}
+file_path <- "logodds-jac.stan";
+lines <- readLines(file_path, encoding="ASCII");
+for (n in 1:length(lines)) cat(lines[n],'\n');
+```
+
+#### Fitting Model 2
+
+Same steps as before.
+
+```{r comment=NA}
+model_logodds_jac <- stan_model("logodds-jac.stan");
+```
+
+With a compiled model, we can fit it using maximum likelihood given
+the names of the data variables.
+
+```{r comment=NA}
+fit_mle_logodds_jac <- optimizing(model_logodds_jac, data=c("N", "y"));
+fit_mle_logodds_jac;
+inv_logit(fit_mle_logodds_jac$par[["alpha"]])
+```
+
+Note that the answer is again the same as from the analytic
+calculation after the inverse logit transform back to the probabilty
+scale.  But now consider what happens in the Bayesian setting (we skip
+echoing the output here):
+
+```{r comment=NA, echo=FALSE}
+fit_bayes_logodds_jac <- sampling(model_logodds_jac, data=c("N", "y"));
+```
+
+and jump straight to printing the fit.
+
+```{r comment=NA}
+print(fit_bayes_logodds_jac, probs=c(0.1, 0.9));
+```
+
+## Conclusion
+
+To sum up, here's a handy table that contrasts the results
+
+Model       | Posterior Mode | Posterior Mean
+------------|----------------|---------------
+prob        |     0.40       |  0.42
+logodds     |     0.40       |  0.40
+logodds-jac |     0.42       |  0.42
+
+For the basic probabilistic coding with $\theta \sim
+\mathsf{Uniform}(0,1)$, the posterior mode (MLE) is 0.40, whereas the
+posterior mean (Bayesian estimate) is 0.42.  Assuming this is the
+model we wish to fit, the "right" posterior mode is achieved if the
+transform is carried out without the Jacobian adjustment, whereas the
+"right" posterior mean arises with the Jacobian adjustment.
+
+This is why it's tricky to talk about the effect of reparameterizations!
