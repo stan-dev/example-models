@@ -149,82 +149,50 @@ $value
 [1] -6.730117</code></pre>
 <p>Note that the answer is the same as from the analytic calculation.</p>
 <p>Next, we can fit the same model using Stan’s default MCMC algorithm for Bayesian posteriors.</p>
-<pre class="r"><code>fit_bayes_prob &lt;- sampling(model_prob, data=c(&quot;N&quot;, &quot;y&quot;));</code></pre>
+<pre class="r"><code>fit_bayes_prob &lt;- sampling(model_prob, data=c(&quot;N&quot;, &quot;y&quot;), refresh=1000);</code></pre>
 <pre><code>
 SAMPLING FOR MODEL 'prob' NOW (CHAIN 1).
 
 Chain 1, Iteration:    1 / 2000 [  0%]  (Warmup)
-Chain 1, Iteration:  200 / 2000 [ 10%]  (Warmup)
-Chain 1, Iteration:  400 / 2000 [ 20%]  (Warmup)
-Chain 1, Iteration:  600 / 2000 [ 30%]  (Warmup)
-Chain 1, Iteration:  800 / 2000 [ 40%]  (Warmup)
 Chain 1, Iteration: 1000 / 2000 [ 50%]  (Warmup)
 Chain 1, Iteration: 1001 / 2000 [ 50%]  (Sampling)
-Chain 1, Iteration: 1200 / 2000 [ 60%]  (Sampling)
-Chain 1, Iteration: 1400 / 2000 [ 70%]  (Sampling)
-Chain 1, Iteration: 1600 / 2000 [ 80%]  (Sampling)
-Chain 1, Iteration: 1800 / 2000 [ 90%]  (Sampling)
 Chain 1, Iteration: 2000 / 2000 [100%]  (Sampling)# 
-#  Elapsed Time: 0.009488 seconds (Warm-up)
-#                0.007309 seconds (Sampling)
-#                0.016797 seconds (Total)
+#  Elapsed Time: 0.009039 seconds (Warm-up)
+#                0.006954 seconds (Sampling)
+#                0.015993 seconds (Total)
 # 
 
 SAMPLING FOR MODEL 'prob' NOW (CHAIN 2).
 
 Chain 2, Iteration:    1 / 2000 [  0%]  (Warmup)
-Chain 2, Iteration:  200 / 2000 [ 10%]  (Warmup)
-Chain 2, Iteration:  400 / 2000 [ 20%]  (Warmup)
-Chain 2, Iteration:  600 / 2000 [ 30%]  (Warmup)
-Chain 2, Iteration:  800 / 2000 [ 40%]  (Warmup)
 Chain 2, Iteration: 1000 / 2000 [ 50%]  (Warmup)
 Chain 2, Iteration: 1001 / 2000 [ 50%]  (Sampling)
-Chain 2, Iteration: 1200 / 2000 [ 60%]  (Sampling)
-Chain 2, Iteration: 1400 / 2000 [ 70%]  (Sampling)
-Chain 2, Iteration: 1600 / 2000 [ 80%]  (Sampling)
-Chain 2, Iteration: 1800 / 2000 [ 90%]  (Sampling)
 Chain 2, Iteration: 2000 / 2000 [100%]  (Sampling)# 
-#  Elapsed Time: 0.006943 seconds (Warm-up)
-#                0.006693 seconds (Sampling)
-#                0.013636 seconds (Total)
+#  Elapsed Time: 0.00732 seconds (Warm-up)
+#                0.006295 seconds (Sampling)
+#                0.013615 seconds (Total)
 # 
 
 SAMPLING FOR MODEL 'prob' NOW (CHAIN 3).
 
 Chain 3, Iteration:    1 / 2000 [  0%]  (Warmup)
-Chain 3, Iteration:  200 / 2000 [ 10%]  (Warmup)
-Chain 3, Iteration:  400 / 2000 [ 20%]  (Warmup)
-Chain 3, Iteration:  600 / 2000 [ 30%]  (Warmup)
-Chain 3, Iteration:  800 / 2000 [ 40%]  (Warmup)
 Chain 3, Iteration: 1000 / 2000 [ 50%]  (Warmup)
 Chain 3, Iteration: 1001 / 2000 [ 50%]  (Sampling)
-Chain 3, Iteration: 1200 / 2000 [ 60%]  (Sampling)
-Chain 3, Iteration: 1400 / 2000 [ 70%]  (Sampling)
-Chain 3, Iteration: 1600 / 2000 [ 80%]  (Sampling)
-Chain 3, Iteration: 1800 / 2000 [ 90%]  (Sampling)
 Chain 3, Iteration: 2000 / 2000 [100%]  (Sampling)# 
-#  Elapsed Time: 0.007135 seconds (Warm-up)
-#                0.006631 seconds (Sampling)
-#                0.013766 seconds (Total)
+#  Elapsed Time: 0.006972 seconds (Warm-up)
+#                0.006269 seconds (Sampling)
+#                0.013241 seconds (Total)
 # 
 
 SAMPLING FOR MODEL 'prob' NOW (CHAIN 4).
 
 Chain 4, Iteration:    1 / 2000 [  0%]  (Warmup)
-Chain 4, Iteration:  200 / 2000 [ 10%]  (Warmup)
-Chain 4, Iteration:  400 / 2000 [ 20%]  (Warmup)
-Chain 4, Iteration:  600 / 2000 [ 30%]  (Warmup)
-Chain 4, Iteration:  800 / 2000 [ 40%]  (Warmup)
 Chain 4, Iteration: 1000 / 2000 [ 50%]  (Warmup)
 Chain 4, Iteration: 1001 / 2000 [ 50%]  (Sampling)
-Chain 4, Iteration: 1200 / 2000 [ 60%]  (Sampling)
-Chain 4, Iteration: 1400 / 2000 [ 70%]  (Sampling)
-Chain 4, Iteration: 1600 / 2000 [ 80%]  (Sampling)
-Chain 4, Iteration: 1800 / 2000 [ 90%]  (Sampling)
 Chain 4, Iteration: 2000 / 2000 [100%]  (Sampling)# 
-#  Elapsed Time: 0.006956 seconds (Warm-up)
-#                0.006538 seconds (Sampling)
-#                0.013494 seconds (Total)
+#  Elapsed Time: 0.007158 seconds (Warm-up)
+#                0.007853 seconds (Sampling)
+#                0.015011 seconds (Total)
 # </code></pre>
 <pre class="r"><code>print(fit_bayes_prob, probs=c(0.1, 0.9));</code></pre>
 <pre><code>Inference for Stan model: prob.
@@ -235,7 +203,7 @@ post-warmup draws per chain=1000, total post-warmup draws=4000.
 theta  0.42    0.00 0.14  0.24  0.61  1245    1
 lp__  -8.69    0.02 0.76 -9.62 -8.16  1236    1
 
-Samples were drawn using NUTS(diag_e) at Mon Apr 18 16:32:54 2016.
+Samples were drawn using NUTS(diag_e) at Mon Apr 18 17:04:07 2016.
 For each parameter, n_eff is a crude measure of effective sample size,
 and Rhat is the potential scale reduction factor on split chains (at 
 convergence, Rhat=1).</code></pre>
@@ -314,77 +282,45 @@ inv_logit(fit_mle_logodds$par[[&quot;alpha&quot;]])</code></pre>
 SAMPLING FOR MODEL 'logodds' NOW (CHAIN 1).
 
 Chain 1, Iteration:    1 / 2000 [  0%]  (Warmup)
-Chain 1, Iteration:  200 / 2000 [ 10%]  (Warmup)
-Chain 1, Iteration:  400 / 2000 [ 20%]  (Warmup)
-Chain 1, Iteration:  600 / 2000 [ 30%]  (Warmup)
-Chain 1, Iteration:  800 / 2000 [ 40%]  (Warmup)
 Chain 1, Iteration: 1000 / 2000 [ 50%]  (Warmup)
 Chain 1, Iteration: 1001 / 2000 [ 50%]  (Sampling)
-Chain 1, Iteration: 1200 / 2000 [ 60%]  (Sampling)
-Chain 1, Iteration: 1400 / 2000 [ 70%]  (Sampling)
-Chain 1, Iteration: 1600 / 2000 [ 80%]  (Sampling)
-Chain 1, Iteration: 1800 / 2000 [ 90%]  (Sampling)
 Chain 1, Iteration: 2000 / 2000 [100%]  (Sampling)# 
-#  Elapsed Time: 0.011558 seconds (Warm-up)
-#                0.00937 seconds (Sampling)
-#                0.020928 seconds (Total)
+#  Elapsed Time: 0.010885 seconds (Warm-up)
+#                0.0092 seconds (Sampling)
+#                0.020085 seconds (Total)
 # 
 
 SAMPLING FOR MODEL 'logodds' NOW (CHAIN 2).
 
 Chain 2, Iteration:    1 / 2000 [  0%]  (Warmup)
-Chain 2, Iteration:  200 / 2000 [ 10%]  (Warmup)
-Chain 2, Iteration:  400 / 2000 [ 20%]  (Warmup)
-Chain 2, Iteration:  600 / 2000 [ 30%]  (Warmup)
-Chain 2, Iteration:  800 / 2000 [ 40%]  (Warmup)
 Chain 2, Iteration: 1000 / 2000 [ 50%]  (Warmup)
 Chain 2, Iteration: 1001 / 2000 [ 50%]  (Sampling)
-Chain 2, Iteration: 1200 / 2000 [ 60%]  (Sampling)
-Chain 2, Iteration: 1400 / 2000 [ 70%]  (Sampling)
-Chain 2, Iteration: 1600 / 2000 [ 80%]  (Sampling)
-Chain 2, Iteration: 1800 / 2000 [ 90%]  (Sampling)
 Chain 2, Iteration: 2000 / 2000 [100%]  (Sampling)# 
-#  Elapsed Time: 0.010019 seconds (Warm-up)
-#                0.009396 seconds (Sampling)
-#                0.019415 seconds (Total)
+#  Elapsed Time: 0.009144 seconds (Warm-up)
+#                0.008801 seconds (Sampling)
+#                0.017945 seconds (Total)
 # 
 
 SAMPLING FOR MODEL 'logodds' NOW (CHAIN 3).
 
 Chain 3, Iteration:    1 / 2000 [  0%]  (Warmup)
-Chain 3, Iteration:  200 / 2000 [ 10%]  (Warmup)
-Chain 3, Iteration:  400 / 2000 [ 20%]  (Warmup)
-Chain 3, Iteration:  600 / 2000 [ 30%]  (Warmup)
-Chain 3, Iteration:  800 / 2000 [ 40%]  (Warmup)
 Chain 3, Iteration: 1000 / 2000 [ 50%]  (Warmup)
 Chain 3, Iteration: 1001 / 2000 [ 50%]  (Sampling)
-Chain 3, Iteration: 1200 / 2000 [ 60%]  (Sampling)
-Chain 3, Iteration: 1400 / 2000 [ 70%]  (Sampling)
-Chain 3, Iteration: 1600 / 2000 [ 80%]  (Sampling)
-Chain 3, Iteration: 1800 / 2000 [ 90%]  (Sampling)
 Chain 3, Iteration: 2000 / 2000 [100%]  (Sampling)# 
-#  Elapsed Time: 0.009787 seconds (Warm-up)
-#                0.009712 seconds (Sampling)
-#                0.019499 seconds (Total)
+#  Elapsed Time: 0.009205 seconds (Warm-up)
+#                0.009307 seconds (Sampling)
+#                0.018512 seconds (Total)
 # 
 
 SAMPLING FOR MODEL 'logodds' NOW (CHAIN 4).
 
 Chain 4, Iteration:    1 / 2000 [  0%]  (Warmup)
-Chain 4, Iteration:  200 / 2000 [ 10%]  (Warmup)
-Chain 4, Iteration:  400 / 2000 [ 20%]  (Warmup)
-Chain 4, Iteration:  600 / 2000 [ 30%]  (Warmup)
-Chain 4, Iteration:  800 / 2000 [ 40%]  (Warmup)
 Chain 4, Iteration: 1000 / 2000 [ 50%]  (Warmup)
 Chain 4, Iteration: 1001 / 2000 [ 50%]  (Sampling)
-Chain 4, Iteration: 1200 / 2000 [ 60%]  (Sampling)
-Chain 4, Iteration: 1400 / 2000 [ 70%]  (Sampling)
-Chain 4, Iteration: 1600 / 2000 [ 80%]  (Sampling)
-Chain 4, Iteration: 1800 / 2000 [ 90%]  (Sampling)
 Chain 4, Iteration: 2000 / 2000 [100%]  (Sampling)# 
-#  Elapsed Time: 0.00971 seconds (Warm-up)
-#                0.012168 seconds (Sampling)
-#                0.021878 seconds (Total)
+#  Elapsed Time: 0.009474 seconds (Warm-up)
+#                0.008737 seconds (Sampling)
+#                0.018211 seconds (Total)
 # </code></pre>
 <p>and jump straight to printing the fit.</p>
 <pre class="r"><code>print(fit_bayes_logodds, probs=c(0.1, 0.9));</code></pre>
@@ -397,7 +333,7 @@ alpha -0.44    0.02 0.67 -1.29  0.41  1154    1
 theta  0.40    0.00 0.15  0.22  0.60  1173    1
 lp__  -7.24    0.02 0.74 -8.15 -6.74  1547    1
 
-Samples were drawn using NUTS(diag_e) at Mon Apr 18 16:32:54 2016.
+Samples were drawn using NUTS(diag_e) at Mon Apr 18 17:04:07 2016.
 For each parameter, n_eff is a crude measure of effective sample size,
 and Rhat is the potential scale reduction factor on split chains (at 
 convergence, Rhat=1).</code></pre>
@@ -419,17 +355,18 @@ p(f^{-1}(\alpha))
 \frac{d}{d\alpha} \mathrm{logit}^{-1}(\alpha)
 \right|
 \ = \
-\mathrm{logit}^{-1}(\alpha) \, (1 - \mathrm{logit}^{-1}(\alpha)).
+\mathrm{logit}^{-1}(\alpha) \times (1 - \mathrm{logit}^{-1}(\alpha)).
 \]</span> Writing it out in full, <span class="math display">\[
 p(\alpha) 
 \ = \
 p(\mathrm{logit}^{-1}(\alpha))
-\, \mathrm{logit}^{-1}(\alpha)
-\, (1 - \mathrm{logit}^{-1}(\alpha)).
+\times \mathrm{logit}^{-1}(\alpha)
+\times (1 - \mathrm{logit}^{-1}(\alpha)).
 \]</span></p>
 </div>
 <div id="model-3-log-odds-with-jacobian-adjustment" class="section level2">
 <h2>Model 3: Log Odds with Jacobian Adjustment</h2>
+<p>In this last section, we apply the Jacobian adjustment and see that this preserves the Bayesian posterior, but alters the maximum likelihood estimate.</p>
 <div id="stan-model-3-logodds-jac.stan" class="section level4">
 <h4>Stan Model 3: <tt>logodds-jac.stan</tt></h4>
 <p>The last model we consider is the version of Model 2 with the appropriate Jacobian correction so that <span class="math inline">\(\theta\)</span> and <span class="math inline">\(\mathrm{logit}^{-1}(\alpha)\)</span> have the same distribution. The Jacobian was derived in the previous section, and is coded up directly in Stan.</p>
@@ -449,7 +386,7 @@ generated quantities {
   real&lt;lower=0, upper=1&gt; theta; 
   theta &lt;- inv_logit(alpha); 
 } </code></pre>
-<p>This is not the most efficient Stan model; the likelihood may be implemented with <code>bernoulli_logit</code> rather than an explicit application of <code>inv_logit</code>, the likelihood may be vectorized, and the efficient and stable <code>log_inv_logit<code> and <code>log1m_inv_logit</code> may be used for the Jacobian calculation.</p>
+<p>This is not the most efficient Stan model; the likelihood may be implemented with <code>bernoulli_logit</code> rather than an explicit application of <code>inv_logit</code>, the likelihood may be vectorized, and the efficient and stable <code>log_inv_logit</code> and <code>log1m_inv_logit</code> may be used for the Jacobian calculation.</p>
 </div>
 <div id="fitting-model-3" class="section level4">
 <h4>Fitting Model 3</h4>
@@ -484,77 +421,45 @@ $value
 SAMPLING FOR MODEL 'logodds-jac' NOW (CHAIN 1).
 
 Chain 1, Iteration:    1 / 2000 [  0%]  (Warmup)
-Chain 1, Iteration:  200 / 2000 [ 10%]  (Warmup)
-Chain 1, Iteration:  400 / 2000 [ 20%]  (Warmup)
-Chain 1, Iteration:  600 / 2000 [ 30%]  (Warmup)
-Chain 1, Iteration:  800 / 2000 [ 40%]  (Warmup)
 Chain 1, Iteration: 1000 / 2000 [ 50%]  (Warmup)
 Chain 1, Iteration: 1001 / 2000 [ 50%]  (Sampling)
-Chain 1, Iteration: 1200 / 2000 [ 60%]  (Sampling)
-Chain 1, Iteration: 1400 / 2000 [ 70%]  (Sampling)
-Chain 1, Iteration: 1600 / 2000 [ 80%]  (Sampling)
-Chain 1, Iteration: 1800 / 2000 [ 90%]  (Sampling)
 Chain 1, Iteration: 2000 / 2000 [100%]  (Sampling)# 
-#  Elapsed Time: 0.010863 seconds (Warm-up)
-#                0.013502 seconds (Sampling)
-#                0.024365 seconds (Total)
+#  Elapsed Time: 0.011094 seconds (Warm-up)
+#                0.009144 seconds (Sampling)
+#                0.020238 seconds (Total)
 # 
 
 SAMPLING FOR MODEL 'logodds-jac' NOW (CHAIN 2).
 
 Chain 2, Iteration:    1 / 2000 [  0%]  (Warmup)
-Chain 2, Iteration:  200 / 2000 [ 10%]  (Warmup)
-Chain 2, Iteration:  400 / 2000 [ 20%]  (Warmup)
-Chain 2, Iteration:  600 / 2000 [ 30%]  (Warmup)
-Chain 2, Iteration:  800 / 2000 [ 40%]  (Warmup)
 Chain 2, Iteration: 1000 / 2000 [ 50%]  (Warmup)
 Chain 2, Iteration: 1001 / 2000 [ 50%]  (Sampling)
-Chain 2, Iteration: 1200 / 2000 [ 60%]  (Sampling)
-Chain 2, Iteration: 1400 / 2000 [ 70%]  (Sampling)
-Chain 2, Iteration: 1600 / 2000 [ 80%]  (Sampling)
-Chain 2, Iteration: 1800 / 2000 [ 90%]  (Sampling)
 Chain 2, Iteration: 2000 / 2000 [100%]  (Sampling)# 
-#  Elapsed Time: 0.013064 seconds (Warm-up)
-#                0.019275 seconds (Sampling)
-#                0.032339 seconds (Total)
+#  Elapsed Time: 0.00972 seconds (Warm-up)
+#                0.009119 seconds (Sampling)
+#                0.018839 seconds (Total)
 # 
 
 SAMPLING FOR MODEL 'logodds-jac' NOW (CHAIN 3).
 
 Chain 3, Iteration:    1 / 2000 [  0%]  (Warmup)
-Chain 3, Iteration:  200 / 2000 [ 10%]  (Warmup)
-Chain 3, Iteration:  400 / 2000 [ 20%]  (Warmup)
-Chain 3, Iteration:  600 / 2000 [ 30%]  (Warmup)
-Chain 3, Iteration:  800 / 2000 [ 40%]  (Warmup)
 Chain 3, Iteration: 1000 / 2000 [ 50%]  (Warmup)
 Chain 3, Iteration: 1001 / 2000 [ 50%]  (Sampling)
-Chain 3, Iteration: 1200 / 2000 [ 60%]  (Sampling)
-Chain 3, Iteration: 1400 / 2000 [ 70%]  (Sampling)
-Chain 3, Iteration: 1600 / 2000 [ 80%]  (Sampling)
-Chain 3, Iteration: 1800 / 2000 [ 90%]  (Sampling)
 Chain 3, Iteration: 2000 / 2000 [100%]  (Sampling)# 
-#  Elapsed Time: 0.009732 seconds (Warm-up)
-#                0.009412 seconds (Sampling)
-#                0.019144 seconds (Total)
+#  Elapsed Time: 0.01839 seconds (Warm-up)
+#                0.010097 seconds (Sampling)
+#                0.028487 seconds (Total)
 # 
 
 SAMPLING FOR MODEL 'logodds-jac' NOW (CHAIN 4).
 
 Chain 4, Iteration:    1 / 2000 [  0%]  (Warmup)
-Chain 4, Iteration:  200 / 2000 [ 10%]  (Warmup)
-Chain 4, Iteration:  400 / 2000 [ 20%]  (Warmup)
-Chain 4, Iteration:  600 / 2000 [ 30%]  (Warmup)
-Chain 4, Iteration:  800 / 2000 [ 40%]  (Warmup)
 Chain 4, Iteration: 1000 / 2000 [ 50%]  (Warmup)
 Chain 4, Iteration: 1001 / 2000 [ 50%]  (Sampling)
-Chain 4, Iteration: 1200 / 2000 [ 60%]  (Sampling)
-Chain 4, Iteration: 1400 / 2000 [ 70%]  (Sampling)
-Chain 4, Iteration: 1600 / 2000 [ 80%]  (Sampling)
-Chain 4, Iteration: 1800 / 2000 [ 90%]  (Sampling)
 Chain 4, Iteration: 2000 / 2000 [100%]  (Sampling)# 
-#  Elapsed Time: 0.009659 seconds (Warm-up)
-#                0.012341 seconds (Sampling)
-#                0.022 seconds (Total)
+#  Elapsed Time: 0.010044 seconds (Warm-up)
+#                0.012359 seconds (Sampling)
+#                0.022403 seconds (Total)
 # </code></pre>
 <pre class="r"><code>print(fit_bayes_logodds_jac, probs=c(0.1, 0.9));</code></pre>
 <pre><code>Inference for Stan model: logodds-jac.
@@ -566,7 +471,7 @@ alpha -0.37    0.02 0.60 -1.13  0.36  1341    1
 theta  0.42    0.00 0.13  0.24  0.59  1354    1
 lp__  -8.65    0.02 0.71 -9.48 -8.16  1941    1
 
-Samples were drawn using NUTS(diag_e) at Mon Apr 18 16:32:55 2016.
+Samples were drawn using NUTS(diag_e) at Mon Apr 18 17:04:08 2016.
 For each parameter, n_eff is a crude measure of effective sample size,
 and Rhat is the potential scale reduction factor on split chains (at 
 convergence, Rhat=1).</code></pre>
@@ -603,6 +508,10 @@ convergence, Rhat=1).</code></pre>
 </table>
 <p>For the basic probabilistic coding with <span class="math inline">\(\theta \sim \mathsf{Uniform}(0,1)\)</span>, the posterior mode (MLE) is 0.40, whereas the posterior mean (Bayesian estimate) is 0.42. Assuming this is the model we wish to fit, the “right” posterior mode is achieved if the transform is carried out without the Jacobian adjustment, whereas the “right” posterior mean arises with the Jacobian adjustment.</p>
 <p>This is why it’s tricky to talk about the effect of reparameterizations!</p>
+</div>
+<div id="licensing" class="section level2">
+<h2>Licensing</h2>
+<p>The code in this document is licensed under the <a href="https://opensource.org/licenses/BSD-3-Clause">new BSD (3-clause)</a> license, and the text is licensed under <a href="https://creativecommons.org/licenses/by/4.0/">CC-BY 4.0</a>.</p>
 </div>
 
 

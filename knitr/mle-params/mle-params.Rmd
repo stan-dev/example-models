@@ -116,7 +116,7 @@ Next, we can fit the same model using Stan's default MCMC algorithm for
 Bayesian posteriors. 
 
 ```{r comment=NA}
-fit_bayes_prob <- sampling(model_prob, data=c("N", "y"));
+fit_bayes_prob <- sampling(model_prob, data=c("N", "y"), refresh=1000);
 print(fit_bayes_prob, probs=c(0.1, 0.9));
 ```
 
@@ -199,7 +199,8 @@ scale.  But now consider what happens in the Bayesian setting (we skip
 echoing the output here):
 
 ```{r comment=NA, echo=FALSE}
-fit_bayes_logodds <- sampling(model_logodds, data=c("N", "y"));
+fit_bayes_logodds <- sampling(model_logodds, data=c("N", "y"),
+                              refresh=1000);
 ```
 
 and jump straight to printing the fit.
@@ -236,18 +237,22 @@ adjustment is
 \frac{d}{d\alpha} \mathrm{logit}^{-1}(\alpha)
 \right|
 \ = \
-\mathrm{logit}^{-1}(\alpha) \, (1 - \mathrm{logit}^{-1}(\alpha)).
+\mathrm{logit}^{-1}(\alpha) \times (1 - \mathrm{logit}^{-1}(\alpha)).
 \]
 Writing it out in full,
 \[
 p(\alpha) 
 \ = \
 p(\mathrm{logit}^{-1}(\alpha))
-\, \mathrm{logit}^{-1}(\alpha)
-\, (1 - \mathrm{logit}^{-1}(\alpha)).
+\times \mathrm{logit}^{-1}(\alpha)
+\times (1 - \mathrm{logit}^{-1}(\alpha)).
 \]
 
 ## Model 3: Log Odds with Jacobian Adjustment
+
+In this last section, we apply the Jacobian adjustment and see that
+this preserves the Bayesian posterior, but alters the maximum
+likelihood estimate.
 
 #### Stan Model 3: <tt>logodds-jac.stan</tt>
 
@@ -266,7 +271,7 @@ for (n in 1:length(lines)) cat(lines[n],'\n');
 This is not the most efficient Stan model;  the likelihood may be
 implemented with <code>bernoulli_logit</code> rather than an explicit
 application of <code>inv_logit</code>, the likelihood may be
-vectorized, and the efficient and stable <code>log_inv_logit<code> and
+vectorized, and the efficient and stable <code>log_inv_logit</code> and
 <code>log1m_inv_logit</code> may be used for the Jacobian calculation.
 
 #### Fitting Model 3
@@ -288,7 +293,8 @@ calculation after the inverse logit transform back to the probabilty
 scale.  But now consider what happens in the Bayesian setting.
 
 ```{r comment=NA, echo=FALSE}
-fit_bayes_logodds_jac <- sampling(model_logodds_jac, data=c("N", "y"));
+fit_bayes_logodds_jac <- sampling(model_logodds_jac, data=c("N", "y"),
+                                  refresh=1000);
 ```
 
 ```{r comment=NA}
@@ -313,3 +319,8 @@ transform is carried out without the Jacobian adjustment, whereas the
 "right" posterior mean arises with the Jacobian adjustment.
 
 This is why it's tricky to talk about the effect of reparameterizations!
+
+## Licensing
+ 
+The code in this document is licensed under the [new BSD (3-clause)](https://opensource.org/licenses/BSD-3-Clause)
+license, and the text is licensed under [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/).
