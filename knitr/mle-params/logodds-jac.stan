@@ -5,12 +5,13 @@ data {
 parameters {
   real alpha;
 }
-model {
-  for (n in 1:N)
-    y[n] ~ bernoulli(inv_logit(alpha));
-  increment_log_prob(log(inv_logit(alpha)) + log(1 - inv_logit(alpha)));
-}
-generated quantities {
+transformed parameters {
   real<lower=0, upper=1> theta;
   theta <- inv_logit(alpha);
+}
+model {
+  for (n in 1:N)
+    y[n] ~ bernoulli(theta);
+  theta ~ uniform(0, 1);
+  increment_log_prob(log(theta) + log(1 - theta));
 }

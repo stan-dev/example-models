@@ -1,7 +1,7 @@
 ---
-title: "MLE, Bayesian Posteriors, and Reparameterization"
+title: "Reparameterization: MLE vs. Bayes"
 author: "Bob Carpenter"
-date: "18 April 2016"
+date: "19 April 2016"
 output: 
   html_document: 
     theme: cerulean
@@ -10,23 +10,88 @@ output:
 ### Abstract
 
 When changing variables, a Jacobian adjustment needs to be provided to
-preserve the probability distributions of quantities of interest,
-incuding Bayesian posteriors.  With appropriate Jacobians, Bayesian
-inference is invariant to the parameterization.  In contrast, applying
-the appropriate Jacobian adjustment leads to different maximum
-likelihood estimates, whereas skipping the Jacobians leaves them
-unchanged.  In this note, we contrast three simple repeated binary
-trial models, varying only by parameterization: (a) direct probability
-parameterization, (b) log odds parameterization without Jacobian
-adjustment, (c) log odds parameterization with Jacobian adjustment.
-Models (a) and (b) provide the same MLE, whereas model (c) has a
-different MLE.  In contrast, models (a) and (c) provide the same
-Bayesian posterior, whereas model (b) differs.
+account for the rate of change of the transform.  Applying the
+adjustment preserves the probability distributions of quantities of
+interest, thus making Bayesian inference invariant to
+reparameterizations.  In contrast, the maximum likelihood estimate
+(posterior mode) is changed when the distribution-preserving Jacobian
+adjustment is included for a parameter.  In this note, we use Stan to
+code a repeated binary trial model parameterized by chance of success,
+along with its reparameterization in terms of log odds in order to
+demonstrate the effect of the Jacobian adjustment on the Bayesian
+posterior and maximum likelihood estimate.  Along the way, we derive
+the logistic distribution by transforming a uniformly distributed
+variable.
 
+
+## Visualizing a Change of Variables
+
+Suppose $\theta \in (0,1)$ represents a probability of success.  Then
+the odds ratio is $\frac{\theta}{1 - \theta} \in (0, \infty)$.  For
+example, if $\theta = 0.75$, the odds ratio is $\frac{0.75}{1 - 0.75}
+= 3$, whereas if $\theta = 0.25$, the odds ratio is $\frac{0.25}{1 -
+  0.25} = \frac{1}{3}$.  An odds ratio of $3$ is conventionally
+written as $3{:}1$ and pronounced as "three to one odds" (in favor of
+success), wheras an odds ratio of $\frac{1}{3}$ is written as $1{:}3$
+and prononced "one to three odds" (in favor, or "three to one odds
+against").  If $\theta = 0.5$, then the odds are $1{:}1$, or "even".
+
+The log odds is just the logarithm of the odds, and the function
+$\mathrm{logit}:(0,1) \rightarrow \mathbb{R}$ converts chance of
+success to log odds by 
+\[
+ \mathrm{logit}(\theta) 
+\ = \
+\log \frac{\theta}{1 - \theta}.
+\]
+The nice thing about log odds is that they are symmetric around zero.
+If the chance of success is $0.5$, the odds ratio is $1$, and the log
+odds are $0$.  If the chance of success is $0.75$ then the log odds
+are just $\log 3$, or about $1.10$, whereas if the chance of success
+is $0.25$, the log odds are just $\log \frac{1}{3} = -\log 3$, or
+about $-1.10$.  = 0.75$.  In general, the log-odds transform has the
+symmetry
+\[
+\mathrm{logit}(\theta) 
+\ = \
+-\mathrm{logit}(1 - \theta),
+\]
+which is useful for defining symmetric priors on log odds centered
+around zero.
+
+Now suppose we have a uniformly-distributed random variable $\theta
+\sim \mathsf{Uniform}(0,1)$ representing a chance of success.  We can
+draw a large sample and plot a histogram.
+
+```{r}
+theta <- runif(100000, 0, 1);
+hist(theta, breaks=20);
+```
+
+It's clear this is a nice uniform distribution.  Now what happens if
+we log-odds transform the draws?
+
+```{r}
+logit <- function(u) log(u / (1 - u));
+logit_theta <- logit(theta);
+hist(logit_theta, breaks=20);
+```
+
+Although the distribution of $\theta$ is uniform, the distribution of
+$\mathrm{logit}(\theta)$ is most certainly not.  The non-linear change
+of variables stretches the distribution in some places more than
+other.  As usual, this rate of change is quantified by the derivative,
+as we will see below in the definition of the Jacobian.  In this case,
+we can define the density of $\mathrm{logit}(z)$ analytically in terms
+of the density of $\theta$ and its derivatives;  the result is the
+logistic distribution, as shown below.
 
 ## Binary Trial Data
 
-We will assume a very simple data set $y_1,\ldots,y_N$, consisting of $N$ repeated binary trials with a chance $\theta \in [0, 1]$ of success.  Let's start by creating a data set of $N = 100$ observations.
+We will assume a very simple data set $y_1,\ldots,y_N$, consisting of
+$N$ repeated binary trials with a chance $\theta \in [0, 1]$ of
+success.  Let's start by creating a data set of $N = 10$ observations
+and parameter $\theta = 0.3$.
 
 ```{r}
 set.seed(123);
@@ -44,32 +109,34 @@ theta_star <- sum(y) / N;
 theta_star;
 ```
 
-Don't worry that `theta_star` isn't the same as `theta`; discrepancies
+Don't worry that $\theta^*$ isn't the same as $\theta$; discrepancies
 arise due to sampling variation.  Try several runs of the binomial
 generation and look at `sum(y)` to get a feeling for the variation due
-to sampling.  If you want to know how to derive this, differentiate
-the log density $\log p(y \, | \, N, \theta)$ with the data set $y$ fixed
-and set it equal to zero; the solution is $\theta^*$ as defined above
-(hint: convert it to binomial form using the sum of $y$ as a
-sufficient statistic).
+to sampling.  If you want to know how to derive the maximum likelihood
+estimate here, differentiate the log density $\log p(y \, | \, N,
+\theta)$ with respect to $\theta$ and set it equal to zero and solve
+for $\theta$; the solution is $\theta^*$ as defined above (hint:
+convert to binomial form using the sum of $y$ as a sufficient
+statistic and note that the binomial coefficients are constant).
 
-## Model 1: Probability Parameterization
+## Model 1: Chance-of-Success Parameterization
 
 The first model involves a direct parameterization of the joint
-density,
+density of the chance-of-success $\theta$ and observed data $y$.
 \[
 p(\theta, y \, | \, N) 
 \ \propto \
 p(y \, | \, \theta, N) \, p(\theta)
 \]
-where the likelihood is defined by independent Bernoulli draws,
+The likelihood is defined by independent Bernoulli draws,
 \[
 p(y \, | \, \theta, N)
 \ = \
 \prod_{n=1}^N
-\mathsf{Bernoulli}(y_n \, | \, \theta)
+\mathsf{Bernoulli}(y_n \, | \, \theta).
 \]
-and where the prior is assumed to be uniform, 
+We can assume a uniform prior for the sake of simplicity, but it is
+not a critical detail.
 \[
 p(\theta) 
 \ = \
@@ -77,8 +144,10 @@ p(\theta)
 \ = \
 1.
 \]
-Note that number of observations $N$, because it is not modeled,
-remains on the right-side of the conditioning bar in the equations.
+The number of observations, $N$, is not modeled, and so remains on the
+right-side of the conditioning bar in the equations.
+
+The model is straightforward to program in Stan.
 
 #### Stan Model 1: <tt>prob.stan</tt>
 
@@ -87,6 +156,18 @@ file_path <- "prob.stan";
 lines <- readLines(file_path, encoding="ASCII");
 for (n in 1:length(lines)) cat(lines[n],'\n');
 ```
+
+It would be more efficient to vectorize the Bernoulli and drop
+the constant uniform, leaving just
+
+```
+model {
+  y ~ bernoulli(theta);
+}
+```
+
+The long form is used to illustrate the direct encoding of the model's
+likelihood and prior.
 
 #### Fitting the Model
 
@@ -116,14 +197,16 @@ Next, we can fit the same model using Stan's default MCMC algorithm for
 Bayesian posteriors. 
 
 ```{r comment=NA}
-fit_bayes_prob <- sampling(model_prob, data=c("N", "y"), refresh=1000);
-print(fit_bayes_prob, probs=c(0.1, 0.9));
+fit_bayes_prob <- sampling(model_prob, data=c("N", "y"),
+                           iter=10000, refresh=5000);
+print(fit_bayes_prob, probs=c(0.1, 0.5, 0.9));
 ```
 
 The posterior mean is 0.42, not 0.4.  The reason for this is that the
 posterior is not symmetric around its mode, but rather skewed to the
 right.  In the case of this simple Bernoulli example with uniform
-prior, the posterior is conjugate, with form
+prior, the posterior is available in closed form (because it is
+conjugate), with form
 \[
 p(\theta \, | \, y) = \mathsf{Beta}(\theta \, | \, 1 + \mathrm{sum}(y), 1 + N -
 \mathrm{sum}(y))
@@ -133,39 +216,22 @@ where $\mathrm{sum}(y) = \sum_{n=1}^N y_n$.  In our case, with $N =
 $p(\theta \, | \, y) = \mathsf{Beta}(\theta \, | \, 5, 7)$, and we
 know that if $\theta \sim \mathsf{Beta}(5, 7)$, then $\theta$ has a
 mean of\[
-\bar{\theta} = \frac{5}{5 + 7} = 0.41\bar{6} \approx 0.42,
+\bar{\theta} = \frac{5}{5 + 7} = 0.416666\cdots \approx 0.42,
 \]
 and a mode of
 \[
 \theta^{*} = \frac{5 - 1}{5 + 7 - 2} = 0.40.
 \]
-
-## Model 2: Log Odds Parameterization
-
-Model 1 parameterized the chance of success directly as a parameter
-$\theta \in [0, 1]$ representing the chance of success.  Another
-popular parameterization, because it leads directly to the use of
-predictors in logistic regression, involves the log odds.  The
-log odds, or logit, function is defined for $\theta \in (0, 1)$ by
-\[
- \mathrm{logit}(\theta) 
-\ = \
-\log \frac{\theta}{1 - \theta},
-\]
-with inverse defined for all $\alpha \in \mathbb{R}$ by
-\[
-\mathrm{logit}^{-1}(\alpha)
-\ = \
-\frac{1}{1 + \exp(-\alpha)}.
-\]
-So $\mathrm{logit} : (0, 1) \rightarrow \mathbb{R}$ and
-$\mathrm{logit}^{-1} : \mathbb{R} \rightarrow (0, 1)$.
-
-These functions are built into Stan as <code>logit</code> and
-<code>inv_logit</code>.  The log odds version of the model is as
-follows.  
+In other words, Stan is producing the correct results here.
 
 
+## Model 2: Log Odds Parameterization without Jacobian
+
+Model 1 used the chance of success $\theta \in [0, 1]$ as a parameter.
+A popular alternative parameterization is the log odds, because it
+leads directly to the use of predictors in logistic regression.  Model
+2 uses a log-odds transformed parameter, but fails to include the
+Jacobian adjustment for the nonlinear change of variables.
 
 #### Stan Model 2: <tt>logodds.stan</tt>
 
@@ -177,14 +243,26 @@ for (n in 1:length(lines)) cat(lines[n],'\n');
 
 #### Fitting Model 2
 
-Same steps as before.
+The model is compiled as before.
 
 ```{r comment=NA}
 model_logodds <- stan_model("logodds.stan");
 ```
 
-With a compiled model, we can fit it using maximum likelihood given
-the names of the data variables.
+But now the compiler produces a warning to alert the user that they
+may need to apply a Jacobian adjustment because of the change of
+variables (we ignore the warning for now, but heed it in the next
+section).
+
+```
+DIAGNOSTIC(S) FROM PARSER:Warning (non-fatal):
+Left-hand side of sampling statement (~) may contain a non-linear transform of a parameter or local variable.
+If so, you need to call increment_log_prob() with the log absolute determinant of the Jacobian of the transform.
+Left-hand-side of sampling statement:
+    theta ~ uniform(...)
+```
+
+The fit proceeds as usual.
 
 ```{r comment=NA}
 fit_mle_logodds <- optimizing(model_logodds, data=c("N", "y"));
@@ -193,21 +271,24 @@ inv_logit <- function(alpha) 1 / (1 + exp(-alpha));
 inv_logit(fit_mle_logodds$par[["alpha"]])
 ```
 
-Note that the answer is again the same as from the analytic
-calculation after the inverse logit transform back to the probabilty
-scale.  But now consider what happens in the Bayesian setting (we skip
-echoing the output here):
+Note that when we transform the maximum likelihood estimate for log
+odds back to a chance-of-success, it is the same as before.  But now
+consider what happens with the posterior.
+
 
 ```{r comment=NA, echo=FALSE}
 fit_bayes_logodds <- sampling(model_logodds, data=c("N", "y"),
-                              refresh=1000);
+                              refresh=5000, iter=10000);
 ```
-
-and jump straight to printing the fit.
 
 ```{r comment=NA}
-print(fit_bayes_logodds, probs=c(0.1, 0.9));
+print(fit_bayes_logodds, probs=c(0.1, 0.5, 0.9));
 ```
+
+Model 2 uses the log odds as a parameterization, but because it does
+not apply an appropriate Jacobian adjustment, it produces the wrong
+Bayesian posterior.  That means that optimization does not produce the
+correct posterior mode (aka, maximum a posteriori or MAP estimate).
 
 
 ## Jacobian Adjustments
@@ -215,10 +296,11 @@ print(fit_bayes_logodds, probs=c(0.1, 0.9));
 The Jacobian for a univariate transform is the absolute derivative of
 the inverse of the transform; it's called "Jacobian" because in the
 general multivariate case, it's the absolute determinant of the
-Jacobian matrix of the transform).  More concretely, suppose I have a
+Jacobian matrix of the transform.  More concretely, suppose we have a
 variable $\theta$ distributed as $p(\theta)$, and I want to consider
-the distribution of a variable $\alpha = f(\theta)$.  Basic calculus
-on density functions shows that the distribution of $\alpha$ will be
+the distribution of a variable $\alpha = f(\theta)$.  To preserve
+probability mass (intervals in the univariate setting) under change
+of variables, the resulting density is
 \[
 p(\alpha) 
 \ = \
@@ -229,6 +311,15 @@ p(f^{-1}(\alpha))
 \right|,
 \]
 where the absolute value term is the Jacobian adjustment.
+
+The inverse of the logit function, $\mathrm{logit}^{-1} : \mathbb{R}
+\rightarrow (0,1)$, is known as the logistic sigmoid function, and
+defined as follows.
+\[
+\mathrm{logit}^{-1}(\alpha)
+\ = \
+\frac{1}{1 + \exp(-\alpha)}.
+\]
 
 In our particular case, where $f = \mathrm{logit}$, the Jacobian
 adjustment is
@@ -248,11 +339,15 @@ p(\mathrm{logit}^{-1}(\alpha))
 \times (1 - \mathrm{logit}^{-1}(\alpha)).
 \]
 
+The logit function and its inverse are built into Stan as
+<code>logit</code> and <code>inv_logit</code>;  Stan also provides
+many compound functions involving the log odds transform.
+
 ## Model 3: Log Odds with Jacobian Adjustment
 
-In this last section, we apply the Jacobian adjustment and see that
-this preserves the Bayesian posterior, but alters the maximum
-likelihood estimate.
+In this section, we apply the Jacobian adjustment we derived in the
+previous section, and see what it does to the posterior mode,
+posterior mean, and posterior quantiles (median or intervals).
 
 #### Stan Model 3: <tt>logodds-jac.stan</tt>
 
@@ -268,11 +363,22 @@ lines <- readLines(file_path, encoding="ASCII");
 for (n in 1:length(lines)) cat(lines[n],'\n');
 ```
 
-This is not the most efficient Stan model;  the likelihood may be
+This is not the most efficient Stan model; the likelihood may be
 implemented with <code>bernoulli_logit</code> rather than an explicit
 application of <code>inv_logit</code>, the likelihood may be
-vectorized, and the efficient and stable <code>log_inv_logit</code> and
-<code>log1m_inv_logit</code> may be used for the Jacobian calculation.
+vectorized, the constant uniform may be dropped, and the efficient and
+stable <code>log_inv_logit</code> and <code>log1m_inv_logit</code> may
+be used for the Jacobian calculation.  The more arithmetically stable
+form (and the more efficient form if <code>theta</code> is not
+available) is as follows.
+
+```
+model {
+  y ~ bernoulli_logit(alpha);
+  increment_log_prob(log_inv_logit(alpha));
+  increment_log_prob(log1m_inv_logit(alpha));
+}
+```
 
 #### Fitting Model 3
 
@@ -294,33 +400,102 @@ scale.  But now consider what happens in the Bayesian setting.
 
 ```{r comment=NA, echo=FALSE}
 fit_bayes_logodds_jac <- sampling(model_logodds_jac, data=c("N", "y"),
-                                  refresh=1000);
+                                  iter=10000, refresh=5000);
 ```
 
 ```{r comment=NA}
-print(fit_bayes_logodds_jac, probs=c(0.1, 0.9));
+print(fit_bayes_logodds_jac, probs=c(0.1, 0.5, 0.9));
 ```
+
+All is now well again after the Jacobian adjustment, with the
+posterior distribution of $\theta$ matching that of the original
+model, thus preserving Bayesian inferences, such as posterior
+predictions for new data points.  Similarly, the posterior mean
+(estimate minimizing expected square error) and mode (estimate
+minimizing expected absolute error) are preserved.
+
+Unlike the posterior mean, the posterior mode changed when we
+reparameterized the model.  This highlights that posterior modes
+(i.e., MAP estimates) are not true Bayesian quantities, but mere side
+effects of parameterizations.  Although we can maintain maximum
+likelihood estimates by ignoring Jacobians on priors (which makes
+sense, given that maximum likelihood does not involve priors, but only
+the likelihood), even frequentists will apply Jacobian adjustments
+when dealing with transformed distributions (e.g., lognormal or
+inverse gamma).
+
+
+
+## The Logistic Distribution
+
+#### Probability density function
+
+Suppose $\theta \sim \mathsf{Uniform}(0,1)$.  Then
+$\mathrm{logit}(\theta)$ has a unit logistic distribution.  We have
+already derived the probability density function, which is simply the
+uniform probability distribution times the Jacobian, or in symbols,
+\[
+\mathsf{Logistic}(y) 
+\ = \
+\mathrm{logit}^{-1}(y) \times (1 - \mathrm{logit}^{-1}(y))
+\ = \
+\frac{\exp(-y)}{(1 + \exp(-y))^2}.
+\]
+
+
+#### Cumulative distribution function
+
+It should come as no surprise at this point that the logistic
+sigmoid $\mathrm{logit}^{-1}(\alpha)$ is the cumulative distribution
+function for the logistic distribution, because differentiating it
+produces the logistic density function.
+
+
+#### Scaling and centering
+
+As with other distributions, the unit form of the distribution may be
+translated by a location parameter $\mu$ and scaled by a parameter
+$\sigma$, to produce the general logistic distribution
+\[
+\mathsf{Logistic}(y \, | \, \mu, \sigma)
+\ = \
+\mathsf{Logistic}\left( \frac{y - \mu}{\sigma} \right).
+\]
+We'll leave it as an exercise for the reader to work out the algebra
+and show this is the same as the [definition in the Wikipedia](https://en.wikipedia.org/wiki/Logistic_distribution).
+
+
+
+
 
 ## Conclusion
 
-To sum up, here's a handy table that contrasts the results
+To sum up, here's a handy table that contrasts the results.
 
-Parameterization | Posterior Mode | Posterior Mean
------------------|----------------|---------------
-prob             |     0.40       |  0.42
-logodds          |     0.40       |  0.40
-logodds-jac      |     0.42       |  0.42
+Parameterization           | Posterior Mode | Posterior Mean
+---------------------------|----------------|---------------
+chance of success          |     0.40       |  0.42
+log odds without Jacobian  |     0.40       |  0.40
+log odds with Jacobian     |     0.42       |  0.42
 
-For the basic probabilistic coding with $\theta \sim
-\mathsf{Uniform}(0,1)$, the posterior mode (MLE) is 0.40, whereas the
-posterior mean (Bayesian estimate) is 0.42.  Assuming this is the
-model we wish to fit, the "right" posterior mode is achieved if the
-transform is carried out without the Jacobian adjustment, whereas the
-"right" posterior mean arises with the Jacobian adjustment.
+The moral of the story is that full Bayesian inference is insensitive
+to parameterization as long as the approprieate Jacobian adjustment is
+applied.  In contrast, posterior modes (i.e., maximum a posteriori
+estimates) do change under reparameterization, and thus are [no true
+Bayesian quantity](https://en.wikipedia.org/wiki/No_true_Scotsman).
 
-This is why it's tricky to talk about the effect of reparameterizations!
+But, if you must do maximum (penalized) likelihood, be careful *not*
+to apply the appropriate Jacobian to your penalty term.
 
-## Licensing
- 
-The code in this document is licensed under the [new BSD (3-clause)](https://opensource.org/licenses/BSD-3-Clause)
-license, and the text is licensed under [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+<br />
+<br />
+
+<hr />
+
+##### Licensing
+
+<small>The code in this document is copyrighted by Columbia University and
+licensed under the [new BSD
+(3-clause)](https://opensource.org/licenses/BSD-3-Clause) license.
+The text is copyrighted by Bob Carpenter and licensed under [CC-BY
+4.0](https://creativecommons.org/licenses/by/4.0/).</small>

@@ -6,5 +6,7 @@ parameters {
   real<lower=0, upper=1> theta;
 }
 model {
-  y ~ bernoulli(theta);
+  for (n in 1:N)
+    y[n] ~ bernoulli(theta);
+  theta ~ uniform(0, 1);
 }
