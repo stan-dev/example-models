@@ -26,8 +26,7 @@ transformed parameters {
   matrix[R, T] logit_p; // Logit detection probability
 
   log_lambda <- alpha0 + alpha1 * X;
-  for (j in 1:T)
-    logit_p[1:R, j] <- beta0 + beta1 * X;
+  logit_p <- rep_matrix(beta0 + beta1 * X, T);
 }
 
 model {
