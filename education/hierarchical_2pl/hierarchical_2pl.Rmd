@@ -33,8 +33,6 @@ $$
 \theta_p \sim \mathrm{N}(0, 1) 
 $$
 
-Prior distributions will be discussed in the next section because they are placed on the reparameterized version of the model.
-
 Variables:
 
 * $i = 1 \ldots I$ indexes items
@@ -53,7 +51,7 @@ Parameters:
 Priors:
 
 * $\mu_1 \sim \mathrm{N}(0,1)$ is a weakly informative prior for the mean of the log discrimination parameters.
-* $\mu_2 \sim \mathrm{N}(0,9)$ is a weakly informative prior for the mean of the difficulty parameters.
+* $\mu_2 \sim \mathrm{N}(0,25)$ is a weakly informative prior for the mean of the difficulty parameters.
 * Let $\tau_1^2 = \Sigma_{1,1}$ be the variance of the log discrimination parameters. Then $\tau \sim \mathrm{Exp}(.1)$ is a weakly informative prior for the standard deviation.
 * Let $\tau_2^2 = \Sigma_{2,2}$ be the variance of the difficulty parameters. Then $\tau_2 \sim \mathrm{Exp}(.1)$ is a weakly informative prior for the standard deviation.
 * A weakly informative prior is placed on the covariance, $\Sigma_{1,2} = \Sigma_{2,1}$, shrinking the posterior towards zero. This is described in more detail in the next section.
@@ -121,11 +119,10 @@ sim_fit <- stan(file = "hierarchical_2pl.stan",
 
 Before interpreting the results, it is necessary to check that the chains have converged. **Stan** provides the $\hat{R}$ statistic for the model parameters and log posterior. These are provided in the following figure. All values for $\hat{R}$ should be less than 1.1.
 
-```{r sim_converge, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the simulation. All values should be less than 1.1 to infer convergence."}
-sim_draws <- extract(sim_fit, permuted = FALSE, inc_warmup = TRUE)
-sim_monitor <- as.data.frame(monitor(sim_draws, print = FALSE))
-sim_monitor$Parameter <- as.factor(gsub("\\[.*]", "", rownames(sim_monitor)))
-ggplot(subset(sim_monitor, !is.nan(Rhat))) +
+```{r sim_converge, warning = FALSE, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the simulation. All values should be less than 1.1 to infer convergence."}
+sim_summary <- as.data.frame(summary(sim_fit)[[1]])
+sim_summary$Parameter <- as.factor(gsub("\\[.*]", "", rownames(sim_summary)))
+ggplot(sim_summary) +
   aes(x = Parameter, y = Rhat, color = Parameter) +
   geom_jitter(height = 0, width = .5, show.legend = FALSE) +
   ylab(expression(hat(italic(R))))
@@ -141,7 +138,7 @@ wanted_pars <- c(paste0("alpha[", 1:I, "]"),
 
 # Get estimated and generating values for wanted parameters
 generating_values = c(alpha, beta, mu, tau, Omega[1,2])
-estimated_values <- sim_monitor[wanted_pars, c("mean", "2.5%", "97.5%")]
+estimated_values <- sim_summary[wanted_pars, c("mean", "2.5%", "97.5%")]
 
 # Assesmble a data frame to pass to ggplot()
 sim_df <- data.frame(parameter = factor(wanted_pars, rev(wanted_pars)),
@@ -188,11 +185,10 @@ sat_fit <- stan(file = "hierarchical_2pl.stan",
 
 As discussed above, convergence of the chains is assessed for every parameter, and also the log posterior, using $\hat{R}$.
 
-```{r example_converge, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the SAT data. All values should be less than 1.1 to infer convergence."}
-sat_draws <- extract(sat_fit, permuted = FALSE, inc_warmup = TRUE)
-sat_monitor <- as.data.frame(monitor(sat_draws, print = FALSE))
-sat_monitor$Parameter <- as.factor(gsub("\\[.*]", "", rownames(sat_monitor)))
-ggplot(subset(sat_monitor, !is.nan(Rhat))) +
+```{r example_converge, warning = FALSE, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the SAT data. All values should be less than 1.1 to infer convergence."}
+ex_summary <- as.data.frame(summary(sat_fit)[[1]])
+ex_summary$Parameter <- as.factor(gsub("\\[.*]", "", rownames(ex_summary)))
+ggplot(ex_summary) +
   aes(x = Parameter, y = Rhat, color = Parameter) +
   geom_jitter(height = 0, width = .5, show.legend = FALSE) +
   ylab(expression(hat(italic(R))))
@@ -210,12 +206,12 @@ To visualize the correlation between item parameters, the values of `alpha[i]` a
 ```{r example_plot, fig.height=4, fig.cap="Discrimination versus difficulty parameters for the SAT data. The lefthand plot shows the pairs in terms of alpha and beta, the usual formulation. The righthand plot shows the pairs in terms of xi, as used by the Stan model."}
 # Assesmble a data frame of item parameter estimates and pass to ggplot
 ab_df <- data.frame(
-  Discrimination = sat_monitor[paste0("alpha[", 1:sat_list$I, "]"), "mean"],
-  Difficulty = sat_monitor[paste0("beta[", 1:sat_list$I, "]"), "mean"],
+  Discrimination = ex_summary[paste0("alpha[", 1:sat_list$I, "]"), "mean"],
+  Difficulty = ex_summary[paste0("beta[", 1:sat_list$I, "]"), "mean"],
   parameterization = "alpha & beta")
 xi_df <- data.frame(
-  Discrimination = sat_monitor[paste0("xi[", 1:sat_list$I, ",1]"), "mean"],
-  Difficulty = sat_monitor[paste0("xi[", 1:sat_list$I, ",2]"), "mean"],
+  Discrimination = ex_summary[paste0("xi[", 1:sat_list$I, ",1]"), "mean"],
+  Difficulty = ex_summary[paste0("xi[", 1:sat_list$I, ",2]"), "mean"],
   parameterization = "xi")
 full_df <- rbind(ab_df, xi_df)
 ggplot(full_df) +

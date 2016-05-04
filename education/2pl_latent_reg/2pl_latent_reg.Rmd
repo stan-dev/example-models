@@ -122,10 +122,9 @@ Before interpreting the results, it is necessary to check that the chains have c
 
 ```{r sim_converge, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the simulation. All values should be less than 1.1 to infer convergence."}
 # Plot of convergence statistics
-sim_draws <- extract(sim_fit, permuted = FALSE, inc_warmup = TRUE)
-sim_monitor <- as.data.frame(monitor(sim_draws, print = FALSE))
-sim_monitor$Parameter <- as.factor(gsub("\\[.*]", "", rownames(sim_monitor)))
-ggplot(sim_monitor) +
+sim_summary <- as.data.frame(summary(sim_fit)[[1]])
+sim_summary$Parameter <- as.factor(gsub("\\[.*]", "", rownames(sim_summary)))
+ggplot(sim_summary) +
   aes(x = Parameter, y = Rhat, color = Parameter) +
   geom_jitter(height = 0, width = .5, show.legend = FALSE) +
   ylab(expression(hat(italic(R))))
@@ -141,7 +140,7 @@ wanted_pars <- c(paste0("alpha[", 1:sim_data$I, "]"),
 
 # Get estimated and generating values for wanted parameters
 generating_values = c(alpha, beta, lambda)
-estimated_values <- sim_monitor[wanted_pars, c("mean", "2.5%", "97.5%")]
+estimated_values <- sim_summary[wanted_pars, c("mean", "2.5%", "97.5%")]
 
 # Assesmble a data frame to pass to ggplot()
 sim_df <- data.frame(parameter = factor(wanted_pars, rev(wanted_pars)),
@@ -217,10 +216,9 @@ As discussed above, convergence of the chains is assessed for every parameter, a
 
 ```{r example_converge, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the example. All values should be less than 1.1 to infer convergence."}
 # Plot of convergence statistics
-ex_draws <- extract(ex_fit, permuted = FALSE, inc_warmup = TRUE)
-ex_monitor <- as.data.frame(monitor(ex_draws, print = FALSE))
-ex_monitor$Parameter <- as.factor(gsub("\\[.*]", "", rownames(ex_monitor)))
-ggplot(ex_monitor) +
+ex_summary <- as.data.frame(summary(ex_fit)[[1]])
+ex_summary$Parameter <- as.factor(gsub("\\[.*]", "", rownames(ex_summary)))
+ggplot(ex_summary) +
   aes(x = Parameter, y = Rhat, color = Parameter) +
   geom_jitter(height = 0, width = .5, show.legend = FALSE) +
   ylab(expression(hat(italic(R))))
