@@ -3,7 +3,6 @@ title: "Multiple Species-Site Occupancy Model"
 author: "Bob Carpenter"
 date: "April 19, 2015"
 output:
-  pdf_document: default
   html_document:
     theme: cerulean
 ---
@@ -399,16 +398,21 @@ traceplot(fit,
           c("Omega", "alpha", "beta", "sigma_uv", "rho_uv",
             "uv[1,1]", "uv[1,2]", "uv[30,1]", "uv[30,2]", 
             "lp__"),
-          inc_warmup=FALSE,
-          window=c(3001,3200));
+          inc_warmup=FALSE) +
+  coord_cartesian(xlim = c(3001,3200)) +
+  scale_x_continuous(breaks=c(3000, 3100, 3200))
 ```
 
 This only shows 200 iterations so the speed of the mixing can be visualized.  It shows that the parameters mix quite well after warmup, which is what leads to high numbes of effective samples (`n_eff`) relative to the number of iterations and mixing diagnostic (`Rhat`) being close to 1.  To get a sense of the speed of convergence, the following shows the traceplot for the first 50 warmup iterations for the total model log density, showing Stan converging rapdily from four different initial starting points of widely varying density.  As seen in this example, Stan is quite effective at converging from diffuse random initializations of the parameters.
 
 
 ```{r}
-traceplot(fit, "lp__", window=c(1,50));
+traceplot(fit, "lp__", inc_warmup=TRUE) +
+  coord_cartesian(xlim = c(1, 50));
 ```
+
+This time, the warmup was included in the traceplot and only the first
+50 iterations shown.
 
 
 ### Pairs Plot and Posterior Covariance of Parameters
@@ -571,3 +575,6 @@ psi_theta_sim_scatter_plot <-
 plot(psi_theta_sim_scatter_plot);
 ```
 
+# Licensing
+
+All code in this document is licensed via the BSD 3-clause license.  

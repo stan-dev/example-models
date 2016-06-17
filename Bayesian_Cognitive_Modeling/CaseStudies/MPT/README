@@ -1,0 +1,49 @@
+In addition to the two implementations given in the Lee and Wagenmakers book, 
+this folder contains three further implementationso of the hierarchical model.
+These further implementations are more in line with the suggested way such 
+models should be programmed in Stan. Some features of the original hierarchical 
+implementation were specifically added to allow for a better convergence using 
+Gibbs sampling such as implemented in JAGS or Bugs. These features do not help 
+the convergence using the NUTS/HMC sampler used by Stan and in fact, the 
+original model shows convergence issues with divergent transitions that can only
+be handeled by relatively strongly changing the Stan samplers' default settings.
+
+The new implementations avoid the Gibbs specific features. Specifically, these 
+implementations do not use the Wishart as prior for the correlation matrix and 
+do not use the parameter expansion. 
+We include three implementations which follow the three recommendations given in
+the Stan manual (section 6.12. "Multivariate Priors for Hierarchical Models") 
+for the Multivariate Regression Example of Gelman and Hill. All three of these 
+have no parameter expansion parameters (xichat, ...). The other changes are: 
+
+1. MPT_3_Stan.R:
+Simply replaces the Wishart prior for the correlation with a correlation matrix 
+Omega with LKJ prior and scaling vector tau. 
+This model still requires some tweaking of the sampler setting to run without 
+any divergent transitions or other numerical problems. There also can occur some
+correlation matrices during estimation that are not positive definite. However, 
+it increases fitting speed dramatically. Final fits still does not look 
+completely well behaved (when looking at the traceplots).
+
+2. MPT_4_Stan.R:
+Further replace the correlation matrix Omega with its Cholesky factor L_Omega 
+and corresponding prior. Likewise, tau will be replaced by corresponding scaling
+parameter sigma. Whereas this again noticably increases the speed of 
+optimization it does still requires tweaking of the sampler setting to converge
+without problems and the final fit is not completely well behaved.
+
+3. MPT_5_Stan.R:
+This contains a further reparametrization of the multivariate normal 
+distribution using a univariate normal distribtuion and basically solves the 
+remaining issues. Specifically, this uses a non-centered parametrization of the 
+multivariate normal (also known as the 'Matt trick' on the Stan mailing list). 
+It further dramatically increases the speed and at the same time dramatically
+increases the number of effective samples using the same number of samples. It 
+also requires only minimal tweaking of the sampler setting to remove the very 
+few remaining issues. Finally, the traceplot show no problem whatsoever.
+The non-centered parameterization is extensively discussed in section 21.2. of 
+the Stan manual. But it also is the same as given in section 6.12. 
+
+
+For further details see the correspondoing thread on the Stan mailing list:
+https://groups.google.com/forum/#!topic/stan-users/ZTiu_ij_bC8

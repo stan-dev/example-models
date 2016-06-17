@@ -1,0 +1,45 @@
+
+h1 {
+  font-size: xx-large;
+}
+h2 {
+  font-size: x-large;
+}
+h3 {
+  font-size: large;
+}
+h4 {
+  font-size: medium;
+}
+
+#TOC:before {
+  content: "Table of contents";
+  font-size: large;
+}
+#TOC {
+  margin-top: 25px;
+  margin-bottom: 50px;
+  margin-right: 10%;
+  margin-left: 10%;
+  font-size: large;
+  border-style: solid;
+  border-width: thin;
+  border-color: LightGray;
+  padding: 10px;
+}
+#TOC ul {
+  list-style-type: none;
+}
+
+.figure{
+  margin-right: 10%;
+  margin-left: 10%;
+  margin-top: 25px;
+  margin-bottom: 25px;
+  font-size: small;
+}
+
+body:after {
+  text-align: center;
+  content: "All code in this document is licensed via the BSD 3-clause license.";
+}

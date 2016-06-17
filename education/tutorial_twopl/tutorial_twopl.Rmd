@@ -1,0 +1,937 @@
+---
+title: "Two-Parameter Logistic Item Response Model"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+author:
+  - name: Daniel C. Furr
+  - name: Seung Yeon Lee
+  - name: Joon-Ho Lee
+  - name: Sophia Rabe-Hesketh
+output:
+  html_document:
+    toc: true
+    number_sections: true
+    fig_caption: true
+    css: ../styles.css
+bibliography: ../bibliography.bib
+---
+
+```{r knitr_opts, include = FALSE}
+knitr::opts_chunk$set(tidy = TRUE, cache = TRUE)
+```
+
+
+This tutorial is organized into four sections: (1) an introduction which describes the two-parameter logistic (2PL) model and the example data used in the tutorial, (2) a walkthrough for fitting and interpreting the model using the **edstan** package for **R** (3) a more technical section on fitting, extending, and checking the model using the **Stan** directly via the **rstan** package, and (4) a section on troubleshooting in the event of convergence difficulties. Researchers who are less familiar with **R** or Bayesian methods may benefit more from the second section, while researchers who already have some familiarity with these topics may be drawn to the third section. In any case, the second, third, and fourth sections may be read independently of one another.
+
+# Introduction
+
+The 2PL model is appropriate for dichotomously scored item response data in which items are expected to load differently on the underlying latent trait. This tutorial requires the following R packages:
+
+```{r libraries, message=FALSE, warning=FALSE}
+library(rstan)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+library(reshape2)  # For switching between long-form and wide-form data
+library(ggplot2)   # For the posterior predictive model checking example
+library(gridExtra) # Also for the posterior predictive model checking example
+```
+
+In addition, the **edstan** package is required. This package is still in development and so is not available on CRAN. Instead, it may installed directly from Github.
+
+```{r install_edstan, message=FALSE, warning=FALSE}
+# Install and load edstan
+library(devtools) # Required for install_github()
+install_github("danielcfurr/edstan")
+library(edstan)
+```
+
+
+## Model {#model}
+
+The 2PL model can be written as
+$$ 
+\mathrm{logit} [\mathrm{Pr}(y_{ij} = 1 | \theta_j)] = \alpha_i (\theta_j - \beta_i)
+$$
+where $y_{ij}$ is the response for person $j$ to item $i$, $\alpha_i$ and $\beta_i$ are discrimination and difficulty parameters, and $\theta_j$ is the ability parameter. Further, $\theta_j$ is specified as a draw from the standard normal distribution such that $\theta_j \sim \mathrm{N}(0, 1^2)$. The ability variance is constrained to 1 for identification because all discrimination parameters are freely estimated.
+
+Priors are chosen as
+$$
+\log \alpha_i \sim \mathrm{N}(.5, 1^2)
+$$
+$$
+\beta_i \sim \mathrm{N}(0, 10^2)
+$$
+The priors for $\alpha_i$ and $\beta_i$ are non-informative, although it is assumed that all $\alpha_i$ are positive. This assumption is generally appropriate for measures of an ability (for example, academic achievement) but may be inappropriate in certain contexts. (The specification of variances as squared standard deviations, like $1^2$ and $10^2$ above, is chosen because the **Stan** model language, which requires standard deviations for the normal distribution, e.g., the distribution of $\beta_i$ is specified as `normal(0,1)`.)
+
+
+## Data example {#spellingdata}
+
+The example dataset is from a study [@Thissen1993] that examined student spelling performance on four words: _infidelity_, _panoramic_, _succumb_, and _girder_. The sample includes 284 male and 374 female undergraduate students from the University of Kansas. Each item was scored as either correct or incorrect. The commands below extract the response matrix and then show some example rows from it.
+
+```{r wide_data}
+# The data set is available from the edstan package.
+x <- as.matrix(spelling[, 2:5])
+head(unique(x))
+```
+
+Before fitting a model, we summarize the data with some descriptive statistics. We make a histogram of the raw score distribution and a bar graph of the proportion of correct responses by item. This provides summary information aggregating over the person-side and over the item-side of the response matrix.
+
+```{r descriptives, fig.show='hold', fig.keep='last'}
+# Record existing plot presets and prepare to make side-by-side pots
+par_bkp <- par(no.readonly = TRUE)
+par(mfrow = c(1, 2))
+
+# Left plot
+person_scores <- apply(x, 1, sum)
+person_counts <- table(person_scores)
+barplot(person_counts,
+        main = "Raw score distribution",
+        xlab = "Raw score",
+        ylab = "Number of persons")
+
+# Right plot
+item_scores <- apply(x, 2, mean)
+barplot(item_scores,
+        main = "Proportion correct by item",
+        ylab = "Proportion correct",
+        ylim = c(0, 1),
+        xaxt = "n")
+# x-axis with angled labels
+text(x =.85 + (1:length(item_scores) - 1)*1.2,
+     y = -.05, 
+     labels = names(item_scores), 
+     xpd = TRUE, srt = 30, pos = 2)
+
+# Return to previous plot presets
+par(par_bkp)
+```
+
+The raw score distribution reveals that about 50 individuals have all incorrect response patterns and about 100 have all correct response patterns. This is noteworthy because these response patterns contribute less to the estimation, and also because estimating $\theta_j$ for them is difficult. Next we look to the proportion of correct responses by item, which helps to describe the difficulty of the items. It may be seen that _infidelity_ was the easiest word to spell and that _succumb_ was the most difficult. Each item appears to have a fair mix of correct and incorrect reponses, and so we expect no difficulty in estimating $\alpha_i$ and $\beta_i$ for any of the items.
+
+
+# Analysis using the **edstan** wrappers
+
+## Estimating the 2PL {#estimate2pl}
+
+Item-response data typically are available in either "wide form" or "long form." The response matrix `x` for the spelling data is an example of wide-form data. These data are "wide" in the sense that items are represented by columns. Long-form data, on the other hand, contains one row per person-item pair. The columns for long-form data include an identifier for person, an identifier for item, and the response. These data are "long" in the sense there are many, many rows but few columns. 
+
+The 2PL model may be fit to either data format using the `twopl_stan()` wrapper from the **edstan** package. First, we show how to proceed with wide-form data. In the **R** code below, the argument `response_matrix = x` indicates that the function should expect wide-form data. 
+
+```{r fit_1, results='hide', message=FALSE, warning=FALSE}
+myfit <- twopl_stan(response_matrix = x, 
+                    iter = 200, 
+                    chains = 4)
+```
+
+In addition, the number of iterations and number of chains are provided in the function call. Default values for `iter` and `chains` will be used if none are specified. In addition, any arguments accepted by the **rstan** function `sampling()` may also be supplied to `twopl_stan()`.
+
+If the data are in long-form, we call `twopl_stan()` using a different set of arguments. To illustrate, we convert the response matrix to long-form.
+
+```{r long_data, message=FALSE}
+wide <- as.data.frame(x)
+# Attach a person ID number to each row.
+wide$id <- 1:nrow(wide)
+long <- melt(wide, 
+             id.vars = "id", 
+             variable.name = "item", 
+             value.name = "response")
+head(long)
+```
+
+With the long-form data, the `twopl_stan()` function is called by assigning the columns of the long-form data to the relevant arguments. The same choices for `iter` and `chains` are provided.
+
+```{r fit_2, eval=FALSE}
+myfit2 <- twopl_stan(id = long$id,
+                     item = long$item,
+                     response = long$response,
+                     iter = 200,
+                     chains = 4)
+```
+
+
+## Postestimation techniques
+
+The `twopl_stan()` function return a *twopl_stanfit* Reference Class, which may be thought of as a list with elements that are a mixture of objects (called "fields") and functions (called "methods"). The *twopl_stanfit* fields include the reformatted data, the basic *stanfit* object, and some other things. The remainder of this section is a demonstration of how the *twopl_stanfit* methods may be used for postestimation work. 
+
+
+### Methods for accessing estimation results {#results_methods}
+
+We start with the `$show()` method, which provides formatted output regarding the estimated parameters.
+
+```{r show_method}
+myfit$show()
+```
+
+The output is separated into three tables: the first two provide estimates and convergence information for item parameters, and the third provides convergence information only for the ability parameters. Focusing for now on the item parameter results, the means of the posterior draws (*mean*) serve as point estimates, while the standard deviations of the posterior draws (*sd*) provide the standard error. Further, the percentiles for the posterior draws may be used to obtain credible intervals (a Bayesian analogue to confidence intervals). 
+
+The method `$parameters()` provides the estimation results as a data frame instead of formatted output. This is useful, for example, for extracting the (fully Bayesian) expected a posteriori (EAP) estimates for $\theta_j$.
+
+```{r parameters_method, results='hold'}
+# Store summary for all parameters
+all_estimates <- myfit$parameters()
+# Store only the person parameters
+theta_estimates <- myfit$parameters(pars = "theta")
+```
+
+
+### Convergence checking
+
+More care is required in evaluating the convergence of a model with Stan in comparison to software that does not use Monte Carlo simulation. Most software packages provide strong warnings about convergence failures, but Monte Carlo simulation, whether conducted by Stan or other software, tends to fail in a softer way, perhaps without any warning message at all. For this reason, Stan users must determine for themselves whether the Monte Carlo simulation has converged.
+
+Fortunately, convergence is not usually difficult to assess. Statistics on convergence are provided by the `$show()` and `$parameters()` methods discussed in the [previous section](#results_methods), and we continue to refer to the output there. We look primarily to the *Rhat* statistic, which provides the estimated ratio of between chain variance to within chain variance for a given parameter [@gelman2014bayesian]. At convergence, *Rhat* will equal one, but values less than 1.1 are considered acceptable for most applications. When *Rhat* is near one for all parameters, we judge the chains to have converged.
+
+Two other statistics are of secondary importance, both of which describe the precision of the estimated parameter posteriors. The Monte Carlo standard error (*se_mean*) indicates the uncertainty in the estimated posteriors due to estimating the posterior expectations by the sample means of a finite number of random draws from the posterior. Here the number of draws used for the posterior means is 400 because each of the four chains was run for 100 iterations after warmup. Increasing the number of iterations per chain will reduce the Monte Carlo standard error. The other statistic, the effective sample size (*n_eff*), represents the effective number of independent draws from the posterior. This number is smaller typically smaller than the total number of post-warmup iterations across chains because of autocorrelation between draws. Increasing the number of iterations per chain will increase the effective sample size.
+
+The above is all that is ordinarily needed for checking convergence. If the values of *Rhat* are high, our first recourse is to increase the number of iterations. We can only guess how many iterations will be needed to obtain convergence, so adjusting this number after preliminary model fitting is common. If increasing the number of iterations does not help, or if the parameter estimates are questionable, then there is likely a problem with the model. We troubleshoot some example convergence issues in [a later section](#troubleshooting).
+
+
+### Plotting item characteristic curves
+
+An item characteristic curve may be plotted with the `$icc()` method.
+
+```{r icc_method, tidy=FALSE, results='hold'}
+# Can identify the item by number:
+# myfit$icc(2)
+# Or by name:
+myfit$icc("panoramic")
+```
+
+A single item characteristic curve by itself may not be interesting, so we show an example of what might be done with this method. In the code below, item characteristic curves are placed on the same plot by looping over the the item names stored in `myfit$item_names`. Setting the option `new = FALSE` in the `$icc()` method allows the item characteristic curves to be added to the current plot rather than generating a new plot for each.
+
+```{r multiple_icc, fig.show='hold'}
+icc_colors <- rainbow(length(myfit$item_names))
+plot(0, .5, 
+     ylim = c(0, 1), 
+     xlim = c(-2, 1.5), 
+     type = "n",
+     main = "Item characteristic curves",
+     xlab = "theta", 
+     ylab = "Pr(correct)")
+for(i in 1:length(myfit$item_names)) {
+  myfit$icc(myfit$item_names[i], 
+            col = icc_colors[i], 
+            new = FALSE)
+}
+legend("bottomright", 
+       legend = myfit$item_names, 
+       col = icc_colors, 
+       lty = 1)
+```
+
+
+# Direct use of Stan without **edstan** package
+In this section, we introduce how to use **Stan** directly without the **edstan** package: how to express the model in Stan, how to prepare data, and how to sample from the posterior distribution using the `stan()` function in the **rstan** package.
+
+## Stan program details
+### Expressing the model in Stan{#twoplstancode}
+
+In order to use **Stan**, we first need to specify the model in the **Stan** modeling language. The model may be coded in a text file (typically with suffix `.stan`), or written with a character string in R. 
+For the former case, we load the **Stan** program file by using the `file` argument of the `stan()` function as follows:
+```{r, eval=FALSE}
+# Do not run the following code yet. This is an example code to illustrate how to use the Stan program file. 
+fit1 <- stan(file = 'twopl.stan', ...)      
+```
+For the latter case, we specify the **Stan** program by using the `model_code` argument as follows:
+```{r, eval=FALSE}
+# Do not run the following code yet. This is an example code to illustrate how to use the Stan program file.
+twopl.code <- cat(paste(readLines('twopl.stan'), collapse = '\n'),'\n')
+fit2 <- stan(model_code = twopl.code, ...)
+```
+
+The **edstan** package includes a **Stan** program file *"twopl.stan"* for the 2PL model. The `twopl_stan()` wrapper in the **edstan** package is based on this **Stan** program. 
+
+The following is *"twopl.stan"*:
+```{r, echo=FALSE, comment=NA, warning=FALSE}
+cat(get_stancode(myfit$fit))
+```
+
+`'twopl.stan'` contains three program blocks: `data`, `parameters` and `model`. 
+
+#### Program block: _data_
+
+First, the `data` block declares the variables in the data. The code here assumes that the data is in long form. The number of questions *I*, the number of students *J*, and the total number of observations *N* are declared as integer values with lower bounds of *1*. Then, a total of *N* student-question pairs observed in the long-form data are declared: for each *n* in *1:N*, *y[n]* is a binary response (1=correct, 0=incorrect) of student *jj[n]* to question *ii[n]*. Here, *ii[N]*, *jj[N]* and *y[N]* are one-dimensional arrays of size *N* containing integers, and these integers are given lower and upper bounds, e.g., 1 to *I* for *ii[N]*. 
+The variables in the `data` block are read from an external input source such as a file or a designated R data structure. Data preparation will be discussed later in [section 3.1.2](#preparedata). 
+
+#### Program block: _parameters_
+Next, the `parameters` block declares model parameters defined in the following 2PL model: 
+$$ 
+\mathrm{logit} [ \mathrm{Pr}(y_{ij} = 1 | \theta_j) ] = \alpha_i (\theta_j - \beta_i) 
+$$
+where $y_{ij}$ is the response for person $j$ to item $i$, $\alpha_i$ and $\beta_i$ are discrimination and difficulty parameters, and $\theta_j$ is the ability parameter.
+
+We declare parameter vectors: *alpha* for $\boldsymbol{\alpha}=(\alpha_1, \alpha_2,...,\alpha_I)^\top$; *beta* for $\boldsymbol{\beta}=(\beta_1, \beta_2,...,\beta_I)^\top$; and *theta* for $\boldsymbol{\theta}=(\theta_1, \theta_2,...,\theta_J)^\top$.
+We declare a lower bound constraint on *alpha* so that discrimination parameters are non-negative. 
+
+#### Program block: _model_
+Lastly, the `model` block defines the elements required for the posterior probability function: priors and likelihood.
+In Bayesian approach, $\alpha_i,$ $\beta_i$ and $\theta_j$ are considered to have priors and the likelihood is the probability of the observed data given all the parameters.  
+
+As mentioned in [section 1.1](#model), we consider the following priors:
+$$
+\alpha_i \sim \mathrm{logN}(.5, 1^2) \mathrm{~~or, ~equivalently, ~~log} \alpha_i \sim \mathrm{N}(.5,1^2)
+$$
+$$
+\beta_i \sim \mathrm{N}(0, 10^2)
+$$
+$$
+\theta_j \sim \mathrm{N}(0, 1^2)
+$$
+The priors for $\alpha_i$ and $\beta_i$ are non-informative, although it is assumed that all $\alpha_i$ are positive.
+
+The code in the `model` block first declares the prior distributions: 
+```
+alpha ~ lognormal(0.5,1); 
+beta ~ normal(0,10); 
+theta ~ normal(0,1); 
+```
+
+Then, the likelihood is defined by specifying the distribution of $y_{ij}$ given the parameters. First, define $\eta_{ij}$ to be logit of probability of person $j$ having correct answer to item $i$
+$$
+\eta_{ij} = \mathrm{logit} [ \mathrm{Pr}(y_{ij} = 1|\theta_j, \alpha_i, \beta_i ) ] = \alpha_i (\theta_j - \beta_i), 
+$$
+
+so that 
+$$
+\mathrm{Pr}(y_{ij}=1|\theta_j, \alpha_i, \beta_i) = \mathrm{logit}^{-1}(\eta_{ij})
+$$
+
+The response $y_{ij}$ of person $j$ to item $i$ has a Bernoulli distribution:
+$$
+y_{ij}|\eta_{ij} \sim \mathrm{Bernoulli(logit^{-1}}(\eta_{ij}))
+$$
+
+The following code defines $\eta_{ij}$: 
+```
+vector[N] eta; 
+for (n in 1:N) 
+  eta[n] <- alpha[ii[n]] * (theta[jj[n]] - beta[ii[n]]);
+```
+A vector *eta* is declared for $\boldsymbol{\eta}=(\eta_1,\eta_2,...,\eta_N)^\top$. Then each element $\eta_{n}$ for n in 1:N is defined as 
+$$
+\eta_{n}=\mathrm{logit} [ \mathrm{Pr}(y_{n} = 1) |\theta_{jj[n]}, \alpha_{ii[n]}, \beta_{ii[n]}] = \alpha_{ii[n]} (\theta_{jj[n]} - \beta_{ii[n]})
+$$
+
+After defining all elements in $\boldsymbol{\eta}$, the response vector $y$, defined in the `data` block, is finally modeled by Bernoulli distribution as follows:
+```
+y ~ bernoulli_logit(eta); 
+```
+The model formulation uses the logit-parameterized version of the Bernoulli distribution, which is defined by 
+$$
+\mathrm{BernoulliLogit}(\boldsymbol{y}|\boldsymbol{\eta})=\mathrm{Bernoulli}(\boldsymbol{y}|\mathrm{logit}^{-1}(\boldsymbol{\eta}))
+$$
+The formulation is vectorized with the vector *eta*. The vectorized formulation is equivalent to the less efficient version
+
+```
+for (n in 1:N)
+  y[n] ~ bernoulli_logit(eta[n]);
+```
+
+Bernoulli logit is further equivalent to the more explicit, but less efficient and less arithmetically stable specification:
+
+```
+for (n in 1:N)
+  y[n] ~ bernoulli(inv_logit(eta[n]));
+```
+
+### Preparing data {#preparedata}
+
+The next step is preparing the data for the model. We specify the data in the `data` argument of the `stan()` function. We may use an object of class *list* or *environment*, or a vector of character strings for all the names of variables that already exist as objects in the working space. 
+
+Let's revisit the [spelling data](#spellingdata) and create a *list* of data variables defined in the data block! 
+```{r, message=FALSE}
+head(long)
+```
+
+There are some restrictions on data to be used in function `stan()`. First, Stan cannot handle missing values automatically so the data should not include any missing values. Second, identifiers for students and items must be consecutive integers starting with 1. 
+
+In the spelling data, there are no missing values, and student id numbers (in the first column) are consecutive integers starting with 1. However, the items are coded as strings--_infidelity, panoramic, succumb, girder_--so we need to define a numeric identifier for items consisting of integers 1 to 4. This can be done by the following R command: 
+```{r, message=FALSE}
+key <- 1:length(unique(long$item))
+names(key) <- unique(long$item)
+long$item.id <- key[long$item]
+head(long)
+```
+A new column `item.id` includes integers assigned to each item: 1 for infidelity, 2 for panoramic, 3 for succumb, and 4 for girder. 
+
+Now, we are ready to create a list of the variables needed for the `data` block of the **Stan** program. We can use the following R command (Note that the element names in the list must match the variable names specified in the **Stan** `model` block.):
+```{r, message=FALSE}
+stan_data <- list(
+    I  = max(long$item.id),
+    J  = max(long$id),
+    N  = nrow(long),
+    ii = long$item.id,
+    jj = long$id,
+    y  = long$response )
+```
+
+```{r, message=FALSE}
+stan_data$I
+stan_data$J
+stan_data$N
+```
+
+With the list `'stan_data'`, the variables in the **Stan** `data` block will have the following values: *I = 4* items, *J = 658* students, and *N = 2632* observations (responses of 658 students on 4 items: 658 $\times$ 4 = 2632). *ii* is the same as the `item.id` column vector, *jj* is the `id` column vector, and *y* is the `response` column vector in the data. For example, for the second observation (*n = 2*), *ii[2] = 1*, *jj[2] = 2* and *y[2] = 0*; this means that the student having an id number of 2 has incorrect answer on item 1 (*infidelity*). 
+
+### Sample from the posterior distribution
+Finally, we can call function `stan()` to draw posterior samples:
+```{r, eval=FALSE}
+#This code will work when the 'twopl.stan' file exists under the working directory. 
+twopl.fit <- stan(file = 'twopl.stan', data = stan_data, iter = 200, chains = 4)
+```
+Function `stan()` returns an object of S4 class *stanfit* which includes posterior samples. For *stanfit*, many methods such as `print()` and `plot()` are available for model inference. Here, for the `iter` and `chains` arguments, the same values were used as the ones considered in [section 2.1](#estimate2pl) so this code provides exactly the same parameter estimates as in [section 2.2.1](#results_methods). 
+
+## Extending the model
+### Latent Regression {#latentregression}
+Let's consider the situation where we have two groups of students and want to compare their mean latent ability. For example, in the [spelling data](#spellingdata), we can estimate the difference in mean ability between males and females using the following latent regression:
+$$
+\theta_j=\gamma x_j + \epsilon_j
+$$
+where $\theta_j$ is the ability for person $j$, $x_j$ is a dummy variable for being male (1=male, 0=female), and $\epsilon_j \sim \mathrm{N}(0, 1)$. For identifiability of the latent regression, the mean ability of females is constrained to zero, and we allow the mean for males to be different from zero -- thus, the intercept is not included. 
+The latent regression model is available in **Stan** with a slight modification on the [2PL Stan program (*"twopl.stan"*)](#twoplstancode). 
+
+In **Stan**, we can consider two parameterization approaches for $\theta_j$: *centered parameterization* and *non-centered parameterization*. 
+
+First, by the centered parameterization, $\theta_j$ can be modeled as
+$$
+\theta_j \sim \mathrm{N}(\gamma x_j, 1)
+$$
+because $\epsilon_j \sim \mathrm{N}(0, 1)$ and $\gamma$ is a fixed parameter. 
+
+On the other hand, the non-centered parameterization separates the mean of $\theta_j$ ($=\gamma x_j$) and $\epsilon_j$ in the prior as follows: 
+$$
+\epsilon_j \sim \mathrm{N}(0, 1)
+$$
+$$
+\theta_j = \gamma x_j + \epsilon_j
+$$
+In **Stan**, non-centered parameterizations tend to be more efficient in terms of effective sample size in hierarchical models. (See p.211 in stan reference 2.9.0. for more information on non-centered reparameterizations). 
+
+Let's start by writing a **Stan** program with the centered parameterization. 
+
+As we have an explanatory variable $X$ which is a dummy for being male, we add the following code in the `data` block. 
+```
+real x[J];
+```
+
+Then, declare the regression coefficient $\gamma$ by adding the following code in the `parameters` block. 
+```
+real gamma;
+```
+
+In the 2PL **Stan** program (*"twopl.stan"*), the prior of $\theta_j$ was declared in the `model` block as follows:
+```
+theta ~ normal(0,1);
+```
+This is the only part that needs to be updated for the latent regression. 
+Following the model defined above, the distribution of $\theta_j$ has a mean of $\gamma x_j$ and standard deviation of $1$. Thus, we modify the code as follows:
+```
+for (j in 1:J)
+  theta[j] ~ normal(gamma * x[j],1);
+```
+
+We define `'reg_centered.stan'` for the modified **Stan** program:
+```{r reg_centered_code, comment="",message=FALSE, echo=FALSE, warning=FALSE, tidy=FALSE}
+cat(readLines("reg_centered.stan"), sep = "\n")
+```
+
+To include the covariate x in the regression model, we need to prepare the data again by extracting a dummy variable for being male from the spelling data and adding this to the list.
+
+```{r, message=FALSE}
+# extract a dummy for male.
+male <- as.vector(spelling[, 1])
+# make a list of the variables needed for the data block
+stan_data_reg <- list(
+    I  = max(long$item.id),
+    J  = max(long$id),
+    N  = nrow(long),
+    ii = long$item.id,
+    jj = long$id,
+    y  = long$response,
+    x = male)
+```  
+
+Finally, we run **Stan** with the updated **Stan** program `'reg_centered.stan'` and data `'stan_data_reg'`.
+```{r latent_reg, results='hide', message=FALSE, warning=FALSE}
+twopl.reg.centered <- stan(file = 'reg_centered.stan',
+                         data = stan_data_reg,
+                         iter = 200,
+                         chains = 4)
+```
+
+```{r latent_reg_print, echo=FALSE, message=FALSE, warning=FALSE}
+print(twopl.reg.centered,pars=c("alpha","beta","gamma")) 
+```
+
+Next, let's make a **Stan** program with the non-centered parameterization. 
+In the non-centered parameterization, we define the *epsilon* parameter instead of *theta* in the `parameters` block, and specify a standard normal prior for *epsilon* in the `model` block. Then, *theta* is defined in terms of *gamma*, *x* and *epsilon* as follows: 
+```
+vector[J] theta;
+epsilon ~ normal(0,1);
+for (j in 1:J)
+  theta[j] <- (gamma * x[j]) + epsilon[j];
+
+```
+
+The **Stan** program using the non-centered parameterization is:
+```{r reg_noncentered_code, comment="",message=FALSE, echo=FALSE, warning=FALSE, tidy=FALSE}
+cat(readLines("reg_noncentered.stan"), sep = "\n")
+```
+
+### Differential Item Functioning
+
+An item is said to exhibit differential item functioning (DIF) when examinees from different groups who have the same ability have different response probabilities for that item. In the [spelling data](#spellingdata), for example, we can investigate the existence of DIF between genders for item $k$ using the following model:
+$$
+\eta_{ij} = \mathrm{logit} [ \mathrm{Pr}(y_{ij} = 1|\theta_j, \alpha_i, \beta_i ) ] = \alpha_i (\theta_j - \beta_{ij}), 
+$$
+$$
+\beta_{ij} = \beta_i + \delta_k (I_{i=k}\times x_j)
+$$
+where $\theta_j$ is the ability for person $j$, $\alpha_i$ is the item discrimination parameter and $\beta_i$ the item difficulty parameter for item $i$, and $\delta_k$ is the DIF parameter for item $k$, $I_{i=k}$ is an indicator variable for item $k$ (taking the value 1 when $i=k$ and 0 otherwise), and $x_j$ is a dummy variable for being male (1=male, 0=female). Under this model, $\delta_k$ is the item difficulty difference for item $k$ between males and females (interaction between item $k$ and gender). 
+The overall gender difference in ability should not be confounded with DIF. It can be dealt with by the latent regression of $\theta_j$ on the dummy variable for being male, 
+$$
+\theta_j=\gamma x_j + \epsilon_j,
+$$
+where $\gamma$ is the regression coefficient and $\epsilon_j \sim \mathrm{N}(0, 1)$.
+By modifying the [2PL Stan program](#twoplstancode), we can estimate the DIF parameter. 
+The **Stan** program for the latent regression is described in [section 3.2.1](#latentregression). In this section, we describe how to modify the **Stan** program (non-centered parameterization) to take DIF into account. 
+
+In the data block, we define a vector _x_ for the dummy for being male and a vector _Ik_ for the indicator of item $k$.
+```
+real x[J];
+int<lower=0, upper=1> Ik[N];
+```
+Next, declare _delta_ for the DIF parameter $\delta_k$ in the `parameters` block.
+```
+real delta;
+```
+Lastly, in the `model` block, we add the interaction term between item $k$ and gender to define $\eta_{ij}$ in the DIF model. 
+```
+for (n in 1:N)
+  eta[n] <- alpha[ii[n]] * (theta[jj[n]] - (beta[ii[n]] + delta * Ik[n] * x[jj[n]]));
+```
+
+We define `'reg_dif.stan'` for the modified **Stan** program:
+```{r difcode, comment="",message=FALSE, echo=FALSE, warning=FALSE, tidy=FALSE}
+cat(readLines("reg_dif.stan"), sep = "\n")
+```
+
+Since we now include a dummy variable for male and a dummy variable for item $k$ in the model, we need to prepare the data again. Here, as an example, we investigate DIF for the *girder* item for which item.id is 4. We extract a dummy variable for being male from the spelling data (*male*) and an indicator variable for item 4 (*Ik*), and add them in the list.  
+
+```{r, message=FALSE}
+# extract a dummy for male.
+male <- as.vector(spelling[, 1])
+# Indicator for item k
+Ik <- ifelse((long$item.id == 4), 1, 0)
+# make a list of the variables needed for the data block
+stan_data_dif <- list(
+    I  = max(long$item.id),
+    J  = max(long$id),
+    N  = nrow(long),
+    ii = long$item.id,
+    jj = long$id,
+    y  = long$response,
+    x = male,
+    Ik = Ik)
+```
+
+Finally, we run **Stan** with the updated **Stan** program `'reg_dif.stan'` and data `'stan_data_dif'`.
+```{r dif, results='hide', message=FALSE, warning=FALSE}
+twopl.dif.fit <- stan(file='reg_dif.stan',
+                         data = stan_data_dif,
+                         iter = 200,
+                         chains = 4)
+```
+
+```{r dif_print, echo=FALSE, message=FALSE, warning=FALSE}
+print(twopl.dif.fit,pars=c("alpha","beta","gamma","delta")) 
+```
+
+## Checking model fit
+
+Once the estimation has converged, our next step should be to determine whether the model fits the data well enough to justify drawing inference about the parameters. The Bayesian approach offers much greater flexibility for testing particular features of a model than classical tests. We will focus on posterior predictive model checking (PPMC) [@gelman1996posterior] as one of such approaches in this section.
+
+The PPMC method is a popular Bayesian model diagnostic tool which can provide graphical or numerical evidence about model misfit. The basic strategy of PPMC is to generate replicated datasets from the posterior predictive distribution for the fitted model and compare these to the observed dataset with respect to any features of interest. If the replicated data are similar to the observed data, we may conclude that model fits well.  
+
+### Posterior predictive replications in Stan
+
+Implementation of PPMC is relatively simple because it can often be incorporated as part of the MCMC algorithm itself. We already have an MCMC-generated sample from the posterior distribution for the parameters in a model as a by-product of MCMC simulations. To simulate posterior predictive replications, the following steps need to be repeated a sufficient number of times:
+
+- **Step 1**. Generate a draw of item parameters $\alpha_{i}$ and $\beta_{i}$ from the posterior distribution $p(\alpha_i, \beta_i|y)$, and draw a new ability parameter vector $\theta_{j}^{rep}$ from its prior $p(\theta_j)$. 
+
+- **Step 2**. Combine $\theta_{j}^{rep}$ with $\alpha_{i}$ and $\beta_{i}$ to generate the predicted probability of a correct response for replicate observations. 
+
+- **Step 3**. Randomly assign responses to correct or incorrect according to the predicted probabilities, resulting in a new vector of replicated responses $y_{ij}^{rep}$. 
+
+Note that new values $\theta_{j}^{rep}$ are drawn from their prior rather than using the existing posterior draws $\theta_{j}$. Therefore, this process may more accurately be labeled as a _mixed_ PPMC. Drawing $\theta_j$ from the posterior would make double use of the data which may yield a conservative test (that often fails detect model misfit) since the observed data can have strong influence on the replicated data [@marshall2003approximate; @Vehtari2015efficient]. A _mixed_ PPMC can considerably reduce such conservatism. 
+
+**Stan** provides an efficient way to generate replicated datasets. We can implement from **Step 1** to **Step 3** by simply adding a `generated quantities` program block at the end of the original [2PL Stan program](#twoplstancode). The **R** code below shows how the `generated quantities` block is defined. 
+
+```{r, tidy = FALSE}
+# Define generated_quantities program block  
+generated_quantities <- "
+generated quantities {
+    real theta_rep[J];
+    int y_rep[N];
+    for(j in 1:J)
+      theta_rep[j] <- normal_rng(0, 1);
+    for (n in 1:N) 
+      y_rep[n] <- bernoulli_rng(inv_logit(alpha[ii[n]] * (theta_rep[jj[n]] - beta[ii[n]])));
+}
+"
+```
+
+Two quantities, `theta_rep[J]` and `y_rep[N]`, are defined in the `generated quantities` block. `theta_rep[J]` is a vector of newly generated ability estimates for persons J from a normal distribution with mean 0 and standard deviation 1.  `normal_rng()` is the normal pseudo-random number generating function in **Stan**. We prepare this quantity for a _mixed_ PPMC. 
+
+The replication `y_rep[n]` here represents a new replicated response vector $y_{ij}^{rep}$ that we might observe if the experiment that generated _y_ is replicated with the same value of $\alpha_{i}$ and $\beta_{i}$ that generated the observed data. Each of `alpha[ii[n]]` and `beta[ii[n]]` represents a draw of item parameters $\alpha_{i}^{rep}$ and $\beta_{i}^{rep}$ from the posterior distribution $p(\alpha_i, \beta_i|y)$. By combining `theta_rep[J]` with `alpha[ii[n]]` and `beta[ii[n]]` and applying the inverse-logit function `inv_logit`, we can generate the predicted probability of a correct response for replicate observations. `bernoulli_rng()` is the **Stan** function that generate a vector of binary responses (1 = correct, 0 = incorrect) from a Bernoulli distribution. We can get a new replicated response vector $y_{ij}^{rep}$ by putting the predicted probability in the `bernoulli_rng()` function.
+
+In the **R** code below, the `generated_quantities` block is appended at the end of the original `twopl.stan` code, the model is run, and `y_rep[n]` is extracted from `stanfit` object. `get_stancode()` is a **rstan** function that gets the **Stan** code for the fitted model from `stanfit` object. `extract()` is also a **rstan** function that gets the samples for all chains for specified parameters from `stanfit` object.
+
+```{r, message=FALSE, warning=FALSE, results='hide'}
+# Extract original twopl.stan code from previous analysis
+twopl_code <- get_stancode(myfit$fit)
+
+# Append gnerated_quantities block at the end of the twopl.stan code
+ppmc_code <- paste(twopl_code, generated_quantities, collapse = "\n")
+
+# Run ppmc_code to generate y_rep
+fit <- stan(model_code = ppmc_code, 
+            data = stan_data, 
+            iter = 200, 
+            chains = 4)
+
+# Extract y_rep from stanfit object
+y_rep <- extract(fit, pars = 'y_rep', permuted = TRUE)$y_rep
+str(y_rep)
+```
+
+The resulting **R** object `y_rep` is a 400 by 2,632 matrix. Each row represents a new replicated response vector of length 2,632 (responses of 658 students on 4 items: 658 $\times$ 4 = 2,632). As the half of the number of iterations (200/2 = 100) for warmup is discarded, we have 400 replications (100 iteration $\times$ 4 chains) of the response vector.  
+
+
+### Discrepancy measures for IRT model checking
+
+Once the new replicated datasets $y^{rep}$ are generated from the posterior predictive distribution, these replicated datasets are then compared to the observed dataset $y$ based on **test statistics** or **discrepancy measures**. It is very important in the PPMC method to choose discrepancy measures that have the power to detect the aspects of the data that the model cannot explain adequately. For example, biserial correlation between item responses and total scores across items will be powerful discrepancy measures to detect misfit of a Rasch model when the items actually have varying discrimination parameters. However, for models with a discrimination parameter $\alpha_{i}$ such as the 2PL model in this tutorial, the biserial correlation coefficients may not be useful.
+
+The 2PL model specified above assumes unidimensionality, local independence, and normality of the ability distribution. Each of these assumptions should be assessed using appropriate discrepancy measures. The following subsections demonstrates how **(1) observed score distribution** and **(2) odds ratio for measuring association among item-pairs** can be used to examine those aspects of the 2PL model. In general, the observed score distribution is a useful discrepancy measure for detecting misfit of an IRT model that assumes a normal ability distribution when the underlying true ability distribution is not normal [@sinharay2006posterior]. The odds ratio is effective for detecting misfit in several types of model misspecifications that induce local dependencies among the items [@chen1997local]. 
+
+
+#### Observed score distribution
+
+For the spelling data, let $NC_s$ denote the number of persons having raw score $s$, $s$ = 0, 1, 2, 3, 4 for the observed dataset. Further, let $NC_{s}^{rep}$ indicate the same quantity for the replicated datasets. 
+
+The preferable way to compare the observed and replicated score distributions is to use graphical plots. We will first plot the observed raw score distribution along with the entire replicated raw score distributions. Strong departure may be observed if the model does not predict the observed score distribution well. The **R** code below indicates how the observed and replicated raw score distributions are calculated and saved as data frames for later use. 
+
+
+```{r}
+# (1) Compute the observed raw score distribution 
+score.obs <- tapply(long$response, long$id, sum)  
+observed <- data.frame(table(score.obs))          
+colnames(observed) <- c("score", "obs")          
+observed$score <- as.numeric(as.character(observed$score))   
+
+# (2) Compute the replicated (posterior predictive) raw score distributions from the y_rep
+score.rep <- apply(y_rep, 1, function(x) tapply(x, long$id, sum))
+replicated <- apply(score.rep, 2, function(x) table(x))
+
+# (3) Compute 5%, 50% (median), and 95% quantiles of each replicated raw score distribution
+rep.quantile <- apply(replicated, 1, quantile, probs = c(.05, .50, .95))  
+rep.quantile <- data.frame(t(rep.quantile))
+colnames(rep.quantile) <- c("Q5", "Q50", "Q95")
+
+# (4) Reshape the replicated raw score distributions into long format
+replicated2 <- data.frame(t(replicated))
+colnames(replicated2) <- seq(0, 4, 1)
+replicated2$id <- 1:nrow(replicated2)   # attach a ID number to each row.
+rep.long <- melt(replicated2, id.vars = "id", variable.name = "score", value.name = "frequency")
+
+# (5) Combine the observed and replicated raw score distribution
+df <- cbind(observed, rep.quantile)
+print(df)
+```
+
+
+Using these data frames, we can graphically compare the observed and replicated score distributions. The **R** code below shows a procedure to build the plot layer by layer using _ggplot2_. For each possible score in the test (any integer from 0 to 4), a violin plot depicts the posterior predictive distribution of the number of examinees obtaining that particular raw score along with all the jittered data points. Posterior predictive medians are overlayed on the violin plot as hollow triangles connected by dashed lines with dotted lines indicating 5% and 95% quantiles. Then the corresponding observed proportions of examinees having each score is added with solid ellipses connected by a solid line. The resulting figure shows that the 2PL model performs respectably in predicting the observed raw score distribution. The observed proportions of examinees lie within 5% and 95% quantiles of posterior predictive distributions, and are close to the posterior predictive medians. 
+
+
+```{r}
+# (1) Basic settings of plot
+p <- ggplot(df, aes(x = score + 1, y = obs)) + theme_bw() + 
+      labs(x = "Raw score", y = "Number of examinees", 
+           title = "The observed and replicated raw score distributions")  
+
+# (2) Add the entire replicated raw score distributions using violin plot and jittered data points
+p <- p + geom_violin(data = rep.long, aes(x = score, y = frequency))
+p <- p + geom_jitter(data = rep.long, aes(x = score, y = frequency, color = score), 
+                     position = position_jitter(width = 0.12), alpha = 0.15) + 
+          theme(legend.position="none")
+
+# (3) Overlay 5%, 50% (median), and 95% quantiles of each replicated raw score distribution
+p <- p + geom_point(aes(y = Q50), size = 4, shape = 2) + 
+         geom_line(aes(y = Q50), size =1, linetype="dashed")
+p <- p + geom_line(aes(y = Q5), size = 1, linetype ="dotted")
+p <- p + geom_line(aes(y = Q95), size = 1, linetype ="dotted")
+
+# (4) Overlay the observed raw score distribution 
+p <- p + geom_point(size = 4) + geom_line(size = 1)
+print(p)
+```
+
+
+If one wants to summarize the model fit to the observed score distribution in a single number, the following $\chi_{NC}^{2}$ discrepancy measure can be used [@beguin2001mcmc]: 
+
+$$\chi _{ NC }^{ 2 }=\sum _{ s=0 }^{ S }{ \frac { [NC_s - E(NC_s)]^2 }{ E(NC_{ s }) }}$$
+
+where $E(NC_s)$ is the expected count indicated by the model, calculated as the average over replicated datasets. Although the $\chi_{NC}^{2}$ statistic does not follow a $\chi^{2}$ distribution, we do not need any distributional assumptions of $\chi^{2}$ in the PPMC method. This is because we can generate our reference distribution of $\chi^{2}$ using replicated dataset `y_rep` as with the parametric bootstrap. 
+
+If we define $\chi_{NC}^{2}$ to be a test statistic and $\chi_{NC^{rep}}^{2}$ to be the same function applied to the replicated data, then we can compute a posterior predictive p-value (PPP-value) as:
+
+$$ PPP = p(\chi_{NC^{rep}}^{2} \ge \chi_{NC}^{2}|NC_s) $$
+
+In words, the PPP-value is the proportion of replicated datasets whose function values $\chi_{NC^{rep}}^{2}$ exceed that of the $\chi_{NC}^{2}$ applied to the observed data. The **R** code below shows how these statistics are computed in our example.
+
+
+```{r}
+# (1) Generate a function for vectorized chi2 test
+# The argument "scores" is a vector of (NC0, NC1, NC2, NC3, NC4)'
+# The argument "expected" is a vector of (E(NC0), E(NC1), ..., E(NC4))'
+chi.test <- function(scores, expected) {  
+  s <- (scores - expected)^2 / expected
+  sum(s)
+}
+
+# (2) Compute the argument "expected" from the replicated datasets
+expected <- apply(replicated, 1, mean)
+
+# (3) Calculate chi2 test statistics in each observed and replicated dataset
+obs.chi2 <- chi.test(observed$obs, expected)
+rep.chi2 <- apply(replicated, 2, chi.test, expected = expected)
+
+# (4) Calculate posterior predictive p-value
+ppp.chi2 <- mean(obs.chi2 <= rep.chi2)
+
+# (5) Histogram comparing obs.chi2 with rep.chi2
+rep.chi2 <- data.frame(x1 = rep.chi2)
+h <- ggplot(rep.chi2, aes(x = x1)) + theme_bw() + labs(x = "Replicated Chi-square discrepancy")
+h <- h + geom_histogram(colour = "black", fill = "grey", binwidth = 5) 
+h <- h + geom_vline(xintercept = obs.chi2, colour="red", linetype = "longdash")
+h <- h + geom_text(aes(0, 10, label = "obs.chi2 = 0.260"), color ="red", size = 4)
+h <- h + geom_text(aes(10, 100, label = "PPP-value = 0.997"), color = "blue", size = 4)
+print(h)
+```
+
+
+The plot above shows a histogram of the replicated values of $\chi_{NC^{rep}}^{2}$ with a vertical line indicating the observed value of $\chi_{NC}^{2}$. The observed $\chi_{NC}^{2}$ is 0.260 and corresponding PPP-value is 0.997 which indicates that the observed raw score distribution is overly predictable by the 2PL model. Extreme PPP-value close to 1 suggests the possibility of model overfit. 
+
+
+#### Measure of association among the item pairs: Odds ratio
+
+The unidimensional 2PL model has no parameters to address association among item pairs. Therefore, discrepancy measures that capture the local dependence among the items have the potential to detect possible misfit of the unidimensional 2PL model. In this subsection, _odds ratio_ is examined as one such measure. 
+
+Let $n_{kk'}$ be the number of examinees scoring $k$ on the one item and $k'$ on another item, with $k, k' = 0, 1$. The sample item pair odds ratio (OR) is given by
+
+$$OR = \frac{n_{11}n_{00}}{n_{01}n_{10}} $$
+
+The odds ratio can be helpful for detecting violation of the local dependence assumption. However, it is not easy to specify an explicit distributional assumption for the ORs, because ORs generally have highly skewed distributions unless sample size is quite large, and standardized log-ORs do not have a normal distribution [@chen1997local]. The PPMC method, which does not require any distributional assumption, is therefore particularly useful in this situation. The logic of using the OR in the PPMC method is that if the assumption of local dependence is violated, the item pair ORs from replicated datasets will be significantly larger or smaller than those from the observed data.  
+
+The following **R** code shows how to compute odds ratios and their posterior predictive p-values (PPP-values) in both observed and replicated datasets. The PPP-values for odds ratios are defined as $p(OR^{rep} \ge OR^{obs})$.
+
+
+```{r, warning=FALSE, message=FALSE}
+# (1) Define a function to calculate the pairwise odds ratio from wide data
+#  The input argument X should be wide-from response data.
+#  The output of the pw.OR function is a data frame with pairwise odds ratios. 
+pw.OR <- function(X) {
+      n <- nrow(X)
+      p <- ncol(X)
+      ind <- t(combn(p, 2))
+      nind <- nrow(ind)
+      OR <- numeric(nind)
+      for (i in 1:nind) {
+            xtab <- table(X[, ind[i, 1]], X[, ind[i, 2]])
+            n00 <- xtab[1,1]
+            n01 <- xtab[1,2]
+            n10 <- xtab[2,1]
+            n11 <- xtab[2,2]
+            OR[i] <- (n00 * n11)/(n01 * n10)
+      }
+      pw.OR <- data.frame(ind, OR)
+      names(pw.OR) <- c("item_i", "item_j", "OR")
+      return(pw.OR)
+  }
+
+# (2) Calculate observed odds ratios for six item pairs
+X <- data.matrix(wide[, -which(colnames(wide)=="id")])
+OR.obs <- pw.OR(X)
+
+# (3) Calculate posterior predictive odds ratios
+OR.rep <- matrix(NA, ncol = nrow(OR.obs), nrow = nrow(y_rep))
+for(i in 1:nrow(OR.rep)) {
+  long.rep <- data.frame(long$id, long$item, y_rep[i,], long$item.id)
+  names(long.rep) <- c("id", "item", "response", "item.id")
+  wide.rep <- dcast(long.rep, id ~ item.id, value.var = "response")
+  X.rep <- data.matrix(wide.rep[, -which(colnames(wide.rep)=="id")])
+  OR.rep[i, ] <- pw.OR(X.rep)$OR
+}
+
+# (4) Compute PPP-value for each observed odds ratio
+OR.obs$PPP <- NA
+for(i in 1:nrow(OR.obs)) {
+  OR.obs$PPP[i] <- mean(OR.obs$OR[i] <= OR.rep[, i])  
+}
+OR.obs$OR <- round(OR.obs$OR, 3)
+OR.obs$PPP <- round(OR.obs$PPP, 3)
+print(OR.obs)
+```
+
+
+The odds ratio for each item pair and its PPP-value can be summarized with a graphical display. The **R** code below illustrates how to display them using heatmaps. The PPP plot shows that there exists no excess association among the items with PPP-values ranging from 0.378 to 0.525. We can therefore conclude that there are no is no evidence for model misfit with respect to local independence.      
+
+
+```{r, warning=FALSE, message=FALSE}
+# (1) Plot odds ratios 
+or <- ggplot(OR.obs, aes(item_i, item_j, fill = OR, label = OR))  
+or <- or + labs(x ="", y="", title = "Odds Ratio")
+or <- or + geom_tile(color = "white") + theme_minimal() 
+or <- or + scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+                              midpoint = 1, limit = c(0, 5), name = "OR")
+or <- or + geom_text(aes(item_i, item_j, fill = OR),  color = "black", size = 3)
+or <- or + theme(panel.grid.major = element_blank()) + coord_fixed()
+
+# (2) Plot PPP-values  
+ppp <- ggplot(OR.obs, aes(item_i, item_j, fill = PPP, label = PPP))  
+ppp <- ppp + labs(x ="", y="", title = "PPP-value")
+ppp <- ppp + geom_tile(color = "white") + theme_minimal() 
+ppp <- ppp + scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+                              midpoint = 0.5, limit = c(0, 1), name = "PPP")
+ppp <- ppp + geom_text(aes(item_i, item_j, fill = PPP),  color = "black", size = 3)
+ppp <- ppp + theme(panel.grid.major = element_blank()) + coord_fixed()
+
+# (3) Combine two plots: OR and PPP
+library(gridExtra)
+grid.arrange(or, ppp, ncol=2)
+```
+
+
+# Troubleshooting Stan convergence {#troubleshooting}
+
+## Troubleshooting example 1
+
+<!-- This chunk is hidden and then revealed at end of section -->
+```{r modify_data, echo = FALSE, evaluate = TRUE}
+# Recode item 4: 0 -> 1 and 1 -> 0
+modified_data <- stan_data
+is_item_4 <- modified_data$ii == 4
+modified_data$y[is_item_4] <- 1 - modified_data$y[is_item_4]
+```
+
+We will explore the question of what to do when models fail to converge by way of two examples. We will work with a modified version of the spelling data, `modified_data`, that is set up to fail. The changes to the original data will be provided at the end of this section, but for now let us pretend to be naive. We fit the 2PL to the altered data in the same way as before.
+
+```{r, results = "hide", cache = TRUE}
+twopl_file <- file.path(path.package("edstan", quiet = TRUE), "extdata",
+                        "twopl.stan")
+troubleshoot_fit1a <- stan(file = twopl_file, data = modified_data, chains = 4,
+                          iter = 200)
+```
+
+Next we observe the table of results.
+
+```{r}
+print(troubleshoot_fit1a, pars = c("alpha", "beta"))
+```
+
+We immediately see that the values for *Rhat* are too high, meaning that the chains have not converged. There is no way to know for sure beforehand how many iterations per chain will be sufficient. Perhaps 200 was too few, so we try a much larger number.
+
+```{r, results = "hide", cache = TRUE}
+troubleshoot_fit1b <- stan(file = twopl_file, data = modified_data, chains = 4,
+                          iter = 1000)
+```
+
+We check the results for the new fit.
+
+```{r}
+print(troubleshoot_fit1b, pars = c("alpha", "beta"))
+```
+
+The values of *Rhat* are acceptable now, though just barely for some. We may be concerned about the large *se_mean* and low *n_eff* for some parameters, which indicates that they have been estimated with a low degree of precision. Given that the **Stan** model behaved much more efficiently for a similar dataset, we may suspect that the slow convergence indicates a problem.
+
+So far we have neglected to look at the parameter posteriors. Looking at the output tables again, we see that `alpha[4]` has a very small, positive posterior mean. We plot a kernal density of the posterior for this parameter with a vertical line at zero.
+
+```{r, message=FALSE}
+stan_hist(troubleshoot_fit1b, pars = "alpha[4]") + geom_vline(xintercept = 0)
+```
+
+We see that the posterior for the parameter tends to be near zero. Remembering that the model constrains the discrimination parameters to be positive, we begin to understand the problem. The log normal prior distribution has weak support for values very close to zero and no support for zero itself. Meanwhile, `alpha[4]` "wants" to be negative. There is a mismatch between the data and the prior.
+
+The R code below reveals how the dataset `modified_data` was constructed; we simply switched the scoring for item 4. A careful researcher might identify and correct such a problem before model fitting.
+
+```{r , ref.label="modify_data" , echo = TRUE, evaluate = FALSE, tidy = TRUE}
+```
+
+
+## Troubleshooting example 2
+
+Next we try a **Stan** model that allows for negative discrimination parameters. We take the original 2PL **Stan** model and change the prior on the discriminations.
+
+```{r, warning=FALSE}
+twopl_code <- readLines(twopl_file)
+new_code <- gsub("vector<lower=0>.*$", "vector[I] alpha;", twopl_code)
+new_code <- gsub("alpha ~.*$", "alpha ~ normal(0,10);", new_code)
+cat(new_code, sep = "\n")
+```
+
+We fit the modified **Stan** model, supplying starting values. Normally we let **Stan** generate random starting values, but we deviate from standard practice here to make a point. Later we will discuss the purpose of these particular starting values.
+
+```{r, results="hide"}
+# Create a set of initial values
+set.seed(1291)
+myinits <- list()
+for(i in 1:4) {
+  alpha_means <- c(1, 1, 1, -1) * ifelse(i == 4, 1, -1)
+  myinits[[i]] <- list(alpha = rnorm(4, mean = alpha_means, sd = .1),
+                       beta =  rnorm(4, mean = 0, sd = .1),
+                       theta = rnorm(658, mean = 0, sd = 1))
+}
+
+# Fit model with initial values
+troubleshoot_fit2 <- stan(model_code = new_code, data = modified_data, 
+                          chains = 4,iter = 200, init = myinits)
+```
+
+We generate the output table.
+
+```{r}
+print(troubleshoot_fit2, pars = c("alpha", "beta"))
+```
+
+The values of *Rhat* and *n_eff* suggest that the chains are far from convergence. The reason is not apparent, though. We'll investigate further using pairwise plots.
+
+```{r}
+pairs(troubleshoot_fit2, pars = c("alpha", "beta"))
+```
+
+Along the diagonal are histograms for the posteriors of individual parameters, and the off-diagonals are scatter plots for the two-way joint posteriors. Judging by the histograms, most of the parameters appear to have bimodal posteriors. Let us zoom in on just the two parameters for item 1.
+
+```{r}
+pairs(troubleshoot_fit2, pars = c("alpha[1]", "beta[1]"))
+```
+
+Both the difficulty and discrimination for item 1 exhibit bimodal posteriors. `alpha[1]` tends to take values near $\pm 2$, and `beta[1]` tends to take values near $\pm 1.5$. The scatter plot shows that the joint posterior is peaked at to regions: one with positive `alpha[1]` and negative `beta[1]`, and another with negative `alpha[1]` and positive `beta[1]`.
+
+Referring back to the larger pairwise plot, the same pattern holds for each of the item parameter pairs. These discontinuous posteriors may occur when the Monte Carlo chains converge towards differing posteriors. To illustrate, we show a trace plot for item 1.
+
+```{r}
+traceplot(troubleshoot_fit2, pars = c("alpha[1]", "beta[1]"))
+```
+
+In the trace plot we see three chains that have converged to the same region and a fourth that occupies a wholly separate area. We would see the same result for all the other parameters. Some chains converge to a posterior with mostly positive discriminations, while others converge to one with mostly negative discriminations. Nothing in the likelihood or prior favors one scale over the other. Specifically, because
+$$
+\alpha_i(\theta_j - \beta_i) = -\alpha_i(-\theta_j + \beta_i) 
+,$$
+the joint posterior has two peaks, one a mirror image of the other. This is referred to as the reflection problem, which relates to the rotational indeterminance problem in factor analysis. This problem exists whether we use the original or modified data.
+
+We could have had better luck and ended up with four chains that just happened to agree. In fact, the purpose of using the starting values was to ensure the occurence of one disagreeing chain. If random starting values are used and all chains by chance converged to the same posterior, there would not be anything wrong with the results per se, but we would have to rely on luck to replicate the results.
+
+Having determined the cause of the problem, what is the solution? We could tighten up the prior on the discrimination parameters, perhaps using a normal distribution with a mean of 1 and a small standard deviation. However, we don't recommend setting a strong prior purely for the sake of expediancy. Better instead to fix the incorrectly coded data and return to the original **Stan** model.
+
+
+# References
+
+<!-- This comment causes section to be numbered -->
