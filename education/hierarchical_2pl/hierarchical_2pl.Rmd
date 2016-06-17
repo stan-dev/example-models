@@ -1,0 +1,232 @@
+---
+title: "Hierarchical two-parameter logistic item response model"
+author: "Daniel C. Furr"
+date: "`r gsub('(^.* )(0)([0-9], .*)', '\\1\\3', format(Sys.time(), '%B %d, %Y'))`"
+output:
+  html_document:
+    toc: true
+    number_sections: true
+    fig_caption: true
+    css: ../styles.css
+bibliography: ../bibliography.bib
+---
+
+
+<!-- 
+(Title:)  Hierarchical two-parameter logistic item response model
+
+Author:  Daniel C. Furr
+
+Date:  2016
+
+Abstract:  This case study documents a Stan model for the two-parameter logistic model (2PL) with hierarchical priors. A brief simulation indicates that the Stan model successfully recovers the generating parameters. An example using a grade 12 science assessment is provided.
+
+Keywords:  education, IRT, 2PL, hierarchical prior. 
+--> 
+
+```{r knitr_opts, include = FALSE}
+knitr::opts_chunk$set(tidy = TRUE, cache = TRUE)
+```
+
+
+# Model
+
+## Overview
+
+The two-parameter logistic model (2PL) is an item response theory model that includes parameters for both the difficulty and discrimination of items. A hierarchical extension, presented here, models these item parameter pairs as correlated draws from a bivariate normal distribution. This model is similar to the hierarchical three-parameter logistic model proposed by @glas2003computerized.
+
+$$ 
+\mathrm{logit} [ \Pr(y_{ij} = 1 | \theta_j, \alpha_i, \beta_i) ] = 
+  \alpha_i (\theta_j - \beta_i) 
+$$
+$$ 
+\log \alpha_i, \beta_i \sim \mathrm{MVN}(\mu_1, \mu_2, \Sigma)
+$$
+$$ 
+\theta_p \sim \mathrm{N}(0, 1) 
+$$
+
+Prior distributions will be discussed in the next section because they are placed on the reparameterized version of the model.
+
+Variables:
+
+* $i = 1 \ldots I$ indexes items
+* $j = 1 \ldots J$ indexes persons
+* $y_{ij} \in \{ 0,1 \}$ is the response of person $j$ to item $i$ 
+
+Parameters:
+
+* $\alpha_i$ is the discrimination for item $i$
+* $\beta_i$ is the difficulty for item $i$
+* $\theta_j$ is the ability for person $j$
+* $\mu_1$ is the mean for $\log \alpha_i$
+* $\mu_2$ is the mean for $\beta_i$
+* $\Sigma$ is the covariance matrix for $\log \alpha_i$ and $\beta_i$
+
+
+## **Stan** program
+
+The **Stan** program for the model is given in *hierarchical_twopl.stan*. It differs from the above in that it is written in terms of the Cholesky decomposition of the correlation matrix for better efficiency. This matrix is named `L_Omega`; `Omega` because it is the correlation rather than covariance matrix, and `L` because it is a Cholesky decomposition. The vector `tau` contains the standard deviations that would be the (square root of the) diagonal of the covariance matrix. (The standard deviations are invariant whether or not the the Cholesky decomposition is used.) In the `model` block, `L_Omega` is converted to its covariance equivalent `L_Sigma`, and item parameter pairs `xi[i]` are sampled from `L_Sigma`. The first element of vector `xi[i]` is the log discrimination for item `i`, and the second is the difficulty for item `i`.
+
+Weakly informative normal priors are placed on `mu`, and weakly informative truncated normal priors are placed on `tau`. The prior placed on `L_Omega` using `lkj_corr_cholesky()` is weakly informative and slightly favors a correlation of zero. See the **Stan** manual for details.
+
+While more efficient, parameters `L_Omega` and `xi` are difficult to interpret. To alleviate this inconvenience, item parameters `alpha` and `beta` are derived from `xi` in the `transformed parameters` block. (There is some redundancy, as `beta[i]` and `xi[i,2]` are equal.) Also, `L_Omega` is converted to a standard correlation matrix, `Omega`, in the `generated quantities` block. 
+
+```{r stan_code, tidy = TRUE, comment="", echo=FALSE}
+cat(readLines("hierarchical_2pl.stan"), sep = "\n")
+```
+
+
+# Simulation
+
+First, the necessary **R** packages are loaded.
+
+```{r, message=FALSE, warning=FALSE, results="hide"}
+# Load R packages
+library(rstan)
+options(mc.cores = parallel::detectCores())
+library(ggplot2)
+```
+
+The **R** code that follows simulates a dataset conforming to the model. The **Stan** model will be evaluated in terms of its ability to recover the generating values of the parameters when fit to this dataset.
+
+```{r sim_data}
+# Set paramters for the simulated data
+I <- 20
+J <- 1000
+mu <- c(0, 0)
+tau <- c(.25, 1)
+Omega <- matrix(c(1, .3, .3, 1), ncol = 2)
+
+# Calculate or sample remaining paramters
+Sigma <- tau %*% t(tau) * Omega
+xi <- MASS::mvrnorm(I, c(0,0), Sigma)
+alpha <- exp(mu[1] + as.vector(xi[,1]))
+beta <-  as.vector(mu[2] + xi[,2])
+theta <- rnorm(J, mean = 0, sd = 1)
+
+# Assemble data and simulate response
+data_list <- list(I = I,
+                  J = J,
+                  N = I*J,
+                  ii = rep(1:I, times = J),
+                  jj = rep(1:J, each = I))
+eta <- alpha[data_list$ii]*(theta[data_list$jj] - beta[data_list$ii])
+data_list$y <- as.numeric(boot::inv.logit(eta) > runif(data_list$N))
+```
+
+The simulated data consists of `r I` items and `r J` persons. The log discriminations have mean `r mu[1]` and standard deviation `r tau[1]`. The difficulties have mean `r mu[2]` and standard deviation `r tau[2]`. The correlation between the log discrimination residuals and difficulty residuals is `r Omega[1,2]`. The simulated dataset is fit with **Stan**.
+
+```{r sim_fit, results='hide'}
+# Fit model to simulated data
+sim_fit <- stan(file = "hierarchical_2pl.stan", 
+                data = data_list, chains = 4, iter = 1000)
+```
+
+Before interpreting the results, it is necessary to check that the chains have converged. **Stan** provides the $\hat{R}$ statistic for the model parameters and log posterior. These are provided in the following figure. All values for $\hat{R}$ should be less than 1.1.
+
+```{r sim_converge, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the simulation. All values should be less than 1.1 to infer convergence."}
+sim_monitor <- as.data.frame(monitor(sim_fit, print = FALSE))
+sim_monitor$Parameter <- as.factor(gsub("\\[.*]", "", rownames(sim_monitor)))
+ggplot(subset(sim_monitor, !is.nan(Rhat))) +
+  aes(x = Parameter, y = Rhat, color = Parameter) +
+  geom_jitter(height = 0, width = .5, show.legend = FALSE) +
+  ylab(expression(hat(italic(R))))
+```
+
+The **Stan** model is evaluated in terms of its ability to recover the generating values of the parameters. The R code below prepares a plot in which the points indicate the difference between the posterior means and generating values for the parameters of main interest. This difference is referred to as discrepancy. The lines indicate the 95% posterior intervals for the difference. Ideally, (nearly) all the 95% posterior intervals would include zero.
+
+```{r sim_plot, fig.height=8, fig.cap="Discrepancies between estimated and generating parameters. Points indicate the difference between the posterior means and generating values for a parameter, and horizontal lines indicate 95% posterior intervals for the difference. Most of the discrepancies are about zero, indicating that **Stan** successfully recovers the true parameters."}
+# Make vector of wanted parameter names
+wanted_pars <- c(paste0("alpha[", 1:I, "]"), 
+                 paste0("beta[", 1:I, "]"), 
+                 c("mu[1]", "mu[2]", "tau[1]", "tau[2]", "Omega[1,2]"))
+
+# Get estimated and generating values for wanted parameters
+generating_values = c(alpha, beta, mu, tau, Omega[1,2])
+estimated_values <- sim_monitor[wanted_pars, c("mean", "2.5%", "97.5%")]
+
+# Assesmble a data frame to pass to ggplot()
+sim_df <- data.frame(parameter = factor(wanted_pars, rev(wanted_pars)),
+                     row.names = NULL)
+sim_df$middle <- estimated_values[,"mean"] - generating_values
+sim_df$lower <- estimated_values[,"2.5%"] - generating_values
+sim_df$upper <- estimated_values[,"97.5%"] - generating_values
+
+# Plot the discrepancy
+ggplot(sim_df) +
+  aes(x = parameter, y = middle, ymin = lower, ymax = upper) +
+  scale_x_discrete() +
+  geom_abline(intercept = 0, slope = 0, color = "white") +
+  geom_linerange() +
+  geom_point(size = 2) +
+  labs(y = "Discrepancy", x = NULL) +
+  theme(panel.grid = element_blank()) +
+  coord_flip()
+```
+
+
+# Example application
+
+```{r example_data, results='hide', warning=FALSE, message=FALSE}
+# Use data and scoring function from the mirt package
+library(mirt)
+sat <- key2binary(SAT12,
+    key = c(1,4,5,2,3,1,2,1,3,1,2,4,2,1,5,3,4,4,1,4,3,3,4,1,3,5,1,3,1,5,4,5))
+```
+
+The example data [@testfact4] are from a grade 12 science assessment. `r nrow(sat)` students responded to `r ncol(sat)` dichotomously scored items. Non-responses were scored as incorrect, so the data contain no missing values. The scored response matrix is converted to list form and fit with **Stan**.
+
+```{r example_fit, , result="hide"}
+# Assemble data list and fit model
+sat_list <- list(I = ncol(sat),
+                 J = nrow(sat),
+                 N = length(sat),
+                 ii = rep(1:ncol(sat), each = nrow(sat)),
+                 jj = rep(1:nrow(sat), times = ncol(sat)),
+                 y = as.vector(sat))
+sat_fit <- stan(file = "hierarchical_2pl.stan", 
+                data = sat_list, chains = 4, iter = 1000)
+```
+
+As discussed above, convergence of the chains is assessed for every parameter, and also the log posterior, using $\hat{R}$.
+
+```{r example_converge, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the SAT data. All values should be less than 1.1 to infer convergence."}
+sat_monitor <- as.data.frame(monitor(sat_fit, print = FALSE))
+sat_monitor$Parameter <- as.factor(gsub("\\[.*]", "", rownames(sat_monitor)))
+ggplot(subset(sat_monitor, !is.nan(Rhat))) +
+  aes(x = Parameter, y = Rhat, color = Parameter) +
+  geom_jitter(height = 0, width = .5, show.legend = FALSE) +
+  ylab(expression(hat(italic(R))))
+```
+
+Next we view summaries of the parameter posteriors.
+
+```{r example_print}
+# View table of parameter posteriors
+print(sat_fit, pars = c("alpha", "beta", "mu", "tau", "Omega[1,2]"))
+```
+
+To visualize the correlation between item parameters, the values of `alpha[i]` and `beta[i]` may be plotted against one another. This is presented in the left side of the figure below. Because the correlation is actually between `xi[i,1]` (which is equal to `beta[i]`) and `xi[i,2]` (which is `alpha[i]` on the log scale), a scatter plot pf `xi[i,1]` versus `xi[i,2]` is given on the right side.
+
+```{r example_plot, fig.height=4, fig.cap="Discrimination versus difficulty parameters for the SAT data. The lefthand plot shows the pairs in terms of alpha and beta, the usual formulation. The righthand plot shows the pairs in terms of xi, as used by the Stan model."}
+# Assesmble a data frame of item parameter estimates and pass to ggplot
+ab_df <- data.frame(
+  Discrimination = sat_monitor[paste0("alpha[", 1:sat_list$I, "]"), "mean"],
+  Difficulty = sat_monitor[paste0("beta[", 1:sat_list$I, "]"), "mean"],
+  parameterization = "alpha & beta")
+xi_df <- data.frame(
+  Discrimination = sat_monitor[paste0("xi[", 1:sat_list$I, ",1]"), "mean"],
+  Difficulty = sat_monitor[paste0("xi[", 1:sat_list$I, ",2]"), "mean"],
+  parameterization = "xi")
+full_df <- rbind(ab_df, xi_df)
+ggplot(full_df) +
+  aes(x = Difficulty, y = Discrimination) +
+  geom_point() + 
+  facet_wrap(~parameterization, scales = "free")
+```
+
+
+# References
+
+<!-- This comment causes section to be numbered -->

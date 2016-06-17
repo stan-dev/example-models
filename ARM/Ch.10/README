@@ -1,7 +1,7 @@
 Data
 ====
 
-1. ideo_incs.data.R
+1. ideo_interactions.data.R
   - N     : number of observations
   - party : party association? 1: Republican, 0: Democrat
   - score1: effect of election results

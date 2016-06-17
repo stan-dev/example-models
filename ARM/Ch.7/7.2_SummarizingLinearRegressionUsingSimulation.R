@@ -46,8 +46,8 @@ print(p2)
 
 ## Why do we need simulation for predictive inferences?
 
-pred.man <- exp (rnorm (1000, 8.4 + 0.17*68 - 0.079*1 + .007*68*1, .88))
-pred.woman <- exp (rnorm (1000, 8.4 + 0.17*68 - 0.079*0 + .007*68*0, .88))
+pred.man <- exp (rnorm (1000, 8.4 + 0.017*68 - 0.079*1 + .007*68*1, .88))
+pred.woman <- exp (rnorm (1000, 8.4 + 0.017*68 - 0.079*0 + .007*68*0, .88))
 pred.diff <- pred.man - pred.woman
 pred.ratio <- pred.man/pred.woman
 

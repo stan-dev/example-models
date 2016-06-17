@@ -4,7 +4,7 @@ rm(list=ls())
 library(rstan)
 
 # to be passed on to Stan
-data <- read_rdump("Rate_4a.data.R")
+data <- read_rdump("Rate_4.data.R")
 # Uncomment for Trompetter Data
 # data <- read_rdump("Rate_4b.data.R") 
 
@@ -16,7 +16,7 @@ parameters <- c("theta", "thetaprior", "postpredk", "priorpredk")
 
 # The following command calls Stan with specific options.
 # For a detailed description type "?stan".
-samples <- stan(file="Rate_4_model.stan",   
+samples <- stan(file="Rate_4.stan",   
                 data=data, 
                 init=myinits,  # If not specified, gives random inits
                 pars=parameters,

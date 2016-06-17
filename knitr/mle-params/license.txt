@@ -1,0 +1,7 @@
+The code in this repository is copyrighted by Columbia University and licensed under the new BSD (3-clause) license:
+
+  https://opensource.org/licenses/BSD-3-Clause
+
+The text in this repository is copyrighted by Bob Carpenter and licensed under the CC-BY 4.0 license: 
+
+  https://creativecommons.org/licenses/by/4.0/
