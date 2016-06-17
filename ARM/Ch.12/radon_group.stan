@@ -1,5 +1,5 @@
 data {
-  int<lower=0> N;
+  int<lower=1> N;
   int<lower=1> J; # number of counties
   int<lower=1,upper=J> county[N];
   vector[N] u;

@@ -1,18 +1,19 @@
 data {
-  int<lower=0> N;
-  int<lower=1,upper=85> county[N];
+  int<lower=1> N;
+  int<lower=1> J; # number of counties
+  int<lower=1,upper=J> county[N];
   vector[N] x;
   vector[N] y;
 }
 parameters {
   real beta;
-  vector[85] eta;
+  vector[J] eta;
   real mu_a;
   real<lower=0> sigma_a;
   real<lower=0> sigma_y;
 }
 transformed parameters {
-  vector[85] a;
+  vector[J] a;
   vector[N] y_hat;
 
   a <- mu_a + sigma_a * eta;
