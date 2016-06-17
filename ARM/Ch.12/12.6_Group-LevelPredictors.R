@@ -73,7 +73,8 @@ dataList.4 <- list(
   N = length(y),
   y = y,
   x = x,
-  county = county
+  county = county,
+  J = max(county)
 )
 radon_no_pool.sf1 <-
   stan(

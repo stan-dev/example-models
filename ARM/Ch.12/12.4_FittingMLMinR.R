@@ -34,7 +34,7 @@ cty.sds = mean(sqrt(cty.vars[!is.na(cty.vars)]))/sqrt(sample.size)
 cty.sds.sep = sqrt(tapply(y,county,var)/sample.size)
 
 ## Varying-intercept model w/ no predictors
-dataList.1 <- list(N = length(y), y = y, county = county)
+dataList.1 <- list(N = length(y), y = y, county = county, J = J)
 radon_intercept.sf1 <- stan(file = 'ARM/Ch.12/radon_intercept.stan',
                             data = dataList.1,
                             iter = 500, chains = 4,
