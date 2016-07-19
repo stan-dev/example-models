@@ -64,12 +64,14 @@ the parameters being sampled and must feed these into the PK model of
 choice which is effectively the solution operator U(t0,t) for the
 model at hand.
 
-Currently, the library only includes a single model, which has the
-structure of three compartments. Compartment 1 transfers mass with
-rate k12 to cmt 2 and mass is eliminated from cmt 1 with rate
-k1. Compartment 2 receives mass with rate k12 from cmt 1 and mass
-exits with rate k2 which flows into compartment 3. This allows to
-cover the situations
+Currently, the library only includes a single model in two
+variants. The full model has the structure of three
+compartments. Compartment 1 transfers mass with rate k12 to cmt 2 and
+mass is eliminated from cmt 1 with rate k1. Compartment 2 receives
+mass with rate k12 from cmt 1 and mass exits with rate k2 which flows
+into compartment 3. The model with all three compartments is the
+`pk_1cmt_metabolite_depot` and an additional variant lacks the depot
+cmt. This allows to cover the situations
 
 - 1cmt oral dosing with calculation of the AUC (set k1=k12)
 - IV dosing and metabolite with AUC calc
@@ -87,5 +89,6 @@ is created.
 - `oral_1cmt.R` runs the example Stan program with simulated data
 - `oral_1cmt_sim.R` simulate (somewhat realistic) data scenario
 - `oral_1cmt_run.data.R` simulated data in Stan format
+- `oral_1cmt_run_nm.csv` simulated data in NONMEM format
 - `oral_1cmt_run.stan` Stan program with includes (DO NOT CHANGE, gets
   overwritten)

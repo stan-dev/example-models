@@ -175,3 +175,14 @@ int[] which_elem(int[] test, int elem) {
     }
   return(res);
 }
+
+// divide fac by div and return the rounded down integer
+int floor_div_int(real fac, real div) {
+  int count;
+  if(fac < 0)
+    reject("floor_div_int only works for positive values.");
+  count <- 1;
+  while(count * div <= fac) { count <- count + 1; }
+  count <- count - 1;
+  return count;
+}

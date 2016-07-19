@@ -18,21 +18,21 @@ dose_cmt  <- c(1, 1)
 dose_tau  <- c(0, 24)
 dose_addl <- c(0, 5) ## these are 5 additional doses (in total 6)
 
-init_lstate <- rep(-25, 3)
+init_lstate <- rep(-25, 2)
 init_time <- 0
 
 ## log of ka, ke, V
 theta <- log(c(log(2)/2, log(2)/12, 10))
-lscale <- rep(0, 3)
+lscale <- rep(0, 2)
 
 ## no of patients
 J <- 30
 
 ## simulate per patient parameters of ke and V
 Theta <- matrix(theta[1:2], J, 2, byrow=TRUE)
-Lscale <- matrix(c(0, theta[3], 0), J, 3, byrow=TRUE)
+Lscale <- matrix(c(0, theta[3]), J, 2, byrow=TRUE)
 Init_time <- rep(0, J)
-Init_lstate <- matrix(-25, J, 3)
+Init_lstate <- matrix(-25, J, 2)
 
 ## simulate subject specific ke (at most 50% deviation)
 omega_ke <- log(1.5)/1.96
@@ -112,29 +112,3 @@ cat(stan_pk_model$model_code, file="oral_1cmt_run.stan")
 
 ## finally save Nonmem data set
 write.csv(nm, file="oral_1cmt_run_nm.csv", quote=FALSE, row.names=FALSE)
-
-model <- stan_model(model_code=stan_pk_model$model_code)
-
-inits <- function() {
-    list(theta=rnorm(3, c(theta, log(10)), 0.25),
-         xi=matrix(rnorm(2*J), 2, J),
-         omega=rlnorm(2, log(0.1), 1),
-         sigma_y=rlnorm(1, log(0.1), 1))
-}
-
-stan_fit <- sampling(model,
-                     data=c(nm,
-                         list(N=nrow(nm),
-                              prior_theta_mean=log(c(log(2)/1, log(2)/10, 10)),
-                              prior_theta_sd=log(c(10, 10, 10))/1.96
-                              )),
-                     init=inits,
-                     chains=2,
-                     warmup=200,
-                     iter=200+200)
-
-pars <- c("theta", "omega", "sigma_y")
-print(stan_fit, pars)
-
-
-traceplot(stan_fit, pars)
