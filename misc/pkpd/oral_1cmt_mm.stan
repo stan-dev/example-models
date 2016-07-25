@@ -1,40 +1,55 @@
 functions {
 #include "utils.stan"
 #include "model_lib.stan"
+
+  // returns dlog(y)/dt (=1/y dy/dt); first order absorbtion
+  // calculcated analytically; parametrization is optimized for
+  // efficient computation
+  real[] pk_1cmt_mm_lode(real t, real[] ly, real[] theta, real[] x_r, int[] x_i) {
+    real dly_dt[1];
+    real ka;
+    real k0;
+    real lAm;
+    real ct;
+
+    ka <- theta[1];
+    k0 <- theta[2];
+    lAm <- theta[3];
+    ct <- exp(theta[4] - t * ka - ly[1]);
+    
+    dly_dt[1] <- ka * ct - k0 * inv_logit(lAm - ly[1]);
+
+    return(dly_dt);
+  }
+
   
-  // we fit a 1-cmt oral dosing situation
+  // avoid to make the simple exponential part of the ODE which
+  // decreases size of sensitivity system
   matrix pk_system(vector lref, vector Dt, vector theta, real[] x_r, int[] x_i) {
-    // as we fitting a 1-cmt oral dosing situation such that k1=k12 (all
-    // mass out of 1 goes to 2)
-    return(pk_1cmt_metabolite(lref, Dt, theta[1], theta[1], theta[2], 0, 0));
+    matrix[num_elements(Dt),num_elements(lref)] sol;
+    real int_sol[num_elements(Dt), 1];
+    int P;
+    real theta_tilde[num_elements(theta)+1];
+    real lref_tilde[1];
+    real ka;
+    P <- num_elements(theta);
+    theta_tilde[1:P] <- to_array_1d(theta);
+    theta_tilde[P+1] <- lref[1];
+    lref_tilde[1] <- lref[2];
+    int_sol <- integrate_ode_rk45(pk_1cmt_mm_lode, lref_tilde, 0, to_array_1d(Dt), theta_tilde, x_r, x_i, 1e-4, 1e-4, 1000);
+    ka <- theta[1];
+    for(i in 1:num_elements(Dt)) {
+      sol[i,1] <- lref[1] - ka * Dt[i];
+      sol[i,2] <- int_sol[i,1];
+    }
+    return(sol);
   }
 
   // note that n are the additional doses to be added such that in total
   // n+1 are added
   matrix pk_system_addl(vector lref, vector Dt, int cmt, real lamt, real tau, int n, vector theta, real[] x_r, int[] x_i) {
     matrix[num_elements(Dt), num_elements(lref)] lstate;
-    matrix[num_elements(Dt), num_elements(lref)] lstate_mdose;
-    vector[num_elements(lref)] lref_mdose;
-    int S;
-    
-    // evolve reference state freely...
-    lstate <- pk_system(lref, Dt, theta, x_r, x_i);
-    
-    // ... and add the extra doses correctly time-shifted
-    S <- num_elements(lref);
-    lref_mdose <- rep_vector(-35, S);
-    lref_mdose[cmt] <- lamt;
-    //if(prod(Dt - tau * n) < 0) reject("All requested times must be past the last dosing addl event.");
-    /*
-      for(i in 1:num_elements(Dt))
-      if((Dt[i] - tau * n) < 0)
-    reject();
-    ("All requested times must be past the last dosing addl event.");
-    */
-    lstate_mdose <- pk_1cmt_metabolite(lref_mdose, Dt - tau * n, theta[1], theta[1], theta[2], tau, n+1);
-    for(s in 1:S)
-      for(t in 1:num_elements(Dt))
-        lstate[t,s] <- log_sum_exp(lstate_mdose[t,s], lstate[t,s]);
+    reject("ADDL dose coding not supported with ODEs!");
     return(lstate);
   }
   
@@ -52,8 +67,8 @@ data {
 
   vector<lower=0>[N] dv; // observations
 
-  vector[3] prior_theta_mean;
-  vector<lower=0>[3] prior_theta_sd;
+  vector[4] prior_theta_mean;
+  vector<lower=0>[4] prior_theta_sd;
 }
 transformed data {
   int dose_ind[count_elem(evid, 1)];
@@ -100,41 +115,42 @@ transformed data {
   
   obs_time_rank <- find_interval_blocked(obs_M, obs_time, dose_M, dose_time);
   obs_dose_given <- count_dose_given_blocked(obs_M, obs_time, dose_M, dose_time, dose_tau, dose_addl);
-  
-  dose_next_obs <- count_obs_event_free_blocked(obs_M, obs_time_rank, dose_M);
 
+  dose_next_obs <- count_obs_event_free_blocked(obs_M, obs_time_rank, dose_M);
+  
   J <- rle_elem_count(id);
   O <- count_elem(mdv, 0);
 
   zero <- rep_row_vector(0, J);
 
-  Init_lstate <- rep_matrix(-25, J, 2);
-  init_time   <- rep_vector(0, J);
+  // we initialize the main cmt to 0.1 in order to avoid too steep
+  // derivatives when the first dose is injected
+  Init_lstate <- append_col(rep_vector(-25, J), rep_vector(log(0.1), J));
+  init_time   <- rep_vector(-1E-3, J);
 }
 parameters {
   ordered[2] theta_lelim;
+  real theta_lAm;
   real theta_lV;
   vector<lower=0>[2] omega;
   matrix[2,J] xi;
   real<lower=0> sigma_y;
 }
 transformed parameters {
-  vector[3] theta;
+  vector[4] theta;
   matrix[3,J] Theta;
   row_vector<lower=0>[J] kDelta;
 
-  // log(ka)
-  theta[1] <- theta_lelim[2]; // absorbtion must be faster (hence larger) than elimination
-  // log(ke)
-  theta[2] <- theta_lelim[1];
-  // log(V)
-  theta[3] <- theta_lV;
-  
-  Theta[1] <- rep_row_vector(theta[1], J);
-  // ncp parametrization
-  //Theta[2:3] <- rep_matrix(theta[2:3], J) + diag_pre_multiply(omega, xi);
-  // cp parametrization
-  Theta[2:3] <- xi;
+  // theta is on log-scale
+  theta[1] <- theta_lelim[2];  // ka is larger than k0 (faster elimination than absorbtion)
+  theta[2] <- theta_lelim[1];  // k0 = Vm/(V * Km)
+  theta[3] <- theta_lAm;       // Am = Km*V
+  theta[4] <- theta_lV;        // V
+
+  // prepare parameters to pass into model function
+  Theta[1] <- rep_row_vector(exp(theta[1]), J); // ka
+  Theta[2] <- exp(xi[1]);                       // k0
+  Theta[3] <- rep_row_vector(theta[3], J);      // log(Am)
 
   // kDelta is only defined to ensure that we have a faster absorption
   // than elimination (avoid "flip-flop") for each patient
@@ -145,31 +161,29 @@ model {
 
   theta_lelim[2] ~ normal(prior_theta_mean[1], prior_theta_sd[1]);
   theta_lelim[1] ~ normal(prior_theta_mean[2], prior_theta_sd[2]);
-  theta_lV       ~ normal(prior_theta_mean[3], prior_theta_sd[3]);
+  theta_lAm      ~ normal(prior_theta_mean[3], prior_theta_sd[3]);
+  theta_lV       ~ normal(prior_theta_mean[4], prior_theta_sd[4]);
 
-  // ncp parametrization
-  //to_vector(xi) ~ normal(0, 1);
   // cp parametrization
   xi[1] ~ normal(theta[2], omega[1]);
-  xi[2] ~ normal(theta[3], omega[2]);
+  xi[2] ~ normal(theta[4], omega[2]);
   
   omega ~ normal(0, 1);
   sigma_y ~ normal(0, 1);
 
   {
-    matrix[2,J] Lscale;
     matrix[O,2] ly;
+    matrix[2,J] Lscale;
 
     Lscale[1] <- zero;
-    Lscale[2] <- Theta[3];
-    
+    Lscale[2] <- xi[2];
+
     ly <- evaluate_model_fast(dose_M, dose_lamt, dose_cmt, dose_time, dose_tau, dose_addl, dose_next_obs,
                               Init_lstate, init_time,
-                              obs_M, obs_time, obs_time_rank, obs_dose_given,
-                              Theta[1:2]',
+                              obs_M, obs_time, obs_time_rank, obs_dose_given, 
+                              Theta',
                               Lscale',
-                              x_r,
-                              x_i);
+                              x_r, x_i);
     for (i in 1:O)
       ipred[i] <- ly[i, obs_cmt[i]];
   }

@@ -26,3 +26,7 @@ pars <- c("theta", "omega", "sigma_y")
 
 print(fit, pars)
 
+theta
+
+
+

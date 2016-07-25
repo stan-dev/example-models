@@ -187,6 +187,46 @@ int floor_div_int(real fac, real div) {
   count <- count - 1;
   return count;
 }
+
+int[] count_obs_event_free(int[] obs_timeRank, int ndose) {
+  int dose_next_obs[ndose];
+  int o;
+  int O;
+  dose_next_obs <- rep_array(0, ndose);
+  o <- 0;
+  O <- size(obs_timeRank);
+  while (o < O && obs_timeRank[o+1] == 0) { o <- o + 1; }
+  for (i in 1:ndose) {
+    int count;
+    count <- 0;
+    while(o < O && obs_timeRank[o+1] == i) {
+      o <- o + 1;
+      count <- count + 1;
+    }
+    dose_next_obs[i] <- count;
+  }
+  return(dose_next_obs);
+}
+
+int[] count_obs_event_free_blocked(int[] M, int[] obs_timeRank, int[] ndose) {
+  int dose_next_obs[sum(ndose)];
+  int l;
+  int ld;
+  dose_next_obs <- rep_array(0, sum(ndose));
+  l <- 1;
+  ld <- 1;
+  for (i in 1:size(M)) {
+    int u;
+    int ud;
+    u <- l + M[i] - 1;
+    ud <- ld + ndose[i] - 1;
+    dose_next_obs[ld:ud] <- count_obs_event_free(obs_timeRank[l:u], ndose[i]);
+    l <- u + 1;
+    ld <- ud + 1;
+  }
+  return(dose_next_obs);
+}
+
 int[] count_dose_given(vector time, vector dose_time, vector dose_tau, int[] dose_addl) {
   int dose_count[num_elements(time)];
   int time_rank[num_elements(time)];
@@ -468,60 +508,72 @@ matrix pk_1cmt_metabolite(vector lref, vector Dt, real lk1, real lk12, real lk20
 
 
 // forward declare pk system functions
-matrix pk_system(vector lref, vector Dt, vector theta);
+matrix pk_system(vector lref, vector Dt, vector theta, real[] x_r, int[] x_i);
 
 
-matrix pk_system_addl(vector lref, vector Dt, int cmt, real lamt, real tau, int n, vector theta);
+matrix pk_system_addl(vector lref, vector Dt, int cmt, real lamt, real tau, int n, vector theta, real[] x_r, int[] x_i);
 
 // model evaluation function taking dosing (and addl dosing) into
-// account for a single patient
-matrix pk_model_fast(vector dose_lamt, int[] dose_cmt, vector dose_time, vector dose_tau, int[] dose_addl,
+// account for a single patient. The function calculates always with
+// respect to a reference state. The initial reference state is the
+// initial time and initial_lstate. Upon the first dosing event past
+// the initial time, the reference time and state is set to the
+// respective dosing event.
+matrix pk_model_fast(vector dose_lamt, int[] dose_cmt, vector dose_time, vector dose_tau, int[] dose_addl, int[] dose_next_obs,
                      vector init_lstate, real init_time,
-                     vector obs_time, int[] obs_timeRank, int[] obs_dose_given,
+                     vector obs_time, int[] obs_timeRank, int[] obs_dose_given, 
                      vector theta,
-                     vector lscale)
+                     vector lscale,
+                     real[] x_r, int[] x_i)
 {
   int D;
   int O;
   int d;
   int o;
   int active_addl;
-  row_vector[num_elements(init_lstate)] lstate_ref;
-  row_vector[num_elements(init_lstate)] row_lscale;
-  real time_ref;
+  //int obs_dose_start;
+  int init_ref;
+  vector[num_elements(init_lstate)] lstate_ref;
   matrix[num_elements(obs_time),num_elements(init_lstate)] lstate;
   
   D <- num_elements(dose_lamt);
   O <- num_elements(obs_time);
 
-  row_lscale <- to_row_vector(lscale);
-    
   o <- 1;
   d <- 0;
+  init_ref <- 1;
   active_addl <- 0; // 0 = FALSE
-  lstate_ref  <- to_row_vector(init_lstate);
-  time_ref    <- init_time;
-  // first skip all dosings before init_time
+  lstate_ref  <- init_lstate;
+  // skip all dosing records prior to init_time
   while(d < D && dose_time[d+1] < init_time) { d <- d + 1; }
+  //obs_dose_start <- o;
   // next, process all elements which are past active dosing
   while(o <= O) {
     // first update reference state to be just after the last
     // dosing
     while(d != obs_timeRank[o]) {
       int nd;
+      //obs_dose_start <- o;
       //print("Advancing from dose ", d, " to ", obs_timeRank[o]);
       // the dose of the reference state is not yet the very
       // last dose given before this observation, add it
       nd <- d + 1;
-      if(active_addl) {
+      if(init_ref) {
+        lstate_ref <- to_vector(pk_system(lstate_ref, rep_vector(dose_time[nd] - init_time, 1), theta,
+                                          x_r, x_i)[1]);
+      } else if(active_addl) {
         // in case of an active addl record, we have to
         // super-impose the developed reference state with the
         // emerged dosing
-        lstate_ref <- pk_system_addl(to_vector(lstate_ref), rep_vector(dose_time[nd] - time_ref, 1), dose_cmt[d], dose_lamt[d], dose_tau[d], dose_addl[d], theta)[1];
+        lstate_ref <- to_vector(pk_system_addl(lstate_ref, rep_vector(dose_time[nd] - dose_time[d], 1), dose_cmt[d], dose_lamt[d], dose_tau[d], dose_addl[d], theta,
+                                               x_r, x_i)[1]);
       } else {
-        lstate_ref <- pk_system(to_vector(lstate_ref), rep_vector(dose_time[nd] - time_ref, 1), theta)[1];
+          lstate_ref <- to_vector(pk_system(lstate_ref, rep_vector(dose_time[nd] - dose_time[d], 1), theta,
+                                            x_r, x_i)[1]);
       }
-      time_ref <- dose_time[nd];
+      // the new reference time point is the dosing event; time is now
+      // measure as time-after-dose
+      
       // add in the dosing, but only if we have a simple dosing
       // event, i.e. no additional dosings
       active_addl <- dose_addl[nd] > 0;
@@ -529,56 +581,106 @@ matrix pk_model_fast(vector dose_lamt, int[] dose_cmt, vector dose_time, vector 
         lstate_ref[dose_cmt[nd]] <- log_sum_exp(lstate_ref[dose_cmt[nd]], dose_lamt[nd]);
       }
       d <- nd;
+      // at this point the initial time is not any more the reference
+      // state
+      init_ref <- 0;
     }
-    // ok, evolve from last dose to current observation...
-    if(active_addl) {
+    // ok, evolve from reference (las dose or initial) to current
+    // observation...
+    if(init_ref) {
+      lstate[o] <- pk_system(lstate_ref, segment(obs_time, o, 1) - init_time, theta,
+                             x_r, x_i)[1];
+      o <- o + 1;
+    } else if(active_addl) {
       int ndose;
+      int event_free;
       // ...in case of addl dosing, the effect of the multiple
       // dosing has not yet been added
-      // note: I would prefer to keep ndose as int, but there is no
-      // int floor(int) function available; TODO: pre-compute this counting vector!
-      //ndose <- floor_div_int((obs_time[o] - dose_time[d]), dose_tau[d]);
+      // number of dosings given from the active addl records
       ndose <- obs_dose_given[o];
+      // advance as far as we can by counting the number of
+      // observations which have the same number of doses given
+      event_free <- 0;
+      while((o + event_free) < O && obs_dose_given[o + event_free + 1] == ndose)
+        event_free <- event_free + 1;
+      
+      lstate[o:(o+event_free)] <- pk_system_addl(lstate_ref, segment(obs_time, o, event_free + 1) - dose_time[d], dose_cmt[d], dose_lamt[d], dose_tau[d], ndose, theta,
+                                                     x_r, x_i);
+        o <- o + event_free + 1;
+
+        /*
       if(ndose >= dose_addl[d]) {
         //print("Adding ", dose_addl[d] + 1 , " doses at once...");
         //print("merging multiple dosing stuff");
         // in this case all doses have been used and we can merge
         // and update the reference state
-        lstate_ref <- pk_system_addl(to_vector(lstate_ref), rep_vector(obs_time[o] - time_ref, 1), dose_cmt[d], dose_lamt[d], dose_tau[d], dose_addl[d], theta)[1];
+        lstate_ref <- pk_system_addl(to_vector(lstate_ref), obs_tad[o], 1), dose_cmt[d], dose_lamt[d], dose_tau[d], dose_addl[d], theta,
+                                     x_r, x_i)[1];
         time_ref <- obs_time[o];
         lstate[o] <- to_row_vector(lstate_ref) - row_lscale;
         active_addl <- 0;
       } else {
+      */
         //print("Adding ", ndose+1 , " doses at once...");
-        lstate[o] <- pk_system_addl(to_vector(lstate_ref), rep_vector(obs_time[o] - time_ref, 1), dose_cmt[d], dose_lamt[d], dose_tau[d], ndose, theta)[1] - row_lscale;
+        /*
+      if(ndose == dose_addl[d]) {
+        // all extra doses are over, hence we can just process the
+        // rest at once
+        int event_free;
+        event_free <- dose_next_obs[d] - (o - obs_dose_start);
+        // ... which is simple for non-addl dosing as dose is
+        // already merged, evolve as long as no other dosing occurs
+        lstate[o:(o+event_free-1)] <- pk_system_addl(lstate_ref, segment(obs_time, o, event_free) - dose_time[d], dose_cmt[d], dose_lamt[d], dose_tau[d], ndose, theta,
+                                                     x_r, x_i);
+        o <- o + event_free;
+      } else {
+        // TODO: we can check with dose_next_obs how many doses we can collate
+        // there are still some addl doses to go, so go one-by-one
+        lstate[o] <- pk_system_addl(lstate_ref, rep_vector(obs_time[o] - dose_time[d], 1), dose_cmt[d], dose_lamt[d], dose_tau[d], ndose, theta,
+                                    x_r, x_i)[1];
+        o <- o + 1;
       }
+        */
     } else {
       // ... which is simple for non-addl dosing as dose is
-      // already merged
-      lstate[o] <- pk_system(to_vector(lstate_ref), rep_vector(obs_time[o] - time_ref, 1), theta)[1] - row_lscale;
+      // already merged, evolve as long as no other dosing occurs
+      int event_free;
+      event_free <- dose_next_obs[d];
+      lstate[o:(o+event_free-1)] <- pk_system(lstate_ref, segment(obs_time, o, event_free) - dose_time[d], theta,
+                                              x_r, x_i);
+      o <- o + event_free;
+      //lstate[o] <- pk_system(to_vector(lstate_ref), rep_vector(obs_time[o] - dose_time[d], 1), theta,
+      //                       x_r, x_i)[1] - row_lscale;
     }
-    o <- o + 1;
   }
-  return(lstate);
+  return(lstate - rep_matrix(to_row_vector(lscale), O));
 }
 
 matrix pk_model(vector dose_lamt, int[] dose_cmt, vector dose_time, vector dose_tau, int[] dose_addl,
                 vector init_lstate, real init_time,
                 vector obs_time,
                 vector theta,
-                vector lscale) {
-  return(pk_model_fast(dose_lamt, dose_cmt, dose_time, dose_tau, dose_addl,
+                vector lscale,
+                real[] x_r, int[] x_i) {
+  int obs_timeRank[num_elements(obs_time)];
+  obs_timeRank <- find_interval(obs_time, dose_time);
+  if (init_time > dose_time[1])
+    reject("Initial time must be at or before first dose!");
+  return(pk_model_fast(dose_lamt, dose_cmt, dose_time, dose_tau, dose_addl, count_obs_event_free(obs_timeRank, size(dose_cmt)),
                        init_lstate, init_time,
-                       obs_time, find_interval(obs_time, dose_time), count_dose_given(obs_time, dose_time, dose_tau, dose_addl),
+                       obs_time, obs_timeRank,
+                       count_dose_given(obs_time, dose_time, dose_tau, dose_addl),
                        theta,
-                       lscale));
+                       lscale,
+                       x_r, x_i));
 }
 
-matrix evaluate_model_fast(int[] dose_M, vector dose_lamt, int[] dose_cmt, vector dose_time, vector dose_tau, int[] dose_addl,
+matrix evaluate_model_fast(int[] dose_M, vector dose_lamt, int[] dose_cmt, vector dose_time, vector dose_tau, int[] dose_addl, int[] dose_next_obs,
                            matrix init_lstate, vector init_time,
-                           int[] obs_M, vector obs_time, int[] obs_timeRank, int[] obs_dose_given,
+                           int[] obs_M, vector obs_time, int[] obs_timeRank, int[] obs_dose_given, 
                            matrix theta,
-                           matrix lscale) {
+                           matrix lscale,
+                           real[] x_r, int[] x_i) {
   matrix[num_elements(obs_time), cols(init_lstate)] lstate;
   int J;
   int d;
@@ -599,11 +701,12 @@ matrix evaluate_model_fast(int[] dose_M, vector dose_lamt, int[] dose_cmt, vecto
     //print("Processing patient ", j);
     d_m <- dose_M[j];
     o_m <- obs_M[j];
-    lstate_j <- pk_model_fast(segment(dose_lamt, d, d_m), segment(dose_cmt, d, d_m), segment(dose_time, d, d_m), segment(dose_tau, d, d_m), segment(dose_addl, d, d_m)
+    lstate_j <- pk_model_fast(segment(dose_lamt, d, d_m), segment(dose_cmt, d, d_m), segment(dose_time, d, d_m), segment(dose_tau, d, d_m), segment(dose_addl, d, d_m), segment(dose_next_obs, d, d_m)
                               ,to_vector(init_lstate[j]), init_time[j]
                               ,segment(obs_time, o, o_m), segment(obs_timeRank, o, o_m), segment(obs_dose_given, o, o_m)
                               ,to_vector(theta[j])
-                              ,to_vector(lscale[j]));
+                              ,to_vector(lscale[j])
+                              ,x_r, x_i);
     
     for(i in 1:o_m)
       lstate[i + o - 1] <- lstate_j[i];
@@ -618,17 +721,23 @@ matrix evaluate_model(int[] dose_M, vector dose_lamt, int[] dose_cmt, vector dos
                       matrix init_lstate, vector init_time,
                       int[] obs_M, vector obs_time,
                       matrix theta,
-                      matrix lscale) {
-  return(evaluate_model_fast(dose_M, dose_lamt, dose_cmt, dose_time, dose_tau, dose_addl,
+                      matrix lscale,
+                      real[] x_r, int[] x_i) {
+  int obs_timeRank[num_elements(obs_time)];
+  obs_timeRank <- find_interval_blocked(obs_M, obs_time, dose_M, dose_time);
+  return(evaluate_model_fast(dose_M, dose_lamt, dose_cmt, dose_time, dose_tau, dose_addl, count_obs_event_free_blocked(obs_M, obs_timeRank, dose_M),
                              init_lstate, init_time,
-                             obs_M, obs_time, find_interval_blocked(obs_M, obs_time, dose_M, dose_time), count_dose_given_blocked(obs_M, obs_time, dose_M, dose_time, dose_tau, dose_addl),
+                             obs_M, obs_time, obs_timeRank,
+                             count_dose_given_blocked(obs_M, obs_time, dose_M, dose_time, dose_tau, dose_addl),
                              theta,
-                             lscale));
+                             lscale,
+                             x_r, x_i));
 }
 
 matrix evaluate_model_nm(int[] id, vector time, int[] cmt, int[] evid, vector amt, vector tau, int[] addl, int[] mdv,
                          matrix init_lstate, vector init_time,
-                         matrix theta, matrix lscale) {
+                         matrix theta, matrix lscale,
+                         real[] x_r, int[] x_i) {
   int dose_ind[count_elem(evid, 1)];
   dose_ind <- which_elem(evid, 1);
   
@@ -636,11 +745,12 @@ matrix evaluate_model_nm(int[] id, vector time, int[] cmt, int[] evid, vector am
                         init_lstate, init_time,
                         rle_int(id), time,
                         theta,
-                        lscale));
+                        lscale,
+                        x_r, x_i));
 }
   
   // we fit a 1-cmt oral dosing situation
-  matrix pk_system(vector lref, vector Dt, vector theta) {
+  matrix pk_system(vector lref, vector Dt, vector theta, real[] x_r, int[] x_i) {
     // as we fitting a 1-cmt oral dosing situation such that k1=k12 (all
     // mass out of 1 goes to 2)
     return(pk_1cmt_metabolite(lref, Dt, theta[1], theta[1], theta[2], 0, 0));
@@ -648,14 +758,14 @@ matrix evaluate_model_nm(int[] id, vector time, int[] cmt, int[] evid, vector am
 
   // note that n are the additional doses to be added such that in total
   // n+1 are added
-  matrix pk_system_addl(vector lref, vector Dt, int cmt, real lamt, real tau, int n, vector theta) {
+  matrix pk_system_addl(vector lref, vector Dt, int cmt, real lamt, real tau, int n, vector theta, real[] x_r, int[] x_i) {
     matrix[num_elements(Dt), num_elements(lref)] lstate;
     matrix[num_elements(Dt), num_elements(lref)] lstate_mdose;
     vector[num_elements(lref)] lref_mdose;
     int S;
     
     // evolve reference state freely...
-    lstate <- pk_system(lref, Dt, theta);
+    lstate <- pk_system(lref, Dt, theta, x_r, x_i);
     
     // ... and add the extra doses correctly time-shifted
     S <- num_elements(lref);
@@ -707,11 +817,14 @@ transformed data {
   int dose_addl[count_elem(evid, 1)];
   vector[count_elem(evid, 1)] dose_lamt;
   int dose_cmt[count_elem(evid, 1)];
+  int dose_next_obs[count_elem(mdv, 1)];
   int J;
   int O;
   row_vector[rle_elem_count(id)] zero;
   matrix[rle_elem_count(id),2] Init_lstate;
   vector[rle_elem_count(id)] init_time;
+  real x_r[0];
+  int x_i[0];
 
   dose_ind <- which_elem(evid, 1);
   obs_ind  <- which_elem(mdv , 0);
@@ -735,6 +848,8 @@ transformed data {
   obs_time_rank <- find_interval_blocked(obs_M, obs_time, dose_M, dose_time);
   obs_dose_given <- count_dose_given_blocked(obs_M, obs_time, dose_M, dose_time, dose_tau, dose_addl);
   
+  dose_next_obs <- count_obs_event_free_blocked(obs_M, obs_time_rank, dose_M);
+
   J <- rle_elem_count(id);
   O <- count_elem(mdv, 0);
 
@@ -795,11 +910,13 @@ model {
     Lscale[1] <- zero;
     Lscale[2] <- Theta[3];
     
-    ly <- evaluate_model_fast(dose_M, dose_lamt, dose_cmt, dose_time, dose_tau, dose_addl,
+    ly <- evaluate_model_fast(dose_M, dose_lamt, dose_cmt, dose_time, dose_tau, dose_addl, dose_next_obs,
                               Init_lstate, init_time,
                               obs_M, obs_time, obs_time_rank, obs_dose_given,
                               Theta[1:2]',
-                              Lscale');
+                              Lscale',
+                              x_r,
+                              x_i);
     for (i in 1:O)
       ipred[i] <- ly[i, obs_cmt[i]];
   }

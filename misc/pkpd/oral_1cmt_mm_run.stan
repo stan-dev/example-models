@@ -1,3 +1,232 @@
+functions {
+/*
+ * Author: S. Weber
+ *
+ * Various utlities
+ */
+
+// helper function for rle_int
+int rle_elem_count(int[] set) {
+  int U;
+    U <- 1;
+    for(i in 2:num_elements(set)) {
+      if(set[i-1] != set[i])
+	U <- U + 1;
+    }
+    return(U);
+}
+
+// repeated length encoding, see rle in R
+int[] rle_int(int[] set) {
+  int res[rle_elem_count(set)];
+  int c;
+  res[1] <- 1;
+  c <- 1;
+  for(i in 2:num_elements(set)) {
+    if(set[i-1] == set[i]) {
+      res[c] <- res[c] + 1;
+    } else {
+      c <- c + 1;
+      res[c] <- 1;
+    }
+  }
+  return(res);
+}
+
+/* calculate the absolute value of a - b in log-space with log(a)
+   and log(b) given. Does so by squaring and taking the root, i.e.
+   
+   la = log(a)
+   lb = log(b)
+   
+   sqrt( (a - b)^2 ) = sqrt( a^2 - 2 * a * b + b^2 )
+   
+   <=> 0.5 * log_diff_exp(log_sum_exp(2*la, 2*lb), log(2) + la + lb)
+*/
+real log_diff_exp_abs(real la, real lb) {
+  return(0.5 * log_diff_exp(log_sum_exp(2*la, 2*lb), log(2) + la + lb));
+}
+
+
+/* find_interval, see findInterval from R
+ * i.e. find the ranks of x in sorted; sorted is assumed to be weakly-sorted.
+ */
+int[] find_interval_slow(vector x, vector sorted) {
+  int res[num_elements(x)];
+  // very brutal and ineffcient way of doing this, but well, it's
+  // C++ speed...
+  for(i in 1:num_elements(x)) {
+    res[i] <- rank(append_row(rep_vector(x[i], 1), sorted), 1);
+  }
+  return(res);
+}
+
+/* faster version which uses bisectioning search
+ */
+int find_interval_elem(real x, vector sorted, int start_ind) {
+  int res;
+  int N;
+  int max_iter;
+  real left;
+  real right;
+  int left_ind;
+  int right_ind;
+  int iter;
+    
+  N <- num_elements(sorted);
+  
+  if(N == 0) return(0);
+  
+  left_ind  <- start_ind;
+  right_ind <- N;
+  
+  max_iter <- 100 * N;
+  left  <- sorted[left_ind ] - x;
+  right <- sorted[right_ind] - x;
+  
+  if(0 <= left)  return(left_ind-1);
+  if(0 == right) return(N-1);
+  if(0 >  right) return(N);
+  
+  iter <- 1;
+  while((right_ind - left_ind) > 1  && iter != max_iter) {
+    int mid_ind;
+    real mid;
+    // is there a controlled way without being yelled at with a
+    // warning?
+    mid_ind <- (left_ind + right_ind) / 2;
+    mid <- sorted[mid_ind] - x;
+    if (mid == 0) return(mid_ind-1);
+    if (left  * mid < 0) { right <- mid; right_ind <- mid_ind; }
+    if (right * mid < 0) { left  <- mid; left_ind  <- mid_ind; }
+    iter <- iter + 1;
+  }
+  if(iter == max_iter)
+    print("Maximum number of iterations reached.");
+  return(left_ind);
+}
+
+int[] find_interval(vector x, vector sorted) {
+  int res[num_elements(x)];
+  for(i in 1:num_elements(x)) {
+    res[i] <- find_interval_elem(x[i], sorted, 1);
+  }
+  return(res);
+}
+
+// takes as input x an ascending sorted vector x which allows to
+// move the left starting index to be moved
+int[] find_interval_asc(vector x, vector sorted) {
+  int res[num_elements(x)];
+  int last;
+  last <- 1;
+  for(i in 1:num_elements(x)) {
+    res[i] <- find_interval_elem(x[i], sorted, last);
+    if(res[i] > 0) last <- res[i];
+  }
+  return(res);
+}
+
+int[] find_interval_blocked(int[] vals_M, vector vals, int[] sorted_M, vector sorted) {
+  int res[num_elements(vals)];
+  int M;
+  int v;
+  int s;
+  M <- num_elements(vals_M);
+  v <- 1;
+  s <- 1;
+  for(m in 1:M) {
+    int temp[vals_M[m]];
+    temp <- find_interval(segment(vals, v, vals_M[m]), segment(sorted, s, sorted_M[m]));
+    for(n in 1:vals_M[m])
+      res[v + n - 1] <- temp[n];
+    v <- v + vals_M[m];
+    s <- s + sorted_M[m];
+  }
+  return(res);
+}
+
+// count number times elem appears in test set
+int count_elem(int[] test, int elem) {
+  int count;
+  count <- 0;
+  for(i in 1:num_elements(test))
+    if(test[i] == elem)
+      count <- count + 1;
+  return(count);
+}
+
+// count number times elems appears in test set
+int[] count_elems(int[] test, int[] elems) {
+  int counts[num_elements(elems)];
+  for(i in 1:num_elements(elems))
+    counts[i] <- count_elem(test, elems[i]);
+  return(counts);
+}
+
+// find elements in test which are equal to elem
+int[] which_elem(int[] test, int elem) {
+  int res[count_elem(test, elem)];
+  int ci;
+  ci <- 1;
+  for(i in 1:num_elements(test))
+    if(test[i] == elem) {
+      res[ci] <- i;
+      ci <- ci + 1;
+    }
+  return(res);
+}
+
+// divide fac by div and return the rounded down integer
+int floor_div_int(real fac, real div) {
+  int count;
+  if(fac < 0)
+    reject("floor_div_int only works for positive values.");
+  count <- 1;
+  while(count * div <= fac) { count <- count + 1; }
+  count <- count - 1;
+  return count;
+}
+
+int[] count_obs_event_free(int[] obs_timeRank, int ndose) {
+  int dose_next_obs[ndose];
+  int o;
+  int O;
+  dose_next_obs <- rep_array(0, ndose);
+  o <- 0;
+  O <- size(obs_timeRank);
+  while (o < O && obs_timeRank[o+1] == 0) { o <- o + 1; }
+  for (i in 1:ndose) {
+    int count;
+    count <- 0;
+    while(o < O && obs_timeRank[o+1] == i) {
+      o <- o + 1;
+      count <- count + 1;
+    }
+    dose_next_obs[i] <- count;
+  }
+  return(dose_next_obs);
+}
+
+int[] count_obs_event_free_blocked(int[] M, int[] obs_timeRank, int[] ndose) {
+  int dose_next_obs[sum(ndose)];
+  int l;
+  int ld;
+  dose_next_obs <- rep_array(0, sum(ndose));
+  l <- 1;
+  ld <- 1;
+  for (i in 1:size(M)) {
+    int u;
+    int ud;
+    u <- l + M[i] - 1;
+    ud <- ld + ndose[i] - 1;
+    dose_next_obs[ld:ud] <- count_obs_event_free(obs_timeRank[l:u], ndose[i]);
+    l <- u + 1;
+    ld <- ud + 1;
+  }
+  return(dose_next_obs);
+}
+
 int[] count_dose_given(vector time, vector dose_time, vector dose_tau, int[] dose_addl) {
   int dose_count[num_elements(time)];
   int time_rank[num_elements(time)];
@@ -475,4 +704,195 @@ matrix evaluate_model_nm(int[] id, vector time, int[] cmt, int[] evid, vector am
                         theta,
                         lscale,
                         x_r, x_i));
+}
+
+  // returns dlog(y)/dt (=1/y dy/dt); first order absorbtion
+  // calculcated analytically; parametrization is optimized for
+  // efficient computation
+  real[] pk_1cmt_mm_lode(real t, real[] ly, real[] theta, real[] x_r, int[] x_i) {
+    real dly_dt[1];
+    real ka;
+    real k0;
+    real lAm;
+    real ct;
+
+    ka <- theta[1];
+    k0 <- theta[2];
+    lAm <- theta[3];
+    ct <- exp(theta[4] - t * ka - ly[1]);
+    
+    dly_dt[1] <- ka * ct - k0 * inv_logit(lAm - ly[1]);
+
+    return(dly_dt);
+  }
+
+  
+  // avoid to make the simple exponential part of the ODE which
+  // decreases size of sensitivity system
+  matrix pk_system(vector lref, vector Dt, vector theta, real[] x_r, int[] x_i) {
+    matrix[num_elements(Dt),num_elements(lref)] sol;
+    real int_sol[num_elements(Dt), 1];
+    int P;
+    real theta_tilde[num_elements(theta)+1];
+    real lref_tilde[1];
+    real ka;
+    P <- num_elements(theta);
+    theta_tilde[1:P] <- to_array_1d(theta);
+    theta_tilde[P+1] <- lref[1];
+    lref_tilde[1] <- lref[2];
+    int_sol <- integrate_ode_rk45(pk_1cmt_mm_lode, lref_tilde, 0, to_array_1d(Dt), theta_tilde, x_r, x_i, 1e-4, 1e-4, 1000);
+    ka <- theta[1];
+    for(i in 1:num_elements(Dt)) {
+      sol[i,1] <- lref[1] - ka * Dt[i];
+      sol[i,2] <- int_sol[i,1];
+    }
+    return(sol);
+  }
+
+  // note that n are the additional doses to be added such that in total
+  // n+1 are added
+  matrix pk_system_addl(vector lref, vector Dt, int cmt, real lamt, real tau, int n, vector theta, real[] x_r, int[] x_i) {
+    matrix[num_elements(Dt), num_elements(lref)] lstate;
+    reject("ADDL dose coding not supported with ODEs!");
+    return(lstate);
+  }
+  
+}
+data {
+  int<lower = 1> N; // number of lines of nm data set
+  vector<lower=0>[N] time;
+  vector<lower=0>[N] amt;
+  int cmt[N];
+  int<lower=0, upper=1> mdv[N];
+  int<lower=0, upper=2> evid[N];
+  int<lower=1, upper=N> id[N];
+  int<lower=0> addl[N];
+  vector<lower=0>[N] tau;
+
+  vector<lower=0>[N] dv; // observations
+
+  vector[4] prior_theta_mean;
+  vector<lower=0>[4] prior_theta_sd;
+}
+transformed data {
+  int dose_ind[count_elem(evid, 1)];
+  int obs_ind[count_elem(mdv, 0)];
+  int obs_M[rle_elem_count(id)];
+  int dose_M[rle_elem_count(id)];
+  int obs_time_rank[count_elem(mdv, 0)];
+  vector[count_elem(mdv, 0)] obs_time;
+  vector[count_elem(mdv, 0)] obs_ldv;
+  int obs_dose_given[count_elem(mdv, 0)];
+  int obs_cmt[count_elem(mdv, 0)];
+  vector[count_elem(evid, 1)] dose_time;
+  vector[count_elem(evid, 1)] dose_tau;
+  int dose_addl[count_elem(evid, 1)];
+  vector[count_elem(evid, 1)] dose_lamt;
+  int dose_cmt[count_elem(evid, 1)];
+  int dose_next_obs[count_elem(mdv, 1)];
+  int J;
+  int O;
+  row_vector[rle_elem_count(id)] zero;
+  matrix[rle_elem_count(id),2] Init_lstate;
+  vector[rle_elem_count(id)] init_time;
+  real x_r[0];
+  int x_i[0];
+
+  dose_ind <- which_elem(evid, 1);
+  obs_ind  <- which_elem(mdv , 0);
+  
+  // note: We implicitly assume here that every patient has at least
+  // one dose. If not, this line breaks, but in any PK problem this
+  // will be given.
+  dose_M <- rle_int(id[dose_ind]);
+  obs_M  <- rle_int(id[obs_ind] );
+
+  obs_time <- time[obs_ind];
+  obs_ldv  <- log(dv[obs_ind]);
+  obs_cmt  <- cmt[obs_ind];
+
+  dose_time <- time[dose_ind];
+  dose_tau <- tau[dose_ind];
+  dose_lamt <- log(amt[dose_ind]);
+  dose_addl <- addl[dose_ind];
+  dose_cmt <- cmt[dose_ind];
+  
+  obs_time_rank <- find_interval_blocked(obs_M, obs_time, dose_M, dose_time);
+  obs_dose_given <- count_dose_given_blocked(obs_M, obs_time, dose_M, dose_time, dose_tau, dose_addl);
+
+  dose_next_obs <- count_obs_event_free_blocked(obs_M, obs_time_rank, dose_M);
+  
+  J <- rle_elem_count(id);
+  O <- count_elem(mdv, 0);
+
+  zero <- rep_row_vector(0, J);
+
+  // we initialize the main cmt to 0.1 in order to avoid too steep
+  // derivatives when the first dose is injected
+  Init_lstate <- append_col(rep_vector(-25, J), rep_vector(log(0.1), J));
+  init_time   <- rep_vector(-1E-3, J);
+}
+parameters {
+  ordered[2] theta_lelim;
+  real theta_lAm;
+  real theta_lV;
+  vector<lower=0>[2] omega;
+  matrix[2,J] xi;
+  real<lower=0> sigma_y;
+}
+transformed parameters {
+  vector[4] theta;
+  matrix[3,J] Theta;
+  row_vector<lower=0>[J] kDelta;
+
+  // theta is on log-scale
+  theta[1] <- theta_lelim[2];  // ka is larger than k0 (faster elimination than absorbtion)
+  theta[2] <- theta_lelim[1];  // k0 = Vm/(V * Km)
+  theta[3] <- theta_lAm;       // Am = Km*V
+  theta[4] <- theta_lV;        // V
+
+  // prepare parameters to pass into model function
+  Theta[1] <- rep_row_vector(exp(theta[1]), J); // ka
+  Theta[2] <- exp(xi[1]);                       // k0
+  Theta[3] <- rep_row_vector(theta[3], J);      // log(Am)
+
+  // kDelta is only defined to ensure that we have a faster absorption
+  // than elimination (avoid "flip-flop") for each patient
+  kDelta <- Theta[1] - Theta[2];
+}
+model {
+  vector[O] ipred;
+
+  theta_lelim[2] ~ normal(prior_theta_mean[1], prior_theta_sd[1]);
+  theta_lelim[1] ~ normal(prior_theta_mean[2], prior_theta_sd[2]);
+  theta_lAm      ~ normal(prior_theta_mean[3], prior_theta_sd[3]);
+  theta_lV       ~ normal(prior_theta_mean[4], prior_theta_sd[4]);
+
+  // cp parametrization
+  xi[1] ~ normal(theta[2], omega[1]);
+  xi[2] ~ normal(theta[4], omega[2]);
+  
+  omega ~ normal(0, 1);
+  sigma_y ~ normal(0, 1);
+
+  {
+    matrix[O,2] ly;
+    matrix[2,J] Lscale;
+
+    Lscale[1] <- zero;
+    Lscale[2] <- xi[2];
+
+    ly <- evaluate_model_fast(dose_M, dose_lamt, dose_cmt, dose_time, dose_tau, dose_addl, dose_next_obs,
+                              Init_lstate, init_time,
+                              obs_M, obs_time, obs_time_rank, obs_dose_given, 
+                              Theta',
+                              Lscale',
+                              x_r, x_i);
+    for (i in 1:O)
+      ipred[i] <- ly[i, obs_cmt[i]];
+  }
+
+  obs_ldv ~ normal(ipred, sigma_y);
+}
+generated quantities {
 }

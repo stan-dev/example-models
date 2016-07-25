@@ -186,3 +186,43 @@ int floor_div_int(real fac, real div) {
   count <- count - 1;
   return count;
 }
+
+int[] count_obs_event_free(int[] obs_timeRank, int ndose) {
+  int dose_next_obs[ndose];
+  int o;
+  int O;
+  dose_next_obs <- rep_array(0, ndose);
+  o <- 0;
+  O <- size(obs_timeRank);
+  while (o < O && obs_timeRank[o+1] == 0) { o <- o + 1; }
+  for (i in 1:ndose) {
+    int count;
+    count <- 0;
+    while(o < O && obs_timeRank[o+1] == i) {
+      o <- o + 1;
+      count <- count + 1;
+    }
+    dose_next_obs[i] <- count;
+  }
+  return(dose_next_obs);
+}
+
+int[] count_obs_event_free_blocked(int[] M, int[] obs_timeRank, int[] ndose) {
+  int dose_next_obs[sum(ndose)];
+  int l;
+  int ld;
+  dose_next_obs <- rep_array(0, sum(ndose));
+  l <- 1;
+  ld <- 1;
+  for (i in 1:size(M)) {
+    int u;
+    int ud;
+    u <- l + M[i] - 1;
+    ud <- ld + ndose[i] - 1;
+    dose_next_obs[ld:ud] <- count_obs_event_free(obs_timeRank[l:u], ndose[i]);
+    l <- u + 1;
+    ld <- ud + 1;
+  }
+  return(dose_next_obs);
+}
+
