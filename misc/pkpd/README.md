@@ -49,6 +49,10 @@ exponential exp(At) and the linear super-position principle holds. As
 consequence a regular dosing situation can quickly solved using the
 geometric series.
 
+For ODE based PK systems the above simplifications cannot be applied
+and as such regular dosings patterns are not supported by the library
+for ODE problems.
+
 ## NONMEM Data Sets
 
 A widely known data format to describe the longitudinal data of each
@@ -64,8 +68,9 @@ the parameters being sampled and must feed these into the PK model of
 choice which is effectively the solution operator U(t0,t) for the
 model at hand.
 
-Currently, the library only includes a single model in two
-variants. The full model has the structure of three
+Currently, the library includes a single analytical model in two
+variants and an example ODE based Michaelis Menten model is
+provided. The full analytical model has the structure of three
 compartments. Compartment 1 transfers mass with rate k12 to cmt 2 and
 mass is eliminated from cmt 1 with rate k1. Compartment 2 receives
 mass with rate k12 from cmt 1 and mass exits with rate k2 which flows
@@ -85,10 +90,21 @@ is created.
 
 # Files
 
-- `oral_1cmt.stan` example Stan program
+- `oral_1cmt.stan` example Stan program (1cmt oral)
 - `oral_1cmt.R` runs the example Stan program with simulated data
 - `oral_1cmt_sim.R` simulate (somewhat realistic) data scenario
 - `oral_1cmt_run.data.R` simulated data in Stan format
 - `oral_1cmt_run_nm.csv` simulated data in NONMEM format
 - `oral_1cmt_run.stan` Stan program with includes (DO NOT CHANGE, gets
-  overwritten)
+overwritten)
+
+- `oral_1cmt_mm.stan` example Stan program (1cmt oral, MM elimination, ODE)
+- `oral_1cmt_mm.R` runs the example Stan program with simulated data
+- `oral_1cmt_mm_sim.R` simulate (somewhat realistic) data scenario
+- `oral_1cmt_mm_run.data.R` simulated data in Stan format
+- `oral_1cmt_mm_run_nm.csv` simulated data in NONMEM format
+- `oral_1cmt_mm_run.stan` Stan program with includes (DO NOT CHANGE, gets
+overwritten)
+
+- `model_lib.stan` model library, Stan user functions
+- `utils.stan` various utility Stan user functions
