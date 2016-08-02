@@ -13,7 +13,7 @@ The Torsten library is licensed under the BSD 3-clause license.
 
 Install
 -------
-Torsten is still under development and has not been added to stan-dev. The code is on github on a forked repo of stan-dev. To install cmdStan with torsten, run the shell script `script setupTorsten.sh`.
+Torsten is still under development and has not been added to stan-dev. The code is on github on a forked repo of stan-dev. To install cmdStan with torsten, run the shell script script `setupTorsten.sh`.
 
 Examples
 ---------
