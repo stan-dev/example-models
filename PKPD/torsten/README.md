@@ -5,11 +5,16 @@
 
 This prototype is still under development and has been uploaded to facilitate working with the community of Stan developers. There is indeed still a lot of work to do! The current prototype was written by Charles Margossian, Bill Gillespie, and Metrum Research Group, LLC.
 
-See the prototype manual (`torstenManual.pdf`) for more information and guidance on the examples. 
+See the prototype manual (`torstenManual.pdf`) for more information and guidance on the examples. If you have any questions, do not hesitate to raise an issue on GitHub, or send me an e-mail (charlesm@metrumrg.com). 
 
 Licensing
 ---------
 The Torsten library is licensed under the BSD 3-clause license. 
+
+Updates
+-------
+08/02: update Stan and Math branch to match stan-dev. This was important because of the recent bug fix in stan 2.10. 
+
 
 Install
 -------
@@ -35,7 +40,16 @@ Both `TwoCptModelExampleSimulation.R` and `TwoCptModelSimulation.R` use *mrgsolv
 
 The third example, multiDoseME2PK1, is a more elaborate model taken from the workshop *Getting Started with Bayesian PKPD Modeling Using Stan*, presented at the PAGE 2016 conference. It has the merit of illustrating how Stan and Torsten can be used to tackle more difficult problems. `MetrumBayesianStanPAGE_example3.pdf` is an excerpt from the workshop slides that describes the model. Just a heads up: Given the complexity of the model and the data, it took me about 8 hours to run this model! 
 
-Future Development
-------------------
+C++ Code
+--------
+This C++ code for Torsten can be found on the following repos:
+
+Math Library: https://github.com/charlesm93/math/tree/feature/issue-314-torsten-pharmacometrics
+
+Stan Grammar: https://github.com/charlesm93/stan/tree/feature/issue-1953-exposing-torsten-pharmacometrics
+
+
+Future Development on Example Branch
+------------------------------------
 * Add summary of output for all models in manual
 * Create project directory with R scripts to facilitate simulating data, running Stan, and doing posterior predictive checks. 
