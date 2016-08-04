@@ -1,0 +1,85 @@
+---
+title: "Hidden Markov Models and Circular Statistics for Animal Movement Models"
+author: "Bob Carpenter"
+date: "8 July 2016"
+output: 
+  html_document: 
+    theme: readable
+---
+
+### Abstract
+
+This case study applies hidden Markov models to the study of animal
+movement.  The basic data is a time series of positions for one or
+more animals, possibly with environmental or animal-specific
+covariates.  The positions are converted to changes in bearing and
+distances traveled.  Circular statistics are required to model the
+changes in bearing, which take on continuous values ranging from
+$-\pi$ to $\pi$ radians, with the two endpoints being wrapped.
+
+### Hidden Markov Models
+
+The top-level structure of our animal movement model will assume that
+animal behavior is a mixture of discrete states, such as foraging,
+resting, or moving.  For each state, there will be a probability of
+transitioning into each other state.  The animal's state then
+determines the distribution of observable variables, such as change in
+bearing (turning angle) and distance moved.  In statistical terms, the
+states make up a Markov model and the observations are conditionally
+independent of each other given the state.
+
+#### The "hidden" Markov model
+
+At observation $t \in 1{:}T$, the animal will be
+assumed to be in state $z_t \in 1{:}K$.  For each state, the model
+requires a probability of transitioning to the next state $1{:}K.
+This transition is assumed to be Markovian in that it only depends on
+the previous state (we relax this assumption later with the
+introduction of covariates).  We will assume $\theta_{k,k'}$ for $k,
+k' \in 1{:}K$, is the probability of transitioning from state $k$ to
+state $k'$.  There is no ordering on states, and states may transition
+to themselves.  Because they are transition probabilities, $\theta_k$
+must be a simplex, or in other words, $\theta_{k,k'} \geta 0$ and
+$\sum_{k'=1}^K \theta{k,k'} = 1$.  The model also requires a
+distribution over the initial states, $\phi$, such that $\phi_k \geq
+0$ and $\sum_{k=1}^K \phi_k = 1$ (often this is the stationary
+distribution).  So our model for the states is
+
+\[
+z_1 \sim \mathsf{Discrete}(\phi)
+\]
+
+and
+
+\[
+z_{t + 1} \sim \mathsf{Discrete}(\theta_{z[t]}),
+\]
+
+where we write $z[t]$ rather than $z_t$ in subscripts for readability.
+
+
+conditioned on only that state, will be assumed to exhibit some
+measurable behavior.  For animal movement models, we assume the
+behavior will be to make a change in bearing $u_t \in (-\pi, \pi]$ and
+move some distance $y_t \in [0, \infty)$.  Only $u$ and $y$ are
+observed, not $z$.  The challenge will be to infer latent states that
+account for the observed behavior.
+
+
+
+Suppose we have $T$ observations of an animal,
+at points $t \in 1{:}T$ and at each tiem $z_t 
+
+Let $K$ be the number of animal behavioral
+states and $T$ be the number of observations of an animal.  Then let $z_t
+\in 1{:}K$ be the state the animal for observations $t \in 1{:}T$.
+
+ The animal is assumed to transition from one
+state to another with a discrete distribution (or perhaps a logistic
+regression based on predictors) per state.
+
+In a hidden Markov model (HMM), these states are
+hidden in the sense of not being directly observed.
+
+  Instead, they are
+used to explain observed behavior.
