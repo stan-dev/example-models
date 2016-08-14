@@ -13,12 +13,3 @@ Two models are estimated.
 - `fx_factor.stan`: Single factor model with local level factor.
 
 Both models use the data in `fx.data.R` as input.
-
-# Nile Data
-
-Example used in Fernando Tussell, "Kalman Filtering in R", *Journal of
-Statistical Software*, http://www.jstatsoft.org/v39/i02/paper, 
-Durbin and Koopman (2001), and the papers in *Journal of Statistical
-Software* Vol 41, a special issue on state space models, http://www.jstatsoft.org/v41.
-
-`nile.stan` is the model, and `nile.data.R` is the input data.
