@@ -1,5 +1,5 @@
 ---
-title: 'Torsten: A PKPD Model Library for Stan'
+title: 'Torsten: A Pharmacokinetic/Pharmacodynamic Model Library for Stan'
 header-includes: \usepackage{graphicx}
                  \usepackage{pdfpages}
                  \usepackage{amssymb}
@@ -25,7 +25,8 @@ Metrum Research Group, LLC has developed a prototype PKPD model library for Stan
 
 - One compartment model with first order absortpion
 - Two compartment model with elimination from and first order absorption into the central compartment
-- General compartmental model described by a system of first order Ordinary Differential Equations (ODEs)
+- General linear compartment model described a system of linear first order Ordinary Differential Equations (ODEs)
+- General compartmental model described by a system of first order ODEs
 
 The models and data format are based on NONMEM\textsuperscript{\textregistered}^[NONMEM\textsuperscript{\textregistered} is licensed and distributed by ICON Development Solutions]/NMTRAN/PREDPP conventions including:
 
@@ -41,12 +42,12 @@ The library provides Stan language functions that calculate amounts in each comp
 - An extensible object-oriented programing approach is used to facilitate development of additional models
 - The core functions are programmed in C++
 - One and two compartment models: analytical calculations programmed in C++
+- General linear compartment models with semi-analytical solutions to ODE through the computation of matrix exponentials
 - General compartment models with numerical solutions to ODE using built-in ODE integrators in Stan (Runge-Kutta 4th/5th and CVODES). NOTE: currently, general compartment models do not handle steady state approximations
 
 **Warning:** The current version of Torsten is a *prototype*. It is being released for review and comment. It is still being developed and should not be used for critical applications without further testing or cross-checking by comparison with other methods.  
 
 ## Development
-
 This project is open-source and forsters collaboration. We have recieved extensive help and advice from researchers at various institutions, notably the Stan Group. See https://groups.google.com/forum/#!forum/stan-dev.
 
 ## Install Stan and Torsten

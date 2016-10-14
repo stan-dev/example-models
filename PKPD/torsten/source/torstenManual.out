@@ -1,0 +1,18 @@
+\BOOKMARK [1][-]{section*.1}{Development}{}% 1
+\BOOKMARK [2][-]{section*.2}{Licensing}{section*.1}% 2
+\BOOKMARK [1][-]{section.1}{1. Introduction}{}% 3
+\BOOKMARK [2][-]{section*.3}{Implementation details}{section.1}% 4
+\BOOKMARK [2][-]{section*.4}{Development plans}{section.1}% 5
+\BOOKMARK [1][-]{section.2}{2. Install Stan and Torsten}{}% 6
+\BOOKMARK [1][-]{section.3}{3. Using Torsten}{}% 7
+\BOOKMARK [2][-]{section*.5}{Example 1: Two Compartment Model}{section.3}% 8
+\BOOKMARK [2][-]{section*.6}{Linear One and Two Compartment Model}{section.3}% 9
+\BOOKMARK [2][-]{section*.7}{General Linear Compartment Model}{section.3}% 10
+\BOOKMARK [2][-]{section*.8}{General Compartment Model}{section.3}% 11
+\BOOKMARK [2][-]{table.2}{Summary}{section.3}% 12
+\BOOKMARK [1][-]{section.4}{4. Additional Example}{}% 13
+\BOOKMARK [2][-]{section*.10}{Example 2: Effect Compartment Model}{section.4}% 14
+\BOOKMARK [1][-]{section.5}{5. Under the Hood Design}{}% 15
+\BOOKMARK [2][-]{section*.16}{Computing Amounts in an ODE-based model}{section.5}% 16
+\BOOKMARK [2][-]{section*.17}{Structure of a Torsten Function}{section.5}% 17
+\BOOKMARK [2][-]{section*.18}{Implementing Torsten in Stan}{section.5}% 18
