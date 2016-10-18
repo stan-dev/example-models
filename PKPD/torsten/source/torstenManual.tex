@@ -496,7 +496,7 @@ model & name & names & in {\tt theta} \\
 
 Table 2 summarizes how to call Torsten functions.
 
-It is key thing to understand which type of models each function works for, and which method optimizes model fitting. A analytical method will always be fastest, but only applies to a few simple cases. Numerical methods that use an ODE integrator are generally applicable, but are orders of magnitude slower. The matrix exponential solutions falls, speed-wise, between the analytical and the numerical solution, and can be used for all linear ODE's system. 
+It is key to understand which type of models each function works for, and which method optimizes model fitting. An analytical method will always be fastest, but only applies to a few simple cases. Numerical methods that use an ODE integrator are generally applicable, but are orders of magnitude slower. The matrix exponential solution falls, speed-wise, between the analytical and the numerical solution, and can be used for all linear ODE's system. 
 
 
 \section{Additional Example}
@@ -528,7 +528,7 @@ Furthermore we add a fourth compartment in which we measure a PD effect (see fig
 
 \subsubsection*{Effect Compartment Model for PD response ($R$)}
 \begin{eqnarray*}
-R_{1ij} &\sim& N\left(\widehat{R}_{ij},\sigma_{R}^2\right) \\
+R_{ij} &\sim& N\left(\widehat{R}_{ij},\sigma_{R}^2\right) \\
 \widehat{R}_{ij} &=& \frac{E_{max}c_{eij}}{EC_{50j} + c_{eij}} \\
 c_{e\cdot j}^\prime &=& k_{e0j}\left(c_{\cdot j} - c_{e\cdot j}\right) \\
 \log\left(EC_{50j}, k_{e0j}\right) &\sim& N\left(\log\left(\widehat{EC}_{50}, \widehat{k}_{e0}\right),\Omega_R\right) \\
@@ -636,7 +636,7 @@ transformed parameters {
 \label{example3Model}
 \end{figure}
 
-\subsubsection*{Results} We use the same diagnosis tools as for the previous examples. The MCMC history plots (Figure 10) suggest the 4 chains have converge to common distributions. We note some minor auto-correlations for $lp\_$ (the log posterior) and for IIV parameters: specifically $\Omega_{ke\_0}$ and $\rho$. The correlation matrix $\rho$ does not explicitly appear in the model, but it is used to construct $\Omega$, which parametrizes the PK IIV. The fits to the plasma concentration data (Figure 12) are in close agreement with the data, notably for the sparse data case (phase IIa study). The fits to the PD data (figure 13) look good, though the data is more noisy. The model reflects the noise by producing larger confidence intervals. The estimated values of the parameters are consistent with the values used to simulate the data. 
+\subsubsection*{Results} We use the same diagnosis tools as for the previous example. The MCMC history plots (Figure 10) suggest the 4 chains have converge to common distributions. We note some minor auto-correlations for $lp\_$ (the log posterior) and for IIV parameters: specifically $\Omega_{ke\_0}$ and $\rho$. The correlation matrix $\rho$ does not explicitly appear in the model, but it is used to construct $\Omega$, which parametrizes the PK IIV. The fits to the plasma concentration data (Figure 12) are in close agreement with the data, notably for the sparse data case (phase IIa study). The fits to the PD data (figure 13) look good, though the data is more noisy. The model reflects the noise by producing larger confidence intervals. The estimated values of the parameters are consistent with the values used to simulate the data. 
 
 \begin{figure}[htbp]
 \includegraphics[width=3.0in,trim=0in 0in 0 0in]{graphics/effCptModelTorsten/effCptModelTorstenPlots001.pdf}
@@ -726,9 +726,9 @@ Most PKPD model are based on ODE's that describe how PK and PD amounts evolve ov
 \frac{dCENT}{dt} &=& kaGUT - \frac{CL}{V_{1}}CENT
 \end{eqnarray*}
 
-If the ODE's fully describe the PKPD system, knowing the state $y_0$ at time $t_0$ fully defines the solution at finite times. Exploiting this property, Torsten calculates how amounts in each compartment evolve from one event to the other. The initial conditions of the ODE system are specified by the previous event, and the ODE's are integrated from $t_{previous} $ to $t_{current}$. 
+If the ODE's fully describe the PKPD system, knowing the state $y_0$ at time $t_0$ fully defines the solution at finite times. Exploiting this property, Torsten calculates the evolution of amounts in each compartment from one event to the other. The initial conditions of the ODE system are specified by the previous event, and the ODE's are integrated from $t_{previous} $ to $t_{current}$. 
 
-Note we cannot simply integrate from $t_{first}$ to $t_{last}$ because the ODE's do not describe exterior interventions, such as additional dosing. Torsten treats these interventions independently. Most importantly, Torsten only integrates between $t_0$ and $t_1$ if no exterior interventions occur during this interval. It is key to Properly handle the \textit{event schedule}. 
+Note we cannot simply integrate from $t_{first}$ to $t_{last}$ because the ODE's do not describe exterior interventions, such as additional dosing. Torsten treats these interventions independently. Most importantly, Torsten only integrates between $t_0$ and $t_1$ if no exterior interventions occur during this interval. It is key to properly handle the \textit{event schedule}. 
 
 All five functions in Torsten call the C++ function \texttt{pred}, which does three things:
 \begin{enumerate}

@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.14159265-2.6-1.40.16 (TeX Live 2015) (preloaded format=pdflatex 2015.5.24)  14 OCT 2016 16:18
+This is pdfTeX, Version 3.14159265-2.6-1.40.16 (TeX Live 2015) (preloaded format=pdflatex 2015.5.24)  16 OCT 2016 19:02
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -1309,7 +1309,7 @@ public/amsfonts/cm/cmsy9.pfb></usr/local/texlive/2015/texmf-dist/fonts/type1/pu
 blic/amsfonts/cm/cmti10.pfb></usr/local/texlive/2015/texmf-dist/fonts/type1/pub
 lic/amsfonts/cm/cmti8.pfb></usr/local/texlive/2015/texmf-dist/fonts/type1/urw/c
 ourier/ucrr8a.pfb>
-Output written on torstenManual.pdf (22 pages, 1787231 bytes).
+Output written on torstenManual.pdf (22 pages, 1787217 bytes).
 PDF statistics:
  916 PDF objects out of 1000 (max. 8388607)
  798 compressed objects within 8 object streams
