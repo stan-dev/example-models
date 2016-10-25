@@ -12,7 +12,10 @@
 \BOOKMARK [2][-]{table.2}{Summary}{section.3}% 12
 \BOOKMARK [1][-]{section.4}{4. Additional Example}{}% 13
 \BOOKMARK [2][-]{section*.10}{Example 2: Effect Compartment Model}{section.4}% 14
-\BOOKMARK [1][-]{section.5}{5. Under the Hood Design}{}% 15
-\BOOKMARK [2][-]{section*.16}{Computing Amounts in an ODE-based model}{section.5}% 16
-\BOOKMARK [2][-]{section*.17}{Structure of a Torsten Function}{section.5}% 17
-\BOOKMARK [2][-]{section*.18}{Implementing Torsten in Stan}{section.5}% 18
+\BOOKMARK [2][-]{section*.16}{Friberg-Karlsson Semi-Mechanistic Model 2364}{section.4}% 15
+\BOOKMARK [2][-]{section*.18}{Friberg-Karlsson Model for drug-induced myelosuppression \(ANC\)}{section.4}% 16
+\BOOKMARK [1][-]{section.5}{5. Under the Hood Design}{}% 17
+\BOOKMARK [2][-]{section*.20}{Computing Amounts in an ODE-based model}{section.5}% 18
+\BOOKMARK [2][-]{section*.21}{Structure of a Torsten Function}{section.5}% 19
+\BOOKMARK [2][-]{section*.22}{Implementing Torsten in Stan}{section.5}% 20
+\BOOKMARK [1][-]{section*.25}{References}{}% 21
