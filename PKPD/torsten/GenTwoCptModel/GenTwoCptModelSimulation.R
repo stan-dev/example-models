@@ -7,7 +7,7 @@
 rm(list = ls())
 gc()
 
-modelName <- "GenTwoCptModelExample"
+modelName <- "GenTwoCptModel"
 
 library(rstan)
 library(mrgsolve)
@@ -18,22 +18,22 @@ set.seed(11091989) ## not required but assures repeatable results
 ## Simulate data using mrgsolve
 
 code <- '
-$PARAM CL=5, Q=8, VC=20, VP=70, KA=1.2
+$PARAM CL=5, Q=8, V2=20, V3=70, KA=1.2
 
 $CMT GUT CENT PERI
 
 $GLOBAL
-#define CP (CENT/VC)
+#define CP (CENT/V2)
 
-$ADVAN4 // Two compartment model
+$PKMODEL ncmt = 2, depot = TRUE
 
-$SIGMA 0.0025
+$SIGMA 0.025
 
 $MAIN
 pred_CL = CL;
 pred_Q = Q;
-pred_VC = VC;
-pred_VP = VP;
+pred_VC = V2;
+pred_VP = V3;
 pred_KA = KA;
 
 $CAPTURE CP
@@ -41,7 +41,7 @@ $CAPTURE CP
 $TABLE table(DV) = CP*exp(EPS(1));
 '
 
-mod <- mread("accum", tempdir(),code) %>% Req(GUT, CENT, CP, DV) %>% update(end=480,delta=0.1)
+mod <- mread("accum", tempdir(),code) %>% Req(DV) %>% update(end=480,delta=0.1)
 
 e1 <- ev(amt=5000) # Create an initial dosing event
 mod %>% ev(e1) %>% mrgsim(end=20) %>% plot # plot data
@@ -61,19 +61,17 @@ SimData <-
   as.data.frame
 
 SimData$cmt[SimData$cmt == 0] <- 2 ## adjust cmt (adopt NONMEM convention)
-SimData <- SimData[!((SimData$evid == 0)&(SimData$CP == 0)),] ## remove observation with 0 drug concentration
+SimData <- SimData[!((SimData$evid == 0)&(SimData$DV == 0)),] ## remove observation with 0 drug concentration
 
 ################################################################################################
+# Format Data for Stan using RStan
 
-xdata <- SimData 
-
-nt <- nrow(xdata)
-
-iObs <- with(xdata, (1:nrow(xdata))[evid == 0])
+nt <- nrow(SimData)
+iObs <- with(SimData, (1:nrow(SimData))[evid == 0])
 nObs <- length(iObs)
 
 ## create Stan data set
-data <- with(xdata,
+data <- with(SimData,
              list(nt = nt,
                   nObs = nObs,
                   iObs = iObs,
@@ -95,7 +93,6 @@ init <- function()
        V2 = exp(rnorm(1, log(70), 0.2)),
        ka = exp(rnorm(1, log(1), 0.2)),
        sigma = runif(1, 0.5, 2))
-
 
 with(data, stan_rdump(ls(data), file = paste0(modelName, ".data.R")))
 inits <- init()

@@ -18,41 +18,40 @@ nSub <- 10; # number of subjects
 nIIV <- 5; # number of parameters with Inter-Individual variation
 
 code <- '
-$PARAM CL=5, Q=8, VC=20, VP=70, KA=1.2
+$PARAM CL=5, Q=8, V2=20, V3=70, KA=1.2
 
 $SET delta=0.1 // simulation grid
 
 $CMT GUT CENT PERI
 
-$ADVAN4 TRANS11 // Two compartment model
+$PKMODEL ncmt = 2, depot = TRUE
 
 $MAIN
 double CLi = exp(log(CL) + ETA(1));
 double Qi = exp(log(Q) + ETA(2));
-double VCi = exp(log(VC) + ETA(3));
-double VPi = exp(log(VP) + ETA(4));
+double V2i = exp(log(V2) + ETA(3));
+double V3i = exp(log(V3) + ETA(4));
 double KAi = exp(log(KA) + ETA(5));
 
 pred_CL = CLi;
 pred_Q = Qi;
-pred_VC = VCi;
-pred_VP = VPi;
+pred_V2 = V2i;
+pred_V3 = V3i;
 pred_KA = KAi;
 
 $OMEGA name="IIV"
 0.0025 0.0025 0.0025 0.0025 0.0025
 
-$SIGMA 0.0025
+$SIGMA 0.025
 
 $TABLE
-table(CP) = CENT/VC;
-table(DV) = CENT/VC*exp(EPS(1));
+table(DV) = CENT/V2*exp(EPS(1));
 '
 
 mod <- mread("accum", tempdir(),code)
 
 e1 <- expand.ev(amt=rep(1000, nSub)) # Create an initial dosing event
-out <- mod %>% data_set(e1) %>% carry.out(dose) %>% Req(CP,DV) %>% mrgsim(end=50)
+out <- mod %>% data_set(e1) %>% carry.out(dose) %>% Req(DV) %>% mrgsim(end=50)
 plot(out, DV~time|factor(ID),scales="same")
 
 # create time at which data will be observed 
@@ -65,32 +64,30 @@ SimData <-
   mod %>%
   data_set(e1) %>%
   carry.out(cmt,ii,addl,rate,amt,evid,ss) %>%
-  mrgsim(Req="CP,GUT,CENT,DV", end=-1, add=tall, recsort=3) %>%
+  mrgsim(Req="DV", end=-1, add=tall, recsort=3) %>%
   as.data.frame
 
 SimData$cmt[SimData$cmt == 0] <- 2 ## adjust cmt (adopt NONMEM convention)
-SimData <- SimData[!((SimData$evid == 0)&(SimData$CP == 0)),] ## remove observation with 0 drug concentration
+SimData <- SimData[!((SimData$evid == 0)&(SimData$DV == 0)),] ## remove observation with 0 drug concentration
 
 ################################################################################################
 ## Format data for Stan 
 
-xdata <- SimData 
+nt <- nrow(SimData)
 
-nt <- nrow(xdata)
-
-iObs <- with(xdata, (1:nrow(xdata))[evid == 0])
+iObs <- with(SimData, (1:nrow(SimData))[evid == 0])
 nObs <- length(iObs)
 
 ## Subject specific data
-xsub <- subset(xdata, !duplicated(ID))
+xsub <- subset(SimData, !duplicated(ID))
 nSubjects <- length(xsub$ID)
 
 ## Row indices for start and end of each individual's data
-start <- (1:nt)[!duplicated(xdata$ID)]
+start <- (1:nt)[!duplicated(SimData$ID)]
 end <- c(start[-1] - 1, nt)
 
 ## create Stan data set
-data <- with(xdata,
+data <- with(SimData,
              list(nt = nt,
                   nSubjects = nSubjects,
                   start = start,
