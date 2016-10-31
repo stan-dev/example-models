@@ -109,13 +109,14 @@ transformed parameters{
   # of the ODE integrator. The user can choose between the bdf and the rk45 integrator. 
   # Returns a matrix with the predicted amount in each compartment 
   # at each event.
-  x = generalCptModel_bdf(twoCptModelODE, 3,
-                          theta, time, amt, rate, ii, evid, cmt, addl, ss,
-                          1e-8, 1e-8, 1e8);
 
-//   x = generalCptModel_rk45(twoCptModelODE, 3,
-//                           theta, time, amt, rate, ii, evid, cmt, addl, ss,
-//                           1e-8, 1e-8, 1e8);
+//  x = generalCptModel_bdf(twoCptModelODE, 3,
+//                          theta, time, amt, rate, ii, evid, cmt, addl, ss,
+//                          1e-8, 1e-8, 1e8);
+
+   x = generalCptModel_rk45(twoCptModelODE, 3,
+                           theta, time, amt, rate, ii, evid, cmt, addl, ss,
+                           1e-8, 1e-8, 1e8);
 
   cHat = col(x, 2) ./ V1;
 

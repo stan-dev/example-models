@@ -101,4 +101,3 @@ init <- function()
 with(data, stan_rdump(ls(data), file = paste0(modelName, ".data.R")))
 inits <- init()
 with(inits, stan_rdump(ls(inits), file = paste0(modelName, ".init.R")))
-
