@@ -174,7 +174,7 @@ The options for \textit{model name} are:
   \item PKModelOneCpt
   \item PKModelTwoCpt
 \end{itemize}
-which respectively correspond to the one and two compartment model with first order absorption (see figure 1). A vector in \texttt{thetha} is expected to contain parameters $CL$, $V2$, and $ka$ for the one compartment case, and $CL$, $Q$, $V2$, $V3$, and $ka$ for the two compartments case, \underline{in this order}, followed by the bioavailability fraction of each compartment (non-effective if set to 1) and the lag time in each compartment (non-effective if set to 0). Note that setting $ka$ to 0 eliminates the fist-order absoprtion.
+which respectively correspond to the one and two compartment model with first order absorption (figure~\ref{cptModels}). A vector in \texttt{thetha} is expected to contain parameters $CL$, $V2$, and $ka$ for the one compartment case, and $CL$, $Q$, $V2$, $V3$, and $ka$ for the two compartments case, \underline{in this order}, followed by the bioavailability fraction of each compartment (non-effective if set to 1) and the lag time in each compartment (non-effective if set to 0). Note that setting $ka$ to 0 eliminates the fist-order absoprtion.
 
 \begin{figure}[htbp]
 \includegraphics[width=3.5in,trim=0in 0in 0 0in]{graphics/cptModels.png}
@@ -253,23 +253,23 @@ which respectively correspond to the one and two compartment model with first or
 \end{fmpage}
 \end{small}
 \end{center}
-\label{example1.1Model}
+\label{TwoCptCode}
 \end{figure}
 
-\textbf{Result.} The MCMC history plots (Figure 3) suggest that the 4 chains have converged to common distributions for all of the key model parameters. The  fit to the plasma concentration data (Figure 5) are in close agreement with the data, which is not surprising since the fitted model is identical to the one used to simulate the data. Similarly the parameter estimates summarized in Table 1 are consistent with the values used for simulation.
+\textbf{Result.} The MCMC history plots (figure~\ref{TwoCptMCMC}) suggest that the 4 chains have converged to common distributions for all of the key model parameters. The  fit to the plasma concentration data (figure~\ref{TwoCptPredictions}) are in close agreement with the data, which is not surprising since the fitted model is identical to the one used to simulate the data. Similarly the parameter estimates summarized in Table 1 are consistent with the values used for simulation.
 
 \begin{figure}[htbp]
 \includegraphics[width=3.0in,trim=0in 0in 0 0in]{graphics/TwoCptModelExamplePlots001.pdf}
 \includegraphics[width=3.0in,trim=0in 0in 0 0in]{graphics/TwoCptModelExamplePlots002.pdf}
 \caption{{MCMC history plots for the parameters of a two compartment model with first order absorption (each color corresponds to a different chain)}}
-\label{MCMC1}
+\label{TwoCptMCMC}
 \end{figure}
 
 \begin{figure}[htbp]
 \begin{center}
 \includegraphics[width=3.5in,trim=0in 0in 0 0in]{graphics/TwoCptModelExamplePlots004.pdf}
 \caption{{Posterior Marginal Densities of the Model Parameters of a two compartment model with first order absorption (each color corresponds to a different chain)}}
-\label{MCMC1}
+\label{TwoCptDensity}
 \end{center}
 \end{figure}
 
@@ -277,7 +277,7 @@ which respectively correspond to the one and two compartment model with first or
 \begin{center}
 \includegraphics[width=3.5in,trim=0in 0in 0 0in]{graphics/TwoCptModelExamplePlots006.pdf}
 \caption{{Predicted (posterior median and 90 \% credible intervals) and observed plasma drug concentrations of a two compartment model with first order absorption}}
-\label{predictions}
+\label{TwoCptPredictions}
 \end{center}
 \end{figure}
 
@@ -366,7 +366,7 @@ where \texttt{K} is the matrix describing the ODE system. Since most of the para
 \end{fmpage}
 \end{small}
 \end{center}
-\label{example1.1Model}
+\label{LinTwoCptCode}
 \end{figure}
 
 \subsection*{General Compartment Model}
@@ -453,7 +453,7 @@ They respectively call the built-in Runge-Kutta 4th/5th integrator, recommended 
 \end{fmpage}
 \end{small}
 \end{center}
-\label{example1.1Model}
+\label{GenTwoCptModelCode}
 \end{figure}
 
 \subsection*{Summary}
@@ -499,10 +499,30 @@ Table 2 summarizes how to call Torsten functions.
 It is key to understand which type of models each function works for, and which method optimizes model fitting. An analytical method will always be fastest, but only applies to a few simple cases. Numerical methods that use an ODE integrator are generally applicable, but are orders of magnitude slower. The matrix exponential solution falls, speed-wise, between the analytical and the numerical solution, and can be used for all linear ODEs system. 
 
 
-\section{Additional Example}
+\section{Additional Examples}
+
+\subsection*{Available Examples online} Code for examples can be found on GitHub: \url{https://github.com/charlesm93/example-models/tree/feature/issue-70-PKPDexamples-torsten/PKPD/torsten}.
+
+The current version of Torsten requires a development version of Stan that has not yet been released. In order to run this version, we advice users to use cmdStan, the command line interface of Stan. When Stan v2.13 (expected end of November 2016) gets released, we will share examples that use RStan.
+
+All the files to run a model are stored under the directory that bears the model's name. There are four files per example:
+\begin{itemize}
+  \item \texttt{<model name>.stan}
+  \item \texttt{<model name>.data.R}
+  \item \texttt{<model name>.init.R}
+  \item \texttt{<model name>Simulation.R}
+\end{itemize}
+
+\texttt{data.R} contains the data we fit the model to and \texttt{init.R} the initial estimates of the parameters. These two files are generated using \texttt{Simulation.R}. In order to run the model, I recommend creating a new directory under \texttt{cmdstan/examples}, next to the \textit{bernouilli} example Stan automatically installs. Under this directory, put the \texttt{data.R}, \texttt{init.R}, and \texttt{.stan} files. You can then compile the model using:
+
+\texttt{make examples/<model name>/<model name>}
+
+and run it:
+
+\texttt{cd examples/<model name>} \\\texttt{./<model name> sample data file=<model name>.data.R init=<model name>.init.R}
 
 \subsection*{Example 2: Effect Compartment Model}
-We now expand example 1 to a population model fitted to the combined data from phase I and phase IIa studies. The parameters exhibit inter-individual variations (IIV), due to both random effects and to the patients' body weight, treated as a covariate and denoted $bw$:
+Let us expand example 1 to a population model fitted to the combined data from phase I and phase IIa studies. The parameters exhibit inter-individual variations (IIV), due to both random effects and to the patients' body weight, treated as a covariate and denoted $bw$:
 
 \subsubsection*{Population Model for Plasma Drug Concentration ($c$)}
 \begin{eqnarray*}
@@ -518,7 +538,7 @@ We now expand example 1 to a population model fitted to the combined data from p
 0 & 0 & 0.25^2 & 0 \\ 0 & 0 & 0 & 0.25^2  \end{array}\right), \ \ \ \sigma = 0.1 \\
 \end{eqnarray*}
 
-Furthermore we add a fourth compartment in which we measure a PD effect (see figure 8).
+Furthermore we add a fourth compartment in which we measure a PD effect (figure~\ref{effCptModel}).
 
 \begin{figure}[htbp]
 \includegraphics[width=3.5in,trim=0in 0in 0 0in]{graphics/effectCptModel.pdf}
@@ -633,10 +653,10 @@ transformed parameters {
 \end{fmpage}
 \end{center}
 \end{tiny} 
-\label{example3Model}
+\label{effCptModelCode}
 \end{figure}
 
-\subsubsection*{Results} We use the same diagnosis tools as for the previous example. The MCMC history plots (Figure 10) suggest the 4 chains have converge to common distributions. We note some minor auto-correlations for $lp\_$ (the log posterior) and for IIV parameters: specifically $\Omega_{ke\_0}$ and $\rho$. The correlation matrix $\rho$ does not explicitly appear in the model, but it is used to construct $\Omega$, which parametrizes the PK IIV. The fits to the plasma concentration  (Figure 12) are in close agreement with the data, notably for the sparse data case (phase IIa study). The fits to the PD data (figure 13) look good, though the data is more noisy. The model reflects the noise by producing larger confidence intervals. The estimated values of the parameters are consistent with the values used to simulate the data. 
+\subsubsection*{Results} We use the same diagnosis tools as for the previous example. The MCMC history plots (figure \ref{effCptModelMCMC}) suggest the 4 chains have converge to common distributions. We note some minor auto-correlations for $lp\_$ (the log posterior) and for IIV parameters: specifically $\Omega_{ke\_0}$ and $\rho$. The correlation matrix $\rho$ does not explicitly appear in the model, but it is used to construct $\Omega$, which parametrizes the PK IIV. The fits to the plasma concentration  (figure~\ref{effCptModelPredictionsPK}) are in close agreement with the data, notably for the sparse data case (phase IIa study). The fits to the PD data (figure~\ref{effCptModelPredictionsPD}) look good, though the data is more noisy. The model reflects the noise by producing larger confidence intervals. The estimated values of the parameters are consistent with the values used to simulate the data. 
 
 \begin{figure}[htbp]
 \includegraphics[width=3.0in,trim=0in 0in 0 0in]{graphics/effCptModelTorsten/effCptModelTorstenPlots001.pdf}
@@ -645,14 +665,14 @@ transformed parameters {
 \includegraphics[width=3.0in,trim=0in 0in 0 0in]{graphics/effCptModelTorsten/effCptModelTorstenPlots004.pdf}
 \includegraphics[width=3.0in,trim=0in 0in 0 0in]{graphics/effCptModelTorsten/effCptModelTorstenPlots005.pdf}
 \caption{{MCMC history plots for the parameters of an Effect Compartment Model (each color corresponds to a different chain) for example 2}}
-\label{MCMC1}
+\label{effCptModelMCMC}
 \end{figure}
 
 \begin{figure}[htbp]
 \includegraphics[width=3.0in,trim=0in 0in 0 0in]{graphics/effCptModelTorsten/effCptModelTorstenPlots006.pdf}
 \includegraphics[width=3.0in,trim=0in 0in 0 0in]{graphics/effCptModelTorsten/effCptModelTorstenPlots007.pdf}
 \caption{{Posterior Marginal Densities of the Model Parameters of an Effect Compartment Model (each color corresponds to a different chain) for example 2}}
-\label{MCMC1}
+\label{effCptModelDens}
 \end{figure}
 
 \begin{figure}[htbp]
@@ -665,7 +685,7 @@ transformed parameters {
 \includegraphics[width=1.5in,trim=0in 0in 0 0in]{graphics/effCptModelTorsten/effCptModelTorstenPlots017.pdf}
 \includegraphics[width=1.5in,trim=0in 0in 0 0in]{graphics/effCptModelTorsten/effCptModelTorstenPlots018.pdf}
 \caption{{Predicted (posterior median and 90 \% credible intervals) and observed plasma drug concentrations for example 2 for an Effect Compartment Model}}
-\label{predictions}
+\label{effCptModelPredictionsPK}
 \end{figure}
 
 \begin{figure}[htbp]
@@ -678,7 +698,7 @@ transformed parameters {
 \includegraphics[width=1.5in,trim=0in 0in 0 0in]{graphics/effCptModelTorsten/effCptModelTorstenPlots025.pdf}
 \includegraphics[width=1.5in,trim=0in 0in 0 0in]{graphics/effCptModelTorsten/effCptModelTorstenPlots026.pdf}
 \caption{{Predicted (posterior median and 90 \% credible intervals) and observed PD Response for example 2}}
-\label{predictions}
+\label{effCptModelPredictionsPD}
 \end{figure}
 
 \begin{table}[ht]
@@ -708,11 +728,11 @@ omegaEC50 & 0.213 & 0.001 & 0.021 & 0.174 & 0.199 & 0.213 & 0.227 & 0.255 & 190.
 \end{tabular}
 \end{table}
 
-\subsection*{Friberg-Karlsson Semi-Mechanistic Model \cite{2364}}
+\subsection*{Example 3: Friberg-Karlsson Semi-Mechanistic Model \cite{2364}}
 
 In this third example, we deal with a more sophisticated PD effect, described by a system of nonlinear ODEs. The PK effects are still described by a two compartment model with a first-order absorption. 
 
-Neutropenia is observed in patients receiving an ME-2 drug. Our goal is to model the relation between neutrophil counts and drug exposure. Using a feedback mechanism, the body maintains the number of neutrophils at a baseline value (see figure 14). While in the patient's blood, the drug impedes the production of neutrophils. As a result, the neutrophil count goes down, and after  the drug clears out, the feedback mechanism kicks in and brings the neutrophil count back to baseline.
+Neutropenia is observed in patients receiving an ME-2 drug. Our goal is to model the relation between neutrophil counts and drug exposure. Using a feedback mechanism, the body maintains the number of neutrophils at a baseline value (figure~\ref{FK}). While in the patient's blood, the drug impedes the production of neutrophils. As a result, the neutrophil count goes down, and after  the drug clears out, the feedback mechanism kicks in and brings the neutrophil count back to baseline.
 
 \subsection*{Friberg-Karlsson Model for drug-induced myelosuppression ($ANC$)}
 
@@ -873,7 +893,7 @@ transformed parameters {
 \end{fmpage}
 \end{center}
 \end{tiny} 
-\label{genCptCode}
+\label{FKCode}
 \end{figure}
 
 
@@ -885,21 +905,21 @@ transformed parameters {
 \includegraphics[width=3.0in,trim=0in 0in 0 0in]{graphics/neutropenia/neutropeniaPopulation1TorstenPlots003.pdf}
 \includegraphics[width=3.0in,trim=0in 0in 0 0in]{graphics/neutropenia/neutropeniaPopulation1TorstenPlots004.pdf}
 \caption{{MCMC history plots for the parameters of a Friberg-Karlsson semi-mechanistic model (each color corresponds to a different chain) for example 3}}
-\label{MCMC3}
+\label{FKMCMC}
 \end{figure}
 
 \begin{figure}[htbp]
 \includegraphics[width=2.5in,trim=0in 0in 0 0in]{graphics/neutropenia/neutropeniaPopulation1TorstenPlots005.pdf}
 \includegraphics[width=2.5in,trim=0in 0in 0 0in]{graphics/neutropenia/neutropeniaPopulation1TorstenPlots006.pdf}
 \caption{{Posterior Marginal Densities of the Model Parameters of a Friberg-Karlsson semi-mechanistic model (each color corresponds to a different chain)}}
-\label{MargDist3}
+\label{FKDens}
 \end{figure}
 
 \begin{figure}[htbp]
 \includegraphics[width=2.5in,trim=0in 0in 0 0in]{graphics/neutropenia/neutropeniaPopulation1TorstenPlots010.pdf}
 \includegraphics[width=2.5in,trim=0in 0in 0 0in]{graphics/neutropenia/neutropeniaPopulation1TorstenPlots011.pdf}
 \caption{{Predicted (posterior median and 90 \% credible intervals) and observed plasma drug concentrations, and Neutrophil counts, for a Friberg-Karlsson semi-mechanistic model}}
-\label{predictions}
+\label{FKPredictions}
 \end{figure}
  
 \begin{table}[ht]
@@ -975,7 +995,7 @@ Under the structural scheme described above, a Torsten function performs a very 
   \item Call pred
 \end{enumerate}  
 
-Figure 14 shows the C++ code for \texttt{PKModelOneCpt}.
+Figure~\ref{PKModelOneCptCode} shows the C++ code for \texttt{PKModelOneCpt}.
 
 \begin{figure}
 \caption{C++ code for the PKModelOneCpt function (abstract)}
@@ -1041,7 +1061,7 @@ PKModelOneCpt(const std::vector< Eigen::Matrix<T0, Eigen::Dynamic, 1> >& pMatrix
 \end{fmpage}
 \end{small}
 \end{center}
-\label{C++ code for the PKModelOneCpt function}
+\label{PKModelOneCptCode}
 \end{figure}
 
 \subsection*{Implementing Torsten in Stan}
