@@ -46,12 +46,12 @@ Stan Grammar: https://github.com/charlesm93/stan/tree/feature/issue-1953-exposin
 Updates
 -------
 10/31
-Add Linear Compartment model function.
-Significant revisions to the user's manual.
-Torsten is now compatible with a development version, post v 2.12. 
+* Add Linear Compartment model function.
+* Significant revisions to the user's manual.
+* Torsten is now compatible with a development version, post v 2.12. 
 
 08/02 
-Update Stan and Math branch to match stan-dev. This is important because of the recent bug fix in stan 2.10. 
+* Update Stan and Math branch to match stan-dev. This is important because of the recent bug fix in stan 2.10. 
 
 
 Future Development on Example Branch
