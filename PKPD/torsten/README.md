@@ -1,12 +1,13 @@
 <b> Torsten </b> is a library of C++ functions that support applications of Stan in Pharmacometrics. The current prototype provides:
 * One and Two Compartment Model functions that compute solutions analytically
-* General Linear Compartment Model functions that compute a matrix exponential solution
+* General Linear Compartment Model function that computes a matrix exponential solution
 * General Compartment Model functions that compute solutions numerically
-* A flexible mechanism that handles the event schedule of clinical trials
+  * Runge-Kutta 4th/5th order for non-stiff ODE systems
+  * Backward Differentiation for stiff ODE systems
+  
+This prototype is still under development and has been uploaded to facilitate working with the community of Stan developers. The current prototype was written by Charles Margossian, Bill Gillespie, and Metrum Research Group, LLC. We have recieved extensive help from the Stan development team.
 
-This prototype is still under development and has been uploaded to facilitate working with the community of Stan developers. There is indeed still a lot of work to do! The current prototype was written by Charles Margossian, Bill Gillespie, and Metrum Research Group, LLC.
-
-See the user manual (`torstenManual.pdf`) for more information and guidance on the examples. If you have any questions, do not hesitate to raise an issue on GitHub or send me an e-mail to charlesm@metrumrg.com. 
+See the user manual (`torstenManual.pdf`) for more information and guidance on the examples. If you have any questions, please raise an issue on GitHub or send me an e-mail at charlesm@metrumrg.com. 
 
 Licensing
 ---------
@@ -17,9 +18,9 @@ Install
 -------
 To install cmdStan with torsten, run the shell script script `setupTorsten.sh`.
 
-We are working with Stan's core development team to create a system to add and share Stan packages. In the mean time, users can download a forked version of Stan with Torsten from GitHub. Torsten uses features from the stan-dev, in particular the matrix exponential function. This means it currently requires the CmdStan interface which is the only interface up to date with stan-dev.
+We are working with Stan's development team to create a system to add and share Stan packages. In the mean time, users can download a forked version of Stan with Torsten from GitHub. Torsten uses features from stan-dev, the development version of Stan. This means it currently requires the CmdStan interface which is the only interface up to date with stan-dev.
 
-When Stan releases version 2.13 (expected end of November 2016), I will update Torsten to be compatible with this realease and usable with all its interfaces, including RStan.
+When Stan releases version 2.13 (expected end of November 2016), I will update Torsten to be compatible with the new realease and usable with all its interfaces, including RStan.
 
 
 Examples
@@ -32,7 +33,7 @@ For each model, we provide the following files:
 
 The simulation file can be used to create the data and init files. 
 
-A detailed description of each example can be found in the user manual. 
+A description of these examples and instructions on how to run them can be found in the manual. 
 
 
 C++ Code
@@ -47,7 +48,7 @@ Updates
 -------
 10/31
 * Add Linear Compartment model function.
-* Significant revisions to the user's manual.
+* Revise the user's manual.
 * Torsten is now compatible with a development version, post v 2.12. 
 
 08/02 
@@ -56,6 +57,5 @@ Updates
 
 Future Development on Example Branch
 ------------------------------------
-* Add section in manual on running examples from CmdStan.
 * Create project directory with R scripts to facilitate simulating data, running Stan, and doing posterior predictive checks. 
 * Upload example for Effect Compartment Model and Friberg-Karlsson model
