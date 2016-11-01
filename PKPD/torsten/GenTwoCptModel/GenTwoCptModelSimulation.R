@@ -1,7 +1,7 @@
 ## Template to simulate PKPD data
 ##
 ## In this example: 
-## Model Parameters: CL=5, Q=8, V1=20, V2=70, KA=1.2, SIGMA = 0.0025
+## Model Parameters: CL=5, Q=8, V1=20, V2=70, KA=1.2, SIGMA = 0.025
 ## Single Dose 
 
 rm(list = ls())
