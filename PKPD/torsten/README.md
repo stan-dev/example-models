@@ -5,7 +5,7 @@
   * Runge-Kutta 4th/5th order for non-stiff ODE systems
   * Backward Differentiation for stiff ODE systems
   
-This prototype is still under development and has been uploaded to facilitate working with the community of Stan developers. The current prototype was written by Charles Margossian, Bill Gillespie, and Metrum Research Group, LLC. We have recieved extensive help from the Stan development team.
+** This prototype is still under development ** and has been uploaded to facilitate working with the community of Stan developers. The current version was written by Charles Margossian, Bill Gillespie, and Metrum Research Group, LLC. We have recieved extensive help from the Stan development team.
 
 See the user manual (`torstenManual.pdf`) for more information and guidance on the examples. If you have any questions, please raise an issue on GitHub or send me an e-mail at charlesm@metrumrg.com. 
 
@@ -35,6 +35,7 @@ The simulation file can be used to create the data and init files.
 
 A description of these examples and instructions on how to run them can be found in the manual. 
 
+Under the R directory, we provide tools to run the examples via cmdStan and look at diagnostic plots.
 
 C++ Code
 --------
@@ -54,8 +55,3 @@ Updates
 08/02 
 * Update Stan and Math branch to match stan-dev. This is important because of the recent bug fix in stan 2.10. 
 
-
-Future Development on Example Branch
-------------------------------------
-* Create project directory with R scripts to facilitate simulating data, running Stan, and doing posterior predictive checks. 
-* Upload example for Effect Compartment Model and Friberg-Karlsson model
