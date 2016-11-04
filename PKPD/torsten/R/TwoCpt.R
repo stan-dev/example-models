@@ -2,6 +2,7 @@ rm(list = ls())
 gc()
 
 modelName <- "TwoCptModel"
+# modelName <- "LinTwoCptModel"
 # modelName <- "GenTwoCptModel"
 
 ## Adjust directories to your settings.
