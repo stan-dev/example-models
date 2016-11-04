@@ -33,13 +33,15 @@ For each model, we provide the following files:
 
 The simulation file can be used to create the data and init files. 
 
-A description of these examples and instructions on how to run them can be found in the manual. 
+There are three Stan files for the simple two compartment model: `TwoCptModel`, `LinTwoCptModel`, and `GenTwoCptModel`. This is probably a good place to start. `effCptModel` tackles a PKPD model based on a linear ODE system, and the Friberg-Karlsson model a semi-mechanist model described by a nonlinear ODE system. Finally, `TwoCptModelPopulation` extends the two compartment model to the case where we have data from multiple patients with inter-individual variability in the parameters. 
 
-Under the R directory, we provide tools to run the examples via cmdStan and look at diagnostic plots.
+See the manual for more assistance.
+
+Under the R directory, we provide tools to run the examples via cmdStan and look at diagnostic plots for a two compartment model and a two compartment population model.
 
 C++ Code
 --------
-This C++ code for Torsten can be found on the following repos:
+The C++ code for Torsten can be found on the following repos:
 
 Math Library: https://github.com/charlesm93/math/tree/feature/issue-314-torsten-pharmacometrics
 
