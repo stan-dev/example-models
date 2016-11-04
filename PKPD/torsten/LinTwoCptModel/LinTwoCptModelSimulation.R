@@ -39,7 +39,7 @@ $TABLE table(DV) = CP*exp(EPS(1));
 
 mod <- mread("accum", tempdir(),code) %>% Req(DV) %>% update(end=480,delta=0.1)
 
-e1 <- ev(amt=5000, rate = 150) # Create an initial dosing event
+e1 <- ev(amt=5000) # Create an initial dosing event
 mod %>% ev(e1) %>% mrgsim(end=20) %>% plot # plot data
 
 # create time at which data will be observed 
