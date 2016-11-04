@@ -169,4 +169,3 @@ generated quantities{
   }
 
 }
-

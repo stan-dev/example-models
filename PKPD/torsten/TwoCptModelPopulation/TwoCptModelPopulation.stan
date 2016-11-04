@@ -1,8 +1,3 @@
-## TwoCptModelPopulation.stan
-## v1.3 - example
-
-
-
 data{
   int<lower = 1> nt;
   int<lower = 1> nObs;
@@ -116,15 +111,15 @@ model{
 }
 
 generated quantities{
+    real cObsCond[nObs];
     vector[nt] cHatPred;
-    real logCObsPred[nt];
+    real cObsPred[nObs];
     matrix[nt, 3] xPred;
     matrix[nIIV, nSubjects] etaStdPred;
     matrix<lower=0>[nSubjects, nIIV] thetaPredM;
     corr_matrix[nIIV] rho;
     vector<lower = 0>[nTheta] thetaPred[1];
-    real logCObsCond[nt];
-
+    
     rho = L * L';
     
     for(i in 1:nSubjects){
@@ -162,17 +157,9 @@ generated quantities{
         cHatPred[i] = xPred[i, 2] / thetaPred[1][3];
       }
     }
-    
-    // Need to check the following lines: individual predictions do not work
-    for(i in 1:nt){
-      if(evid[i] == 1){
-        logCObsCond[i] = -99;
-        logCObsPred[i] = -99;
-      }
-      else{
-        logCObsCond[i] = normal_rng(log(cHat[i]), sigma);
-        logCObsPred[i] = normal_rng(log(cHatPred[i]), sigma);
-      }
-    }   
 
+  for(i in 1:nObs){
+      cObsCond[i] = exp(normal_rng(log(cHatObs[i]), sigma)); # individual predictions
+      cObsPred[i] = exp(normal_rng(log(cHatPred[iObs[i]]), sigma)); # population predictions
+    }
 }

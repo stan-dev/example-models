@@ -1,6 +1,5 @@
 ## GenTwoCptModelExample.stan
-## v1.3 - Example
-## Test model for Stan Pmetrics function PKModelTwoCpt.
+## Run two compartment model using numerical solution
 ## Heavily anotated to help new users
 
 functions{
@@ -145,5 +144,3 @@ generated quantities{
     }
 			 
 }
-
-

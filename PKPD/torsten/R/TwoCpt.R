@@ -91,7 +91,7 @@ ptable <- parameterTable(fit, parametersToPlot)
 write.csv(ptable, file = file.path(tabDir, paste(modelName, "ParameterTable.csv", sep = "")))
 
 ################################################################################################
-## posterior predictive distributions
+## posterior predictive plot
 data <- read_rdump(file.path(modelDir, paste0(modelName,".data.R")))
 data <- data.frame(data$cObs, data$time[-1])
 data <- plyr::rename(data, c("data.cObs" = "cObs", "data.time..1." = "time"))

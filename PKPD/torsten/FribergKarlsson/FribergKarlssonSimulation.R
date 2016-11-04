@@ -1,5 +1,4 @@
 ## Template to simulate PKPD data
-##
 ## Fribgerg-Karlsson population model
 
 modelName <- "fribergKarlsson"

@@ -1,6 +1,5 @@
 ## TwoCptModel.stan
-## v1.3 - example
-## Test model for Torsten function PKModelTwoCpt.
+## Run two compartment model using built-in analytical solution 
 ## Heavily anotated to help new users
 
 data{

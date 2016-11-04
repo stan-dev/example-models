@@ -1,7 +1,5 @@
 ## Template to simulate PKPD data for population model
-##
-## Model Parameters: CL=5, Q=8, V1=20, V2=70, KA=1.2, SIGMA = 0.0025
-## Inter-individual variability on all PK parammeters (0.0025)
+## Inter-individual variability on all PK parammeters
 
 rm(list = ls())
 gc()
