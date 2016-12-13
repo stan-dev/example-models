@@ -8,7 +8,7 @@ data {
 transformed data {
   vector[nyears] year_squared;
 
-  year_squared <- year .* year;
+  year_squared = year .* year;
 }
 
 parameters {
@@ -21,9 +21,9 @@ transformed parameters {
   vector[nyears] logit_p;
 
   // Linear predictor
-  logit_p <- alpha +
-             beta1 * year +
-             beta2 * year_squared;
+  logit_p = alpha
+          + beta1 * year
+          + beta2 * year_squared;
 }
 
 model {
@@ -41,5 +41,5 @@ generated quantities {
   real<lower=0,upper=1> p[nyears];
 
   for (i in 1:nyears)
-    p[i] <- inv_logit(logit_p[i]);
+    p[i] = inv_logit(logit_p[i]);
 }
