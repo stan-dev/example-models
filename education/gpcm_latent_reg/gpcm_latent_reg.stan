@@ -2,7 +2,7 @@ functions {
   vector gpcm_probs(real theta, real mu, real alpha, vector beta) {
     vector[rows(beta) + 1] unsummed;
     vector[rows(beta) + 1] probs;
-    unsummed <- append_row(rep_vector(0.0, 1), alpha*theta + mu - beta);
+    unsummed <- append_row(rep_vector(0.0, 1), alpha*(theta + mu - beta));
     probs <- softmax(cumulative_sum(unsummed));
     return probs;
   }

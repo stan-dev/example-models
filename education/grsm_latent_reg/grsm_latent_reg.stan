@@ -2,7 +2,7 @@ functions {
   vector grsm_probs(real theta, real mu, real alpha, real beta, vector kappa) {
     vector[rows(kappa) + 1] unsummed;
     vector[rows(kappa) + 1] probs;
-    unsummed <- append_row(rep_vector(0, 1), alpha*theta + mu - beta - kappa);
+    unsummed <- append_row(rep_vector(0, 1), alpha*(theta + mu - beta - kappa));
     probs <- softmax(cumulative_sum(unsummed));
     return probs;
   }
