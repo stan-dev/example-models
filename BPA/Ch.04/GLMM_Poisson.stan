@@ -4,6 +4,14 @@ data {
   vector[n] year;       // Year
 }
 
+transformed data {
+  vector[n] year_squared;
+  vector[n] year_cubed;
+
+  year_squared = year .* year;
+  year_cubed = year .* year .* year;
+}
+
 parameters {
   real<lower=-20,upper=20> alpha;
   real<lower=-10,upper=10> beta1;
@@ -17,11 +25,11 @@ transformed parameters {
   vector[n] log_lambda;
 
   // Linear predictor incl. random year effect
- log_lambda <- alpha +
-               beta1 * year +
-               beta2 * year .* year +
-               beta3 * year .* year .* year +
-               eps;
+ log_lambda = alpha
+            + beta1 * year
+            + beta2 * year_squared
+            + beta3 * year_cubed
+            + eps;
 }
 
 model {
@@ -40,5 +48,5 @@ model {
 generated quantities {
   vector<lower=0>[n] lambda;
 
-  lambda <- exp(log_lambda);
+  lambda = exp(log_lambda);
 }
