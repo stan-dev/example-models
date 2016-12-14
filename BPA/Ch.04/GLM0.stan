@@ -15,11 +15,9 @@ parameters {
 }
 
 transformed parameters {
-  real log_lambda[nyear, nsite];
+  matrix[nyear, nsite] log_lambda;
 
-  for (i in 1:nyear)
-    for (j in 1:nsite)
-      log_lambda[i, j] <- alpha;
+  log_lambda = rep_matrix(alpha, nyear, nsite);
 }
 
 model {
@@ -35,5 +33,5 @@ generated quantities {
   int<lower=0> mis[nmis];
 
   for (i in 1:nmis)
-    mis[i] <- poisson_log_rng(log_lambda[misyear[i], missite[i]]);
+    mis[i] = poisson_log_rng(log_lambda[misyear[i], missite[i]]);
 }

@@ -16,7 +16,7 @@ data {
 
 parameters {
   real mu;                      // Overall intercept
-  real beta1;                   // Overall trend 
+  real beta1;                   // Overall trend
   real beta2;                   // First-year observer effect
   vector[nsite] alpha;          // Random site effects
   real<lower=0,upper=3> sd_alpha;
@@ -27,12 +27,12 @@ parameters {
 }
 
 transformed parameters {
-  vector[nsite] log_lambda[nyear];
+  matrix[nyear, nsite] log_lambda;
 
-  for (i in 1:nyear)
-    for (j in 1:nsite)
-      log_lambda[i][j] <- mu + beta1 * year[i] + beta2 * first[i, j] +
-                          alpha[j] + gamma[newobs[i, j]] + eps[i];
+  for (j in 1:nsite)
+    for (i in 1:nyear)
+      log_lambda[i, j] = mu + beta1 * year[i] + beta2 * first[i, j]
+                       + alpha[j] + gamma[newobs[i, j]] + eps[i];
 }
 
 model {
@@ -42,22 +42,22 @@ model {
   beta2 ~ normal(0, 10);
 
   alpha ~ normal(0, sd_alpha);
-  sd_alpha ~ uniform(0, 3);
+  //  sd_alpha ~ uniform(0, 3); // Implicitly defined
 
   eps ~ normal(0, sd_eps);
-  sd_eps ~ uniform(0, 1);
+  //  sd_eps ~ uniform(0, 1);   // Implicitly defined
 
-  gamma ~ normal(0, sd_gamma); 
-  sd_gamma ~ uniform(0, 1);
+  gamma ~ normal(0, sd_gamma);
+  //  sd_gamma ~ uniform(0, 1); // Implicitly defined
 
   // Likelihood
   for (i in 1:nobs)
-    obs[i] ~ poisson_log(log_lambda[obsyear[i]][obssite[i]]);
+    obs[i] ~ poisson_log(log_lambda[obsyear[i], obssite[i]]);
 }
 
 generated quantities {
   int<lower=0> mis[nmis];
 
   for (i in 1:nmis)
-    mis[i] <- poisson_log_rng(log_lambda[misyear[i]][missite[i]]);
+    mis[i] = poisson_log_rng(log_lambda[misyear[i], missite[i]]);
 }
