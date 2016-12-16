@@ -8,11 +8,11 @@ transformed data {
   int<lower=0> s[M];            // Totals in each row
   int<lower=0> C;               // Size of observed data set
 
-  C <- 0;
+  C = 0;
   for (i in 1:M) {
-    s[i] <- sum(y[i]);
+    s[i] = sum(y[i]);
     if (s[i] > 0)
-      C <- C + 1;
+      C = C + 1;
   }
 }
 
@@ -22,9 +22,9 @@ parameters {
 }
 
 model {
-  // Priors
-  omega ~ uniform(0, 1);
-  p ~ uniform(0, 1);
+  // Priors are imlicitly defined;
+  //  omega ~ uniform(0, 1);
+  //  p ~ uniform(0, 1);
 
   // Likelihood
   for (i in 1:M) {
@@ -32,15 +32,15 @@ model {
 
     if (s[i] > 0) {
       // z[i] == 1
-      increment_log_prob(bernoulli_log(1, omega) +
-                         binomial_log(s[i], T, p));
+      target += bernoulli_lpmf(1 | omega)
+              + binomial_lpmf(s[i] | T, p);
     } else { // s[i] == 0
       // z[i] == 1
-      lp[1] <- bernoulli_log(1, omega) +
-               binomial_log(0, T, p);
+      lp[1] = bernoulli_lpmf(1 | omega)
+            + binomial_lpmf(0 | T, p);
       // z[i] == 0
-      lp[2] <- bernoulli_log(0, omega);
-      increment_log_prob(log_sum_exp(lp));
+      lp[2] = bernoulli_lpmf(0 | omega);
+      target += log_sum_exp(lp[1], lp[2]);
     }
   }
 }
@@ -48,5 +48,5 @@ model {
 generated quantities {
   int<lower=C> N;
 
-  N <- C + binomial_rng(M, omega * pow(1 - p, T));
+  N = C + binomial_rng(M, omega * (1 - p)^T);
 }
