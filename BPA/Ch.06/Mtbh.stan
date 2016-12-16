@@ -8,11 +8,11 @@ transformed data {
   int<lower=0> s[M];            // Detection times for each species
   int<lower=0> C;               // Number of observed species
 
-  C <- 0;
+  C = 0;
   for (i in 1:M) {
-    s[i] <- sum(y[i]);
+    s[i] = sum(y[i]);
     if (s[i] > 0)
-      C <- C + 1;
+      C = C + 1;
   }
 }
 
@@ -29,28 +29,28 @@ transformed parameters {
   vector<lower=0,upper=1>[T] p[M];
 
   for (j in 1:T)
-    alpha[j] <- logit(mean_p[j]); // Define logit
+    alpha[j] = logit(mean_p[j]); // Define logit
   for (i in 1:M) {
     real logit_p[M, T];
 
     // First occasion: no term for recapture (gamma)
-    logit_p[i, 1] <- alpha[1] + eps[i];
-    p[i][1] <- inv_logit(logit_p[i, 1]);
+    logit_p[i, 1] = alpha[1] + eps[i];
+    p[i][1] = inv_logit(logit_p[i, 1]);
 
     // All subsequent occasions: includes recapture term (gamma)
     for (j in 2:T) {
-      logit_p[i, j] <- alpha[j] + eps[i] + gamma * y[i, j - 1];
-      p[i][j] <- inv_logit(logit_p[i, j]);
+      logit_p[i, j] = alpha[j] + eps[i] + gamma * y[i, j - 1];
+      p[i][j] = inv_logit(logit_p[i, j]);
     }
   }
 }
 
 model {
   // Priors
-  omega ~ uniform(0, 1);
-  mean_p ~ uniform(0, 1);         // Detection intercepts
+  //  omega ~ uniform(0, 1);
+  //  mean_p ~ uniform(0, 1);
   gamma ~ normal(0, 10);
-  sigma ~ uniform(0, 3);
+  //  sigma ~ uniform(0, 3);
 
   // Likelihood
   for (i in 1:M) {
@@ -61,15 +61,15 @@ model {
 
     if (s[i] > 0) {
       // z[i] == 1
-      increment_log_prob(bernoulli_log(1, omega) +
-                         bernoulli_log(y[i], p[i]));
+      target += bernoulli_lpmf(1 | omega)
+              + bernoulli_lpmf(y[i] | p[i]);
     } else { // s[i] == 0
       // z[i] == 1
-      lp[1] <- bernoulli_log(1, omega) +
-               bernoulli_log(0, p[i]);
+      lp[1] = bernoulli_lpmf(1 | omega)
+            + bernoulli_lpmf(0 | p[i]);
       // z[i] == 0
-      lp[2] <- bernoulli_log(0, omega);
-      increment_log_prob(log_sum_exp(lp));
+      lp[2] = bernoulli_lpmf(0 | omega);
+      target += log_sum_exp(lp[1], lp[2]);
     }
   }
 }
@@ -82,8 +82,8 @@ generated quantities {
     real pr;
 
 
-    pr <- prod(rep_vector(1.0, T) - p[i]);
-    zero[i] <- bernoulli_rng(omega * pr);
+    pr = prod(rep_vector(1.0, T) - p[i]);
+    zero[i] = bernoulli_rng(omega * pr);
   }
-  N <- C + sum(zero);
+  N = C + sum(zero);
 }
