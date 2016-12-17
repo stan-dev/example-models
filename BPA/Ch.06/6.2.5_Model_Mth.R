@@ -21,8 +21,8 @@ params <- c("N", "mean_p", "mean_lp", "sigma", "omega")
 
 ## MCMC settings
 ni <- 15000
-nt <- 5
-nb <- 10000
+nt <- 10
+nb <- 5000
 nc <- 4
 
 ## Call Stan from R

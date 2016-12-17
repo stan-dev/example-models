@@ -22,16 +22,16 @@ stan_data <- list(y = as.matrix(y), M = nrow(y), T = ncol(y))
 params <- c("N", "mean_p", "gamma", "sigma", "omega")
 
 ## MCMC settings
-ni <- 30000
+ni <- 15000
 nt <- 10
-nb <- 20000
+nb <- 5000
 nc <- 4
 
 ## Initial values
 inits <- lapply(1:nc, function(i) {
     list(mean_p = runif(ncol(y), 0.1, 0.5),
          sigma = runif(1, 0.5, 1.0),
-         omega = runif(1, 0.1, 0.5),
+         omega = runif(1, 0.2, 0.5),
          gamma = runif(1, -0.5, 0.5),
          eps = runif(nrow(y), -1, 1))})
 
