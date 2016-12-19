@@ -21,6 +21,8 @@ parameters {
   real<lower=0,upper=1> mean_p[T];      // Mean detection probability
   real gamma;
   real<lower=0,upper=3> sigma;
+  // In case a weakly informative prior is used
+  //  real<lower=0> sigma;
   real<lower=-16,upper=16> eps[M];
 }
 
@@ -31,26 +33,29 @@ transformed parameters {
   for (j in 1:T)
     alpha[j] = logit(mean_p[j]); // Define logit
   for (i in 1:M) {
-    real logit_p[M, T];
+    real logit_p;
 
     // First occasion: no term for recapture (gamma)
-    logit_p[i, 1] = alpha[1] + eps[i];
-    p[i][1] = inv_logit(logit_p[i, 1]);
+    logit_p = alpha[1] + eps[i];
+    p[i][1] = inv_logit(logit_p);
 
     // All subsequent occasions: includes recapture term (gamma)
     for (j in 2:T) {
-      logit_p[i, j] = alpha[j] + eps[i] + gamma * y[i, j - 1];
-      p[i][j] = inv_logit(logit_p[i, j]);
+      logit_p = alpha[j] + eps[i] + gamma * y[i, j - 1];
+      p[i][j] = inv_logit(logit_p);
     }
   }
 }
 
 model {
   // Priors
+  gamma ~ normal(0, 10);
+  // Uniform priors are implicitly defined.
   //  omega ~ uniform(0, 1);
   //  mean_p ~ uniform(0, 1);
-  gamma ~ normal(0, 10);
   //  sigma ~ uniform(0, 3);
+  // In case a weakly informative prior is used
+  //  sigma ~ normal(1.5, 0.75);
 
   // Likelihood
   for (i in 1:M) {

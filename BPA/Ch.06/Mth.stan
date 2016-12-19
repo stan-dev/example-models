@@ -20,6 +20,8 @@ parameters {
   real<lower=0,upper=1> omega;          // Inclusion probability
   real<lower=0,upper=1> mean_p[T];      // Mean detection probability
   real<lower=0,upper=5> sigma;
+  // In case a weakly informative prior is used
+  //  real<lower=0> sigma;
   real eps[M];                          // Random effects
 }
 
@@ -39,6 +41,8 @@ model {
   //  omega ~ uniform(0, 1);
   //  mean_p ~ uniform(0, 1);
   //  sigma ~ uniform(0, 5);
+  // In case a weakly informative prior is used
+  //  sigma ~ normal(2.5, 1.25);
 
   // Likelihood
   for (i in 1:M) {
