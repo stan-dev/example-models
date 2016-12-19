@@ -20,7 +20,9 @@ parameters {
   real<lower=0,upper=1> omega;          // Inclusion probability
   real<lower=0,upper=1> mean_p[T];      // Mean detection probability
   real gamma;
-  real<lower=0> sigma;
+  real<lower=0,upper=3> sigma;
+  // In case a weakly informative prior is used
+  //  real<lower=0> sigma;
   real<lower=-16,upper=16> eps[M];
 }
 
@@ -47,12 +49,13 @@ transformed parameters {
 
 model {
   // Priors
+  gamma ~ normal(0, 10);
+  // Uniform priors are implicitly defined.
   //  omega ~ uniform(0, 1);
   //  mean_p ~ uniform(0, 1);
-  gamma ~ normal(0, 10);
-  // A weakly informative prior is used for sigma
-  //  instead of uniform(0, 3).
-  sigma ~ cauchy(0, 2.5);
+  //  sigma ~ uniform(0, 3);
+  // In case a weakly informative prior is used
+  //  sigma ~ normal(1.5, 0.75);
 
   // Likelihood
   for (i in 1:M) {
