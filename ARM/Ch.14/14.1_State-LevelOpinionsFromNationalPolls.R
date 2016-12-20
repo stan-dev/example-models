@@ -1,6 +1,7 @@
 library(rstan)
 library(ggplot2)
 library(gridBase)
+library(grid)
 library(boot)
 ## Read the data & define variables
 # Data are at http://www.stat.columbia.edu/~gelman/arm/examples/election88
