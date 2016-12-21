@@ -1,4 +1,4 @@
-// This models is derived from section 11.3 of "Stan Modeling Language
+// This models is derived from section 12.3 of "Stan Modeling Language
 // User's Guide and Reference Manual"
 
 functions {
@@ -12,7 +12,7 @@ functions {
   int last_capture(int[] y_i) {
     for (k_rev in 0:(size(y_i) - 1)) {
       int k;
-      k <- size(y_i) - k_rev;
+      k = size(y_i) - k_rev;
       if (y_i[k])
         return k;
     }
@@ -24,17 +24,17 @@ functions {
     matrix[nind, n_occasions] chi;
 
     for (i in 1:nind) {
-      chi[i, n_occasions] <- 1.0;
+      chi[i, n_occasions] = 1.0;
       for (t in 1:(n_occasions - 1)) {
         int t_curr;
         int t_next;
 
-        t_curr <- n_occasions - t;
-        t_next <- t_curr + 1;
-        chi[i, t_curr] <- (1 - phi[i, t_curr]) +
-                          phi[i, t_curr] *
-                          (1 - p[i, t_next - 1]) *
-                          chi[i, t_next];
+        t_curr = n_occasions - t;
+        t_next = t_curr + 1;
+        chi[i, t_curr] = (1 - phi[i, t_curr])
+                       + phi[i, t_curr]
+                       * (1 - p[i, t_next - 1])
+                       * chi[i, t_next];
       }
     }
     return chi;
@@ -56,9 +56,9 @@ transformed data {
   int<lower=0,upper=n_occasions> last[nind];
 
   for (i in 1:nind)
-    first[i] <- first_capture(y[i]);
+    first[i] = first_capture(y[i]);
   for (i in 1:nind)
-    last[i] <- last_capture(y[i]);
+    last[i] = last_capture(y[i]);
 }
 
 parameters {
@@ -75,20 +75,20 @@ transformed parameters {
   vector[g] mu_phi;
 
   for (u in 1:g)
-    mu_phi[u] <- logit(mean_phi[u]);
+    mu_phi[u] = logit(mean_phi[u]);
 
   // Constraints
   for (i in 1:nind) {
     for (t in 1:(first[i] - 1)) {
-      phi[i, t] <- 0;
-      p[i, t] <- 0;
+      phi[i, t] = 0;
+      p[i, t] = 0;
     }
     for (t in first[i]:(n_occasions - 1)) {
-      phi[i, t] <- inv_logit(eta_phi[t, group[i]]);
-      p[i, t] <- p_g[group[i]];
+      phi[i, t] = inv_logit(eta_phi[t, group[i]]);
+      p[i, t] = p_g[group[i]];
     }
   }
-  chi <- prob_uncaptured(nind, n_occasions, p, phi);
+  chi = prob_uncaptured(nind, n_occasions, p, phi);
 }
 
 model {
@@ -97,11 +97,12 @@ model {
   Sigma ~ inv_wishart(df, R);
 
   for (t in 1:(n_occasions - 1))
-    increment_log_prob(multi_normal_log(row(eta_phi, t), mu_phi, Sigma));
-  mean_phi ~ uniform(0, 1);
+    eta_phi[t] ~ multi_normal(mu_phi, Sigma);
+  // Uniform priors are implicitly defined.
+  //  mean_phi ~ uniform(0, 1);
 
   // for recapture parameters
-  p_g ~ uniform(0, 1);
+  //  p_g ~ uniform(0, 1);
 
   // Likelihood
   for (i in 1:nind) {

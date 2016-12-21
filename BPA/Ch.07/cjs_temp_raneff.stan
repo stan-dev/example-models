@@ -1,4 +1,4 @@
-// This models is derived from section 11.3 of "Stan Modeling Language
+// This models is derived from section 12.3 of "Stan Modeling Language
 // User's Guide and Reference Manual"
 
 functions {
@@ -12,7 +12,7 @@ functions {
   int last_capture(int[] y_i) {
     for (k_rev in 0:(size(y_i) - 1)) {
       int k;
-      k <- size(y_i) - k_rev;
+      k = size(y_i) - k_rev;
       if (y_i[k])
         return k;
     }
@@ -24,17 +24,17 @@ functions {
     matrix[nind, n_occasions] chi;
 
     for (i in 1:nind) {
-      chi[i, n_occasions] <- 1.0;
+      chi[i, n_occasions] = 1.0;
       for (t in 1:(n_occasions - 1)) {
         int t_curr;
         int t_next;
 
-        t_curr <- n_occasions - t;
-        t_next <- t_curr + 1;
-        chi[i, t_curr] <- (1 - phi[i, t_curr]) +
-                          phi[i, t_curr] *
-                          (1 - p[i, t_next - 1]) *
-                          chi[i, t_next];
+        t_curr = n_occasions - t;
+        t_next = t_curr + 1;
+        chi[i, t_curr] = (1 - phi[i, t_curr])
+                       + phi[i, t_curr]
+                       * (1 - p[i, t_next - 1])
+                       * chi[i, t_next];
       }
     }
     return chi;
@@ -52,15 +52,17 @@ transformed data {
   int<lower=0,upper=n_occasions> last[nind];
 
   for (i in 1:nind)
-    first[i] <- first_capture(y[i]);
+    first[i] = first_capture(y[i]);
   for (i in 1:nind)
-    last[i] <- last_capture(y[i]);
+    last[i] = last_capture(y[i]);
 }
 
 parameters {
   real<lower=0,upper=1> mean_phi;    // Mean survival
   real<lower=0,upper=1> mean_p;      // Mean recapture
   real<lower=0,upper=10> sigma;
+  // In case a weakly informative prior is used
+  //  real<lower=0> sigma;
   real epsilon[n_occasions - 1];
 }
 
@@ -70,28 +72,31 @@ transformed parameters {
   matrix<lower=0,upper=1>[nind, n_occasions] chi;
   real mu;
 
-  mu <- logit(mean_phi);
+  mu = logit(mean_phi);
   // Constraints
   for (i in 1:nind) {
     for (t in 1:(first[i] - 1)) {
-      phi[i, t] <- 0;
-      p[i, t] <- 0;
+      phi[i, t] = 0;
+      p[i, t] = 0;
     }
     for (t in first[i]:(n_occasions - 1)) {
-      phi[i, t] <- inv_logit(mu + epsilon[t]);
-      p[i, t] <- mean_p;
+      phi[i, t] = inv_logit(mu + epsilon[t]);
+      p[i, t] = mean_p;
     }
   }
 
-  chi <- prob_uncaptured(nind, n_occasions, p, phi);
+  chi = prob_uncaptured(nind, n_occasions, p, phi);
 }
 
 model {
   // Priors
-  mean_phi ~ uniform(0, 1);
-  mean_p ~ uniform(0, 1);
+  // Uniform priors are implicitly defined.
+  //  mean_phi ~ uniform(0, 1);
+  //  mean_p ~ uniform(0, 1);
+  //  sigma ~ uniform(0, 10);
+  // In case weakly informative prior is used
+  //  sigma ~ normal(5, 2.5);
   epsilon ~ normal(0, sigma);
-  sigma ~ uniform(0, 10);
 
   // Likelihood
   for (i in 1:nind) {
@@ -108,5 +113,5 @@ model {
 generated quantities {
   real<lower=0> sigma2;
 
-  sigma2 <- square(sigma);
+  sigma2 = square(sigma);
 }
