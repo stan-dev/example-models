@@ -30,7 +30,7 @@ inits <- lapply(1:nc, function(i) {
 cjs_group_raneff <- stan("cjs_group_raneff.stan",
                          data = stan_data, init = inits, pars = params,
                          chains = nc, iter = ni, warmup = nb, thin = nt,
-                         control = list(adapt_delta = 0.95),
+                         control = list(adapt_delta = 0.99),
                          seed = 1,
                          open_progress = FALSE)
 ## Note: there may be divergent transitions after warmup.
