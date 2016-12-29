@@ -1,7 +1,7 @@
 ---
 title: "Hidden Markov Models and Circular Statistics for Animal Movement Models"
 author: "Bob Carpenter"
-date: "8 July 2016"
+date: "6 September 2016"
 output: 
   html_document: 
     theme: readable
@@ -9,26 +9,258 @@ output:
 
 ### Abstract
 
-This case study applies hidden Markov models to the study of animal
-movement.  The basic data is a time series of positions for one or
-more animals, possibly with environmental or animal-specific
-covariates.  The positions are converted to changes in bearing and
-distances traveled.  Circular statistics are required to model the
-changes in bearing, which take on continuous values ranging from
-$-\pi$ to $\pi$ radians, with the two endpoints being wrapped.
+Animal movement studies record the position of one or more animals
+over time.  In this case study, we will assume position is measured in
+two dimensions (e.g., latitude and longitude) at equal time intervals
+for one or more animals, along with environmental covariates such as
+temperature, time of day, or distance and direction to the nearest
+body of water water.  We demonstrates how to model such data using
+hidden Markov models and then program the models in Stan in order to
+carry out (penalized) maximum likelihood estimates of parameters using
+optimization, full Bayesian inference using sampling, and approximate
+Bayesian inference using variational techniques.
 
-### Hidden Markov Models
+**Extensions**: covariates, multiple animals with hierarchical model, missing data,
+		measurement error, history
 
-The top-level structure of our animal movement model will assume that
-animal behavior is a mixture of discrete states, such as foraging,
-resting, or moving.  For each state, there will be a probability of
-transitioning into each other state.  The animal's state then
-determines the distribution of observable variables, such as change in
-bearing (turning angle) and distance moved.  In statistical terms, the
-states make up a Markov model and the observations are conditionally
-independent of each other given the state.
 
-#### The "hidden" Markov model
+### Hidden Markov models
+
+Hidden Markov models (HMM) are finite mixture models where the
+sequence of latent (unobserved, or hidden) states determining the
+mixture component forms a Markov chain.
+
+Suppose we have $K$ mixture components.  For generating a sequence of
+$N$ items, we first generate the latent states $z_1, \ldots, z_N$,
+with $z_n \in 1{:}K$ indicating the mixture component of observation
+$n$.  The first state is generated according to
+
+\[
+z_1 \sim \mbox{Categorical}(\psi),
+\]
+
+where $\psi$ is a $K$-simplex, i.e., $\psi_{k} \geq 0$ and
+$\sum_{k=1}^K \psi_k = 1$.  Thus the marginal distribution of initial
+states $z_1$ is given by
+
+\[
+\mbox{Pr}[z_1 = k] = \psi_k.
+\]
+
+Each subsequent state $z_n$ is generated conditionally independently
+given the previous state $z_{n-1}$ as
+
+\[
+z_n \sim \mbox{Categorical}(\theta_{z_{n-1}}),
+\]
+
+where $\theta_k$ is a $K$-simplex of transition probabilities from
+state $k$ for $k \in 1{:}K$, i.e., $\theta{k',k} \geq 0$ and 
+$\sum_{k=1}^K \theta{k', k} = 1$.  That is,
+
+\[
+\mbox{Pr}[z_n = k | z_{n-1} = k'] = \theta_{k', k}
+\]
+
+The observations $y_1, \ldots, y_N$ are then generated from the
+mixture component indicated by their state $z_n \in 1{:}K$,
+
+
+\[
+y_n \sim \mbox{Foo}(\phi_{z_n})
+\]
+
+where Foo is the sampling distribution and $\phi_k$ is the sequence of
+parameters for mixture component $k$ for $k \in 1{:}K$.
+
+### Likelihood via the forward algorithm
+
+The likelihood $p(y | \theta, \phi, \psi)$ can be calculated using the
+forward algorithm.  The forward algorithm defines the forward variables
+
+\[
+\alpha_{n, k} = p(z_n = k, y_1, \ldots, y_k | \psi, \theta, \phi)
+\]
+
+so that
+
+\[
+p(y_1, \ldots, y_n | \psi, \theta, \phi) = \sum_{k=1}^{K} \alpha_{n, k}
+\]
+
+The algorithm proceeds by dynamic programming, starting with the base case,
+
+\[
+\alpha_{1, k} = \psi_k \mbox{Foo}(y_1 | \phi_k)
+\]
+
+and then building out for $n > 1$, 
+
+\[
+\alpha_{n, k} = \sum_{k' = 1}^K \alpha_{n-1, k'} \, \theta_{k', k} \, \mbox{Foo}(y_n | \phi_k)
+\]
+
+By construction, the likelihood is given by the 
+
+\[
+p(y_1, \ldots, y_N | \psi, \theta, \phi)
+= \sum_{k=1}^K \alpha_{N, k}
+\]
+
+For arithmetic stability, calculations actually take place on the log scale, with
+
+\[
+\log \alpha_{1, k} = \log \psi_k + \log \mbox{Foo}(y_1 | \phi_k)
+\]
+and
+\[
+\log \alpha_{n, k}
+= \mbox{log_sum_exp}_{k' = 1}^K   
+  \left( \log \alpha_{n-1, k'} + \log \theta_{k', k} + \log \mbox{Foo}(y_n | \phi_k) \right)
+\]
+
+
+where
+
+\[
+\mbox{log_sum_exp}_{i=1}^I u_i = \log \sum_{i=1}^I \exp(u_i).
+\]
+
+The unobserved latent states can be marginalized out of predictions
+using the forward algorithm.
+
+
+
+### Hidden Markov models of animal movement
+
+Hidden Markov model (HMM) assume that at each time point, an animal is
+modeled as being in one of $K$ states, such as foraging, transiting,
+or sleeping.  In this way, hidden Markov models (HMMs), are a kind of
+discrete time-series finite mixture model.  In the simplest case,
+transitions frome one state to the next are modeled categorically
+based only on the previous state, the movement at each time point
+depends only on the current state.  By coding movement in terms of
+change of bearing and distance traveled, HMMs can model directed
+movement.  For example, a directed transit state can generate
+relatively large distances traveled and relatively small changes in
+bearing, whereas a foraging state would involve broad changes in
+direction and relatively short distances traveled.
+
+### Discrete fomulation of simple hidden Markov models
+
+We start with the simplest form of HMMs and apply them to a single
+animal's movement.
+
+#### Observations
+
+We will assume the position of a single animal is measured at $N+1$
+equal time points in terms of latitude and longitude; rather than
+accounting for the curvature of the Earth, we will assume these points
+form a plane.  With a little trigonometry, these positional
+measurements are then transformed into $N$ measurements consisting of
+a pair $y_n = (\gamma_n, \delta_n)$, where $\gamma_n \in (-\pi,\pi)$
+is the change in bearing (an angle in radians) and $\delta_n > 0$ is
+the distance moved.
+
+#### Number of States
+
+Although it is a modeling decision, we will treat the number $K$ of
+distinct behavioral states as a constant; this is a modeling
+assumption, with different numbers of states yielding more or less
+fine-grained models.  Because these states are only a crude model of
+animal behavior, we do not try to answer the non-questioon of the
+exact number of states; more states will provide finer-grained models,
+but may be less interpretable, so such judgements will remain
+subjective.  We will be able to evaluate how well models with varying
+numbers of states model animal movement, but more states will always
+be better in the sense that they encompass the smaller number of state
+models. 
+
+#### Latent State
+
+An HMM models the state of an animal at each observation using a
+discrete parameter $z_n \in 1{:}K$.  
+
+*State Change*: Simple HMMs model the behavioral state $z_{n+1}$ of an
+animal at point $n$ as being conditionally independent of all other
+parameters given the previous state $z_n$.  In the simple case with no
+covariate information, state change is assumed to follow a categorical
+distribution, 
+
+\[
+z_{n+1} \sim \mbox{Categorical}(\theta_{z_n}).
+\]
+
+These categorical distributions require parameter vectors $\theta_k$,
+with $\theta_{k, k'}$ being the probability that an animal in state
+$k$ will change to state $k'$ for the next time period.  This means
+that $\theta_k$ must be a $K$-simplex, i.e., $\theta_{k,k'} > 0$ and
+$\sum_{k'=1}^K \theta_{k'} = 1$.
+
+*State-Based Movement*: HMMs are flexible in terms of how observations
+ are generated based on state.  Here, we will generate the observation
+ pair $(\gamma_n, \delta_n)$ consisting of change in bearing and
+ distance moved independently based on the state $z_{n}$.  Because the
+ change in bearing must fall in $(-\pi, pi)$ radians and because $\pi$
+ and $-\pi$ both represent the same turn, it is natural to use a
+ circular distribution such as the von-Mises to model the change in
+ bearing in step $n$ using parameters that depend on the behavioral
+ state $z_n \in 1{:}K$,
+
+\[
+\gamma_n \sim \mbox{VonMises}(\mu_{z_n}, \kappa_{z_n})$,
+\]
+
+where the parameter $\mu_k \in (-\pi, \pi)$ is the mean change in
+direction and $\kappa_k > 0$ the scale of change for behavioral state
+$k \in 1{:}K$.
+
+The distance moved will be modeled with a Weibull distribution with
+parameters determined by behavioral state $z_n \in 1{:}K$ for step $n$,
+
+\[
+\delta_n \sim \mbox{Weibull}(\alpha_{z_n}, \sigma_{z_n})
+\]
+
+where $\alpha_k > 0$ is the location parameter and $\sigma_k$ the
+scale for the distances moved in state $k \in 1{:}K$.
+
+All of these parameters together generate the sampling distribution of
+latent states $z$ and observations $y$ as
+
+\[
+p(y, z| \theta, \mu, \kappa, \alpha)
+\ = \ 
+p(z | \theta) \ p(y | z, \mu, \kappa, \alpha),
+\]
+
+where
+
+\[
+p(z)
+= p(z_1 | \phi) 
+  \prod_{n = 2}^{N} \mbox{Categorical}(z_n | \theta_{z_{n-1}})
+\]
+
+and 
+
+\[
+p(y | z, \mu, \kappa, \alpha)
+= \prod_{n=1}^N 
+  \left(
+    \mbox{VonMises}(y_{n,1} | \mu_{z_n}, \kappa_{z_n})
+    \mbox{Weibull}(y_{n,2} | \alpha_{z_n}, \sigma_{z_n})
+  \right).
+\]
+
+* $K$: number of states
+* $\theta_k$ for $k \in 1:K$: $K$-simplex of transition probabilities from state $k$
+* $\phi_k$ for $k \in 1:K$: vector of emission parameters for state $k$
+
+To generate a time series of outcomes $y_1,\ldots, 
+
+
+We will assume
 
 At observation $t \in 1{:}T$, the animal will be
 assumed to be in state $z_t \in 1{:}K$.  For each state, the model

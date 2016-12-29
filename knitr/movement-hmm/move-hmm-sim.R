@@ -1,3 +1,5 @@
+library(rstan);
+
 rcat <- function(theta) sample(1:length(theta), size=1, prob=theta);
 
 N <- 10000;
@@ -19,8 +21,7 @@ turn <- turn - pi;
 alpha_dist <- c(1, 3);
 sigma_dist <- c(0.25, 0.5);
 dist <- rep(NA, N);
-for (n in 1:N) dist[n] <- rlnorm(1, alpha_dist[z[n]], sigma_dist[z[n]]);
-# was: rweibull(...)
+for (n in 1:N) dist[n] <- rweibull(1, alpha_dist[z[n]], sigma_dist[z[n]]);
 
 df <- data.frame(turn, dist);
 library(ggplot2);
@@ -37,6 +38,7 @@ plot;
 library(rstan);
 K <- 2;
 m <- stan_model("move-hmm.stan");
-fit <- sampling(m, data=c("N", "turn", "dist", "K"),
-                chains = 1, iter = 200,
-                control=list(stepsize=0.05, adapt_delta=0.9), refresh=2);
+fit <- stan("move-hmm.stan", 
+            data=c("N", "turn", "dist", "K"),
+            chains = 1, iter = 200,
+            control=list(stepsize=0.05, adapt_delta=0.9), refresh=2);

@@ -22,17 +22,21 @@ parameters {
   vector<lower=0>[K] sigma;
 }  
 model {
-  vector[K] log_theta[K];
+  vector[K] log_theta_tr[K];
   vector[K] lp;
+  vector[K] lp_p1;
 
-  for (k in 1:K) log_theta[k] = log(theta[k]);
+  for (k_from in 1:K)
+    for (k in 1:K)
+      log_theta_tr[k, k_from] = log(theta[k_from, k]);
   lp = rep_vector(-log(K), K);
   for (n in 1:N) {
     for (k in 1:K)
-      lp[k]
-        = log_sum_exp(log_theta[k] + lp)
+      lp_p1[k]
+        = log_sum_exp(log_theta_tr[k] + lp)
         + von_mises_lpdf(turn[n] | mu[k], kappa[k])
-        + lognormal_lpdf(dist[n] | alpha[k], sigma[k]);
+        + weibull_lpdf(dist[n] | alpha[k], sigma[k]);
+    lp = lp_p1;
   }
   target += log_sum_exp(lp);
 
