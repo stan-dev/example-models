@@ -42,7 +42,7 @@ transformed parameters {
     // Above main diagonal
     for (j in (t + 1):n_occ_minus_1) {
       pr_j[t, j] = phi_juv[t] * prod(phi_ad[(t + 1):j])
-                 * prod(q[t:(j - 1)]) * p[j];
+                  * prod(q[t:(j - 1)]) * p[j];
       pr_a[t, j] = prod(phi_ad[t:j]) * prod(q[t:(j - 1)]) * p[j];
     }
 
