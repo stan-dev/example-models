@@ -26,15 +26,18 @@ functions {
     for (i in 1:nind) {
       chi[i, n_occasions] = 1.0;
       for (t in 1:(n_occasions - 1)) {
+        // Compoud declaration was enabled in Stan 2.13
+        int t_curr = n_occasions - t;
+        int t_next = t_curr + 1;
+        /*
         int t_curr;
         int t_next;
 
         t_curr = n_occasions - t;
         t_next = t_curr + 1;
+        */
         chi[i, t_curr] = (1 - phi[i, t_curr])
-                       + phi[i, t_curr]
-                       * (1 - p[i, t_next - 1])
-                       * chi[i, t_next];
+                        + phi[i, t_curr] * (1 - p[i, t_next - 1]) * chi[i, t_next];
       }
     }
     return chi;
@@ -45,14 +48,17 @@ data {
   int<lower=0> nind;            // Number of individuals
   int<lower=2> n_occasions;     // Number of capture occasions
   int<lower=0,upper=1> y[nind, n_occasions];    // Capture-history
-  real x[n_occasions - 1];      // Covariate
+  vector[n_occasions - 1] x;    // Covariate
 }
 
 transformed data {
+  int n_occ_minus_1 = n_occasions - 1;
+  //  int n_occ_minus_1;
   int<lower=0,upper=n_occasions> first[nind];
   int<lower=0,upper=n_occasions> last[nind];
   vector<lower=0,upper=nind>[n_occasions] n_captured;
 
+  //  n_occ_minus_1 = n_occasions - 1;
   for (i in 1:nind)
     first[i] = first_capture(y[i]);
   for (i in 1:nind)
@@ -68,15 +74,15 @@ parameters {
   real beta;                          // Slope parameter
   real<lower=0,upper=1> mean_phi;     // Mean survival
   real<lower=0,upper=1> mean_p;       // Mean recapture
-  real epsilon[n_occasions - 1];
+  vector[n_occ_minus_1] epsilon;
   real<lower=0,upper=10> sigma;
   // In case a weakly informative prior is used
   //  real<lower=0> sigma;
 }
 
 transformed parameters {
-  matrix<lower=0,upper=1>[nind, n_occasions - 1] phi;
-  matrix<lower=0,upper=1>[nind, n_occasions - 1] p;
+  matrix<lower=0,upper=1>[nind, n_occ_minus_1] phi;
+  matrix<lower=0,upper=1>[nind, n_occ_minus_1] p;
   matrix<lower=0,upper=1>[nind, n_occasions] chi;
   real mu;
 
@@ -87,7 +93,7 @@ transformed parameters {
       phi[i, t] = 0;
       p[i, t] = 0;
     }
-    for (t in first[i]:(n_occasions - 1)) {
+    for (t in first[i]:n_occ_minus_1) {
       phi[i, t] = inv_logit(mu + beta * x[t] + epsilon[t]);
       p[i, t] = mean_p;
     }
@@ -120,10 +126,13 @@ model {
 
 generated quantities {
   real<lower=0> sigma2;
-  real<lower=0,upper=1> phi_est[n_occasions - 1];
+  vector<lower=0,upper=1>[n_occ_minus_1] phi_est;
 
   sigma2 = square(sigma);
-  for (t in 1:(n_occasions - 1))
-    phi_est[t] = inv_logit(mu + beta * x[t] + epsilon[t]); // Yearly survival
-
+  // inv_logit was vectorized in Stan 2.13
+  phi_est = inv_logit(mu + beta * x + epsilon); // Yearly survival
+  /*
+  for (t in 1:n_occ_minus_1)
+    phi_est[t] = inv_logit(mu + beta * x[t] + epsilon[t]); 
+  */
 }

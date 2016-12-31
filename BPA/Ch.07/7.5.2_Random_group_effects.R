@@ -13,11 +13,11 @@ set.seed(123)
 stan_data <- read_rdump("cjs_group.data.R")
 
 ## Parameters monitored
-params <- c("mean_phi", "mean_p", "sigma")
+params <- c("mean_phi", "mean_p", "phi_g", "sigma")
 
 ## MCMC settings
-ni <- 6000
-nt <- 3
+ni <- 4000
+nt <- 1
 nb <- 3000
 nc <- 4
 

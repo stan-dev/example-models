@@ -26,15 +26,18 @@ functions {
     for (i in 1:nind) {
       chi[i, n_occasions] = 1.0;
       for (t in 1:(n_occasions - 1)) {
+        // Compoud declaration was enabled in Stan 2.13
+        int t_curr = n_occasions - t;
+        int t_next = t_curr + 1;
+        /*
         int t_curr;
         int t_next;
 
         t_curr = n_occasions - t;
         t_next = t_curr + 1;
+        */
         chi[i, t_curr] = (1 - phi[i, t_curr])
-                       + phi[i, t_curr]
-                       * (1 - p[i, t_next - 1])
-                       * chi[i, t_next];
+                        + phi[i, t_curr] * (1 - p[i, t_next - 1]) * chi[i, t_next];
       }
     }
     return chi;
@@ -50,9 +53,13 @@ data {
 }
 
 transformed data {
+  // Compoud declaration is enabled in Stan 2.13
+  int n_occ_minus_1 = n_occasions - 1;
+  //  int n_occ_minus_1;
   int<lower=0,upper=n_occasions> first[nind];
   int<lower=0,upper=n_occasions> last[nind];
 
+  //  n_occ_minus_1 = n_occasions - 1;
   for (i in 1:nind)
     first[i] = first_capture(y[i]);
   for (i in 1:nind)
@@ -60,18 +67,17 @@ transformed data {
 }
 
 parameters {
-  real beta[g];
+  vector[g] beta;
   real mean_beta;                       // Logit of mean survival
   real<lower=0,upper=10> sigma;         // SD of logit of survival variability
   // In case a weakly informative prior is used
   //  real<lower=0> sigma;
   real<lower=0,upper=1> mean_p;
-  real<lower=0,upper=1> phi_g[g];       // Group-specific survival
 }
 
 transformed parameters {
-  matrix<lower=0,upper=1>[nind, n_occasions - 1] phi;
-  matrix<lower=0,upper=1>[nind, n_occasions - 1] p;
+  matrix<lower=0,upper=1>[nind, n_occ_minus_1] phi;
+  matrix<lower=0,upper=1>[nind, n_occ_minus_1] p;
   matrix<lower=0,upper=1>[nind, n_occasions] chi;
 
   // Constraints
@@ -80,11 +86,12 @@ transformed parameters {
       phi[i, t] = 0;
       p[i, t] = 0;
     }
-    for (t in first[i]:(n_occasions - 1)) {
+    for (t in first[i]:n_occ_minus_1) {
       phi[i, t] = inv_logit(beta[group[i]]);
       p[i, t] = mean_p;
     }
   }
+
   chi = prob_uncaptured(nind, n_occasions, p, phi);
 }
 
@@ -113,6 +120,8 @@ model {
 
 generated quantities {
   real<lower=0,upper=1> mean_phi;
+  vector<lower=0,upper=1>[g] phi_g;     // Group-specific survival
 
   mean_phi = inv_logit(mean_beta);
+  phi_g = inv_logit(beta);
 }
