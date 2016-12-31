@@ -11,8 +11,10 @@ functions {
 
   int last_capture(int[] y_i) {
     for (k_rev in 0:(size(y_i) - 1)) {
-      int k;
-      k = size(y_i) - k_rev;
+      // Compoud declaration was enabled in Stan 2.13
+      int k = size(y_i) - k_rev;
+      //      int k;
+      //      k = size(y_i) - k_rev;
       if (y_i[k])
         return k;
     }

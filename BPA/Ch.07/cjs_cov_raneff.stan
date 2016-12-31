@@ -11,8 +11,10 @@ functions {
 
   int last_capture(int[] y_i) {
     for (k_rev in 0:(size(y_i) - 1)) {
-      int k;
-      k = size(y_i) - k_rev;
+      // Compoud declaration was enabled in Stan 2.13
+      int k = size(y_i) - k_rev;
+      //      int k;
+      //      k = size(y_i) - k_rev;
       if (y_i[k])
         return k;
     }
@@ -84,9 +86,11 @@ transformed parameters {
   matrix<lower=0,upper=1>[nind, n_occ_minus_1] phi;
   matrix<lower=0,upper=1>[nind, n_occ_minus_1] p;
   matrix<lower=0,upper=1>[nind, n_occasions] chi;
-  real mu;
+  // Compoud declaration was enabled in Stan 2.13
+  real mu = logit(mean_phi);
+  //  real mu;
 
-  mu = logit(mean_phi);
+  //  mu = logit(mean_phi);
   // Constraints
   for (i in 1:nind) {
     for (t in 1:(first[i] - 1)) {
