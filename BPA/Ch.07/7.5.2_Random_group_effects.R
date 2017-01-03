@@ -13,11 +13,11 @@ set.seed(123)
 stan_data <- read_rdump("cjs_group.data.R")
 
 ## Parameters monitored
-params <- c("mean_phi", "mean_p", "sigma")
+params <- c("mean_phi", "mean_p", "phi_g", "sigma")
 
 ## MCMC settings
-ni <- 6000
-nt <- 3
+ni <- 4000
+nt <- 1
 nb <- 3000
 nc <- 4
 
@@ -30,7 +30,7 @@ inits <- lapply(1:nc, function(i) {
 cjs_group_raneff <- stan("cjs_group_raneff.stan",
                          data = stan_data, init = inits, pars = params,
                          chains = nc, iter = ni, warmup = nb, thin = nt,
-                         control = list(adapt_delta = 0.95),
+                         control = list(adapt_delta = 0.99),
                          seed = 1,
                          open_progress = FALSE)
 ## Note: there may be divergent transitions after warmup.
