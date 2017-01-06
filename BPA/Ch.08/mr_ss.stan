@@ -1,4 +1,12 @@
 functions {
+  /**
+   * Return an integer value denoting occasion of first capture.
+   * This function is derived from Stan Modeling Language
+   * User's Guide and Reference Manual.
+   *
+   * @param y         Observed values
+   * @return Occasion of first capture
+   */
   int first_capture(int[] y_i) {
     for (k in 1:size(y_i))
       if (y_i[k])
@@ -7,9 +15,19 @@ functions {
   }
 
   int last_capture(int[] y_i) {
+  /**
+   * Return an integer value denoting occasion of last capture.
+   * This function is derived from Stan Modeling Language
+   * User's Guide and Reference Manual.
+   *
+   * @param y         Observed values
+   * @return Occasion of last capture
+   */
     for (k_rev in 0:(size(y_i) - 1)) {
-      int k;
-      k <- size(y_i) - k_rev;
+      // Compound declaration was enabled in Stan 2.13
+      int k = size(y_i) - k_rev;
+      //      int k;
+      //      k = size(y_i) - k_rev;
       if (y_i[k])
         return k;
     }
@@ -20,16 +38,16 @@ functions {
                    int first, int last) {
     vector[n_occasions] pr;
 
-    pr[first] <- (1 - s[first]) * r[first];
+    pr[first] = (1 - s[first]) * r[first];
 
     for (j in (first + 1):n_occasions - 1)
-      pr[j] <- prod(segment(s, first, j - first)) * (1 - s[j]) * r[j];
+      pr[j] = prod(s[first:(j - 1)]) * (1 - s[j]) * r[j];
 
     for (j in 1:(first - 1))
-      pr[j] <- 0;
+      pr[j] = 0;
 
     for (t in 1:n_occasions - 1)
-      pr[n_occasions] <- 1 - sum(head(pr, n_occasions - 1));
+      pr[n_occasions] = 1 - sum(pr[:(n_occasions - 1)]);
 
     return pr[last];
   }
@@ -42,13 +60,16 @@ data {
 }
 
 transformed data {
+  int n_occ_minus_1 = n_occasions - 1;
+  //  int n_occ_minus_1;
   int<lower=0,upper=n_occasions> first[nind];
   int<lower=0,upper=n_occasions> last[nind];
 
+  //  n_occ_minus_1 = n_occasions - 1;
   for (i in 1:nind)
-    first[i] <- first_capture(y[i]);
+    first[i] = first_capture(y[i]);
   for (i in 1:nind)
-    last[i] <- last_capture(y[i]);
+    last[i] = last_capture(y[i]);
 }
 
 parameters {
@@ -57,26 +78,27 @@ parameters {
 }
 
 transformed parameters {
-  matrix<lower=0,upper=1>[nind, n_occasions - 1] s;
-  matrix<lower=0,upper=1>[nind, n_occasions - 1] r;
+  matrix<lower=0,upper=1>[nind, n_occ_minus_1] s;
+  matrix<lower=0,upper=1>[nind, n_occ_minus_1] r;
 
   // Constraints
   for (i in 1:nind) {
     for (t in 1:(first[i] - 1)) {
-      s[i, t] <- 0;
-      r[i, t] <- 0;
+      s[i, t] = 0;
+      r[i, t] = 0;
     }
-    for (t in first[i]:n_occasions - 1) {
-      s[i, t] <- mean_s;
-      r[i, t] <- mean_r;
+    for (t in first[i]:n_occ_minus_1) {
+      s[i, t] = mean_s;
+      r[i, t] = mean_r;
     }
   }
 }
 
 model {
   // Priors
-  mean_s ~ uniform(0, 1);
-  mean_r ~ uniform(0, 1);
+  // Uniform priors are implicitly defined.
+  //  mean_s ~ uniform(0, 1);
+  //  mean_r ~ uniform(0, 1);
 
   // Likelihood 
   for (i in 1:nind){
@@ -84,9 +106,9 @@ model {
 
     if (first[i] > 0) {
       if (last[i] > first[i]) // Recovered
-        pr <- cell_prob(n_occasions, s[i], r[i], first[i], last[i] - 1);
+        pr = cell_prob(n_occasions, s[i], r[i], first[i], last[i] - 1);
       else                    // Never Recovered
-        pr <- cell_prob(n_occasions, s[i], r[i], first[i], n_occasions);
+        pr = cell_prob(n_occasions, s[i], r[i], first[i], n_occasions);
       1 ~ bernoulli(pr);
     }
   }
