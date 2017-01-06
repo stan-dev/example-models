@@ -24,10 +24,7 @@ functions {
    * @return Occasion of last capture
    */
     for (k_rev in 0:(size(y_i) - 1)) {
-      // Compound declaration was enabled in Stan 2.13
       int k = size(y_i) - k_rev;
-      //      int k;
-      //      k = size(y_i) - k_rev;
       if (y_i[k])
         return k;
     }
@@ -61,11 +58,9 @@ data {
 
 transformed data {
   int n_occ_minus_1 = n_occasions - 1;
-  //  int n_occ_minus_1;
   int<lower=0,upper=n_occasions> first[nind];
   int<lower=0,upper=n_occasions> last[nind];
 
-  //  n_occ_minus_1 = n_occasions - 1;
   for (i in 1:nind)
     first[i] = first_capture(y[i]);
   for (i in 1:nind)
