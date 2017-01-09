@@ -10,7 +10,7 @@ set.seed(123)
 ## Read data
 ## The data generation code is in bpa-code.txt, available at
 ## http://www.vogelwarte.ch/de/projekte/publikationen/bpa/complete-code-and-data-files-of-the-book.html
-stan_data <- read_rdump("lifedead.data.R")                  
+stan_data <- read_rdump("lifedead.data.R")
 
 ## Initial values
 inits <- function() list(mean_s = runif(1, 0, 1),
@@ -34,4 +34,3 @@ lifedead <- stan("lifedead.stan",
                  seed = 1,
                  open_progress = FALSE)
 print(lifedead, digits = 3)
-
