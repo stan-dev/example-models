@@ -34,4 +34,3 @@ ls <- stan("ladyslipper.stan",
            seed = 1,
            open_progress = FALSE)
 print(ls, digits = 3)
-

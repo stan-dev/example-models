@@ -10,7 +10,7 @@ set.seed(123)
 ## Read data
 ## The data generation code is in bpa-code.txt, available at
 ## http://www.vogelwarte.ch/de/projekte/publikationen/bpa/complete-code-and-data-files-of-the-book.html
-stan_data <- read_rdump("ms.data.R")                  
+stan_data <- read_rdump("ms.data.R")
 
 ## Initial values
 inits <- function() list(mean_phi = runif(2, 0, 1),
