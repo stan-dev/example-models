@@ -27,8 +27,8 @@ functions {
    */
   int last_capture(int[] y_i) {
     for (k_rev in 0:(size(y_i) - 1)) {
-      int k;
-      k <- size(y_i) - k_rev;
+      int k = size(y_i) - k_rev;
+
       if (y_i[k])
         return k;
     }
@@ -52,20 +52,96 @@ functions {
     matrix[nind, n_occasions] chi;
 
     for (i in 1:nind) {
-      chi[i, n_occasions] <- 1.0;
+      chi[i, n_occasions] = 1.0;
       for (t in 1:(n_occasions - 1)) {
-        int t_curr;
-        int t_next;
+        int t_curr = n_occasions - t;
+        int t_next = t_curr + 1;
 
-        t_curr <- n_occasions - t;
-        t_next <- t_curr + 1;
-        chi[i, t_curr] <- (1.0 - phi[i, t_curr]) +
-                          phi[i, t_curr] *
-                          (1.0 - p[i, t_next]) *
-                          chi[i, t_next];
+        chi[i, t_curr] = (1.0 - phi[i, t_curr])
+                        + phi[i, t_curr] * (1.0 - p[i, t_next]) * chi[i, t_next];
       }
     }
     return chi;
+  }
+
+  /**
+   * Calculate log likelihood of a Jolly-Seber model
+   * under the superpopulation parameterization
+   *
+   * @param n_ind       Number of individuals
+   * @param n_occasions Number of capture occasions
+   * @param y           Capture history
+   * @param first       First capture occasion
+   * @param last        Last capture occasion
+   * @param p           Detection probability matrix
+   * @param phi         Survival probability matrix
+   * @param psi         Inclusion probability
+   * @param nu          Entry probability vector
+   * @param chi         Uncapture probability matrix
+   */
+  void js_super_lp(int n_ind, int n_occasions, int[,] y,
+                      int[] first, int[] last,
+                      matrix p, matrix phi, real psi,
+                      vector nu, matrix chi) {
+    vector[n_occasions] qnu = 1.0 - nu;
+
+    for (i in 1:n_ind) {
+      vector[n_occasions] qp = 1.0 - p[i]';
+
+      if (first[i]) { // Observed
+        // Included
+        1 ~ bernoulli(psi);
+
+        // Until first capture
+        if (first[i] == 1) {
+          1 ~ bernoulli(nu[1] * p[i, 1]);
+        } else {  // first[i] >= 2
+          vector[first[i]] lp;
+
+          // Entered at 1st occasion
+          lp[1] = bernoulli_lpmf(1 | nu[1])
+                 + bernoulli_lpmf(1 | prod(qp[1:(first[i] - 1)]))
+                 + bernoulli_lpmf(1 | prod(phi[i, 1:(first[i] - 1)]))
+                 + bernoulli_lpmf(1 | p[i, first[i]]);
+          // Entered at t-th occasion (1 < t < first[i])
+          for (t in 2:(first[i] - 1))
+            lp[t] = bernoulli_lpmf(1 | prod(qnu[1:(t - 1)]))
+                   + bernoulli_lpmf(1 | nu[t])
+                   + bernoulli_lpmf(1 | prod(qp[t:(first[i] - 1)]))
+                   + bernoulli_lpmf(1 | prod(phi[i, t:(first[i] - 1)]))
+                   + bernoulli_lpmf(1 | p[i, first[i]]);
+          lp[first[i]] = bernoulli_lpmf(1 | prod(qnu[1:(first[i] - 1)]))
+                        + bernoulli_lpmf(1 | nu[first[i]])
+                        + bernoulli_lpmf(1 | p[i, first[i]]);
+          target += log_sum_exp(lp);
+        }
+        // Until last capture
+        for (t in (first[i] + 1):last[i]) {
+          1 ~ bernoulli(phi[i, t - 1]);   // Survived
+          y[i, t] ~ bernoulli(p[i, t]);   // Capture/Non-capture
+        }
+        // Subsequent occasions
+        1 ~ bernoulli(chi[i, last[i]]);
+      } else {          // Never observed
+        vector[n_occasions+1] lp;
+
+        // Entered at 1st occasion, but never captured
+        lp[1] = bernoulli_lpmf(1 | psi)
+               + bernoulli_lpmf(1 | nu[1])
+               + bernoulli_lpmf(0 | p[i, 1])
+               + bernoulli_lpmf(1 | chi[i, 1]);
+        // Entered at t-th occation (t > 1), but never captured
+        for (t in 2:n_occasions)
+          lp[t] = bernoulli_lpmf(1 | psi)
+                 + bernoulli_lpmf(1 | prod(qnu[1:(t - 1)]))
+                 + bernoulli_lpmf(1 | nu[t])
+                 + bernoulli_lpmf(0 | p[i, t])
+                 + bernoulli_lpmf(1 | chi[i, t]);
+        // Never captured
+        lp[n_occasions + 1] = bernoulli_lpmf(0 | psi);
+        target += log_sum_exp(lp);
+      }
+    }
   }
 }
 
@@ -80,9 +156,9 @@ transformed data {
   int<lower=0,upper=n_occasions> last[M];
 
   for (i in 1:M)
-    first[i] <- first_capture(y[i]);
+    first[i] = first_capture(y[i]);
   for (i in 1:M)
-    last[i] <- last_capture(y[i]);
+    last[i] = last_capture(y[i]);
 }
 
 parameters {
@@ -91,11 +167,13 @@ parameters {
   real<lower=0,upper=1> psi;                  // Inclusion probability
   vector<lower=0>[n_occasions] beta;
   vector[M] epsilon;
-  real<lower=0> sigma;
+  real<lower=0,upper=5> sigma;
+  // In case of using a weakly informative prior
+  //  real<lower=0> sigma;
 }
 
 transformed parameters {
-  matrix<lower=0,upper=1>[M, n_occasions-1] phi;
+  matrix<lower=0,upper=1>[M, n_occasions - 1] phi;
   matrix<lower=0,upper=1>[M, n_occasions] p;
   simplex[n_occasions] b;                     // Entry probability
   vector<lower=0,upper=1>[n_occasions] nu;
@@ -104,98 +182,40 @@ transformed parameters {
   // Constraints
   for (i in 1:M) {
     for (t in 1:(n_occasions - 1))
-      phi[i, t] <- mean_phi;
+      phi[i, t] = mean_phi;
     for (t in 1:n_occasions)
-      p[i, t] <- inv_logit(logit(mean_p) + epsilon[i]);
-  } //i
+      p[i, t] = inv_logit(logit(mean_p) + epsilon[i]);
+  }
 
   // Dirichlet prior for entry probabilities
   // beta ~ gamma(1, 1);  // => model block
-  b <- beta / sum(beta);
+  b = beta / sum(beta);
 
   // Convert entry probs to conditional entry probs
-  nu[1] <- b[1];
+  nu[1] = b[1];
   for (t in 2:(n_occasions - 1))
-    nu[t] <- b[t] / (1.0 - sum(b[1:(t - 1)]));
-  nu[n_occasions] <- 1.0;
+    nu[t] = b[t] / (1.0 - sum(b[1:(t - 1)]));
+  nu[n_occasions] = 1.0;
 
   // Uncaptured probability
-  chi <- prob_uncaptured(M, n_occasions, p, phi);
+  chi = prob_uncaptured(M, n_occasions, p, phi);
 }
 
 model {
-  vector[n_occasions] qnu;
-
-  qnu <- 1.0 - nu;
-
   // Priors
-  // An improper flat prior (0,+infinity) is implicitly used on sigma.
-  mean_phi ~ uniform(0, 1);
-  mean_p ~ uniform(0, 1);
+  // Uniform priors are implicitly defined.
+  //  mean_phi ~ uniform(0, 1);
+  //  mean_p ~ uniform(0, 1);
+  //  psi ~ uniform(0, 1);
+  //  sigma ~ uniform(0, 5);
+  // In case of using a weakly informative prior
+  //  sigma ~ normal(2.5, 1.25);
   epsilon ~ normal(0, sigma);
-  psi ~ uniform(0, 1);
   beta ~ gamma(1, 1);
 
   // Likelihood
-  for (i in 1:M) {
-    vector[n_occasions] qp;
-
-    qp <- 1.0 - p[i]';
-
-    if (first[i]) { // Observed
-      // Included
-      1 ~ bernoulli(psi);
-
-      // Until first capture
-      if (first[i] == 1) {
-        1 ~ bernoulli(nu[1] * p[i, 1]);
-      } else {  // first[i] >= 2
-        vector[first[i]] lp;
-
-        // Entered at 1st occasion
-        lp[1] <- bernoulli_log(1, nu[1])
-          + bernoulli_log(1, prod(qp[1:(first[i] - 1)]))
-          + bernoulli_log(1, prod(phi[i, 1:(first[i] - 1)]))
-          + bernoulli_log(1, p[i, first[i]]);
-        // Entered at t-th occasion (1 < t < first[i])
-        for (t in 2:(first[i] - 1))
-          lp[t] <- bernoulli_log(1, prod(qnu[1:(t - 1)]))
-            + bernoulli_log(1, nu[t])
-            + bernoulli_log(1, prod(qp[t:(first[i] - 1)]))
-            + bernoulli_log(1, prod(phi[i, t:(first[i] - 1)]))
-            + bernoulli_log(1, p[i, first[i]]);
-        lp[first[i]] <- bernoulli_log(1, prod(qnu[1:(first[i] - 1)]))
-          + bernoulli_log(1, nu[first[i]])
-          + bernoulli_log(1, p[i, first[i]]);
-        increment_log_prob(log_sum_exp(lp));
-      }
-      // Until last capture
-      for (t in (first[i] + 1):last[i]) {
-        1 ~ bernoulli(phi[i, t - 1]);   // Survived
-        y[i, t] ~ bernoulli(p[i, t]);   // Capture/Non-capture
-      }
-      // Subsequent occasions
-      1 ~ bernoulli(chi[i, last[i]]);
-    } else {          // Never observed
-      vector[n_occasions+1] lp;
-
-      // Entered at 1st occasion, but never captured
-      lp[1] <- bernoulli_log(1, psi)
-        + bernoulli_log(1, nu[1])
-        + bernoulli_log(0, p[i, 1])
-        + bernoulli_log(1, chi[i, 1]);
-      // Entered at t-th occation (t > 1), but never captured
-      for (t in 2:n_occasions)
-        lp[t] <- bernoulli_log(1, psi)
-          + bernoulli_log(1, prod(qnu[1:(t - 1)]))
-          + bernoulli_log(1, nu[t])
-          + bernoulli_log(0, p[i, t])
-          + bernoulli_log(1, chi[i, t]);
-      // Never captured
-      lp[n_occasions + 1] <- bernoulli_log(0, psi);
-      increment_log_prob(log_sum_exp(lp));
-    }
-  }
+  js_super_lp(M, n_occasions, y, first, last,
+              p, phi, psi, nu, chi);
 }
 
 generated quantities {
@@ -207,21 +227,20 @@ generated quantities {
   int<lower=0,upper=1> z[M, n_occasions]; // Latent state
   int<lower=0,upper=1> u[M, n_occasions]; // Deflated latent state
 
-  sigma2 <- sigma^2;
+  sigma2 = sigma^2;
 
   // Generate w[] and z[]
   for (i in 1:M) {
     if (bernoulli_rng(psi)) {      // Included
-      w[i] <- 1;
-      z[i, 1] <- bernoulli_rng(nu[1]);
-      for (t in 2:n_occasions) {
-        z[i, t] <- bernoulli_rng(z[i, t - 1] * phi[i, t - 1] +
+      w[i] = 1;
+      z[i, 1] = bernoulli_rng(nu[1]);
+      for (t in 2:n_occasions)
+        z[i, t] = bernoulli_rng(z[i, t - 1] * phi[i, t - 1] +
                                  (1 - z[i, t - 1]) * nu[t]);
-      }
     } else {
-      w[i] <- 0;
+      w[i] = 0;
       for (t in 1:n_occasions)     // Not included
-        z[i, t] <- 0;
+        z[i, t] = 0;
     }
   }
 
@@ -231,24 +250,22 @@ generated quantities {
     int Nind[M];
     int Nalive[M];
 
+    for (i in 1:M)
+      for (t in 1:n_occasions)
+        u[i, t] = z[i, t] * w[i];
     for (i in 1:M) {
-      for (t in 1:n_occasions) {
-        u[i, t] <- z[i, t] * w[i];
-      }
+      recruit[i, 1] = u[i, 1];
+      for (t in 2:n_occasions)
+        recruit[i, t] = (1 - u[i, t - 1]) * u[i, t];
+    }
+    for (t in 1:n_occasions) {
+      N[t] = sum(u[, t]);
+      B[t] = sum(recruit[, t]);
     }
     for (i in 1:M) {
-      recruit[i, 1] <- u[i, 1];
-      for (t in 2:n_occasions)
-        recruit[i, t] <- (1 - u[i, t - 1]) * u[i, t];
-    } //i
-    for (t in 1:n_occasions) {
-      N[t] <- sum(u[1:M, t]);
-      B[t] <- sum(recruit[1:M, t]);
-    } //t
-    for (i in 1:M) {
-      Nind[i] <- sum(u[i]);
-      Nalive[i] <- (Nind[i] > 0);
-    } //i
-    Nsuper <- sum(Nalive);
+      Nind[i] = sum(u[i]);
+      Nalive[i] = (Nind[i] > 0);
+    }
+    Nsuper = sum(Nalive);
   }
 }
