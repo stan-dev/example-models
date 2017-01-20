@@ -38,4 +38,3 @@ nl <- stan("js_tempran.stan",
            seed = 1,
            open_progress = FALSE)
 print(nl, digits = 3)
-

@@ -36,29 +36,27 @@ functions {
   }
 
   /**
-   * Return a matrix of uncaptured probability
+   * Return a matrix of uncaptured probabilities
    *
-   * @param nind        Number of individuals
-   * @param n_occasions Number of capture occasions
-   * @param p           Detection probability for each individual
+   * @param p           Matrix of detection probabilities for each individual
    *                    and capture occasion
-   * @param phi         Survival probability for each individual
+   * @param phi         Matrix of survival probabilities for each individual
    *                    and capture occasion
    *
-   * @return Uncaptured probability matrix
+   * @return Matrix of uncaptured probabilities
    */
-  matrix prob_uncaptured(int nind, int n_occasions,
-                         matrix p, matrix phi) {
-    matrix[nind, n_occasions] chi;
+  matrix prob_uncaptured(matrix p, matrix phi) {
+    int n_ind = rows(p);
+    int n_occasions = cols(p);
+    matrix[n_ind, n_occasions] chi;
 
-    for (i in 1:nind) {
+    for (i in 1:n_ind) {
       chi[i, n_occasions] = 1.0;
       for (t in 1:(n_occasions - 1)) {
         int t_curr = n_occasions - t;
         int t_next = t_curr + 1;
 
         chi[i, t_curr] = (1 - phi[i, t_curr])
-
           + phi[i, t_curr] * (1 - p[i, t_next]) * chi[i, t_next];
       }
     }
@@ -68,20 +66,19 @@ functions {
   /**
    * Calculate log likelihood of a Jolly-Seber model
    *
-   * @param n_ind       Number of individuals
-   * @param n_occasions Number of capture occasions
-   * @param y           Capture history
-   * @param first       First capture occasion
-   * @param last        Last capture occasion
-   * @param p           Detection probability matrix
-   * @param phi         Survival probability matrix
-   * @param gamma       Removal entry probability vector
-   * @param chi         Uncapture probability matrix
+   * @param y     Integer array of capture history
+   * @param first Integer array of first capture occasions
+   * @param last  Integer array of last capture occasions
+   * @param p     Matrix of detection probabilities
+   * @param phi   Matrix of survival probabilities
+   * @param gamma Vector of removal entry probabilities
+   * @param chi   Matrix of uncapture probabilities
    */
-  void jolly_seber_lp(int n_ind, int n_occasions, int[,] y,
-                      int[] first, int[] last,
+  void jolly_seber_lp(int[,] y, int[] first, int[] last,
                       matrix p, matrix phi, vector gamma,
                       matrix chi) {
+    int n_ind = dims(y)[1];
+    int n_occasions = dims(y)[2];
     vector[n_occasions] qgamma = 1.0 - gamma;
 
     for (i in 1:n_ind) {
@@ -137,6 +134,27 @@ functions {
       }
     }
   }
+
+  /**
+   * Returns delta, where
+   * delta[n] = gamma[n] * PROD_{m < n} (1 - gamma[m])
+   * (Thanks to Dr. Carpenter)
+   *
+   * @param gamma Vector of probability sequence
+   *
+   * @return Vector of complementary probability sequence
+   */
+  vector seq_cprob(vector gamma) {
+    int N = rows(gamma);
+    vector[N] log_cprob;
+    real log_residual_prob = 0;
+
+    for (n in 1:N) {
+      log_cprob[n] = log(gamma[n]) + log_residual_prob;
+      log_residual_prob = log_residual_prob + log(1 - gamma[n]);
+    }
+    return exp(log_cprob);
+  }
 }
 
 data {
@@ -168,27 +186,19 @@ transformed parameters {
   matrix<lower=0,upper=1>[M, n_occasions] chi;
 
   // Constraints
-  for (i in 1:M) {
-    for (t in 1:n_occ_minus_1)
-      phi[i, t] = mean_phi;
-    for (t in 1:n_occasions)
-      p[i, t] = mean_p;
-  }
+  phi = rep_matrix(mean_phi, M, n_occ_minus_1);
+  p = rep_matrix(mean_p, M, n_occasions);
 
   // Uncapture probability
-  chi = prob_uncaptured(M, n_occasions, p, phi);
+  chi = prob_uncaptured(p, phi);
 }
 
 model {
   // Priors
   // Uniform priors are implicitly defined.
-  //  mean_phi ~ uniform(0, 1);
-  //  mean_p ~ uniform(0, 1);
-  //  gamma ~ uniform(0, 1);
 
   // Likelihood
-  jolly_seber_lp(M, n_occasions, y, first, last,
-                 p, phi, gamma, chi);
+  jolly_seber_lp(y, first, last, p, phi, gamma, chi);
 }
 
 generated quantities {
@@ -201,37 +211,33 @@ generated quantities {
 
   // Generate z[]
   for (i in 1:M) {
-    int q[n_occasions - 1];
+    int q = 1;
     real mu2;
 
     z[i, 1] = bernoulli_rng(gamma[1]);
     for (t in 2:n_occasions) {
-      q[t - 1] = 1 - z[i, t - 1];
+      q = q * (1 - z[i, t - 1]);
       mu2 = phi[i, t - 1] * z[i, t - 1]
-           + gamma[t] * prod(q[1:(t - 1)]);
+           + gamma[t] * q;
       z[i, t] = bernoulli_rng(mu2);
     }
   }
 
   // Calculate derived population parameters
   {
-    vector[n_occasions - 1] qgamma;
-    vector[n_occasions] cprob;
-    int recruit[M, n_occasions];
+    vector[n_occasions] cprob  = seq_cprob(gamma);
+    int recruit[M, n_occasions] = rep_array(0, M, n_occasions);
     int Nind[M];
     int Nalive[M];
 
-    qgamma = 1 - gamma[1:(n_occasions - 1)];
-    cprob[1] = gamma[1];
-    for (t in 2:n_occasions)
-      cprob[t] = gamma[t] * prod(qgamma[1:(t - 1)]);
     psi = sum(cprob);
     b = cprob / psi;
+    
     for (i in 1:M) {
-      recruit[i, 1] = z[i, 1];
-      for (t in 2:n_occasions) {
-        recruit[i, t] = (1 - z[i, t - 1]) * z[i, t];
-      }
+      int f = first_capture(z[i, ]);
+
+      if (f > 0)
+        recruit[i, f] = 1;
     }
     for (t in 1:n_occasions) {
       N[t] = sum(z[, t]);
@@ -239,7 +245,7 @@ generated quantities {
     }
     for (i in 1:M) {
       Nind[i] = sum(z[i]);
-      Nalive[i] = (Nind[i] > 0);
+      Nalive[i] = 1 - !Nind[i];
     }
     Nsuper = sum(Nalive);
   }

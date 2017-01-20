@@ -10,6 +10,29 @@
 // 2 not seen
 //--------------------------------------
 
+functions {
+  /**
+   * Returns delta, where
+   * delta[n] = gamma[n] * PROD_{m < n} (1 - gamma[m])
+   * (Thanks to Dr. Carpenter)
+   *
+   * @param gamma Vector of probability sequence
+   *
+   * @return Vector of complementary probability sequence
+   */
+  vector seq_cprob(vector gamma) {
+    int N = rows(gamma);
+    vector[N] log_cprob;
+    real log_residual_prob = 0;
+
+    for (n in 1:N) {
+      log_cprob[n] = log(gamma[n]) + log_residual_prob;
+      log_residual_prob = log_residual_prob + log(1 - gamma[n]);
+    }
+    return exp(log_cprob);
+  }
+}
+
 data {
   int<lower=0> M;                               // Augmented sample size
   int<lower=0> n_occasions;                     // Number of capture occasions
@@ -44,7 +67,7 @@ transformed parameters {
     for (t in 1:n_occ_minus_1) {
       ps[1, i, t, 1] = 1.0 - gamma[t];
       ps[1, i, t, 2] = gamma[t];
-      ps[1, i, t, 3] =  0.0;
+      ps[1, i, t, 3] = 0.0;
       ps[2, i, t, 1] = 0.0;
       ps[2, i, t, 2] = phi[t];
       ps[2, i, t, 3] = 1 - phi[t];
@@ -111,17 +134,12 @@ generated quantities {
 
   // Calculate derived population parameters
   {
-    vector[n_occ_minus_1] qgamma;
-    vector[n_occ_minus_1] cprob;
+    vector[n_occ_minus_1] cprob  = seq_cprob(gamma[:n_occ_minus_1]);
     int al[M, n_occ_minus_1];
     int d[M, n_occ_minus_1];
     int alive[M];
     int w[M];
 
-    qgamma = 1.0 - gamma;
-    cprob[1] = gamma[1];
-    for (t in 2:n_occ_minus_1)
-      cprob[t] = gamma[t] * prod(qgamma[1:(t - 1)]);
     psi = sum(cprob);
     b = cprob / psi;
 
@@ -129,7 +147,7 @@ generated quantities {
       for (t in 2:n_occasions)
         al[i, t - 1] = (z[i, t] == 2);
       for (t in 1:n_occ_minus_1)
-        d[i, t] = (z[i, t] - al[i, t] == 0);
+        d[i, t] = (z[i, t] == al[i, t]);
       alive[i] = sum(al[i]);
     }
 
@@ -138,7 +156,7 @@ generated quantities {
       B[t] = sum(d[, t]);
     }
     for (i in 1:M)
-      w[i] = (alive[i] != 0);
+      w[i] = 1 - !alive[i];
     Nsuper = sum(w);
   }
 }
