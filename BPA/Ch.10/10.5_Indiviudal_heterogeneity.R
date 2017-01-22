@@ -17,8 +17,8 @@ params <- c("sigma2", "psi", "mean_p", "mean_phi",
             "N", "Nsuper", "b", "B")
 
 ## MCMC settings
-ni <- 8000
-nt <- 6
+ni <- 30000
+nt <- 28
 nb <- 2000
 nc <- 4
 
@@ -26,12 +26,14 @@ nc <- 4
 inits <- lapply(1:nc, function(i)
     list(mean_phi = runif(1, 0, 1),
          mean_p = runif(1, 0, 1),
-         gamma = runif(stan_data$n_occasions, 0, 1)))
+         sigma = runif(1, 0, 1),
+         beta = runif(stan_data$n_occasions, 0, 1)))
 
 ## Call Stan from R
 js_ran <- stan("js_super_indran.stan",
                data = stan_data, init = inits, pars = params,
                chains = nc, iter = ni, warmup = nb, thin = nt,
-               seed = 1,
+               seed = 2, control = list(adapt_delta = 0.9),
                open_progress = FALSE)
+## lp__ of this model may have a small effective sample size.
 print(js_ran, digits = 3)
