@@ -45,5 +45,5 @@ ipm_hoopoe <- stan("ipm_hoopoe.stan",
                    seed = 2,
                    control = list(adapt_delta = 0.95),
                    open_progress = FALSE)
-
+## Divergent transitions after warmup may occur.
 print(ipm_hoopoe, digits = 3)
