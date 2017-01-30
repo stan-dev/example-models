@@ -14,7 +14,7 @@ bibliography: ../bibliography.bib
 ```{r knitr_opts, include = FALSE}
 set.seed(68)
 
-knitr::opts_chunk$set(tidy = FALSE, cache = TRUE, message = FALSE)
+knitr::opts_chunk$set(tidy = FALSE, cache = FALSE, message = FALSE)
 
 nand <- function(x) {
   l <- length(x)
@@ -29,13 +29,23 @@ nand <- function(x) {
 }
 ```
 
-This case study uses **Stan** to fit the Rasch and two-parameter logistic (2PL) item response theory models, including a latent regression for person ability for both. The Rasch model is some times referred to as the one-parameter logistic model. Analysis is performed with **R**, making use of the **rstan** and **edstan** packages. **rstan** is the implementation of **Stan** for **R**, and **edstan** provides **Stan** models for item response theory and several convenience functions. The following **R** code loads the necessary packages and then sets some **rstan** options, which causes the compiled **Stan** model to be saved for future use and the MCMC chains to be executed in parallel.
+This case study uses **Stan** to fit the Rasch and two-parameter logistic (2PL) item response theory models, including a latent regression for person ability for both. The Rasch model is some times referred to as the one-parameter logistic model. Analysis is performed with **R**, making use of the **rstan** and **edstan** packages. **rstan** is the implementation of **Stan** for **R**, and **edstan** provides **Stan** models for item response theory and several convenience functions. 
 
-```{r, warning=FALSE, results="hide"}
+The **edstan** package is available on **CRAN**, but a more up to date version may often be found on Github. The following **R** code may be used to install the package from Github.
+
+```{r github, eval = FALSE}
+# Install edstan from Github rather than CRAN
+install.packages("devtools")
+devtools::install_github("danielcfurr/edstan")
+```
+
+The following **R** code loads the necessary packages and then sets some **rstan** options, which causes the compiled **Stan** model to be saved for future use and the MCMC chains to be executed in parallel.
+
+```{r libraries, warning=FALSE, results="hide"}
 # Load R packages
 library(rstan)
-library(ggplot2)
 library(edstan)
+library(ggplot2)
 library(TAM)
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
@@ -92,7 +102,7 @@ Priors:
 
 ## **Stan** code for a simple Rasch model
 
-A simple **Stan** model is described before discussing the complete model, as the code for it is somewhat cumbersome. The simpler model, printed below, restricts $\lambda$ to be a model intercept only. It contains the same constraints, priors, and likelihood as the full **Stan** code model.
+A simple **Stan** model is described before discussing the complete model, as the code for the complete model is somewhat cumbersome. The simpler model, printed below, omits the latent regression and so does not require rescaling of the person covariates or `lambda`. The mean of the person distribution is set to zero and the constraint is removed from the item difficulties, which also differs from the complete model.
 
 ```{r simple_rasch_code, comment=""}
 # Print the simple Rasch model from the edstan package
@@ -101,16 +111,12 @@ simple_rasch_file <- system.file("extdata/rasch_simple.stan",
 cat(readLines(simple_rasch_file), sep = "\n")
 ```
 
-Data are fed into the model in vector form. That is, `y` is a long vector of scored item responses, and `ii` and `jj` indicate with which item and person each element in `y` is associated. These three vectors are of length `N`, which is either equal to `I` times `J` or less if there are missing responses.
-
-The parameters `beta_free`, `theta`, `sigma`, and `lambda` are declared in the parameters block. The unconstrained item parameters are contained in `beta_free`, which is why it has a length of $I-1$. In the transformed parameters block, `beta` is created by appending the constrained item difficulty to `beta_free`. The other parameters are handled in conventional ways, with `sigma` being assigned a lower bound of zero because it is a standard deviation.
-
-The model block contains the priors and the likelihood. Priors are placed on `beta_free` rather than on `beta`, as the prior does not apply to the constrained parameter. The likelihood (`y ~ ...`) uses vectorization by indexing `theta` and `beta` with `jj` and `ii`, which is more efficient than a loop.
+Data are fed into the model in vector form. That is, `y` is a long vector of scored item responses, and `ii` and `jj` indicate with which item and person each element in `y` is associated. These three vectors are of length `N`, which is equal to `I` times `J` if there are no missing responses. Parameters `beta`, `theta`, and `sigma` are declared in the parameters block, and priors for these are set in the model block. The likelihood for `y` in the last line uses vectorization by indexing `theta` and `beta` with `jj` and `ii`, which is more efficient than using a loop.
 
 
 ## **Stan** code for the Rasch model with latent regression
 
-The Rasch model with latent regression will be discussed in relation to the simpler model, and both models are equivalent when the latent regression is restricted to an intercept only. The model with latent regression, which is featured in **edstan**, is printed below. It is more complicated than is typically necessary for a **Stan** model because it is written to apply sensible priors automatically for parameters associated with arbitrarily scaled covariates.
+The Rasch  model with latent regression, which is featured in **edstan**, is printed below. It is more complicated than is typically necessary for a **Stan** model because it is written to apply sensible priors for regression parameters associated with arbitrarily scaled covariates.
 
 ```{r latreg_rasch_code, comment=""}
 # Print the latent regression Rasch model from the edstan package
@@ -119,11 +125,13 @@ rasch_latreg_file <- system.file("extdata/rasch_latent_reg.stan",
 cat(readLines(rasch_latreg_file), sep = "\n")
 ```
 
-In the data block, the number of covariates (plus the intercept) `K` is now required, as is the matrix of covariates `W`. In the transformed parameters block, `W_adj` is made from `W`. The first column of `W_adj` is automatically set to one, and then in an unsightly bit of code a loop is used to calculated the remaining columns. In short, it is determined whether a given column is a binary or continuous variable by checking whether any values in it are unequal to the minimum or maximum. The values required for transformation are stored in `center` and `spread`, and the transformation is carried out.
+The **Stan** model begins with the creation of the `obtain_adjustments()` function, which accepts a covariate matrix and returns a matrix that contains values to be used in adjusting the covariates. The returned matrix has one column for each covariate (starting with the constant for the intercept). The first row of it provides the values used to center the covariates, and the second provides the values used to scale them. The function begins by setting the values in the first column to zero and one, which corresponds to no change to the constant. Next the function loops over the remaining columns of the covariate matrix and determines whether the covariate is binary or continuous. This determination is made by counting the number of values that are equal to either the maximum or minimum for a given coavariate; if this count equals $J$, then the covariate must be binary. Based on this determination the appropriate adjustments for the covariates are calculated and then added to the returned matrix.
 
-The parameters, transformed parameters, and model blocks are similar to those for the simple model, except that `W_adj` and `lambda_adj` are used instead of `W` and `lambda`. Also, the prior for `theta` includes the regression prediction `W*lambda` as the mean. This approach is referred to as hierarchical centering and tends to be more efficient when there is a large amount of data. The alternative is a "decentered" approach in which the prior mean for `theta` would be set to zero, and then `W*lambda` would be added to `theta` in the likelihood statement. (The simple Rasch model may also be considered to use hierarchical centering given that the mean is included in the prior.)
+In the transformed data block, the `obtain_adjustments()` function is called and the results are stored in `adj`. Then a double loop is used to assign adjusted covariate values to `W_adj` using `W` and `adj`. The latent regression is carried out in the model block in the declaration of the prior for `theta`, based on `W_adj` and `lambda_adj`. (This approach is referred to as hierarchical centering and tends to be more efficient when there is a large amount of data. The alternative is a "decentered" approach in which the prior mean for `theta` would be set to zero, and then `W*lambda` would be added to `theta` in the likelihood statement.)
 
-Lastly, the generated quantities block is used to calculate what the regression coefficients and intercept would have been on the original covariate scales. For the coefficients this is determined simply by dividing the coefficients by the same value of `spread` used to scale the original covariates. The intercept given the original scale is also recovered with some algebra.
+The generated quantities block is used to calculate what the regression coefficients and intercept would have been on the scales of the original covariates. For the coefficients this is determined simply by dividing the coefficients by the same value of `spread` used to modify the scale the original covariates. The intercept given the original scale is then recovered with some algebra. The `obtain_adjustments()` function and related code for adjusting the covariates and regression coefficients is used in the same way across **edstan** models.
+
+There are a few other differences from the simple model. In the data block, the number of covariates (plus the intercept) `K` is now required, as is the matrix of covariates `W`. The first column of `W` must have all elements equal to one. Also, the unconstrained item parameters are contained in `beta_free`, which is why it has a length of $I-1$. In the transformed parameters block, `beta` is created by appending the constrained item difficulty to `beta_free`. Priors are placed on `beta_free` rather than on `beta`, as the prior does not apply to the constrained parameter.
 
 
 ## Simulation for parameter recovery
@@ -170,7 +178,7 @@ ggplot(data.frame(w2 = c(0, 20))) +
   xlab("Value for continous covariate")
 ```
 
-The simulated dataset is next fit with **Stan** using `irt_stan()` from the **edstan** package. `irt_stan()` is merely a wrapper for `stan()` in **rstan**. Using 1,000 posterior draws may be somewhat excessive is we are mainly interested in the posterior means of the parameters. However, as parameter recovery will be evaulated using the 2.5th and 97.5th percentiles of the posterior, the large number of posterior samples is warranted.
+The simulated dataset is next fit with **Stan** using `irt_stan()` from the **edstan** package. `irt_stan()` is merely a wrapper for `stan()` in **rstan**. Using 1,000 posterior draws per chain may be somewhat excessive as we are mainly interested in the posterior means of the parameters. However, as parameter recovery will be evaulated using the 2.5th and 97.5th percentiles of the posterior, the large number of posterior samples is warranted.
 
 ```{r sim_rasch_fit, results="hide", message=FALSE}
 # Fit model to simulated data using an edstan function
