@@ -1,8 +1,45 @@
 // Binomial-mixture model with overdispersion in both abundance and detection
+
+functions {
+  /**
+   * Returns log likelihood of N-mixture model
+   * with 2 replicated observations using
+   * bivariate Poisson distibution
+   *
+   * References
+   * Dennis et al. (2015) Computational aspects of N-mixture models.
+   *   Biometrics 71:237--246. DOI:10.1111/biom.12246
+   * Stan users mailing list
+   *   https://groups.google.com/forum/#!topic/stan-users/9mMsp1oB69g
+   *
+   * @param n          Number of observed individuals
+   * @param log_lambda Log of Poisson mean of population size
+   * @param logit_p    Logit of detection probability
+   *
+   * return Log probability
+  */
+  real bivariate_poisson_lpmf(int[] n, real log_lambda, real[] logit_p) {
+    real s[min(n) + 1];
+    real lambda = exp(log_lambda);
+    real p[2] = inv_logit(logit_p);
+
+    if (lambda < 0) {
+      reject("lambda must be non-negative.");
+    } else if (p[1] < 0 || p[1] > 1 || p[2] < 0 || p[2] > 1) {
+      reject("p must be in [0,1].");
+    }
+    for (u in 0:min(n))
+      s[u + 1] = poisson_lpmf(n[1] - u | lambda * p[1] * (1 - p[2]))
+        + poisson_lpmf(n[2] - u | lambda * p[2] * (1 - p[1]))
+        + poisson_lpmf(u | lambda * p[1] * p[2]);
+    return log_sum_exp(s);
+  }
+}
+
 data {
   int<lower=1> R;                // Number of sites
-  int<lower=1> T;                // Number of replications
-  int<lower=-1> y[R, T, 7];      // Counts (-1:NA)
+  // int<lower=1> T;                // Number of replications; fixed as 2
+  int<lower=-1> y[R, 2, 7];      // Counts (-1:NA)
   int<lower=1,upper=7> first[R]; // First occasion
   int<lower=1,upper=7> last[R];  // Last occasion
   int<lower=0> K;                // Upper bounds of population size
@@ -10,46 +47,41 @@ data {
 
 transformed data {
   int<lower=0> max_y[R, 7];
+  int<lower=0,upper=R> num_obs_site[7];
+  int T = 2;
 
   for (i in 1:R) {
     for (k in 1:(first[i] - 1))
-      max_y[i, k] <- 0;
+      max_y[i, k] = 0;
     for (k in (last[i] + 1):7)
-      max_y[i, k] <- 0;
+      max_y[i, k] = 0;
     for (k in first[i]:last[i])
-      max_y[i, k] <- max(y[i, 1:T, k]);
+      max_y[i, k] = max(y[i, 1:T, k]);
+  }
+  for (k in 1:7) {
+    num_obs_site[k] = 0;
+    for (i in 1:R)
+      num_obs_site[k] = num_obs_site[k] + (y[i, 1, k] != -1);
   }
 }
 
 parameters {
-  vector[7] alpha_lam;
+  vector<upper=7>[7] alpha_lam; // Constraint for stability
   vector[7] beta;
-  vector[R] eps_raw;
+  vector<upper=7>[R] eps_raw;   // Constraint for stability
   real<lower=0> sd_lam;
   real<lower=0> sd_p;
-  real logit_p[R, T, 7];   // Originally `lp' in the BPA book
+  vector<lower=-7,upper=7>[7] logit_p[R, T]; // Originally `lp' in the BPA book
 }
 
 transformed parameters {
-  vector[R] eps;
+  vector[R] eps;                // Abundance noise
   matrix[R, 7] log_lambda;
-  vector[K+1] lp[R, 7];
 
-  eps <- sd_lam * eps_raw;
-  for (i in 1:R) {                    // Loop over R sites (95)
-    for (k in 1:7)
-      log_lambda[i, k] <- alpha_lam[k] + eps[i];
-    for (k in 1:(first[i] - 1))
-      lp[i, k] <- rep_vector(negative_infinity(), K + 1);
-    for (k in (last[i] + 1):7)
-      lp[i, k] <- rep_vector(negative_infinity(), K + 1);
-    for (k in first[i]:last[i]) {     // Loop over days
-      lp[i, k, 1:max_y[i, k]] <- rep_vector(negative_infinity(), max_y[i, k]);
-      for (n in max_y[i, k]:K)
-        lp[i, k, n + 1] <- poisson_log_log(n, log_lambda[i, k])
-          + binomial_logit_log(y[i, 1:T, k], n, logit_p[i, 1:T, k]);
-    }
-  }
+  eps = sd_lam * eps_raw;
+  for (k in 1:7)
+    for (i in 1:R)
+      log_lambda[i, k] = alpha_lam[k] + eps[i];
 }
 
 model {
@@ -57,89 +89,83 @@ model {
   alpha_lam ~ normal(0, sqrt(10));
   beta ~ normal(0, sqrt(10));
   eps_raw ~ normal(0, 1);
-  // Half-Cauchy priors are used on sd_lam and sd_p, instead of
-  // uniform(0, 3) used in the book;
-  sd_lam ~ cauchy(0, 2.5);
-  sd_p ~ cauchy(0, 2.5);
 
-  for (i in 1:R)                      // Loop over R sites (95)
-    for (k in first[i]:last[i])       // Loop over days
-      logit_p[i, 1:T, k] ~ normal(beta[k], sd_p);
+  // Weakly informative priors are used on sd_lam and sd_p,
+  // instead of uniform(0, 3) used in the book
+  sd_lam ~ normal(1.5, 0.75);
+  sd_p ~ normal(1.5, 0.75);
+
+  for (i in 1:R)
+    for (j in 1:T)
+      logit_p[i, j] ~ normal(beta, sd_p);
 
   // Likelihood
-  for (i in 1:R)                      // Loop over R sites (95)
-    for (k in first[i]:last[i])       // Loop over days
-      increment_log_prob(log_sum_exp(lp[i, k, (max_y[i, k] + 1):(K + 1)]));
+  for (i in 1:R)
+    for (k in first[i]:last[i])
+      y[i, 1:2, k] ~ bivariate_poisson(log_lambda[i, k], logit_p[i, 1:2, k]);
 }
 
 generated quantities {
-  int totalN[7];
+  int totalN[7];            // Total pop. size across all sites
   vector[7] mean_abundance;
   vector[7] mean_N;
   vector[7] mean_detection;
-  real fit;
-  real fit_new;
+  real fit = 0;
+  real fit_new = 0;
 
   {
-    int N[R, 7];
-    real eval[R, T, 7];
-    real y_new[R, T, 7];
-    real p[R, T, 7];
+    int N[R, 7];          // Abundance
+    real eval[R, T, 7];   // Expected values
+    real y_new[R, T, 7];  // Replicate data
+    vector[7] p[R, T];
     matrix[T, 7] E[R];
     matrix[T, 7] E_new[R];
     matrix[R, 7] ik_p;
-    vector[7] num_obs_site;
 
-    for (i in 1:R) {                         // Loop over R sites (95)
-      for (k in 1:(first[i] - 1)) {
-        N[i, k] <- 0;
-        ik_p[i, k] <- 0;
-        E[i, 1:T, k] <- rep_vector(0, T);
-        E_new[i, 1:T, k] <- rep_vector(0, T);
-      }
-      for (k in (last[i] + 1):7) {
-        N[i, k] <- 0;
-        ik_p[i, k] <- 0;
-        E[i, 1:T, k] <- rep_vector(0, T);
-        E_new[i, 1:T, k] <- rep_vector(0, T);
-      }
-      for (k in first[i]:last[i]) {          // Loop over days (7)
-        vector[K+1] pr;
+    // Initialize N and ik_p
+    N = rep_array(0, R, 7);
+    ik_p = rep_matrix(0, R, 7);
+    for (i in 1:R) {
+      // Initialize E and E_new
+      E[i] = rep_matrix(0, T, 7);
+      E_new[i] = rep_matrix(0, T, 7);
 
-        pr <- softmax(lp[i, k]);
-        N[i, k] <- categorical_rng(pr) - 1;
+      for (j in 1:T)
+        p[i, j] = inv_logit(logit_p[i, j]);
+
+      for (k in first[i]:last[i]) {
+        vector[K + 1] lp;
+
+        for (n in 0:(max_y[i, k] - 1))
+          lp[n + 1] = negative_infinity();
+        for (n in max_y[i, k]:K)
+          lp[n + 1] = poisson_log_lpmf(n | log_lambda[i, k])
+            + binomial_lpmf(y[i, 1:T, k] | n, p[i, 1:T, k]);
+        N[i, k] = categorical_rng(softmax(lp)) - 1;
         for (j in 1:T) {
-          p[i, j, k] <- inv_logit(logit_p[i, j, k]);
-
           // Assess model fit using Chi-squared discrepancy
           // Compute fit statistic E for observed data
-          eval[i, j, k] <- p[i, j, k] * N[i, k];   // Expected values
-          E[i, j, k] <- square(y[i, j, k] - eval[i, j, k])
-            / (eval[i, j, k] + 0.5);
+          eval[i, j, k] = p[i, j, k] * N[i, k];
+          E[i, j, k] = square(y[i, j, k]
+                              - eval[i, j, k]) / (eval[i, j, k] + 0.5);
           // Generate replicate data and compute fit stats for them
-          y_new[i, j, k] <- binomial_rng(N[i, k], p[i, j, k]);
-          E_new[i, j, k] <- square(y_new[i, j, k] - eval[i, j, k])
-            / (eval[i, j, k] + 0.5);
+          y_new[i, j, k] = binomial_rng(N[i, k], p[i, j, k]);
+          E_new[i, j, k] = square(y_new[i, j, k]
+                                  - eval[i, j, k]) / (eval[i, j, k] + 0.5);
         }
-        ik_p[i, k] <- mean(p[i, 1:T, k]);
+        ik_p[i, k] = mean(p[i, 1:T, k]);
       }
     }
 
     for (k in 1:7) {
-      num_obs_site[k] <- 0.0;
-      for (i in 1:R)
-        num_obs_site[k] <- num_obs_site[k] + (y[i, 1, k] != -1);
-
-      totalN[k] <- sum(N[, k]);  // Total pop. size across all sites
-      mean_abundance[k] <- mean(exp(log_lambda[, k]));
-      mean_N[k] <- totalN[k] / num_obs_site[k];
-      mean_detection[k] <- sum(ik_p[, k]) / num_obs_site[k];
+      totalN[k] = sum(N[, k]);
+      mean_abundance[k] = mean(exp(log_lambda[, k]));
+      mean_N[k] = 1.0 * totalN[k] / num_obs_site[k];
+      mean_detection[k] = sum(ik_p[, k]) / num_obs_site[k];
      }
-    fit <- 0.0;
-    fit_new <- 0.0;
     for (i in 1:R) {
-      fit <- fit + sum(E[i]);
-      fit_new <- fit_new + sum(E_new[i]);
+      fit = fit + sum(E[i]);
+      fit_new = fit_new + sum(E_new[i]);
     }
   }
 }

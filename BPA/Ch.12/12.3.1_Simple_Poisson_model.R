@@ -30,9 +30,9 @@ y[is.na(y)] <- -1
 params <- c("totalN", "mean_abundance", "alpha_lam", "p", "fit", "fit_new")
 
 ## MCMC settings
-ni <- 1000
+ni <- 2000
 nt <- 1
-nb <- 500
+nb <- 1000
 nc <- 4
 
 ## Initial values
@@ -41,7 +41,7 @@ inits <- lapply(1:nc, function(i)
 
 ## Call Stan from R
 out0 <- stan("Nmix0.stan",
-             data = list(y = y, R = R, T = T,
+             data = list(y = y, R = R,
                          first = first, last = last, K = 100),
              init = inits, pars = params,
              chains = nc, iter = ni, warmup = nb, thin = nt,
@@ -50,9 +50,8 @@ out0 <- stan("Nmix0.stan",
              open_progress = FALSE)
 print(out0, digits = 3)
 
-## Note: A small number of divergent transitions may occur.
-## Posteriors relevant to day 1 and 2 will somewhat differ from those
-## in the book. This may be due to small number of observations in
-## those days (total = 4 and 0, respectively), as described in the
+## Note: Posteriors relevant to day 1 and 2 will somewhat differ from
+## those in the book. This may be due to small number of observations
+## in those days (total = 4 and 0, respectively), as described in the
 ## text. For simulated data, this model will produce similar results
 ## to BUGS.

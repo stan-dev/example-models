@@ -32,9 +32,9 @@ params <- c("totalN", "alpha_lam", "beta", "sd_lam", "sd_p",
             "fit", "fit_new")
 
 ## MCMC settings
-ni <- 3500
-nt <- 3
-nb <- 500
+ni <- 30000
+nt <- 28
+nb <- 2000
 nc <- 4
 
 ## Initial values
@@ -48,12 +48,11 @@ out2 <- stan("Nmix2.stan",
                          first = first, last = last, K = 70),
              init = inits, pars = params,
              chains = nc, iter = ni, warmup = nb, thin = nt,
-             seed = 2,
+             seed = 1,
+             control = list(adapt_delta = 0.95),
              open_progress = FALSE)
 print(out2, digits = 3)
 
-## Note: This model will take a long time to complete. Some posteriors
-## will differ from those in the book. This may be due to lower
-## precision of them, or due to difference in prior of sd_lam to some
-## extent. For simulated data, this model will produce similar
-## results to BUGS.
+## Note: Some posteriors will differ from those in the book. This may
+## be due to lower precision of them. For simulated data, this model
+## will produce similar results to BUGS.
