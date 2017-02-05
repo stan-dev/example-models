@@ -44,7 +44,7 @@ inits <- lapply(1:nc, function(i)
 
 ## Call Stan from R
 out2 <- stan("Nmix2.stan",
-             data = list(y = y, R = R, T = T,
+             data = list(y = y, R = R, T = 2,
                          first = first, last = last, K = 70),
              init = inits, pars = params,
              chains = nc, iter = ni, warmup = nb, thin = nt,

@@ -12,26 +12,25 @@ functions {
    * Stan users mailing list
    *   https://groups.google.com/forum/#!topic/stan-users/9mMsp1oB69g
    *
-   * @param n      Number of observed individuals
-   * @param lambda Poisson mean of population size
-   * @param p      Detection probability
+   * @param n          Number of observed individuals
+   * @param log_lambda Log of Poisson mean of population size
+   * @param p          Detection probability
    *
    * return Log probability
    */
-  real bivariate_poisson_lpmf(int[] n, real lambda, real p) {
+  real bivariate_poisson_log_lpmf(int[] n, real log_lambda, real p) {
     real s[min(n) + 1];
-    real theta_1 = lambda * p * (1 - p);
-    real theta_0 = lambda * p * p;
+    real log_theta_1 = log_lambda + log(p) + log1m(p);
+    real log_theta_0 = log_lambda + log(p) * 2;
 
-    if (lambda < 0) {
-      reject("lambda must be non-negative.");
-    } else if (p < 0 || p > 1) {
+    if (size(n) != 2)
+      reject("Size of n must be 2.");
+    if (p < 0 || p > 1)
       reject("p must be in [0,1].");
-    }
     for (u in 0:min(n))
-      s[u + 1] = poisson_lpmf(n[1] - u | theta_1)
-               + poisson_lpmf(n[2] - u | theta_1)
-               + poisson_lpmf(u | theta_0);
+      s[u + 1] = poisson_log_lpmf(n[1] - u | log_theta_1)
+               + poisson_log_lpmf(n[2] - u | log_theta_1)
+               + poisson_log_lpmf(u | log_theta_0);
     return log_sum_exp(s);
   }
 
@@ -42,35 +41,33 @@ functions {
    * @param max_y_site Max. number of counts on the site
    * @param N          Population size
    * @param oemga      Inclusion probability
+   * @param log_lambda Log of Poisson mean
    * @param p          Detection probability
    *
    * @return Log probability
    */
   real zipbin_lpmf(int[] y, int max_y_site,
                    int n, real omega, real log_lambda, real p) {
-    real lp;
 
     if (max_y_site) {
-      if (max(y) > n) {
-        lp = negative_infinity();
-      } else {
-        lp = bernoulli_lpmf(1 | omega)
-          + poisson_log_lpmf(n | log_lambda)
-          + binomial_lpmf(y | n, p);
-      }
+      if (max(y) > n)
+        return negative_infinity();
+      return bernoulli_lpmf(1 | omega)
+        + poisson_log_lpmf(n | log_lambda)
+        + binomial_lpmf(y | n, p);
     } else {
-      lp = log_sum_exp(bernoulli_lpmf(0 | omega),
-                       bernoulli_lpmf(1 | omega)
-                       + poisson_log_lpmf(n | log_lambda)
-                       + binomial_lpmf(y | n, p));
+      return log_sum_exp(bernoulli_lpmf(0 | omega),
+                         bernoulli_lpmf(1 | omega)
+                         + poisson_log_lpmf(n | log_lambda)
+                         + binomial_lpmf(y | n, p));
     }
-    return lp;
+    return negative_infinity();
   }
 }
 
 data {
   int<lower=1> R;                // Number of sites
-  // int<lower=1> T;                // Number of replications; fixed as 2
+  int<lower=1> T;                // Number of replications; fixed as 2
   int<lower=-1> y[R, 2, 7];      // Counts (-1:NA)
   int<lower=1,upper=7> first[R]; // First occasion
   int<lower=1,upper=7> last[R];  // Last occasion
@@ -80,7 +77,6 @@ data {
 transformed data {
   int<lower=0> max_y[R, 7];
   int<lower=0> max_y_site[R];
-  int T = 2;
 
   for (i in 1:R) {
     for (k in 1:(first[i] - 1))
@@ -110,8 +106,8 @@ model {
       real lp = bernoulli_lpmf(1 | omega);
 
       for (k in first[i]:last[i])
-        lp = lp + bivariate_poisson_lpmf(y[i, 1:2, k] |
-                                         exp(alpha_lam[k]), p[k]);
+        lp = lp
+          + bivariate_poisson_log_lpmf(y[i, 1:T, k] | alpha_lam[k], p[k]);
       target += lp;
     } else {
       real lp[2];
@@ -119,8 +115,8 @@ model {
       lp[1] = bernoulli_lpmf(0 | omega);
       lp[2] = bernoulli_lpmf(1 | omega);
       for (k in first[i]:last[i])
-        lp[2] = lp[2] + bivariate_poisson_lpmf(y[i, 1:2, k] |
-                                               exp(alpha_lam[k]), p[k]);
+        lp[2] = lp[2]
+          + bivariate_poisson_log_lpmf(y[i, 1:T, k] | alpha_lam[k], p[k]);
       target += log_sum_exp(lp);
     }
   }
@@ -139,13 +135,17 @@ generated quantities {
     matrix[T, 7] E[R];
     matrix[T, 7] E_new[R];
 
+    // Initialize N, E and E_new
     N = rep_array(0, R, 7);
+    E[1] = rep_matrix(0, T, 7);
+    E_new[1] = rep_matrix(0, T, 7);
+    for (i in 2:R) {
+      E[i] = E[i - 1];
+      E_new[i] = E_new[i - 1];
+    }
     for (i in 1:R) {
-      real p_unobs;  // Prob. site is suitable but no indiv. observed.
-
-      E[i] = rep_matrix(0, T, 7);
-      E_new[i] = rep_matrix(0, T, 7);
-
+      real log_p_unobs;  // Log of prob. site is suitable
+                         // but no indiv. observed.
       for (k in first[i]:last[i]) {
         vector[K + 1] lp;
 
@@ -156,8 +156,8 @@ generated quantities {
       }
 
       if (max_y_site[i] == 0) {  // Unobserved
-        p_unobs = omega * exp(binomial_lpmf(0 | N[i], p))^T;
-        if (bernoulli_rng(p_unobs) == 0) {
+        log_p_unobs = log(omega) + binomial_lpmf(0 | N[i], p) * T;
+        if (bernoulli_rng(exp(log_p_unobs)) == 0) {
           // Site is not suitable
           for (k in first[i]:last[i])
             N[i, k] = 0;

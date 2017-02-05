@@ -18,27 +18,24 @@ functions {
    *
    * return Log probability
   */
-  real bivariate_poisson_lpmf(int[] n, real log_lambda, real[] logit_p) {
+  real bivariate_poisson_log_lpmf(int[] n, real log_lambda, real[] p) {
     real s[min(n) + 1];
-    real lambda = exp(log_lambda);
-    real p[2] = inv_logit(logit_p);
 
-    if (lambda < 0) {
-      reject("lambda must be non-negative.");
-    } else if (p[1] < 0 || p[1] > 1 || p[2] < 0 || p[2] > 1) {
+    if (size(n) != 2)
+      reject("Size of n must be 2.");
+    if (p[1] < 0 || p[1] > 1 || p[2] < 0 || p[2] > 1)
       reject("p must be in [0,1].");
-    }
     for (u in 0:min(n))
-      s[u + 1] = poisson_lpmf(n[1] - u | lambda * p[1] * (1 - p[2]))
-        + poisson_lpmf(n[2] - u | lambda * p[2] * (1 - p[1]))
-        + poisson_lpmf(u | lambda * p[1] * p[2]);
+      s[u + 1] = poisson_log_lpmf(n[1] - u | log_lambda + log(p[1]) + log1m(p[2]))
+        + poisson_log_lpmf(n[2] - u | log_lambda + log(p[2]) + log1m(p[1]))
+        + poisson_log_lpmf(u | log_lambda + log(p[1]) + log(p[2]));
     return log_sum_exp(s);
   }
 }
 
 data {
   int<lower=1> R;                // Number of sites
-  // int<lower=1> T;                // Number of replications; fixed as 2
+  int<lower=1> T;                // Number of replications; fixed as 2
   int<lower=-1> y[R, 2, 7];      // Counts (-1:NA)
   int<lower=1,upper=7> first[R]; // First occasion
   int<lower=1,upper=7> last[R];  // Last occasion
@@ -48,7 +45,6 @@ data {
 transformed data {
   int<lower=0> max_y[R, 7];
   int<lower=0,upper=R> num_obs_site[7];
-  int T = 2;
 
   for (i in 1:R) {
     for (k in 1:(first[i] - 1))
@@ -69,6 +65,10 @@ parameters {
   vector<upper=7>[7] alpha_lam; // Constraint for stability
   vector[7] beta;
   vector<upper=7>[R] eps_raw;   // Constraint for stability
+                                // Without these constraints, some
+                                // estimates become unstable maybe due
+                                // to insufficient information in the
+                                // data used in the BPA book.
   real<lower=0> sd_lam;
   real<lower=0> sd_p;
   vector<lower=-7,upper=7>[7] logit_p[R, T]; // Originally `lp' in the BPA book
@@ -102,7 +102,8 @@ model {
   // Likelihood
   for (i in 1:R)
     for (k in first[i]:last[i])
-      y[i, 1:2, k] ~ bivariate_poisson(log_lambda[i, k], logit_p[i, 1:2, k]);
+      y[i, 1:2, k] ~ bivariate_poisson_log(log_lambda[i, k],
+                                           inv_logit(logit_p[i, 1:2, k]));
 }
 
 generated quantities {
@@ -125,11 +126,14 @@ generated quantities {
     // Initialize N and ik_p
     N = rep_array(0, R, 7);
     ik_p = rep_matrix(0, R, 7);
+    // Initialize E and E_new
+    E[1] = rep_matrix(0, T, 7);
+    E_new[1] = rep_matrix(0, T, 7);
+    for (i in 2:R) {
+      E[i] = E[i - 1];
+      E_new[i] = E_new[i - 1];
+    }
     for (i in 1:R) {
-      // Initialize E and E_new
-      E[i] = rep_matrix(0, T, 7);
-      E_new[i] = rep_matrix(0, T, 7);
-
       for (j in 1:T)
         p[i, j] = inv_logit(logit_p[i, j]);
 

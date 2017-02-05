@@ -12,33 +12,32 @@ functions {
    * Stan users mailing list
    *   https://groups.google.com/forum/#!topic/stan-users/9mMsp1oB69g
    *
-   * @param n      Number of observed individuals
-   * @param lambda Poisson mean of population size
-   * @param p      Detection probability
+   * @param n          Number of observed individuals
+   * @param log_lambda Log of Poisson mean of population size
+   * @param p          Detection probability
    *
    * return Log probability
   */
-  real bivariate_poisson_lpmf(int[] n, real lambda, real p) {
+  real bivariate_poisson_log_lpmf(int[] n, real log_lambda, real p) {
     real s[min(n) + 1];
-    real theta_1 = lambda * p * (1 - p);
-    real theta_0 = lambda * p * p;
+    real log_theta_1 = log_lambda + log(p) + log1m(p);
+    real log_theta_0 = log_lambda + log(p) * 2;
 
-    if (lambda < 0) {
-      reject("lambda must be non-negative.");
-    } else if (p < 0 || p > 1) {
+    if (size(n) != 2)
+      reject("Size of n must be 2.");
+    if (p < 0 || p > 1)
       reject("p must be in [0,1].");
-    }
     for (u in 0:min(n))
-      s[u + 1] = poisson_lpmf(n[1] - u | theta_1)
-               + poisson_lpmf(n[2] - u | theta_1)
-               + poisson_lpmf(u | theta_0);
+      s[u + 1] = poisson_log_lpmf(n[1] - u | log_theta_1)
+               + poisson_log_lpmf(n[2] - u | log_theta_1)
+               + poisson_log_lpmf(u | log_theta_0);
     return log_sum_exp(s);
   }
 }
 
 data {
   int<lower=1> R;                // Number of sites
-  //  int<lower=1> T;            // Number of replications; fixed as 2
+  int<lower=1> T;                // Number of replications; fixed as 2
   int<lower=-1> y[R, 2, 7];      // Counts (-1:NA)
   int<lower=1,upper=7> first[R]; // First occasion
   int<lower=1,upper=7> last[R];  // Last occasion
@@ -47,7 +46,6 @@ data {
 
 transformed data {
   int<lower=0> max_y[R, 7];
-  int T = 2;
 
   for (i in 1:R) {
     for (k in 1:(first[i] - 1))
@@ -72,7 +70,7 @@ model {
   // Likelihood
   for (i in 1:R)
     for (k in first[i]:last[i])
-      y[i, 1:2, k] ~ bivariate_poisson(exp(alpha_lam[k]), p[k]);
+      y[i, 1:T, k] ~ bivariate_poisson_log(alpha_lam[k], p[k]);
 }
 
 generated quantities {
@@ -90,10 +88,13 @@ generated quantities {
 
     // Initialize N, E and E_new
     N = rep_array(0, R, 7);
+    E[1] = rep_matrix(0, T, 7);
+    E_new[1] = rep_matrix(0, T, 7);
+    for (i in 2:R) {
+      E[i] = E[i - 1];
+      E_new[i] = E_new[i - 1];
+    }
     for (i in 1:R) {
-      E[i] = rep_matrix(0, T, 7);
-      E_new[i] = rep_matrix(0, T, 7);
-
       for (k in first[i]:last[i]) {
         vector[K + 1] lp;
 
