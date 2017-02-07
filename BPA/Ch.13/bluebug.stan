@@ -72,20 +72,17 @@ model {
 }
 
 generated quantities {
-  real<lower=0,upper=1> mean_p;
+  real<lower=0,upper=1> mean_p = inv_logit(alpha_p);
   int<lower=0,upper=1> z[R];
   int<lower=0> occ_fs;                  // Number of occupied sites
-
-  mean_p = inv_logit(alpha_p);
 
   // Full simulation without condition of
   // observed y
   // Note: the result will disperse wider than
   //       that of the book.
   for (i in 1:R) {
-    real psi;
+    real psi = inv_logit(logit_psi[i]);
 
-    psi = inv_logit(logit_psi[i]);
     z[i] = bernoulli_rng(psi);
   }
   occ_fs = sum(z);
