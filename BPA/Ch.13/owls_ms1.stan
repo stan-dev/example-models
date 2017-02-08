@@ -21,25 +21,21 @@ transformed parameters {
   p3 = beta / sum(beta);       // Induce Dirichlet prior
 
   // Define state vector
-  for (s in 1:R) {
-    phi[s, 1] = 1 - psi;          // Prob. of non-occupation
-    phi[s, 2] = psi * (1 - r);    // Prob. of occupancy without repro
-    phi[s, 3] = psi * r;            // Prob. of occupancy and repro
-  }
+  phi[, 1] = rep_array(1 - psi, R);       // Prob. of non-occupation
+  phi[, 2] = rep_array(psi * (1 - r), R); // Prob. of occupancy without repro
+  phi[, 3] = rep_array(psi * r, R);       // Prob. of occupancy and repro
 
   // Define observation matrix
   // Order of indices: true state, time, observed state
-  for (t in 1:T) {
-    p[1, t, 1] = 1;
-    p[1, t, 2] = 0;
-    p[1, t, 3] = 0;
-    p[2, t, 1] = 1 - p2;
-    p[2, t, 2] = p2;
-    p[2, t, 3] = 0;
-    p[3, t, 1] = p3[1];
-    p[3, t, 2] = p3[2];
-    p[3, t, 3] = p3[3];
-  }
+  p[1, , 1] = rep_array(1, T);
+  p[1, , 2] = rep_array(0, T);
+  p[1, , 3] = rep_array(0, T);
+  p[2, , 1] = rep_array(1 - p2, T);
+  p[2, , 2] = rep_array(p2, T);
+  p[2, , 3] = rep_array(0, T);
+  p[3, , 1] = rep_array(p3[1], T);
+  p[3, , 2] = rep_array(p3[2], T);
+  p[3, , 3] = rep_array(p3[3], T);
 }
 
 model {
