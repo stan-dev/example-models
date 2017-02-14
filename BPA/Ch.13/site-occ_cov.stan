@@ -55,17 +55,19 @@ model {
 }
 
 generated quantities {
-  int<lower=0> occ_fs;    // Number of occupied sites
-  int z[R];
-
-  // This code fully simulate the states without condition of
-  // observed y, so that the result will disperse wider than
-  // that of the book.
+  int occ_fs = occ_obs; // Number of occupied sites
+  // Number of sites observed as occupied
+  // + Number of sites occupied and not observed
   for (i in 1:R) {
-    real psi;
+    if (sum_y[i] == 0) {
+      int z;
+      real psi = inv_logit(logit_psi[i]);
+      vector[T] p = inv_logit(logit_p[i])';
 
-    psi = inv_logit(logit_psi[i]);
-    z[i] = bernoulli_rng(psi);
+      z = bernoulli_rng(psi);
+      for (t in 1:T)
+        z = z * (1 - bernoulli_rng(p[t]));
+      occ_fs = occ_fs + z;
+    }
   }
-  occ_fs = sum(z);
 }
