@@ -1,10 +1,10 @@
 ---
-title: "Impact of Reparameterization on Point Estimates"
+title: "The Impact of Reparameterization on Point Estimates"
 author: "Bob Carpenter"
 date: "24 April 2016"
 output:
   html_document:
-    theme: cerulean
+    theme: readable
 ---
 
 ### Abstract
