@@ -29,7 +29,17 @@ nand <- function(x) {
 }
 ```
 
-This case study uses **Stan** to fit the Rating Scale Model (RSM) and Generalized Rating Scale Model (GRSM), including a latent regression for person ability for both. Analysis is performed with **R**, making use of the **rstan** and **edstan** packages. **rstan** is the implementation of **Stan** for **R**, and **edstan** provides **Stan** models for item response theory and several convenience functions. The following **R** code loads the necessary packages and then sets some **rstan** options, which causes the compiled **Stan** model to be saved for future use and the MCMC chains to be executed in parallel.
+This case study uses **Stan** to fit the Rating Scale Model (RSM) and Generalized Rating Scale Model (GRSM), including a latent regression for person ability for both. Analysis is performed with **R**, making use of the **rstan** and **edstan** packages. **rstan** is the implementation of **Stan** for **R**, and **edstan** provides **Stan** models for item response theory and several convenience functions. 
+
+The **edstan** package is available on **CRAN**, but a more up to date version may often be found on Github. The following **R** code may be used to install the package from Github.
+
+```{r github, eval = FALSE}
+# Install edstan from Github rather than CRAN
+install.packages("devtools")
+devtools::install_github("danielcfurr/edstan")
+```
+
+The following **R** code loads the necessary packages and then sets some **rstan** options, which causes the compiled **Stan** model to be saved for future use and the MCMC chains to be executed in parallel.
 
 ```{r, warning=FALSE, results="hide"}
 # Load R packages
@@ -95,8 +105,8 @@ Constraints:
 Priors:
 
 * $\sigma \sim \mathrm{Exp}(.1)$ is weakly informative for the person standard deviation.
-* $\beta_1 \ldots \beta_{I-1} \sim \mathrm{N}(0, 9)$ is weakly informative, and no prior is needed for the constrained difficulty $\beta_I$.
-* $\kappa_1 \ldots \kappa_{m-1} \sim \mathrm{N}(0, 9)$ is weakly informative, and no prior is needed for the constrained difficulty $\kappa_m$.
+* $\beta_i \sim \mathrm{N}(0, 9)$ is also weakly informative.
+* $\kappa_s \sim \mathrm{N}(0, 9)$ is weakly informative.
 * $\lambda \sim t_3(0, 1)$, where $t_3$ is the Student's $t$ distribution with three degrees of freedom, *and* the covariates have been transformed as follows: (1) continuous covariates are mean-centered and then divided by two times their standard deviations, (2) binary covariates are mean-centered and divided their maximum minus minimum values, and (3) no change is made to the constant, set to one, for the model intercept. This approach to setting priors is similar to one that has been suggested for logistic regression [@gelman2008weakly]. It is possible to adjust the  coefficients back to the scales of the original covariates.
 
 
@@ -117,7 +127,7 @@ Looking to the data block, data are fed into the model in vector form. That is, 
 
 In the parameters block, `kappa_free` is declared as a vector of length `m - 1` and represents the unconstrained step parameters. In the transformed parameters block, the constrained step parameter is appened to `kappa_free` to make `kappa`, which is the complete vector of step difficulties. The other parameters are handled in conventional ways, with `sigma` being assigned a lower bound of zero because it is a standard deviation.
 
-The model block indicates the priors and the likelihood. The prior for step difficulties is placed on `kappa_free` rather than on `kappa` in order to avoid placing a prior on the constrained parameter. The likelihood manually increments the log posterior using the `target += ...` syntax with the `rsm()` function.
+The model block indicates the priors and the likelihood. The `target += ...` syntax for the prior on `kappa` is a manual way of incrementing the log posterior used when the prior is placed on a transformed parameter. The likelihood uses similar syntax along with the `rsm()` function.
 
 
 ## **Stan** code for the rating scale model with latent regression
@@ -132,7 +142,7 @@ cat(readLines(rsm_file), sep = "\n")
 
 The complete model adds `obtain_adjustments()` to the functions block, which is used to adjust the covariate matrix. In brief, the model operates on the adjusted covariate matrix, `W_adj`, and then in the generated quantities block determines what the latent regression coefficients would be on the original scale of the covariates. For a more in depth discussion of `obtain_adjustments()` and the transformations related to the latent regression, see the [Rasch and 2PL case study](http://mc-stan.org/documentation/case-studies/rasch_and_2pl.html).
 
-In the data block, the number of covariates (plus the intercept) `K` is now required, as is the matrix of covariates `W`. The parameters `beta_free`, `kappa_free`, `theta`, `sigma`, and `lambda` are declared in the parameters block. The unconstrained item parameters are contained in `beta_free`. In the transformed parameters block, `beta` is created by appending the constrained item difficulty to `beta_free`. The model block contains the priors and the likelihood. Priors are placed on `beta_free` rather than on `beta`, as the prior does not apply to the constrained parameter. The same approach is taken with `kappa` and `kappa_free`. 
+In the data block, the number of covariates (plus the intercept) `K` is now required, as is the matrix of covariates `W`. The parameters `beta_free`, `kappa_free`, `theta`, `sigma`, and `lambda` are declared in the parameters block. The unconstrained item parameters are contained in `beta_free`. In the transformed parameters block, `beta` is created by appending the constrained item difficulty to `beta_free`. The model block contains the priors and the likelihood.
 
 
 ## Simulation for parameter recovery

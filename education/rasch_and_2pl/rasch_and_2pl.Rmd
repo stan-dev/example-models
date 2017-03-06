@@ -96,7 +96,7 @@ Constraints:
 Priors:
 
 * $\sigma \sim \mathrm{Exp}(.1)$ is weakly informative for the person standard deviation.
-* $\beta_1 \ldots \beta_{I-1} \sim \mathrm{N}(0, 9)$ is weakly informative, and no prior is needed for the constrained difficulty $\beta_I$.
+* $\beta_i \sim \mathrm{N}(0, 9)$ is also weakly informative.
 * $\lambda \sim t_3(0, 1)$, where $t_3$ is the Student's $t$ distribution with three degrees of freedom, *and* the covariates have been transformed as follows: (1) continuous covariates are mean-centered and then divided by two times their standard deviations, (2) binary covariates are mean-centered and divided their maximum minus minimum values, and (3) no change is made to the constant, set to one, for the model intercept. This approach to setting priors is similar to one that has been suggested for logistic regression [@gelman2008weakly]. It is possible to adjust the  coefficients back to the scales of the original covariates.
 
 
@@ -131,7 +131,7 @@ In the transformed data block, the `obtain_adjustments()` function is called and
 
 The generated quantities block is used to calculate what the regression coefficients and intercept would have been on the scales of the original covariates. For the coefficients this is determined simply by dividing the coefficients by the same value of `spread` used to modify the scale the original covariates. The intercept given the original scale is then recovered with some algebra. The `obtain_adjustments()` function and related code for adjusting the covariates and regression coefficients is used in the same way across **edstan** models.
 
-There are a few other differences from the simple model. In the data block, the number of covariates (plus the intercept) `K` is now required, as is the matrix of covariates `W`. The first column of `W` must have all elements equal to one. Also, the unconstrained item parameters are contained in `beta_free`, which is why it has a length of $I-1$. In the transformed parameters block, `beta` is created by appending the constrained item difficulty to `beta_free`. Priors are placed on `beta_free` rather than on `beta`, as the prior does not apply to the constrained parameter.
+There are a few other differences from the simple model. In the data block, the number of covariates (plus the intercept) `K` is now required, as is the matrix of covariates `W`. The first column of `W` must have all elements equal to one. Also, the unconstrained item parameters are contained in `beta_free`, which is why it has a length of $I-1$. In the transformed parameters block, `beta` is created by appending the constrained item difficulty to `beta_free`. The `target += ...` syntax for the prior on `beta` is a manual way of incrementing the log posterior used when the prior is placed on a transformed parameter.
 
 
 ## Simulation for parameter recovery

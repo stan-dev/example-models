@@ -29,7 +29,17 @@ nand <- function(x) {
 }
 ```
 
-This case study uses **Stan** to fit the Partial Credit Model (PCM) and Generalized Partial Credit Model (GPCM), including a latent regression for person ability for both. Analysis is performed with **R**, making use of the **rstan** and **edstan** packages. **rstan** is the implementation of **Stan** for **R**, and **edstan** provides **Stan** models for item response theory and several convenience functions. The following **R** code loads the necessary packages and then sets some **rstan** options, which causes the compiled **Stan** model to be saved for future use and the MCMC chains to be executed in parallel.
+This case study uses **Stan** to fit the Partial Credit Model (PCM) and Generalized Partial Credit Model (GPCM), including a latent regression for person ability for both. Analysis is performed with **R**, making use of the **rstan** and **edstan** packages. **rstan** is the implementation of **Stan** for **R**, and **edstan** provides **Stan** models for item response theory and several convenience functions. 
+
+The **edstan** package is available on **CRAN**, but a more up to date version may often be found on Github. The following **R** code may be used to install the package from Github.
+
+```{r github, eval = FALSE}
+# Install edstan from Github rather than CRAN
+install.packages("devtools")
+devtools::install_github("danielcfurr/edstan")
+```
+
+The following **R** code loads the necessary packages and then sets some **rstan** options, which causes the compiled **Stan** model to be saved for future use and the MCMC chains to be executed in parallel.
 
 ```{r, warning=FALSE, results="hide"}
 # Load R packages
@@ -93,7 +103,7 @@ Constraints:
 Priors:
 
 * $\sigma \sim \mathrm{Exp}(.1)$ is weakly informative for the person standard deviation.
-* $\beta_1 \ldots \beta_{I-1} \sim \mathrm{N}(0, 9)$ is weakly informative, and no prior is needed for the constrained difficulty $\beta_I$.
+* $\beta_{is} \sim \mathrm{N}(0, 9)$ is also weakly informative.
 * $\lambda \sim t_3(0, 1)$, where $t_3$ is the Student's $t$ distribution with three degrees of freedom, *and* the covariates have been transformed as follows: (1) continuous covariates are mean-centered and then divided by two times their standard deviations, (2) binary covariates are mean-centered and divided their maximum minus minimum values, and (3) no change is made to the constant, set to one, for the model intercept. This approach to setting priors is similar to one that has been suggested for logistic regression [@gelman2008weakly]. It is possible to adjust the  coefficients back to the scales of the original covariates.
 
 
@@ -131,7 +141,7 @@ The complete model adds `obtain_adjustments()` to the functions block, which is 
 
 In the data block, the number of covariates (plus the intercept) `K` is now required, as is the matrix of covariates `W`. Otherwise this block is the same as before. An import change in this model is that `beta` is now a single, long vector rather than an array. This set up allows items to have different numbers of steps but requires additional programming. To that end, two variables are created in the transformed data block, and these are used to access the elements in `beta` relevant to a given item: `pos` indicates the position in `beta` of the first parameter for a given item, and `m` indicates the count of parameters for an item.
 
-The parameters `beta_free`, `theta`, `sigma`, and `lambda` are declared in the parameters block. The unconstrained item parameters are contained in `beta_free`. In the transformed parameters block, `beta` is created by appending the constrained item difficulty to `beta_free`. The model block contains the priors and the likelihood. Priors are placed on `beta_free` rather than on `beta`, as the prior does not apply to the constrained parameter. 
+The parameters `beta_free`, `theta`, `sigma`, and `lambda` are declared in the parameters block. The unconstrained item parameters are contained in `beta_free`. In the transformed parameters block, `beta` is created by appending the constrained item difficulty to `beta_free`. The model block contains the priors and the likelihood. The `target += ...` syntax for the prior on `beta` is a manual way of incrementing the log posterior used when the prior is placed on a transformed parameter.
 
 
 ## Simulation for parameter recovery
