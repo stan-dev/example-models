@@ -1,0 +1,432 @@
+---
+title: "Rasch and two-parameter logistic item response models with latent regression"
+author: "Daniel C. Furr"
+date: "`r gsub('(^.* )(0)([0-9], .*)', '\\1\\3', format(Sys.time(), '%B %d, %Y'))`"
+output:
+  html_document:
+    toc: true
+    number_sections: true
+    fig_caption: true
+    css: ../styles.css
+bibliography: ../bibliography.bib
+---
+
+```{r knitr_opts, include = FALSE}
+set.seed(68)
+
+knitr::opts_chunk$set(tidy = FALSE, cache = FALSE, message = FALSE)
+
+nand <- function(x) {
+  l <- length(x)
+  if(l == 1) {
+    return(x)
+  } else if(l == 2) {
+    return(paste(x, collapse = " and "))
+  } else if(l > 2) {
+    part <- paste(x[-l], collapse = ", ")
+    return(paste(c(part, x[l]), collapse = ", and "))
+  }
+}
+```
+
+This case study uses **Stan** to fit the Rasch and two-parameter logistic (2PL) item response theory models, including a latent regression for person ability for both. The Rasch model is some times referred to as the one-parameter logistic model. Analysis is performed with **R**, making use of the **rstan** and **edstan** packages. **rstan** is the implementation of **Stan** for **R**, and **edstan** provides **Stan** models for item response theory and several convenience functions. 
+
+The **edstan** package is available on **CRAN**, but a more up to date version may often be found on Github. The following **R** code may be used to install the package from Github.
+
+```{r github, eval = FALSE}
+# Install edstan from Github rather than CRAN
+install.packages("devtools")
+devtools::install_github("danielcfurr/edstan")
+```
+
+The following **R** code loads the necessary packages and then sets some **rstan** options, which causes the compiled **Stan** model to be saved for future use and the MCMC chains to be executed in parallel.
+
+```{r libraries, warning=FALSE, results="hide"}
+# Load R packages
+library(rstan)
+library(edstan)
+library(ggplot2)
+library(TAM)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+```
+
+The case study uses 
+**R** version `r getRversion()`,
+**rstan** version `r packageVersion("rstan")`, 
+**ggplot2** version `r packageVersion("ggplot2")`, and
+**edstan** version `r packageVersion("edstan")`.
+Also, the example data are from
+**TAM** version `r packageVersion("TAM")`.
+Readers may wish to check the versions for their installed packages using the `packageVersion()` function.
+
+
+# Rasch model with latent regression
+
+## Overview of the model
+
+The Rasch model [@Rasch1960a] is an item response theory model for dichotomous items. The version presented includes a latent regression, in which the person abilities are regressed on person characteristics. However, the latent regression part of the model may be restricted to an intercept only, resulting in a regular Rasch model.
+
+$$ 
+\mathrm{logit} [ \Pr(y_{ij} = 1 | \theta_j, \beta_i) ] = 
+  \theta_j - \beta_i
+$$
+$$
+  \theta_j \sim \mathrm{N}(w_j' \lambda, \sigma^2)
+$$
+
+Variables:
+
+* $i = 1 \ldots I$ indexes items.
+* $j = 1 \ldots J$ indexes persons.
+* $y_{ij} \in \{ 0, 1 \}$ is the response of person $j$ to item $i$.
+* $w_{j}$ is the vector of covariates for person $j$, the first element of which *must* equal one for a model intercept. $w_{j}$ may be assembled into a $J$-by-$K$ covariate matrix $W$, where $K$ is number of elements in $w_j$.
+
+Parameters:
+
+* $\beta_i$ is the difficulty for item $i$.
+* $\theta_j$ is the ability for person $j$.
+* $\lambda$ is the vector of latent regression parameters of length $K$.
+* $\sigma^2$ is the variance for the ability distribution.
+
+Constraints:
+
+* The last item difficulty is constrained to be the negative sum of the other difficulties, $\beta_I = -\sum_{i}^{(I-1)} \beta_i$, resulting in the average item difficulty being zero.
+
+Priors:
+
+* $\sigma \sim \mathrm{Exp}(.1)$ is weakly informative for the person standard deviation.
+* $\beta_i \sim \mathrm{N}(0, 9)$ is also weakly informative.
+* $\lambda \sim t_3(0, 1)$, where $t_3$ is the Student's $t$ distribution with three degrees of freedom, *and* the covariates have been transformed as follows: (1) continuous covariates are mean-centered and then divided by two times their standard deviations, (2) binary covariates are mean-centered and divided their maximum minus minimum values, and (3) no change is made to the constant, set to one, for the model intercept. This approach to setting priors is similar to one that has been suggested for logistic regression [@gelman2008weakly]. It is possible to adjust the  coefficients back to the scales of the original covariates.
+
+
+## **Stan** code for a simple Rasch model
+
+A simple **Stan** model is described before discussing the complete model, as the code for the complete model is somewhat cumbersome. The simpler model, printed below, omits the latent regression and so does not require rescaling of the person covariates or `lambda`. The mean of the person distribution is set to zero and the constraint is removed from the item difficulties, which also differs from the complete model.
+
+```{r simple_rasch_code, comment=""}
+# Print the simple Rasch model from the edstan package
+simple_rasch_file <- system.file("extdata/rasch_simple.stan", 
+                                 package = "edstan")
+cat(readLines(simple_rasch_file), sep = "\n")
+```
+
+Data are fed into the model in vector form. That is, `y` is a long vector of scored item responses, and `ii` and `jj` indicate with which item and person each element in `y` is associated. These three vectors are of length `N`, which is equal to `I` times `J` if there are no missing responses. Parameters `beta`, `theta`, and `sigma` are declared in the parameters block, and priors for these are set in the model block. The likelihood for `y` in the last line uses vectorization by indexing `theta` and `beta` with `jj` and `ii`, which is more efficient than using a loop.
+
+
+## **Stan** code for the Rasch model with latent regression
+
+The Rasch  model with latent regression, which is featured in **edstan**, is printed below. It is more complicated than is typically necessary for a **Stan** model because it is written to apply sensible priors for regression parameters associated with arbitrarily scaled covariates.
+
+```{r latreg_rasch_code, comment=""}
+# Print the latent regression Rasch model from the edstan package
+rasch_latreg_file <- system.file("extdata/rasch_latent_reg.stan", 
+                                 package = "edstan")
+cat(readLines(rasch_latreg_file), sep = "\n")
+```
+
+The **Stan** model begins with the creation of the `obtain_adjustments()` function, which accepts a covariate matrix and returns a matrix that contains values to be used in adjusting the covariates. The returned matrix has one column for each covariate (starting with the constant for the intercept). The first row of it provides the values used to center the covariates, and the second provides the values used to scale them. The function begins by setting the values in the first column to zero and one, which corresponds to no change to the constant. Next the function loops over the remaining columns of the covariate matrix and determines whether the covariate is binary or continuous. This determination is made by counting the number of values that are equal to either the maximum or minimum for a given coavariate; if this count equals $J$, then the covariate must be binary. Based on this determination the appropriate adjustments for the covariates are calculated and then added to the returned matrix.
+
+In the transformed data block, the `obtain_adjustments()` function is called and the results are stored in `adj`. Then a double loop is used to assign adjusted covariate values to `W_adj` using `W` and `adj`. The latent regression is carried out in the model block in the declaration of the prior for `theta`, based on `W_adj` and `lambda_adj`. (This approach is referred to as hierarchical centering and tends to be more efficient when there is a large amount of data. The alternative is a "decentered" approach in which the prior mean for `theta` would be set to zero, and then `W*lambda` would be added to `theta` in the likelihood statement.)
+
+The generated quantities block is used to calculate what the regression coefficients and intercept would have been on the scales of the original covariates. For the coefficients this is determined simply by dividing the coefficients by the same value of `spread` used to modify the scale the original covariates. The intercept given the original scale is then recovered with some algebra. The `obtain_adjustments()` function and related code for adjusting the covariates and regression coefficients is used in the same way across **edstan** models.
+
+There are a few other differences from the simple model. In the data block, the number of covariates (plus the intercept) `K` is now required, as is the matrix of covariates `W`. The first column of `W` must have all elements equal to one. Also, the unconstrained item parameters are contained in `beta_free`, which is why it has a length of $I-1$. In the transformed parameters block, `beta` is created by appending the constrained item difficulty to `beta_free`. The `target += ...` syntax for the prior on `beta` is a manual way of incrementing the log posterior used when the prior is placed on a transformed parameter.
+
+
+## Simulation for parameter recovery
+
+The **Stan** model is fit to a simulated dataset to evaluate it's ability to recover the generating parameter values. The **R** code that follows simulates a dataset conforming to the model.
+
+```{r rasch_sim_data}
+# Set parameters for the simulated data
+I <- 20
+J <- 500
+sigma <- .8
+lambda <- c(-10*.05, .05, .5, -.025)
+w_2 <- rnorm(J, 10, 5)
+w_3 <- rbinom(J, 1, .5)
+W <- cbind(1, w_2, w_3, w_2*w_3)
+beta_free <- seq(from = -1, to = 1, length.out = I-1)
+
+# Calculate or sample remaining variables and parameters
+N <- I*J
+ii <- rep(1:I, times = J)
+jj <- rep(1:J, each = I)
+beta <- c(beta_free, -1 * sum(beta_free))
+rasch_theta <-  rnorm(J, W %*% matrix(lambda), sigma)
+rasch_eta <- (rasch_theta[jj] - beta[ii])
+rasch_y <- rbinom(N, size = 1, prob = boot::inv.logit(rasch_eta))
+
+# Assemble the data list using an edstan function
+sim_rasch_list <- irt_data(y = rasch_y, ii = ii, jj = jj, 
+                           covariates = as.data.frame(W), 
+                           formula = NULL)
+```
+
+The simulated data consists of `r I` dichotomous items and `r J` persons. The person covariate vectors $w_j$ include (1) a value of one for the model intercept, (2) a random draw from a normal distribution with mean of 10 and standard deviation of 5, (3) an indicator variable taking values of zero and one, and (4) an interaction between the two. These are chosen to represent a difficult case for assigning automatic priors for the latent regression coefficients. The generating coefficients $\lambda$ for the latent regression are `r nand(lambda)`. The generating unconstrained difficulties $\beta_1 \cdots \beta_{`r I-1`}$ are equidistant values between `r nand(range(beta_free))`, the constrained difficulty $\beta_{`r I`}$ is equal to `r round(beta[I], 2)`, and the abilities $\theta$ are random draws from a normal distribution with a mean generated from the latent regression and a standard deviation $\sigma = `r sigma`$.
+
+```{r rasch_sim_theta_plot, fig.cap="Mean of generated abilities as a function of the continuous covariate. A line is shown separately for the two groups identified by the binary variable."}
+# Plot mean ability conditional on the covariates
+f1 <- function(x) lambda[1] + x*lambda[2]
+f2 <- function(x) lambda[1] + lambda[3] + x*(lambda[2] + lambda[4])
+ggplot(data.frame(w2 = c(0, 20))) +
+  aes(x = w2) +
+  stat_function(fun = f1, color = "red") +
+  stat_function(fun = f2, color = "blue") +
+  ylab("Mean generated ability") +
+  xlab("Value for continous covariate")
+```
+
+The simulated dataset is next fit with **Stan** using `irt_stan()` from the **edstan** package. `irt_stan()` is merely a wrapper for `stan()` in **rstan**. Using 1,000 posterior draws per chain may be somewhat excessive as we are mainly interested in the posterior means of the parameters. However, as parameter recovery will be evaulated using the 2.5th and 97.5th percentiles of the posterior, the large number of posterior samples is warranted.
+
+```{r sim_rasch_fit, results="hide", message=FALSE}
+# Fit model to simulated data using an edstan function
+sim_rasch_fit <- irt_stan(sim_rasch_list, model = "rasch_latent_reg.stan",
+                          chains = 4, iter = 1000)
+```
+
+```{r sim_rasch_rhat, echo = FALSE}
+# Fit model to simulated data using an edstan function
+rasch_sim_max_rhat <- max(summary(sim_rasch_fit)$summary[,"Rhat"])
+```
+
+The highest value for $\hat R$ was 
+`r round(rasch_sim_max_rhat, 3)` 
+for all parameters and the log posterior, suggesting that the chains have converged.
+The **Stan** model is evaluated in terms of its ability to recover the generating values of the parameters. The R code below prepares a plot in which the points indicate the difference between the posterior means and generating values for the parameters of main interest. This difference is referred to as discrepancy. The lines indicate the 95% poster intervals for the difference, defined as the 2.5th and 97.5th percentiles of the posterior draws. Ideally, (nearly) all the 95% intervals would include zero.
+
+```{r sim_rasch_dif, fig.height=6, fig.cap="Discrepancies between estimated and generating parameters. Points indicate the difference between the posterior means and generating values for a parameter, and horizontal lines indicate 95% posterior intervals for the difference. Most of the discrepancies are about zero, indicating that **Stan** successfully recovers the true parameters."}
+# Get estimated and generating values for wanted parameters
+rasch_generating_values <- c(beta, lambda, sigma)
+rasch_estimated_values <- summary(sim_rasch_fit,  
+                                  pars = c("beta", "lambda", "sigma"),
+                                  probs = c(.025, .975))
+rasch_estimated_values <- rasch_estimated_values[["summary"]]
+
+# Make a data frame of the discrepancies
+rasch_discrep <- data.frame(par = rownames(rasch_estimated_values),
+                            mean = rasch_estimated_values[, "mean"],
+                            p025 = rasch_estimated_values[, "2.5%"],
+                            p975 = rasch_estimated_values[, "97.5%"],
+                            gen = rasch_generating_values)
+rasch_discrep$par <- with(rasch_discrep, factor(par, rev(par)))
+rasch_discrep$lower <- with(rasch_discrep, p025 - gen)
+rasch_discrep$middle <- with(rasch_discrep, mean - gen)
+rasch_discrep$upper <- with(rasch_discrep, p975 - gen)
+
+# Plot the discrepancies
+ggplot(rasch_discrep) +
+  aes(x = par, y = middle, ymin = lower, ymax = upper) +
+  scale_x_discrete() +
+  labs(y = "Discrepancy", x = NULL) +
+  geom_abline(intercept = 0, slope = 0, color = "white") +
+  geom_linerange() +
+  geom_point(size = 2) +
+  theme(panel.grid = element_blank()) +
+  coord_flip()
+```
+
+
+# Two-parameter logistic model with latent regression
+
+## Overview of the model
+
+The two-parameter logistic model (2PL) [@swaminathan1985bayesian] is an item response theory model that includes parameters for both the difficulty and discrimination of dichotomous items. The version presented includes a latent regression. However, the latent regression part of the model may be restricted to an intercept only, resulting in a regular 2PL.
+
+$$
+  \mathrm{logit} [ \Pr(y_{ij} = 1 | \alpha_i, \beta_i, \theta_j) ] =
+  \alpha_i \theta_j - \beta_i
+$$
+$$
+  \theta_j \sim \mathrm{N}(w_j' \lambda, 1)
+$$
+
+Many aspects of the 2PL are similar to the Rasch model described earlier. Parameters $\beta_i$, $\theta_j$, and $\lambda$ have the same interpretation, but the 2PL adds a discrimination parameter $\alpha_i$ and constrains the variance of $\theta_j$ to one. The prior $\alpha_i \sim \mathrm{log~N}(1, 1)$ is added, which is weakly informative but assumes positive discriminations. The same priors are placed on $\beta_i$ and $\lambda$, and the same constraint is placed on $\beta_I$.
+
+
+## **Stan** code for the 2PL with latent regression
+
+The **Stan** code for the 2PL is similar to that for the Rasch model except for the addition of the discrimination parameters.
+
+```{r latreg_2pl_code, comment=""}
+# Print the latent regression 2PL model from the edstan package
+twopl_latreg_file <- system.file("extdata/2pl_latent_reg.stan", 
+                                 package = "edstan")
+cat(readLines(twopl_latreg_file), sep = "\n")
+```
+
+
+## Simulation for parameter recovery
+
+The **Stan** model is fit to a simulated dataset to evaluate it's ability to recover the generating parameter values. The **R** code that follows simulates a dataset conforming to the model. The item difficulties and some other elements are borrowed from the Rasch model simulation.
+
+```{r sim_2pl_data}
+# Set alpha, and otherwise use parameters from the previous simulation
+alpha <- rep(c(.8, 1, 1.2, 1.4),  length.out = I)
+
+# Calculate or sample remaining variables and parameters where needed
+twopl_theta <-  rnorm(J, W %*% matrix(lambda), 1)
+twopl_eta <- alpha[ii]*twopl_theta[jj] - beta[ii]
+twopl_y <- rbinom(N, size = 1, prob = boot::inv.logit(twopl_eta))
+
+# Assemble the data list using an edstan function
+sim_2pl_list <- irt_data(y = twopl_y, ii = ii, jj = jj, 
+                         covariates = as.data.frame(W), 
+                         formula = NULL)
+```
+
+The simulated dataset is next fit with **Stan** using `irt_stan()` from the **edstan** package.
+
+```{r sim_2pl_fit, results="hide", message=FALSE}
+# Fit model to simulated data using an edstan function
+sim_2pl_fit <- irt_stan(sim_2pl_list, model = "2pl_latent_reg.stan",
+                        chains = 4, iter = 1000)
+```
+
+```{r sim_2pl_rhat, echo = FALSE}
+# Fit model to simulated data using an edstan function
+twopl_sim_max_rhat <- max(summary(sim_2pl_fit)$summary[,"Rhat"])
+```
+
+The highest value for $\hat R$ was 
+`r round(twopl_sim_max_rhat, 3)`
+for all parameters and the log posterior. 
+The **Stan** model is evaluated in terms of its ability to recover the generating values of the parameters. The R code below prepares a plot in which the points indicate the difference between the posterior means and generating values for the parameters of main interest. This difference is referred to as discrepancy. The lines indicate the 95% poster intervals for the difference, defined as the 2.5th and 97.5th percentiles of the posterior draws. Ideally, (nearly) all the 95% intervals would include zero.
+
+```{r sim_2pl_dif, fig.height=8, fig.cap="Discrepancies between estimated and generating parameters. Points indicate the difference between the posterior means and generating values for a parameter, and horizontal lines indicate 95% posterior intervals for the difference. Most of the discrepancies are about zero, indicating that **Stan** successfully recovers the true parameters."}
+# Get estimated and generating values for wanted parameters
+twopl_generating_values <- c(alpha, beta, lambda)
+twopl_estimated_values <- summary(sim_2pl_fit,  
+                                  pars = c("alpha", "beta", "lambda"),
+                                  probs = c(.025, .975))
+twopl_estimated_values <- twopl_estimated_values[["summary"]]
+
+# Make a data frame of the discrepancies
+twopl_discrep <- data.frame(par = rownames(twopl_estimated_values),
+                            mean = twopl_estimated_values[, "mean"],
+                            p025 = twopl_estimated_values[, "2.5%"],
+                            p975 = twopl_estimated_values[, "97.5%"],
+                            gen = twopl_generating_values)
+twopl_discrep$par <- with(twopl_discrep, factor(par, rev(par)))
+twopl_discrep$lower <- with(twopl_discrep, p025 - gen)
+twopl_discrep$middle <- with(twopl_discrep, mean - gen)
+twopl_discrep$upper <- with(twopl_discrep, p975 - gen)
+
+# Plot the discrepancies
+ggplot(twopl_discrep) +
+  aes(x = par, y = middle, ymin = lower, ymax = upper) +
+  scale_x_discrete() +
+  labs(y = "Discrepancy", x = NULL) +
+  geom_abline(intercept = 0, slope = 0, color = "white") +
+  geom_linerange() +
+  geom_point(size = 2) +
+  theme(panel.grid = element_blank()) +
+  coord_flip()
+```
+
+
+# Example application
+
+## Data
+
+The example data are from the The First International Mathematics Study [@husen1967international; @postlethwaite1967school]. The data include information about student gender and country (Australia or Japan). For convenience, only a subset of the full data are used. 
+
+```{r example_data}
+# Attach the example dataset. The TAM package is required.
+data(data.fims.Aus.Jpn.scored, package = "TAM")
+
+# Subset the full data
+select <- floor(seq(from = 1, to = nrow(data.fims.Aus.Jpn.scored),
+                    length.out = 500))
+subsetted_df <- data.fims.Aus.Jpn.scored[select, ]
+str(subsetted_df)
+```
+
+The dataset is next divided into an item response matrix and a matrix of student covariates.
+
+```{r example_respmatrix}
+# Extract the response matrix
+response_matrix <- as.matrix(subsetted_df[, grepl("^M1", names(subsetted_df))])
+dim(response_matrix)
+# Set up a data frame of person covariates
+covariates <- data.frame(male = as.numeric(subsetted_df$SEX == 2),
+                         japan = as.numeric(subsetted_df$country == 2))
+table(covariates)
+```
+
+`r nrow(W)` students responded to `r ncol(W)` dichotomously scored items. The data contain no missing values. The two matrices are converted to a list suitable for the **Stan** model.
+
+```{r example_data_list, result="hide"}
+# Assemble the data list using an edstan function
+ex_list <- irt_data(response_matrix = response_matrix, 
+                    covariates = covariates, 
+                    formula = ~ male*japan)
+```
+
+
+## Rasch model results
+
+The Rasch model is fit to the data list.
+
+```{r example_rasch_fit, results="hide", message=FALSE}
+# Fit the Rasch model model using an edstan function
+ex_rasch_fit <- irt_stan(ex_list, model = "rasch_latent_reg.stan", 
+                         chains = 4, iter = 300)
+```
+
+As discussed above, convergence of the chains is assessed for every parameter, and also the log posterior density, using $\hat{R}$.
+
+```{r example_rasch_converge, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the example. All values should be less than 1.1 to infer convergence. Horizontal jitter is applied to the points."}
+# Plot of convergence statistics using an edstan function
+stan_columns_plot(ex_rasch_fit)
+```
+
+Next we view summaries of the parameter posteriors.
+
+```{r example_rasch_print}
+# View table of parameter posteriors using an edstan function
+print_irt_stan(ex_rasch_fit)
+```
+
+A Rasch model without the latent regression could be fit by changing the person covariate matrix to include only an intercept term. Shown below is how this may be done for the example data.
+
+```{r example_rasch_noreg, eval=FALSE}
+# Fit the example data without latent regression
+noreg_list <- ex_list
+noreg_list$W <- matrix(1, nrow = ex_list$J, ncol = 1)
+noreg_list$K <- 1
+noreg_fit <- stan(file = "rasch_latent_reg.stan", 
+                  data = noreg_list, chains = 4, iter = 300)
+```
+
+
+## Two parameter logistic model results
+
+The 2PL is fit to the data list.
+
+```{r example_2pl_fit, results="hide", message=FALSE}
+# Fit the 2PL using an edstan function
+ex_2pl_fit <- irt_stan(ex_list, model = "2pl_latent_reg.stan", 
+                       chains = 4, iter = 300)
+```
+
+As discussed above, convergence of the chains is assessed for every parameter, and also the log posterior density, using $\hat{R}$.
+
+```{r example_2pl_converge, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the example. All values should be less than 1.1 to infer convergence. Horizontal jitter is applied to the points."}
+# Plot of convergence statistics using an edstan function
+stan_columns_plot(ex_2pl_fit)
+```
+
+Next we view summaries of the parameter posteriors.
+
+```{r example_2pl_print}
+# View table of parameter posteriors using an edstan function
+print_irt_stan(ex_2pl_fit, ex_list)
+```
+
+
+# References
+
+<!-- This comment causes section to be numbered -->
+

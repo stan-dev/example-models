@@ -29,9 +29,9 @@ model {
   theta ~ normal(0, 1);
   L_Omega ~ lkj_corr_cholesky(4);
   mu[1] ~ normal(0,1);
-  tau[1] ~ normal(0,1);
+  tau[1] ~ exponential(.1);
   mu[2] ~ normal(0,5);
-  tau[2] ~ normal(0,3);
+  tau[2] ~ exponential(.1);
   y ~ bernoulli_logit(alpha[ii] .* (theta[jj] - beta[ii]));
 }
 generated quantities {

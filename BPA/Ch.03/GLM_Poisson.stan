@@ -8,8 +8,8 @@ transformed data {
   vector[n] year_squared;
   vector[n] year_cubed;
 
-  year_squared <- year .* year;
-  year_cubed <- year .* year .* year;
+  year_squared = year .* year;
+  year_cubed = year .* year .* year;
 }
 
 parameters {
@@ -22,18 +22,14 @@ parameters {
 transformed parameters {
   vector[n] log_lambda;
 
-  log_lambda <- alpha +
-                beta1 * year +
-                beta2 * year_squared +
-                beta3 * year_cubed;
+  log_lambda = alpha
+             + beta1 * year +
+             + beta2 * year_squared +
+             + beta3 * year_cubed;
 }
 
 model {
-  // Priors
-  alpha ~ uniform(-20, 20);
-  beta1 ~ uniform(-10, 10);
-  beta2 ~ uniform(-10, 10);
-  beta3 ~ uniform(-10, 10);
+  // Implicit uniform priors are used.
 
   // Likelihood
   C ~ poisson_log(log_lambda);
@@ -42,5 +38,5 @@ model {
 generated quantities {
   vector[n] lambda;
 
-  lambda <- exp(log_lambda);
+  lambda = exp(log_lambda);
 }

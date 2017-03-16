@@ -11,7 +11,7 @@ transformed data {
   int<lower=0> s[M];            // Totals in each row
 
   for (i in 1:M)
-    s[i] <- sum(y[i]);
+    s[i] = sum(y[i]);
 }
 
 parameters {
@@ -19,7 +19,7 @@ parameters {
   real<lower=0,upper=1> mean_p[T];      // Mean detection probability
   real beta;
   real mu_size;
-  real<lower=0> sd_size;
+  real<lower=0,upper=prior_sd_upper> sd_size;
   real<lower=-6,upper=6> bsize_mis[M-C];        // Missing data
 }
 
@@ -28,24 +28,24 @@ transformed parameters {
   vector<lower=0,upper=1>[T] p[M];
 
   for (j in 1:T)
-    alpha[j] <- logit(mean_p[j]); // Define logit
+    alpha[j] = logit(mean_p[j]); // Define logit
   for (i in 1:C)
     for (j in 1:T)
-      p[i][j] <- inv_logit(alpha[j] + beta * bsize[i]);
+      p[i][j] = inv_logit(alpha[j] + beta * bsize[i]);
   for (i in (C + 1):M)
     for (j in 1:T)
-      p[i][j] <- inv_logit(alpha[j] + beta * bsize_mis[i - C]);
+      p[i][j] = inv_logit(alpha[j] + beta * bsize_mis[i - C]);
 }
 
 model {
   real lp[2];
 
   // Priors
-  omega ~ uniform(0, 1);
-  mean_p ~ uniform(0, 1);
+  //  omega ~ uniform(0, 1);
+  //  mean_p ~ uniform(0, 1);
   beta ~ normal(0, 10);
   mu_size ~ normal(0, 10);
-  sd_size ~ uniform(0, prior_sd_upper);   // Provide upper bound as data
+  //  sd_size ~ uniform(0, prior_sd_upper);   // Provide upper bound as data
 
   // Likelihood
   for (i in 1:C)
@@ -56,15 +56,15 @@ model {
   for (i in 1:M) {  // Loop over individuals
     if (s[i] > 0) {
       // z[i] == 1
-      increment_log_prob(bernoulli_log(1, omega) +
-                         bernoulli_log(y[i], p[i]));
+      target += bernoulli_lpmf(1 | omega)
+              + bernoulli_lpmf(y[i] | p[i]);
     } else { // s[i] == 0
       // z[i] == 1
-      lp[1] <- bernoulli_log(1, omega) +
-               bernoulli_log(0, p[i]);
+      lp[1] = bernoulli_lpmf(1 | omega)
+            + bernoulli_lpmf(0 | p[i]);
       // z[i] == 0
-      lp[2] <- bernoulli_log(0, omega);
-      increment_log_prob(log_sum_exp(lp));
+      lp[2] = bernoulli_lpmf(0 | omega);
+      target += log_sum_exp(lp[1], lp[2]);
     }
   }
 }
@@ -77,8 +77,8 @@ generated quantities {
   for (i in 1:M) {
     real pr;
 
-    pr <- prod(rep_vector(1.0, T) - p[i]);
-    zero[i] <- bernoulli_rng(omega * pr);
+    pr = prod(rep_vector(1.0, T) - p[i]);
+    zero[i] = bernoulli_rng(omega * pr);
   }
-  N <- C + sum(zero);
+  N = C + sum(zero);
 }

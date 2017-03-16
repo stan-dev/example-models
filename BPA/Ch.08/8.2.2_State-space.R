@@ -34,4 +34,3 @@ mr_ss <- stan("mr_ss.stan",
 
 ## Summarize posteriors
 print(mr_ss, digits = 3)
-

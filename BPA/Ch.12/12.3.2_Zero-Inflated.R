@@ -32,9 +32,9 @@ params <- c("omega", "totalN", "alpha_lam", "p",
             "mean_abundance", "fit", "fit_new")
 
 ## MCMC settings
-ni <- 1000
+ni <- 2000
 nt <- 1
-nb <- 500
+nb <- 1000
 nc <- 4
 
 ## Initial values
@@ -43,12 +43,12 @@ inits <- lapply(1:nc, function(i)
 
 ## Call Stan from R
 out1 <- stan("Nmix1.stan",
-             data = list(y = y, R = R, T = T,
+             data = list(y = y, R = R, T = 2,
                          first = first, last = last, K = 100),
              init = inits, pars = params,
              chains = nc, iter = ni, warmup = nb, thin = nt,
              seed = 1,
-             control = list(adapt_delta = 0.8),
+             control = list(adapt_delta = 0.9),
              open_progress = FALSE)
 print(out1, digits = 3)
 

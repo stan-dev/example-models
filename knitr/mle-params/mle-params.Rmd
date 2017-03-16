@@ -1,27 +1,23 @@
 ---
-title: "Reparameterization: MLE vs. Bayes"
+title: "The Impact of Reparameterization on Point Estimates"
 author: "Bob Carpenter"
-date: "19 April 2016"
-output: 
-  html_document: 
-    theme: cerulean
+date: "24 April 2016"
+output:
+  html_document:
+    theme: readable
 ---
 
 ### Abstract
 
 When changing variables, a Jacobian adjustment needs to be provided to
 account for the rate of change of the transform.  Applying the
-adjustment preserves the probability distributions of quantities of
-interest, thus making Bayesian inference invariant to
-reparameterizations.  In contrast, the maximum likelihood estimate
-(posterior mode) is changed when the distribution-preserving Jacobian
-adjustment is included for a parameter.  In this note, we use Stan to
-code a repeated binary trial model parameterized by chance of success,
-along with its reparameterization in terms of log odds in order to
-demonstrate the effect of the Jacobian adjustment on the Bayesian
-posterior and maximum likelihood estimate.  Along the way, we derive
-the logistic distribution by transforming a uniformly distributed
-variable.
+adjustment ensures that inferences that are based on expectations over the
+posterior are invariant under reparameterizations. In contrast, the posterior mode changes as a result of the reparameterization. In this note, we use Stan to code a repeated binary
+trial model parameterized by chance of success, along with its reparameterization
+in terms of log odds in order to demonstrate the effect of the Jacobian
+adjustment on the Bayesian posterior and the posterior mode. We contrast the
+posterior mode to the maximum likelihood estimate, which, like the Bayesian estimates,
+is invariant under reparameterization. Along the way, we derive the logistic distribution by transforming a uniformly distributed variable.
 
 
 ## Visualizing a Change of Variables
@@ -38,9 +34,9 @@ against").  If $\theta = 0.5$, then the odds are $1{:}1$, or "even".
 
 The log odds is just the logarithm of the odds, and the function
 $\mathrm{logit}:(0,1) \rightarrow \mathbb{R}$ converts chance of
-success to log odds by 
+success to log odds by
 \[
- \mathrm{logit}(\theta) 
+ \mathrm{logit}(\theta)
 \ = \
 \log \frac{\theta}{1 - \theta}.
 \]
@@ -49,10 +45,9 @@ If the chance of success is $0.5$, the odds ratio is $1$, and the log
 odds are $0$.  If the chance of success is $0.75$ then the log odds
 are just $\log 3$, or about $1.10$, whereas if the chance of success
 is $0.25$, the log odds are just $\log \frac{1}{3} = -\log 3$, or
-about $-1.10$.  = 0.75$.  In general, the log-odds transform has the
-symmetry
+about $-1.10$. The log-odds transform has the symmetry
 \[
-\mathrm{logit}(\theta) 
+\mathrm{logit}(\theta)
 \ = \
 -\mathrm{logit}(1 - \theta),
 \]
@@ -124,7 +119,7 @@ statistic and note that the binomial coefficients are constant).
 The first model involves a direct parameterization of the joint
 density of the chance-of-success $\theta$ and observed data $y$.
 \[
-p(\theta, y \, | \, N) 
+p(\theta, y \, | \, N)
 \ \propto \
 p(y \, | \, \theta, N) \, p(\theta)
 \]
@@ -138,9 +133,9 @@ p(y \, | \, \theta, N)
 We can assume a uniform prior for the sake of simplicity, but it is
 not a critical detail.
 \[
-p(\theta) 
+p(\theta)
 \ = \
-\mathsf{Uniform}(\theta \, | \, 0, 1) 
+\mathsf{Uniform}(\theta \, | \, 0, 1)
 \ = \
 1.
 \]
@@ -183,18 +178,19 @@ Then we can compile the model as follows.
 model_prob <- stan_model("prob.stan");
 ```
 
-With a compiled model, we can fit it using maximum likelihood given
+With a compiled model, we can calculate the posterior mode given
 the names of the data variables.
 
 ```{r comment=NA}
-fit_mle_prob <- optimizing(model_prob, data=c("N", "y"));
-fit_mle_prob;
+fit_pmode_prob <- optimizing(model_prob, data=c("N", "y"));
+fit_pmode_prob;
 ```
 
-Note that the answer is the same as from the analytic calculation.
+As the prior is uniform in $\theta$, the posterior mode for $\theta$ is equal to maximum
+likelihood estimate $\theta^*$ calculated analytically above.
 
 Next, we can fit the same model using Stan's default MCMC algorithm for
-Bayesian posteriors. 
+Bayesian posteriors.
 
 ```{r comment=NA}
 fit_bayes_prob <- sampling(model_prob, data=c("N", "y"),
@@ -220,7 +216,7 @@ mean of\[
 \]
 and a mode of
 \[
-\theta^{*} = \frac{5 - 1}{5 + 7 - 2} = 0.40.
+\theta^{M} = \frac{5 - 1}{5 + 7 - 2} = 0.40.
 \]
 In other words, Stan is producing the correct results here.
 
@@ -265,13 +261,13 @@ Left-hand-side of sampling statement:
 The fit proceeds as usual.
 
 ```{r comment=NA}
-fit_mle_logodds <- optimizing(model_logodds, data=c("N", "y"));
-fit_mle_logodds;
+fit_pmode_logodds <- optimizing(model_logodds, data=c("N", "y"));
+fit_pmode_logodds;
 inv_logit <- function(alpha) 1 / (1 + exp(-alpha));
-inv_logit(fit_mle_logodds$par[["alpha"]])
+inv_logit(fit_pmode_logodds$par[["alpha"]])
 ```
 
-Note that when we transform the maximum likelihood estimate for log
+Note that when we transform this incorrectly computed 'posterior mode' for log
 odds back to a chance-of-success, it is the same as before.  But now
 consider what happens with the posterior.
 
@@ -302,11 +298,11 @@ the distribution of a variable $\alpha = f(\theta)$.  To preserve
 probability mass (intervals in the univariate setting) under change
 of variables, the resulting density is
 \[
-p(\alpha) 
+p(\alpha)
 \ = \
 p(f^{-1}(\alpha))
 \,
-\left|  
+\left|
 \frac{d}{d\alpha} f^{-1}(\alpha)
 \right|,
 \]
@@ -332,7 +328,7 @@ adjustment is
 \]
 Writing it out in full,
 \[
-p(\alpha) 
+p(\alpha)
 \ = \
 p(\mathrm{logit}^{-1}(\alpha))
 \times \mathrm{logit}^{-1}(\alpha)
@@ -389,14 +385,12 @@ model_logodds_jac <- stan_model("logodds-jac.stan");
 ```
 
 ```{r comment=NA}
-fit_mle_logodds_jac <- optimizing(model_logodds_jac, data=c("N", "y"));
-fit_mle_logodds_jac;
-inv_logit(fit_mle_logodds_jac$par[["alpha"]])
+fit_pmode_logodds_jac <- optimizing(model_logodds_jac, data=c("N", "y"));
+fit_pmode_logodds_jac;
+inv_logit(fit_pmode_logodds_jac$par[["alpha"]])
 ```
 
-Note that the answer is again the same as from the analytic
-calculation after the inverse logit transform back to the probabilty
-scale.  But now consider what happens in the Bayesian setting.
+Note that this answer is different from the result obtained from model 1, demonstrating that the posterior mode depends on parameterization. But now consider what happens in the Bayesian setting.
 
 ```{r comment=NA, echo=FALSE}
 fit_bayes_logodds_jac <- sampling(model_logodds_jac, data=c("N", "y"),
@@ -411,20 +405,15 @@ All is now well again after the Jacobian adjustment, with the
 posterior distribution of $\theta$ matching that of the original
 model, thus preserving Bayesian inferences, such as posterior
 predictions for new data points.  Similarly, the posterior mean
-(estimate minimizing expected square error) and mode (estimate
+(estimate minimizing expected square error) and median (estimate
 minimizing expected absolute error) are preserved.
 
 Unlike the posterior mean, the posterior mode changed when we
 reparameterized the model.  This highlights that posterior modes
 (i.e., MAP estimates) are not true Bayesian quantities, but mere side
-effects of parameterizations.  Although we can maintain maximum
-likelihood estimates by ignoring Jacobians on priors (which makes
-sense, given that maximum likelihood does not involve priors, but only
-the likelihood), even frequentists will apply Jacobian adjustments
-when dealing with transformed distributions (e.g., lognormal or
-inverse gamma).
-
-
+effects of parameterizations.  In contrast, the Maximum Likehood
+Estimate, like the Bayesian quantities, is indenpendent of the
+parameterization of theta.
 
 ## The Logistic Distribution
 
@@ -435,7 +424,7 @@ $\mathrm{logit}(\theta)$ has a unit logistic distribution.  We have
 already derived the probability density function, which is simply the
 uniform probability distribution times the Jacobian, or in symbols,
 \[
-\mathsf{Logistic}(y) 
+\mathsf{Logistic}(y)
 \ = \
 \mathrm{logit}^{-1}(y) \times (1 - \mathrm{logit}^{-1}(y))
 \ = \
@@ -484,13 +473,17 @@ applied.  In contrast, posterior modes (i.e., maximum a posteriori
 estimates) do change under reparameterization, and thus are [no true
 Bayesian quantity](https://en.wikipedia.org/wiki/No_true_Scotsman).
 
-But, if you must do maximum (penalized) likelihood, be careful *not*
-to apply the appropriate Jacobian to your penalty term.
-
 <br />
 <br />
 
 <hr />
+
+## Acknowledgements
+
+Thanks to Stijn de Waele for corrections and clarifications on the
+first version of this document.
+
+<br />
 
 ##### Licensing
 

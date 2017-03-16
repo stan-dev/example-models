@@ -2,7 +2,15 @@ data {
   int<lower=0> nsite;           // Number of populations
   int<lower=0> nyear;           // Number of years
   int<lower=0> C[nyear, nsite]; // Counts
-  real year[nyear];             // Year covariate
+  vector[nyear] year;           // Year covariate
+}
+
+transformed data {
+  vector[nyear] year_squared;
+  vector[nyear] year_cubed;
+
+  year_squared = year .* year;
+  year_cubed = year .* year .* year;
 }
 
 parameters {
@@ -17,13 +25,13 @@ parameters {
 transformed parameters {
   vector[nsite] log_lambda[nyear];
 
+  // Linear predictor including random site and random year effects
   for (i in 1:nyear)
-    // Linear predictor including random site and random year effects
-    log_lambda[i] <- alpha +
-                     beta[1] * year[i] +
-                     beta[2] * pow(year[i], 2) +
-                     beta[3] * pow(year[i], 3) +
-                     eps[i];
+    log_lambda[i] = alpha
+                  + beta[1] * year[i]
+                  + beta[2] * year_squared[i]
+                  + beta[3] * year_cubed[i]
+                  + eps[i];
 }
 
 model {
@@ -36,22 +44,20 @@ model {
   mu ~ normal(0, 10);
 
   // Hyperparameter 2
-  sd_alpha ~ uniform(0, 2);
+  //  sd_alpha ~ uniform(0, 2); // Implicitly defined
 
   beta ~ normal(0, 10);
 
   // Hyperparameter 3
-  sd_year ~ uniform(0, 1);
+  //  sd_year ~ uniform(0, 1); // Implicitly defined
 
   // Random year effects
   eps ~ normal(0, sd_year);
 
   // Likelihood
   for (i in 1:nyear) {
-    for (j in 1:nsite) {
-      // Distribution for random part
-      // Link function
-      C[i, j] ~ poisson_log(log_lambda[i][j]);
-    } #j
-  } #i
+    // Distribution for random part
+    // Link function
+    C[i] ~ poisson_log(log_lambda[i]);
+  }
 }

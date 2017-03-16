@@ -36,4 +36,3 @@ rk_ageA <- stan("mr_mnl_age3.stan",
 
 ## Summarize posteriors
 print(rk_ageA, digits = 3)
-

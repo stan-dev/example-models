@@ -11,20 +11,18 @@ data {
 }
 
 parameters {
-  real alpha[nsite];            // Site effects
-  real eps2[nyear - 1];	        // Year effects (year > 1)
+  vector[nsite] alpha;          // Site effects
+  vector[nyear - 1] eps2;       // Year effects (year > 1)
 }
 
 transformed parameters {
-  real eps[nyear];	        // Year effects
-  real log_lambda[nyear, nsite];
+  vector[nyear] eps;            // Year effects
+  matrix[nyear, nsite] log_lambda;
 
-  eps[1] <- 0;
-  for (i in 2:nyear)
-    eps[i] <- eps2[i - 1];
-  for (i in 1:nyear)
-    for (j in 1:nsite)
-       log_lambda[i, j] <- alpha[j] + eps[i];
+  eps[1] = 0;
+  eps[2:nyear] = eps2[1:nyear - 1];
+  log_lambda = rep_matrix(alpha', nyear)
+             + rep_matrix(eps, nsite);
 }
 
 model {
@@ -41,5 +39,5 @@ generated quantities {
   int<lower=0> mis[nmis];
 
   for (i in 1:nmis)
-    mis[i] <- poisson_log_rng(log_lambda[misyear[i], missite[i]]);
+    mis[i] = poisson_log_rng(log_lambda[misyear[i], missite[i]]);
 }

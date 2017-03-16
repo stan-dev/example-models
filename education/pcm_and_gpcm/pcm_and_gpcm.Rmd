@@ -1,0 +1,479 @@
+---
+title: "Partial credit and generalized partial credit models with latent regression"
+author: "Daniel C. Furr"
+date: "`r gsub('(^.* )(0)([0-9], .*)', '\\1\\3', format(Sys.time(), '%B %d, %Y'))`"
+output:
+  html_document:
+    toc: true
+    number_sections: true
+    fig_caption: true
+    css: ../styles.css
+bibliography: ../bibliography.bib
+---
+
+```{r knitr_opts, include = FALSE}
+set.seed(80)
+
+knitr::opts_chunk$set(tidy = FALSE, cache = FALSE, message = FALSE)
+
+nand <- function(x) {
+  l <- length(x)
+  if(l == 1) {
+    return(x)
+  } else if(l == 2) {
+    return(paste(x, collapse = " and "))
+  } else if(l > 2) {
+    part <- paste(x[-l], collapse = ", ")
+    return(paste(c(part, x[l]), collapse = ", and "))
+  }
+}
+```
+
+This case study uses **Stan** to fit the Partial Credit Model (PCM) and Generalized Partial Credit Model (GPCM), including a latent regression for person ability for both. Analysis is performed with **R**, making use of the **rstan** and **edstan** packages. **rstan** is the implementation of **Stan** for **R**, and **edstan** provides **Stan** models for item response theory and several convenience functions. 
+
+The **edstan** package is available on **CRAN**, but a more up to date version may often be found on Github. The following **R** code may be used to install the package from Github.
+
+```{r github, eval = FALSE}
+# Install edstan from Github rather than CRAN
+install.packages("devtools")
+devtools::install_github("danielcfurr/edstan")
+```
+
+The following **R** code loads the necessary packages and then sets some **rstan** options, which causes the compiled **Stan** model to be saved for future use and the MCMC chains to be executed in parallel.
+
+```{r, warning=FALSE, results="hide"}
+# Load R packages
+library(rstan)
+library(ggplot2)
+library(edstan)
+library(TAM)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+```
+
+The case study uses 
+**R** version `r getRversion()`,
+**rstan** version `r packageVersion("rstan")`, 
+**ggplot2** version `r packageVersion("ggplot2")`, and
+**edstan** version `r packageVersion("edstan")`.
+Also, the example data are from
+**TAM** version `r packageVersion("TAM")`.
+Readers may wish to check the versions for their installed packages using the `packageVersion()` function.
+
+
+# Partial credit model with latent regression
+
+## Overview of the model
+
+The PCM [@masters1982rasch] is appropriate for item response data that features more than two *ordered* response categories for some or all items. The items may have differing numbers of response categories. For dichotomous items (items with exactly two response categories), the partial credit model is equivalent to the Rasch model. The version presented includes a latent regression. However, the latent regression part of the model may be restricted to an intercept only, resulting in the standard partial credit model.
+
+$$
+\Pr(Y_{ij} = y,~y > 0 | \theta_j, \beta_i) =
+\frac{\exp \sum_{s=1}^y (\theta_j - \beta_{is})}
+     {1 + \sum_{k=1}^{m_i} \exp \sum_{s=1}^k (\theta_j - \beta_{is})}
+$$
+$$
+\Pr(Y_{ij} = y,~y = 0 | \theta_j, \beta_i) =
+\frac{1}
+     {1 + \sum_{k=1}^{m_i} \exp \sum_{s=1}^k (\theta_j - \beta_{is})}
+$$
+$$
+\theta_j \sim \mathrm{N}(w_{j}' \lambda, \sigma^2)
+$$
+
+Variables:
+
+* $i = 1 \ldots I$ indexes items.
+* $j = 1 \ldots J$ indexes persons.
+* $Y_{ij} \in \{ 0 \ldots m_i \}$ is the response of person $j$ to item $i$
+* $m_i$ is simultaneously the maximum score and number of step difficulty parameters for item $i$.
+* $w_{j}$ is the vector of covariates for person $j$, the first element of which *must* equal one for a model intercept. $w_{j}$ may be assembled into a $J$-by-$K$ covariate matrix $W$, where $K$ is number of elements in $w_j$.
+
+Parameters:
+
+* $\beta_{is}$ is the $s$-th step difficulty for item $i$.
+* $\theta_j$ is the ability for person $j$.
+* $\lambda$ is a vector of latent regression parameters of length $K$.
+* $\sigma^2$ is the variance for the ability distribution.
+
+Constraints:
+
+* The last step difficulty parameter is constrained to be the negative sum of the other difficulties, resulting in the average difficulty parameter being zero.
+
+Priors:
+
+* $\sigma \sim \mathrm{Exp}(.1)$ is weakly informative for the person standard deviation.
+* $\beta_{is} \sim \mathrm{N}(0, 9)$ is also weakly informative.
+* $\lambda \sim t_3(0, 1)$, where $t_3$ is the Student's $t$ distribution with three degrees of freedom, *and* the covariates have been transformed as follows: (1) continuous covariates are mean-centered and then divided by two times their standard deviations, (2) binary covariates are mean-centered and divided their maximum minus minimum values, and (3) no change is made to the constant, set to one, for the model intercept. This approach to setting priors is similar to one that has been suggested for logistic regression [@gelman2008weakly]. It is possible to adjust the  coefficients back to the scales of the original covariates.
+
+
+## **Stan** code for a simple partial credit model
+
+A simple **Stan** model is described before discussing the complete model, as the code for the complete model is somewhat cumbersome. The simpler model, printed below, omits the latent regression and so does not require rescaling of the person covariates or `lambda`. The mean of the person distribution is set to zero and the constraint is removed from the item difficulties, which also differs from the complete model.
+
+```{r simple_pcm_code, comment=""}
+# Print the simple PCM from the edstan package
+simple_pcm_file <- system.file("extdata/pcm_simple.stan", 
+                               package = "edstan")
+cat(readLines(simple_pcm_file), sep = "\n")
+```
+
+The functions block includes a user-specified function `pcm()`, which accepts a response `y`, a value for `theta`, and a vector of parameters `beta` for one item. With these inputs, it returns a vector of model-predicted log probability for the response. Later, in the model block, `pcm()` is used to get the likelihood of the observed item responses.
+
+Looking to the data block, data are fed into the model in vector form. That is, `y` is a long vector of scored item responses, and `ii` and `jj` indicate with which item and person each element in `y` is associated. These three vectors are of length `N`, which is either equal to `I` times `J` or less if there are missing responses. In the transformed data block, the variable `m` is created, which represents the number of steps per item.
+
+In the parameters block, `beta` is declared to be `I` vectors of length `m`. Each vector in `beta` contains the step difficulties for a given item. In this simplified model, all items must have the same number of response categories. The other parameters are handled in conventional ways, with `sigma` being assigned a lower bound of zero because it is a standard deviation.
+
+The model block indicates the priors and the likelihood. The prior for `beta` requires a loop because `beta` is an array rather than a vector. The likelihood manually increments the log posterior using the `target += ...` syntax.
+
+
+## **Stan** code for the partial credit model with latent regression
+
+The PCM with latent regression will be discussed in relation to the simpler model, and both models are equivalent when the latent regression is restricted to an intercept only. The model with latent regression, which is featured in **edstan**, is printed below. It is more complicated than is typically necessary for a **Stan** model because it is written to apply sensible priors automatically for parameters associated with arbitrarily scaled covariates.
+
+```{r stan_code, comment="", echo=FALSE}
+pcm_file <- system.file("extdata/pcm_latent_reg.stan", 
+                        package = "edstan")
+cat(readLines(pcm_file), sep = "\n")
+```
+
+The complete model adds `obtain_adjustments()` to the functions block, which is used to adjust the covariate matrix. In brief, the model operates on the adjusted covariate matrix, `W_adj`, and then in the generated quantities block determines what the latent regression coefficients would be on the original scale of the covariates. For a more in depth discussion of `obtain_adjustments()` and the transformations related to the latent regression, see the [Rasch and 2PL case study](http://mc-stan.org/documentation/case-studies/rasch_and_2pl.html).
+
+In the data block, the number of covariates (plus the intercept) `K` is now required, as is the matrix of covariates `W`. Otherwise this block is the same as before. An import change in this model is that `beta` is now a single, long vector rather than an array. This set up allows items to have different numbers of steps but requires additional programming. To that end, two variables are created in the transformed data block, and these are used to access the elements in `beta` relevant to a given item: `pos` indicates the position in `beta` of the first parameter for a given item, and `m` indicates the count of parameters for an item.
+
+The parameters `beta_free`, `theta`, `sigma`, and `lambda` are declared in the parameters block. The unconstrained item parameters are contained in `beta_free`. In the transformed parameters block, `beta` is created by appending the constrained item difficulty to `beta_free`. The model block contains the priors and the likelihood. The `target += ...` syntax for the prior on `beta` is a manual way of incrementing the log posterior used when the prior is placed on a transformed parameter.
+
+
+## Simulation for parameter recovery
+
+The **Stan** model is fit to a simulated dataset to evaluate it's ability to recover the generating parameter values. The **R** code that follows simulates a dataset conforming to the model.
+
+```{r sim_data}
+# Set parameters for the simulated data
+J <- 500
+sigma <- 1.2
+lambda <- c(-10*.05, .05, .5, -.025)
+w_2 <- rnorm(J, 10, 5)
+w_3 <- rbinom(J, 1, .5)
+W <- cbind(1, w_2, w_3, w_2*w_3)
+
+# Set item parameters
+I <- 20
+Beta_uncentered <- matrix(NA, nrow = I, ncol = 2)
+Beta_uncentered[,1] <- seq(from = -1, to = 0, length.out = I)
+Beta_uncentered[,2] <- Beta_uncentered[,1] + rep(c(.2, .4, .6, .8), 
+                                                 length.out = I)
+Beta_centered <- Beta_uncentered - mean(Beta_uncentered)
+
+# A function to simulate responses from the model
+simulate_response <- function(theta, beta) {
+  unsummed <- c(0, theta - beta)
+  numerators <- exp(cumsum(unsummed))
+  denominator <- sum(numerators)
+  response_probs <- numerators/denominator
+  simulated_y <- sample(1:length(response_probs) - 1, size = 1, 
+                        prob = response_probs) 
+  return(simulated_y)
+}
+
+# Calculate or sample remaining variables and parameters
+N <- I*J
+ii <- rep(1:I, times = J)
+jj <- rep(1:J, each = I)
+pcm_theta <-  rnorm(J, W %*% matrix(lambda), sigma)
+pcm_y <- numeric(N)
+for(n in 1:N) {
+  pcm_y[n] <- simulate_response(pcm_theta[jj[n]], Beta_centered[ii[n], ])
+}
+
+# Assemble the data list using an edstan function
+sim_pcm_list <- irt_data(y = pcm_y, ii = ii, jj = jj, 
+                         covariates = as.data.frame(W), 
+                         formula = NULL)
+```
+
+The simulated data consists of `r I` items having 3 response categories and `r J` persons. The person covariate vectors $w_j$ include (1) a value of one for the model intercept, (2) a random draw from a normal distribution with mean of 10 and standard deviation of 5, (3) an indicator variable taking values of zero and one, and (4) an interaction between the two. These are chosen to represent a difficult case for assigning automatic priors for the latent regression coefficients. The generating coefficients $\lambda$ for the latent regression are `r nand(lambda)`. The abilities $\theta$ are random draws from a normal distribution with a mean generated from the latent regression and a standard deviation $\sigma = `r sigma`$.
+
+```{r pcm_sim_theta_plot, fig.cap="Mean of generated abilities as a function of the continuous covariate. A line is shown separately for the two groups identified by the binary variable."}
+# Plot mean ability conditional on the covariates
+f1 <- function(x) lambda[1] + x*lambda[2]
+f2 <- function(x) lambda[1] + lambda[3] + x*(lambda[2] + lambda[4])
+ggplot(data.frame(w2 = c(0, 20))) +
+  aes(x = w2) +
+  stat_function(fun = f1, color = "red") +
+  stat_function(fun = f2, color = "blue") +
+  ylab("Mean generated ability") +
+  xlab("Value for continous covariate")
+```
+
+The simulated dataset is next fit with **Stan** using `irt_stan()` from the **edstan** package. `irt_stan()` is merely a wrapper for `stan()` in **rstan**. Using 1,000 posterior draws per chain may be somewhat excessive as we are mainly interested in the posterior means of the parameters. However, as parameter recovery will be evaluated using the 2.5th and 97.5th percentiles of the posterior, the large number of posterior samples is warranted.
+
+```{r pcm_sim_fit, results="hide"}
+#Fit model to simulated data
+sim_pcm_fit <- irt_stan(sim_pcm_list, model = "pcm_latent_reg.stan", 
+                        chains = 4, iter = 1000)
+```
+
+```{r sim_pcm_rhat, echo = FALSE}
+# Fit model to simulated data using an edstan function
+pcm_sim_max_rhat <- max(summary(sim_pcm_fit)$summary[,"Rhat"])
+```
+
+The highest value for $\hat R$ was 
+`r round(pcm_sim_max_rhat, 3)` 
+for all parameters and the log posterior, suggesting that the chains have converged.
+The **Stan** model is evaluated in terms of its ability to recover the generating values of the parameters. The R code below prepares a plot in which the points indicate the difference between the posterior means and generating values for the parameters of main interest. This difference is referred to as discrepancy. The lines indicate the 95% poster intervals for the difference, defined as the 2.5th and 97.5th percentiles of the posterior draws. Ideally, (nearly) all the 95% intervals would include zero.
+
+```{r sim_pcm_dif, fig.height=6, fig.cap="Discrepancies between estimated and generating parameters. Points indicate the difference between the posterior means and generating values for a parameter, and horizontal lines indicate 95% posterior intervals for the difference. Most of the discrepancies are about zero, indicating that **Stan** successfully recovers the true parameters."}
+# Get estimated and generating values for wanted parameters
+beta <- as.vector(t(Beta_centered))
+pcm_generating_values <- c(beta, lambda, sigma)
+pcm_estimated_values <- summary(sim_pcm_fit,  
+                                pars = c("beta", "lambda", "sigma"),
+                                probs = c(.025, .975))
+pcm_estimated_values <- pcm_estimated_values[["summary"]]
+
+# Make a data frame of the discrepancies
+pcm_discrep <- data.frame(par = rownames(pcm_estimated_values),
+                            mean = pcm_estimated_values[, "mean"],
+                            p025 = pcm_estimated_values[, "2.5%"],
+                            p975 = pcm_estimated_values[, "97.5%"],
+                            gen = pcm_generating_values)
+pcm_discrep$par <- with(pcm_discrep, factor(par, rev(par)))
+pcm_discrep$lower <- with(pcm_discrep, p025 - gen)
+pcm_discrep$middle <- with(pcm_discrep, mean - gen)
+pcm_discrep$upper <- with(pcm_discrep, p975 - gen)
+
+# Plot the discrepancies
+ggplot(pcm_discrep) +
+  aes(x = par, y = middle, ymin = lower, ymax = upper) +
+  scale_x_discrete() +
+  labs(y = "Discrepancy", x = NULL) +
+  geom_abline(intercept = 0, slope = 0, color = "white") +
+  geom_linerange() +
+  geom_point(size = 2) +
+  theme(panel.grid = element_blank()) +
+  coord_flip()
+```
+
+
+# Generalized partial credit model with latent regression
+
+## Overview of the model
+
+The GPCM [@muraki1992generalized] extends the PCM by including a discrimination term. For dichotomous items (items with exactly two response categories), the generalized partial credit model is equivalent to the two-parameter logistic model. The version presented includes a latent regression. However, the latent regression may be restricted to a model intercept, resulting in the standard generalized partial credit model.
+
+$$
+\Pr(Y_{ij} = y,~y > 0 | \theta_j, \alpha_i, \beta_i) =
+\frac{\exp \sum_{s=1}^y (\alpha_i \theta_j - \beta_{is})}
+     {1 + \sum_{k=1}^{m_i} \exp \sum_{s=1}^k 
+       (\alpha_i \theta_j - \beta_{is})}
+$$
+$$
+\Pr(Y_{ij} = y,~y = 0 | \theta_j, \alpha_i, \beta_i) =
+\frac{1}
+     {1 + \sum_{k=1}^{m_i} \exp \sum_{s=1}^k 
+       (\alpha_i \theta_j - \beta_{is})}
+$$
+$$
+\theta_j \sim \mathrm{N}(w_{j}' \lambda, 1)
+$$
+
+Many aspects of the GPCM are similar to the PCM described earlier. Parameters $\beta_i$, $\theta_j$, and $\lambda$ have the same interpretation, but the GPCM adds a discrimination parameter $\alpha_i$ and constrains the variance of $\theta_j$ to one. The prior $\alpha_i \sim \mathrm{log~N}(1, 1)$ is added, which is weakly informative but assumes positive discriminations. The same priors are placed on $\beta_i$ and $\lambda$, and the same constraint is placed on $\beta_I$.
+
+
+## **Stan** code for the generalized partial credit model with latent regression
+
+The **Stan** code for the GPCM is similar to that for the PCM except for the addition of the discrimination parameters.
+
+```{r latreg_gpcm_code, comment=""}
+# Print the latent regression gpcm model from the edstan package
+gpcm_latreg_file <- system.file("extdata/gpcm_latent_reg.stan", 
+                                package = "edstan")
+cat(readLines(gpcm_latreg_file), sep = "\n")
+```
+
+
+## Simulation for parameter recovery
+
+The **Stan** model is fit to a simulated dataset to evaluate it's ability to recover the generating parameter values. The **R** code that follows simulates a dataset conforming to the model. The step difficulties and some other elements are borrowed from the PCM simulation.
+
+```{r sim_gpcm_data}
+# Set alpha, and otherwise use parameters from the previous simulation
+alpha <- rep(c(.8, 1.2),  length.out = I)
+
+# Calculate or sample remaining variables and parameters where needed
+gpcm_theta <-  W %*% matrix(lambda) + rnorm(J, 0, 1)
+gpcm_y <- numeric(N)
+for(n in 1:N) {
+  gpcm_y[n] <- simulate_response(alpha[ii[n]]*gpcm_theta[jj[n]], 
+                                 Beta_centered[ii[n], ])
+}
+
+# Assemble the data list using an edstan function
+sim_gpcm_list <- irt_data(y = gpcm_y, ii = ii, jj = jj, 
+                          covariates = as.data.frame(W), 
+                          formula = NULL)
+```
+
+The simulated dataset is next fit with **Stan** using `irt_stan()` from the **edstan** package.
+
+```{r sim_gpcm_fit, results="hide", message=FALSE}
+# Fit model to simulated data using an edstan function
+sim_gpcm_fit <- irt_stan(sim_gpcm_list, model = "gpcm_latent_reg.stan",
+                         chains = 4, iter = 1000)
+```
+
+```{r sim_gpcm_rhat, echo = FALSE}
+# Fit model to simulated data using an edstan function
+gpcm_sim_max_rhat <- max(summary(sim_gpcm_fit)$summary[,"Rhat"])
+```
+
+The highest value for $\hat R$ was 
+`r round(gpcm_sim_max_rhat, 3)`
+for all parameters and the log posterior. 
+The **Stan** model is evaluated in terms of its ability to recover the generating values of the parameters. The R code below prepares a plot in which the points indicate the difference between the posterior means and generating values for the parameters of main interest. This difference is referred to as discrepancy. The lines indicate the 95% poster intervals for the difference, defined as the 2.5th and 97.5th percentiles of the posterior draws. Ideally, (nearly) all the 95% intervals would include zero.
+
+```{r sim_gpcm_dif, fig.height=8, fig.cap="Discrepancies between estimated and generating parameters. Points indicate the difference between the posterior means and generating values for a parameter, and horizontal lines indicate 95% posterior intervals for the difference. Most of the discrepancies are about zero, indicating that **Stan** successfully recovers the true parameters."}
+# Get estimated and generating values for wanted parameters
+gpcm_generating_values <- c(alpha, beta, lambda)
+gpcm_estimated_values <- summary(sim_gpcm_fit,  
+                                 pars = c("alpha", "beta", "lambda"),
+                                 probs = c(.025, .975))
+gpcm_estimated_values <- gpcm_estimated_values[["summary"]]
+
+# Make a data frame of the discrepancies
+gpcm_discrep <- data.frame(par = rownames(gpcm_estimated_values),
+                            mean = gpcm_estimated_values[, "mean"],
+                            p025 = gpcm_estimated_values[, "2.5%"],
+                            p975 = gpcm_estimated_values[, "97.5%"],
+                            gen = gpcm_generating_values)
+gpcm_discrep$par <- with(gpcm_discrep, factor(par, rev(par)))
+gpcm_discrep$lower <- with(gpcm_discrep, p025 - gen)
+gpcm_discrep$middle <- with(gpcm_discrep, mean - gen)
+gpcm_discrep$upper <- with(gpcm_discrep, p975 - gen)
+
+# Plot the discrepancies
+ggplot(gpcm_discrep) +
+  aes(x = par, y = middle, ymin = lower, ymax = upper) +
+  scale_x_discrete() +
+  labs(y = "Discrepancy", x = NULL) +
+  geom_abline(intercept = 0, slope = 0, color = "white") +
+  geom_linerange() +
+  geom_point(size = 2) +
+  theme(panel.grid = element_blank()) +
+  coord_flip()
+```
+
+
+# Example application
+
+## Data
+
+The example data are from the TIMSS 2011 mathematics assessment [@mullis2012timss] of Australian and Taiwanese students. For convenience, a subset of 500 students is used. The subsetted data is then divided into a person covariate matrix and an item response matrix.
+
+```{r example_subset_data}
+# Attach the example dataset. The TAM package is required.
+data(data.timssAusTwn.scored, package = "TAM")
+
+# Subset the full data
+select <- floor(seq(from = 1, to = nrow(data.timssAusTwn.scored), 
+                    length.out = 500))
+subsetted_df <- data.timssAusTwn.scored[select, ]
+str(subsetted_df)
+```
+
+
+The dataset is next divided into an item response matrix and a matrix of student covariates.
+
+```{r example_separate_matrices}
+# Make a matrix of person predictors
+w_mat <- cbind(intercept = rep(1, times = nrow(subsetted_df)),
+               taiwan = as.numeric(subsetted_df$IDCNTRY == 158),
+               female = as.numeric(subsetted_df$ITSEX == 2),
+               book14 = as.numeric(subsetted_df$IDBOOK == 14))
+head(w_mat)
+
+# Make a matrix of item responses
+y_mat <- as.matrix(subsetted_df[, grep("^M", names(subsetted_df))])
+head(y_mat)
+```
+
+The person covariate matrix `w_mat` has columns representing an intercept and three indicator variables for being in Taiwan (versus Australia), being female (versus male), and being assigned test booklet 14 (instead of booklet 1). The item response matrix `y_mat` contains `r ncol(y_mat)` items. Neither the response matrix or person covariates contain missing data.
+
+The following **R** code checks the maximum score per item.
+
+```{r example_item_maxes}
+# Maximum score for each item
+apply(y_mat, 2, max)
+```
+
+The above results show that the data are a mixture of dichotomous item and polytomous items with three responses categories. The first and second items are dichotomous, while the third and fourth are polytomous, for example. Consequently, the first and second items will have one step parameter each, while the third and fourth will have two each.
+
+The data are now formatted into a data list.
+
+```{r example_fit, result="hide"}
+# Assemble data list for Stan
+ex_list <- irt_data(response_matrix = y_mat, covariates = as.data.frame(w_mat),
+                    formula = ~ taiwan*female + book14)
+```
+
+
+## Partial credit model results
+
+```{r ex_pcm_fit}
+# Run Stan model
+pcm_fit <- irt_stan(ex_list, model = "pcm_latent_reg.stan",
+                    chains = 4, iter = 300)
+```
+
+As discussed above, convergence of the chains is assessed for every parameter, and also the log posterior density, using $\hat{R}$.
+
+```{r ex_pcm_converge, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the example. All values should be less than 1.1 to infer convergence."}
+# Plot of convergence statistics
+stan_columns_plot(pcm_fit)
+```
+
+Next we view a summary of the parameter posteriors.
+
+```{r ex_pcm_print}
+# View table of parameter posteriors
+print_irt_stan(pcm_fit, ex_list)
+```
+
+If person covariates are unavailable, or their inclusion unwanted, the model may be fit restricting the matrix of person covariates to an intercept only. In this case, the vector `lambda` contains only one element, which will represent the mean of the ability distribution. The code below is an example of how to create the data list for this purpose.
+
+```{r ex_pcm_noreg, eval=FALSE}
+# Fit the example data without latent regression
+noreg_list <- irt_data(response_matrix = y_mat)
+noreg_fit <- irt_stan(noreg_list, model = "pcm_latent_reg.stan",
+                      chains = 4, iter = 300)
+```
+
+
+## Generalized partial credit model results
+
+```{r ex_gpcm_fit}
+# Run Stan model
+gpcm_fit <- irt_stan(ex_list, model = "gpcm_latent_reg.stan",
+                     chains = 4, iter = 300)
+```
+
+As discussed above, convergence of the chains is assessed for every parameter, and also the log posterior density, using $\hat{R}$.
+
+```{r ex_gpcm_converge, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the example. All values should be less than 1.1 to infer convergence."}
+# Plot of convergence statistics
+stan_columns_plot(gpcm_fit)
+```
+
+Next we view a summary of the parameter posteriors.
+
+```{r ex_gpcm_print}
+# View table of parameter posteriors
+print_irt_stan(gpcm_fit, ex_list)
+```
+
+
+# References
+
+<!-- This comment causes section to be numbered -->

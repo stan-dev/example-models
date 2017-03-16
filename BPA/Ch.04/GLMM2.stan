@@ -19,10 +19,10 @@ parameters {
 }
 
 transformed parameters {
-  vector[nsite] log_lambda[nyear];
+  matrix[nyear, nsite] log_lambda;
 
-  for (i in 1:nyear)
-    log_lambda[i] <- mu + alpha + eps[i];
+  log_lambda = mu + rep_matrix(alpha', nyear)
+                  + rep_matrix(eps, nsite);
 }
 
 model {
@@ -30,19 +30,19 @@ model {
   mu ~ normal(0, 10);
 
   alpha ~ normal(0, sd_alpha);
-  sd_alpha ~ uniform(0, 5);
+  //  sd_alpha ~ uniform(0, 5);  // Implicitly defined
 
   eps ~ normal(0, sd_eps);
-  sd_eps ~ uniform(0, 3);
+  //  sd_eps ~ uniform(0, 3);    // Implicitly defined
 
   // Likelihood
   for (i in 1:nobs)
-    obs[i] ~ poisson_log(log_lambda[obsyear[i]][obssite[i]]);
+    obs[i] ~ poisson_log(log_lambda[obsyear[i], obssite[i]]);
 }
 
 generated quantities {
   int<lower=0> mis[nmis];
 
   for (i in 1:nmis)
-    mis[i] <- poisson_log_rng(log_lambda[misyear[i]][missite[i]]);
+    mis[i] = poisson_log_rng(log_lambda[misyear[i], missite[i]]);
 }

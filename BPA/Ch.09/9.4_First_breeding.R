@@ -10,7 +10,7 @@ set.seed(123)
 ## Read data
 ## The data generation code is in bpa-code.txt, available at
 ## http://www.vogelwarte.ch/de/projekte/publikationen/bpa/complete-code-and-data-files-of-the-book.html
-stan_data <- read_rdump("agerecruitment.data.R")                  
+stan_data <- read_rdump("agerecruitment.data.R")
 
 ## Initial values
 inits <- function() list(mean_phi1 = runif(1, 0, 1),
@@ -39,4 +39,3 @@ agefirst <- stan("agerecruitment.stan",
                  seed = 1,
                  open_progress = FALSE)
 print(agefirst, digits = 3)
-

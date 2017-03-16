@@ -37,10 +37,12 @@ library(gridExtra) # Also for the posterior predictive model checking example
 
 In addition, the **edstan** package is required. This package is still in development and so is not available on CRAN. Instead, it may installed directly from Github.
 
-```{r install_edstan, message=FALSE, warning=FALSE}
-# Install and load edstan
-library(devtools) # Required for install_github()
+```{r, message = FALSE, warning = FALSE, result="hide"}
+# Install new edstan
+library(devtools)
 install_github("danielcfurr/edstan")
+
+# Load edstan
 library(edstan)
 ```
 
@@ -65,12 +67,12 @@ The priors for $\alpha_i$ and $\beta_i$ are non-informative, although it is assu
 
 ## Data example {#spellingdata}
 
-The example dataset is from a study [@Thissen1993] that examined student spelling performance on four words: _infidelity_, _panoramic_, _succumb_, and _girder_. The sample includes 284 male and 374 female undergraduate students from the University of Kansas. Each item was scored as either correct or incorrect. The commands below extract the response matrix and then show some example rows from it.
+The example dataset is from a study [@Thissen1993] that examined student spelling performance on four words: _infidelity_, _panoramic_, _succumb_, and _girder_. The sample includes 284 male and 374 female undergraduate students from the University of Kansas, and student gender is recorded in the column _male_. Each item was scored as either correct or incorrect. The commands below extract the response matrix and then show some example rows from it.
 
 ```{r wide_data}
 # The data set is available from the edstan package.
-x <- as.matrix(spelling[, 2:5])
-head(unique(x))
+preview_rows <- seq(from=1, to=nrow(spelling), length.out = 10)
+spelling[preview_rows, ]
 ```
 
 Before fitting a model, we summarize the data with some descriptive statistics. We make a histogram of the raw score distribution and a bar graph of the proportion of correct responses by item. This provides summary information aggregating over the person-side and over the item-side of the response matrix.
@@ -81,7 +83,7 @@ par_bkp <- par(no.readonly = TRUE)
 par(mfrow = c(1, 2))
 
 # Left plot
-person_scores <- apply(x, 1, sum)
+person_scores <- apply(spelling[, 2:5], 1, sum)
 person_counts <- table(person_scores)
 barplot(person_counts,
         main = "Raw score distribution",
@@ -89,7 +91,7 @@ barplot(person_counts,
         ylab = "Number of persons")
 
 # Right plot
-item_scores <- apply(x, 2, mean)
+item_scores <- apply(spelling[, 2:5], 2, mean)
 barplot(item_scores,
         main = "Proportion correct by item",
         ylab = "Proportion correct",
@@ -112,110 +114,78 @@ The raw score distribution reveals that about 50 individuals have all incorrect 
 
 ## Estimating the 2PL {#estimate2pl}
 
-Item-response data typically are available in either "wide form" or "long form." The response matrix `x` for the spelling data is an example of wide-form data. These data are "wide" in the sense that items are represented by columns. Long-form data, on the other hand, contains one row per person-item pair. The columns for long-form data include an identifier for person, an identifier for item, and the response. These data are "long" in the sense there are many, many rows but few columns. 
+A brief description of the **edstan** package is that it provides a few convenience functions and several pre-programmed **Stan** IRT models. 
+As discussed in depth below, one **edstan** function (`irt_data()`) assists in preparing the data in the particular way required by the **Stan** IRT models, and another (`irt_stan()`) pairs that data with one of the pre-programmed **Stan** IRT models to conduct the estimation. As of this writing, the IRT models included with **Edstan** are the Rasch model, partial credit model, rating scale model, 2PL, generalized partical credit model, and generalized rating scale model. Each of these may optionally included a latent regression of ability.
 
-The 2PL model may be fit to either data format using the `twopl_stan()` wrapper from the **edstan** package. First, we show how to proceed with wide-form data. In the **R** code below, the argument `response_matrix = x` indicates that the function should expect wide-form data. 
+The convenience functions of most importance are `irt_data()`, which assists in formatting a dataset in the particular way required by the **Stan** models, and `irt_stan()`, which is a wrapper for fitting the pre-programmed **Stan** IRT models to the result of `irt_data()`.
 
-```{r fit_1, results='hide', message=FALSE, warning=FALSE}
-myfit <- twopl_stan(response_matrix = x, 
-                    iter = 200, 
-                    chains = 4)
+Item-response data typically are available in either "wide-form" or "long-form." The spelling data is an example of wide-form data. These data are "wide" in the sense that items are represented by columns. Long-form data, on the other hand, would contain one row per person-item pair. The columns for long-form data would include an identifier for person, an identifier for item, and the response. Long-form data are "long" in the sense there are many, many rows but few columns. 
+
+In either case, the **edstan** function `irt_data()` is used to prepare the data. 
+For wide-form data, like the spelling example, we provide `irt_data()` with a response matrix and optionally a matrix of person covariates for performing a latent regression. In the code below, the dataset is split in to response matrix `X` and covariate matrix `W`, and `W` contains the variable for gender along with an intercept term. The result of calling `irt_data()` is a list object suitable for the pre-programmed **Stan** models.
+
+```{r}
+# Set up data list from wide-form data using irt_data()
+X <- spelling[, 2:5] # Response matrix
+W <- cbind(1, spelling[, 1]) # Person covariate matrix
+spelling_list <- irt_data(response_matrix = X, W = W)
 ```
 
-In addition, the number of iterations and number of chains are provided in the function call. Default values for `iter` and `chains` will be used if none are specified. In addition, any arguments accepted by the **rstan** function `sampling()` may also be supplied to `twopl_stan()`.
+The model is then fit with `irt_stan()`, shown below. This function requires a data list (`spelling_list`) and a choice of model (`"2pl_latent_reg.stan"`). It is simply a wrapper for the **rstan** function `stan()`, and as such it accepts all of the options associated `stan()`. In general, we will want to specify the number of MCMC iterations (`iter`) and the number of MCMC chains (`chains`). The choices for `iter` and `chains` given below are sensible for the spelling data, but more iterations may be needed for other data.
 
-If the data are in long-form, we call `twopl_stan()` using a different set of arguments. To illustrate, we convert the response matrix to long-form.
-
-```{r long_data, message=FALSE}
-wide <- as.data.frame(x)
-# Attach a person ID number to each row.
-wide$id <- 1:nrow(wide)
-long <- melt(wide, 
-             id.vars = "id", 
-             variable.name = "item", 
-             value.name = "response")
-head(long)
+```{r, results="hide", message = FALSE}
+# Fit 2PL to the data using irt_stan()
+twopl_fit <- irt_stan(spelling_list, model = "2pl_latent_reg.stan",
+                      iter = 200, chains = 4)
 ```
 
-With the long-form data, the `twopl_stan()` function is called by assigning the columns of the long-form data to the relevant arguments. The same choices for `iter` and `chains` are provided.
-
-```{r fit_2, eval=FALSE}
-myfit2 <- twopl_stan(id = long$id,
-                     item = long$item,
-                     response = long$response,
-                     iter = 200,
-                     chains = 4)
-```
+The result, `twopl_fit`, is a `stanfit` object of the same type as returned by `stan()`, and so it may be used with **rstan** functions.
 
 
 ## Postestimation techniques
 
-The `twopl_stan()` function return a *twopl_stanfit* Reference Class, which may be thought of as a list with elements that are a mixture of objects (called "fields") and functions (called "methods"). The *twopl_stanfit* fields include the reformatted data, the basic *stanfit* object, and some other things. The remainder of this section is a demonstration of how the *twopl_stanfit* methods may be used for postestimation work. 
-
-
 ### Methods for accessing estimation results {#results_methods}
 
-We start with the `$show()` method, which provides formatted output regarding the estimated parameters.
+A table of results is provided by `print_irt_stan()` provides a table summarizing the posteriors. This function is a replacement for `print()` in **rstan** for use with **edstan** models. The parameter summaries are grouped into a series of tables, one for each item and one for the latent regression.
 
-```{r show_method}
-myfit$show()
+```{r, results="hold", tidy = FALSE}
+# View summary of posteriors using print_irt_stan()
+print_irt_stan(twopl_fit, spelling_list)
+
+# Alternatively:
+# print(twopl_fit, pars = c("alpha", "beta", "lambda"))
 ```
 
-The output is separated into three tables: the first two provide estimates and convergence information for item parameters, and the third provides convergence information only for the ability parameters. Focusing for now on the item parameter results, the means of the posterior draws (*mean*) serve as point estimates, while the standard deviations of the posterior draws (*sd*) provide the standard error. Further, the percentiles for the posterior draws may be used to obtain credible intervals (a Bayesian analogue to confidence intervals). 
+Focusing for now on the item parameter results, the means of the posterior draws (*mean*) serve as point estimates, while the standard deviations of the posterior draws (*sd*) provide the standard error. Further, the percentiles for the posterior draws may be used to obtain credible intervals (a Bayesian analogue to confidence intervals). 
 
-The method `$parameters()` provides the estimation results as a data frame instead of formatted output. This is useful, for example, for extracting the (fully Bayesian) expected a posteriori (EAP) estimates for $\theta_j$.
+We may wish to access these results programatically, in which case we may use the **rstan** function `summary()`. This function returns a list of two objects; the first is matrix providing an overall summary of results, and the second is an array that shows results separately for each chain. Ordinarily we are only interested in the first, so in the code below only the overall summary is extracted. Further, we can specify whether we want the summary for all parameter or only for a subset.
 
 ```{r parameters_method, results='hold'}
-# Store summary for all parameters
-all_estimates <- myfit$parameters()
-# Store only the person parameters
-theta_estimates <- myfit$parameters(pars = "theta")
+# Store summary for all parameters in a matrix
+all_estimates <- summary(twopl_fit)[[1]]
+# Store only the person parameters in a matrix
+theta_estimates <- summary(twopl_fit, pars = "theta")[[1]]
 ```
+
+The results stored in `theta_estimates` corresponds to the expected a posteriori (EAP) estimates for $\theta_j$. These have the advantage of being fully Bayesian in that they incorporate the uncertainty associated with the other parameters.
 
 
 ### Convergence checking
 
 More care is required in evaluating the convergence of a model with Stan in comparison to software that does not use Monte Carlo simulation. Most software packages provide strong warnings about convergence failures, but Monte Carlo simulation, whether conducted by Stan or other software, tends to fail in a softer way, perhaps without any warning message at all. For this reason, Stan users must determine for themselves whether the Monte Carlo simulation has converged.
 
-Fortunately, convergence is not usually difficult to assess. Statistics on convergence are provided by the `$show()` and `$parameters()` methods discussed in the [previous section](#results_methods), and we continue to refer to the output there. We look primarily to the *Rhat* statistic, which provides the estimated ratio of between chain variance to within chain variance for a given parameter [@gelman2014bayesian]. At convergence, *Rhat* will equal one, but values less than 1.1 are considered acceptable for most applications. When *Rhat* is near one for all parameters, we judge the chains to have converged.
+Fortunately, convergence is not usually difficult to assess. Statistics on convergence are provided by the `print_irt_stan()` and `print()` function discussed in the [previous section](#results_methods), and we continue to refer to the output there. We look primarily to the *Rhat* statistic, which provides the estimated ratio of between chain variance to within chain variance for a given parameter [@gelman2014bayesian]. At convergence, *Rhat* will equal one, but values less than 1.1 are considered acceptable for most applications. When *Rhat* is near one for all parameters, we judge the chains to have converged.
+
+The table above does not provide summaries for the ability parameters as there are too many to list. Nonetheless, we should still check whether they appear to have converged. A convenient way to do this is to use the **rstan** function `stan_rhat()`, which provides a histogram of *Rhat* statistics for a set of parameters.
+
+```{r stan_rhat, message = FALSE, fig.cap = "Histogram of *Rhat* statistics for $\\theta_j$. All values should be less than 1.1 to infer convergence."}
+# Plot a histogram of Rhat values for theta
+stan_rhat(twopl_fit, pars = "theta")
+```
 
 Two other statistics are of secondary importance, both of which describe the precision of the estimated parameter posteriors. The Monte Carlo standard error (*se_mean*) indicates the uncertainty in the estimated posteriors due to estimating the posterior expectations by the sample means of a finite number of random draws from the posterior. Here the number of draws used for the posterior means is 400 because each of the four chains was run for 100 iterations after warmup. Increasing the number of iterations per chain will reduce the Monte Carlo standard error. The other statistic, the effective sample size (*n_eff*), represents the effective number of independent draws from the posterior. This number is smaller typically smaller than the total number of post-warmup iterations across chains because of autocorrelation between draws. Increasing the number of iterations per chain will increase the effective sample size.
 
 The above is all that is ordinarily needed for checking convergence. If the values of *Rhat* are high, our first recourse is to increase the number of iterations. We can only guess how many iterations will be needed to obtain convergence, so adjusting this number after preliminary model fitting is common. If increasing the number of iterations does not help, or if the parameter estimates are questionable, then there is likely a problem with the model. We troubleshoot some example convergence issues in [a later section](#troubleshooting).
-
-
-### Plotting item characteristic curves
-
-An item characteristic curve may be plotted with the `$icc()` method.
-
-```{r icc_method, tidy=FALSE, results='hold'}
-# Can identify the item by number:
-# myfit$icc(2)
-# Or by name:
-myfit$icc("panoramic")
-```
-
-A single item characteristic curve by itself may not be interesting, so we show an example of what might be done with this method. In the code below, item characteristic curves are placed on the same plot by looping over the the item names stored in `myfit$item_names`. Setting the option `new = FALSE` in the `$icc()` method allows the item characteristic curves to be added to the current plot rather than generating a new plot for each.
-
-```{r multiple_icc, fig.show='hold'}
-icc_colors <- rainbow(length(myfit$item_names))
-plot(0, .5, 
-     ylim = c(0, 1), 
-     xlim = c(-2, 1.5), 
-     type = "n",
-     main = "Item characteristic curves",
-     xlab = "theta", 
-     ylab = "Pr(correct)")
-for(i in 1:length(myfit$item_names)) {
-  myfit$icc(myfit$item_names[i], 
-            col = icc_colors[i], 
-            new = FALSE)
-}
-legend("bottomright", 
-       legend = myfit$item_names, 
-       col = icc_colors, 
-       lty = 1)
-```
 
 
 # Direct use of Stan without **edstan** package
@@ -237,11 +207,9 @@ twopl.code <- cat(paste(readLines('twopl.stan'), collapse = '\n'),'\n')
 fit2 <- stan(model_code = twopl.code, ...)
 ```
 
-The **edstan** package includes a **Stan** program file *"twopl.stan"* for the 2PL model. The `twopl_stan()` wrapper in the **edstan** package is based on this **Stan** program. 
-
-The following is *"twopl.stan"*:
+For didactic purposes, a simpler **Stan** program file, *"twopl.stan"*, is discussed in this section rather than *"2pl_latent_reg.stan"*, which is provided in **edstan**. The following is *"twopl.stan"*:
 ```{r, echo=FALSE, comment=NA, warning=FALSE}
-cat(get_stancode(myfit$fit))
+cat(readLines("twopl.stan"), sep = "\n")
 ```
 
 `'twopl.stan'` contains three program blocks: `data`, `parameters` and `model`. 
@@ -336,8 +304,13 @@ for (n in 1:N)
 
 The next step is preparing the data for the model. We specify the data in the `data` argument of the `stan()` function. We may use an object of class *list* or *environment*, or a vector of character strings for all the names of variables that already exist as objects in the working space. 
 
-Let's revisit the [spelling data](#spellingdata) and create a *list* of data variables defined in the data block! 
+Let's revisit the [spelling data](#spellingdata) and create a *list* of data variables defined in the data block! It is easier to proceed with long-form data, so we start by transforming the wide-form data in the previous section to long-form.
+
 ```{r, message=FALSE}
+# Convert the data from wide to long-form
+wide <- as.data.frame(X)
+wide$id <- 1:nrow(wide) # Attach a person ID number to each row.
+long <- melt(wide, id.vars = "id", variable.name = "item", value.name = "response")
 head(long)
 ```
 
@@ -563,7 +536,7 @@ Implementation of PPMC is relatively simple because it can often be incorporated
 
 Note that new values $\theta_{j}^{rep}$ are drawn from their prior rather than using the existing posterior draws $\theta_{j}$. Therefore, this process may more accurately be labeled as a _mixed_ PPMC. Drawing $\theta_j$ from the posterior would make double use of the data which may yield a conservative test (that often fails detect model misfit) since the observed data can have strong influence on the replicated data [@marshall2003approximate; @Vehtari2015efficient]. A _mixed_ PPMC can considerably reduce such conservatism. 
 
-**Stan** provides an efficient way to generate replicated datasets. We can implement from **Step 1** to **Step 3** by simply adding a `generated quantities` program block at the end of the original [2PL Stan program](#twoplstancode). The **R** code below shows how the `generated quantities` block is defined. 
+**Stan** provides an efficient way to generate replicated datasets. We can implement from **Step 1** to **Step 3** by simply adding a `generated quantities` program block at the end of the [2PL Stan program](#twoplstancode) from the previous section. The **R** code below shows how the `generated quantities` block is defined. 
 
 ```{r, tidy = FALSE}
 # Define generated_quantities program block  
@@ -587,7 +560,7 @@ In the **R** code below, the `generated_quantities` block is appended at the end
 
 ```{r, message=FALSE, warning=FALSE, results='hide'}
 # Extract original twopl.stan code from previous analysis
-twopl_code <- get_stancode(myfit$fit)
+twopl_code <- paste(readLines("twopl.stan"), collapse = "\n")
 
 # Append gnerated_quantities block at the end of the twopl.stan code
 ppmc_code <- paste(twopl_code, generated_quantities, collapse = "\n")
@@ -825,9 +798,7 @@ modified_data$y[is_item_4] <- 1 - modified_data$y[is_item_4]
 We will explore the question of what to do when models fail to converge by way of two examples. We will work with a modified version of the spelling data, `modified_data`, that is set up to fail. The changes to the original data will be provided at the end of this section, but for now let us pretend to be naive. We fit the 2PL to the altered data in the same way as before.
 
 ```{r, results = "hide", cache = TRUE}
-twopl_file <- file.path(path.package("edstan", quiet = TRUE), "extdata",
-                        "twopl.stan")
-troubleshoot_fit1a <- stan(file = twopl_file, data = modified_data, chains = 4,
+troubleshoot_fit1a <- stan(file = "twopl.stan", data = modified_data, chains = 4,
                           iter = 200)
 ```
 
@@ -840,7 +811,7 @@ print(troubleshoot_fit1a, pars = c("alpha", "beta"))
 We immediately see that the values for *Rhat* are too high, meaning that the chains have not converged. There is no way to know for sure beforehand how many iterations per chain will be sufficient. Perhaps 200 was too few, so we try a much larger number.
 
 ```{r, results = "hide", cache = TRUE}
-troubleshoot_fit1b <- stan(file = twopl_file, data = modified_data, chains = 4,
+troubleshoot_fit1b <- stan(file = "twopl.stan", data = modified_data, chains = 4,
                           iter = 1000)
 ```
 
@@ -871,7 +842,7 @@ The R code below reveals how the dataset `modified_data` was constructed; we sim
 Next we try a **Stan** model that allows for negative discrimination parameters. We take the original 2PL **Stan** model and change the prior on the discriminations.
 
 ```{r, warning=FALSE}
-twopl_code <- readLines(twopl_file)
+twopl_code <- readLines("twopl.stan")
 new_code <- gsub("vector<lower=0>.*$", "vector[I] alpha;", twopl_code)
 new_code <- gsub("alpha ~.*$", "alpha ~ normal(0,10);", new_code)
 cat(new_code, sep = "\n")

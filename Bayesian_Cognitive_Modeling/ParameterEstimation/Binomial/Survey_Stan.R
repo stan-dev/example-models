@@ -14,7 +14,7 @@ parameters <- c("theta", "n")
 
 # The following command calls Stan with specific options.
 # For a detailed description type "?stan".
-samples <- stan(file="Survey_model.stan",   
+samples <- stan(file="Survey.stan",   
                 data=data, 
                 init=myinits,  # If not specified, gives random inits
                 pars=parameters,
