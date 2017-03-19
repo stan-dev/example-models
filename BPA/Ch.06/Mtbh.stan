@@ -80,15 +80,17 @@ model {
 }
 
 generated quantities {
-  int<lower=0,upper=1> zero[M];
+  int<lower=0,upper=1> z[M];
   int<lower=C> N;
 
   for (i in 1:M) {
-    real pr;
-
-
-    pr = prod(rep_vector(1.0, T) - p[i]);
-    zero[i] = bernoulli_rng(omega * pr);
+    if(s[i] > 0) {  // animal was detected at least once
+      z[i] = 1;
+    } else {        // animal never detected
+      real pr;      // prob never detected given present
+      pr = prod(rep_vector(1.0, T) - p[i]);
+      z[i] = bernoulli_rng(omega * pr / (omega * pr + (1 - omega)));
+    }
   }
-  N = C + sum(zero);
+  N = sum(z);
 }

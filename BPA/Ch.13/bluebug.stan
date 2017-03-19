@@ -73,17 +73,21 @@ model {
 
 generated quantities {
   real<lower=0,upper=1> mean_p = inv_logit(alpha_p);
-  int<lower=0,upper=1> z[R];
-  int<lower=0> occ_fs;                  // Number of occupied sites
-
-  // Full simulation without condition of
-  // observed y
-  // Note: the result will disperse wider than
-  //       that of the book.
+  int occ_fs;       // Number of occupied sites
+  real psi_con[R];  // prob present | data
+  int z[R];         // occupancy indicator, 0/1
+  
   for (i in 1:R) {
-    real psi = inv_logit(logit_psi[i]);
-
-    z[i] = bernoulli_rng(psi);
+    if (sum_y[i] == 0) {  // species not detected
+      real psi = inv_logit(logit_psi[i]);
+      vector[last[i]] q = inv_logit(-logit_p[i, 1:last[i]])';  // q = 1 - p
+      real qT = prod(q[]);
+      psi_con[i] = (psi * qT) / (psi * qT + (1 - psi));
+      z[i] = bernoulli_rng(psi_con[i]);
+    } else {             // species detected at least once
+      psi_con[i] = 1;
+      z[i] = 1;
+    }
   }
   occ_fs = sum(z);
 }

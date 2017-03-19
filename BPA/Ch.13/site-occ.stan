@@ -7,7 +7,7 @@ data {
 }
 
 transformed data {
-  int<lower=0,upper=T> sum_y[R];  // Number of occupation for each site
+  int<lower=0,upper=T> sum_y[R];  // Number of detections for each site
   int<lower=0,upper=R> occ_obs;   // Number of observed occupied sites
 
   occ_obs = 0;
@@ -43,9 +43,9 @@ model {
 }
 
 generated quantities {
-  real<lower=occ_obs> occ_fs;
-
-  // Observed number of occupied sites
-  // + Number of sites occupied and not observed
-  occ_fs = occ_obs + binomial_rng(R, psi * (1 - p)^T);
+  int<lower=occ_obs, upper=R> occ_fs;
+  real psi_nd;  // prob occurred given not detected
+  
+  psi_nd = (psi * (1 - p)^T) / (psi * (1 - p)^T + (1 - psi));
+  occ_fs = occ_obs + binomial_rng(R - occ_obs, psi_nd);
 }
