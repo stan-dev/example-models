@@ -1,7 +1,7 @@
 ---
 title: "Multiple Species-Site Occupancy Model"
 author: "Bob Carpenter"
-date: "April 19, 2015"
+date: "April 19, 2015 (revised March 21, 2017)"
 output:
   html_document:
     theme: cerulean
@@ -18,7 +18,7 @@ They apply their model to estimating total numbers of butterfly species (and of 
 This [knitr](http://yihui.name/knitr/) document contains all that you need to replicate Dorazio et al.'s statistical analysis of butterfly species.  The model is coded and statistical inference carried out using the Bayesian inference package [RStan](http://mc-stan.org).  A great follow-on exercise would be to code up more of the models from [Dorazio and Royle's book](http://www.mbr-pwrc.usgs.gov/pubanalysis/roylebook/chapters.htm) in Stan.
 
 
-## Data 
+## Data
 
 The data consists of an the observation of butterfly species in July 1997 at "grazed seminatural grasslands located in south-central Sweden...Twenty grasslands thought to be representative of the region were selected for sampling".
 
@@ -77,7 +77,7 @@ detections_heatmap_plot <-
 plot(detections_heatmap_plot);
 ```
 
-Unlike Dorazio et al.'s original plot, this version does not reorder the species by total detections. 
+Unlike Dorazio et al.'s original plot, this version does not reorder the species by total detections.
 
 ## Statistical Model
 
@@ -107,14 +107,14 @@ These species-level effects are given a hierarchical multivariate normal prior w
 
 so that the covariance matrix for the prior on $(u,v)$ pairs is defined as
 
-$\Sigma 
-=  \left[ 
-      \begin{array}{cc} 
+$\Sigma
+=  \left[
+      \begin{array}{cc}
          \sigma_u^2 & \sigma_u \sigma_v \rho_{uv} \\
          \sigma_u \sigma_v \rho_{uv} & \sigma_v^2
       \end{array}
     \right]$
-    
+
 ### Priors
 
 Rather than using Dorazio et al.'s exact diffuse priors, we follow the recommendations given in the Stan manual, and formulate priors as
@@ -131,9 +131,9 @@ Rather than using Dorazio et al.'s exact diffuse priors, we follow the recommend
 
 Although we did not perform any prior sensitivity analysis, the results from the above weakly informative priors are in-line with what Dorazio et al. found with diffuse conjugate inverse gamma priors on $\sigma_u, \sigma_v$, diffuse normal priors on $\alpha, \beta$, and uniform priors on $\Omega$ and $\rho_{uv}$.
 
-### Latent Parameters 
+### Latent Parameters
 
-Dorazio et al. formulate the likelihood for $x_{i,j}$ in terms of two discrete variables, 
+Dorazio et al. formulate the likelihood for $x_{i,j}$ in terms of two discrete variables,
 
 * $z_{i,j} = 1$ if species $i$ is present at site $j$
 
@@ -149,7 +149,7 @@ The site-level availability is modeled by
 
 where $\psi_i = \mbox{logit}^{-1}(u_i + \alpha)$.  Dorazio et al. use two indexes, writing $\psi_{i,j}$, but for their analyses assume $\psi_{i,j} = \psi_{i,j'}$ for all $j, j'$, allowing this note to simplify $\psi$ to a vector.
 
-### Likelihood 
+### Likelihood
 
 The likelihood for the observed data is defined by marginalizing over the unobserved latent parameters (by "summing out" using the law of total probability), with the number of visits to site $j$ on which species $i$ was detected is given by equation (2) in Dorazio et al.'s paper, which we rewrite using sampling notation as
 
@@ -157,50 +157,50 @@ The likelihood for the observed data is defined by marginalizing over the unobse
 
 where the detection probability is $\theta_i = \mbox{logit}^{-1}(v_i + \beta)$.  (As with $\psi$, this note simplifies Dorazio et al.'s notation by treating $\theta$ as a vector.)
 
-Note that if $z_{i,j} = 0$, then species $i$ is not present at site $j$ and hence $x_{i,j} = 0$ by definition. As pointed out in the paper, "if species $i$ is not detected at site $j$ (i.e., $x_{i,j} = 0$), species $i$ is either absent (with probability $1 - \psi_i$) or present but undetected (with probability $\psi_i (1 - \theta_i)^K$)."  
+Note that if $z_{i,j} = 0$, then species $i$ is not present at site $j$ and hence $x_{i,j} = 0$ by definition. As pointed out in the paper, "if species $i$ is not detected at site $j$ (i.e., $x_{i,j} = 0$), species $i$ is either absent (with probability $1 - \psi_i$) or present but undetected (with probability $\psi_i (1 - \theta_i)^K$)."
 
 Marginalizing the $z_{i,j}$ from the above gives the following for $i \in 1{:}n$, which is explicitly conditioned on the species being available $w_i = 1$,
 
-$p(x_{i,j} \, | \, \theta_i, \psi_i) 
-= \mbox{Bernoulli}(1 \, | \, \psi_i) \times \mbox{Binomial}(x_{i,j} \, | \, K, \theta_i) 
+$p(x_{i,j} \, | \, \theta_i, \psi_i)
+= \mbox{Bernoulli}(1 \, | \, \psi_i) \times \mbox{Binomial}(x_{i,j} \, | \, K, \theta_i)
   + \mbox{Bernoulli}(0 \, | \, \psi_i) \times \mbox{I}(x_{i,j} = 0)$
-  
+
 The Stan model will exploit the fact that if $x_{i,j} > 0$, the second term representing non-occurrence drops out.
 
 The $w_i = 1$ enters the likelihood computation as $\mbox{Bernoulli}(1 \, | \, \Omega)$ when looking at the entire vector $x_i = x_{i,1}, \ldots, x_{i,n}$ of site-detection counts for detected species $i \in 1{:}n$, as
 
-$p(x_i \, | \, \theta_i, \psi_i, \Omega) 
+$p(x_i \, | \, \theta_i, \psi_i, \Omega)
 = \mbox{Bernoulli}(1 \, | \, \Omega) \times \prod_{j=1}^J p(x_{i,j} \, | \, \theta_i, \psi_i)$
 
 Expanding out the nested probability function gives the final form of
 
-$p(x_i \, | \, \theta_i, \psi_i, \Omega) 
-= \mbox{Bernoulli}(1 \, | \, \Omega) 
-  \times \prod_{j=1}^J 
+$p(x_i \, | \, \theta_i, \psi_i, \Omega)
+= \mbox{Bernoulli}(1 \, | \, \Omega)
+  \times \prod_{j=1}^J
            \left(
-             \mbox{Bernoulli}(1 \, | \, \psi_i) \times \mbox{Binomial}(x_{i,j} \, | \, K, \theta_i) 
+             \mbox{Bernoulli}(1 \, | \, \psi_i) \times \mbox{Binomial}(x_{i,j} \, | \, K, \theta_i)
              + \mbox{Bernoulli}(0 \, | \, \psi_i) \times \mbox{I}(x_{i,j} = 0)
-          \right)$   
+          \right)$
 
 The $1$ built into the Bernoulli is because we know that $x_{i,j} > 0$ for at least one $j$ and hence we know species $i$ is available.
 
-The last step is marginalizing out the $w_i$ for the undetected species $i \in (n+1){:}S$, for which we know $x_{i,j} = 0$, giving 
+The last step is marginalizing out the $w_i$ for the undetected species $i \in (n+1){:}S$, for which we know $x_{i,j} = 0$, giving
 
-$p(x_i \, | \, \Omega, \psi_i, \theta_i) 
+$p(x_i \, | \, \Omega, \psi_i, \theta_i)
 = \mbox{Bernoulli}(0 \, | \, \Omega)
-  + \mbox{Bernoulli}(1 \, | \, \Omega) 
+  + \mbox{Bernoulli}(1 \, | \, \Omega)
     \times \prod_{j=1}^J p(x_{i,j} \, | \, \theta_i, \psi_i)$.
-    
+
 where the final term is defined as for the formula conditioning on $w_i = 1$ above, knowing that $x_{i,j} = 0$ because $i > n$, resulting in the full joint likelihood of $x_i = x_{i,1}, \ldots, x_{i,J}$ for the case where $i > n$ of
 
-$p(x_i \, | \, \Omega, \psi_i, \theta_i) 
+$p(x_i \, | \, \Omega, \psi_i, \theta_i)
  =  \begin{array}[t]{l}
        \mbox{Bernoulli}(0 \, | \, \Omega)
-       \\ \mbox{ } 
-          + \mbox{Bernoulli}(1 \, | \, \Omega) 
-            \times \prod_{j=1}^J 
-                     \big( 
-                       \mbox{Bernoulli}(1 \, | \, \psi_i) \times \mbox{Binomial}(x_{i,j} \, | \, K, \theta_i) 
+       \\ \mbox{ }
+          + \mbox{Bernoulli}(1 \, | \, \Omega)
+            \times \prod_{j=1}^J
+                     \big(
+                       \mbox{Bernoulli}(1 \, | \, \psi_i) \times \mbox{Binomial}(x_{i,j} \, | \, K, \theta_i)
                        + \mbox{Bernoulli}(0 \, | \, \psi_i)
                     \big)
     \end{array}$
@@ -214,16 +214,16 @@ stan_program <- "
 functions {
   matrix cov_matrix_2d(vector sigma, real rho) {
     matrix[2,2] Sigma;
-    Sigma[1,1] <- square(sigma[1]);
-    Sigma[2,2] <- square(sigma[2]);
-    Sigma[1,2] <- sigma[1] * sigma[2] * rho;
-    Sigma[2,1] <- Sigma[1,2];
+    Sigma[1,1] = square(sigma[1]);
+    Sigma[2,2] = square(sigma[2]);
+    Sigma[1,2] = sigma[1] * sigma[2] * rho;
+    Sigma[2,1] = Sigma[1,2];
     return Sigma;
   }
 
   real lp_observed(int x, int K, real logit_psi, real logit_theta) {
-    return log_inv_logit(logit_psi) 
-      + binomial_logit_log(x, K, logit_theta);
+    return log_inv_logit(logit_psi)
+      + binomial_logit_lpmf(x | K, logit_theta);
   }
 
   real lp_unobserved(int K, real logit_psi, real logit_theta) {
@@ -233,15 +233,12 @@ functions {
 
   real lp_never_observed(int J, int K, real logit_psi, real logit_theta,
                          real Omega) {
-      real lp_unavailable;
-      real lp_available;
-      lp_unavailable <- bernoulli_log(0, Omega);
-      lp_available <- bernoulli_log(1, Omega)
+      real lp_unavailable = bernoulli_lpmf(0 | Omega);
+      real lp_available = bernoulli_lpmf(1 | Omega)
         + J * lp_unobserved(K, logit_psi, logit_theta);
       return log_sum_exp(lp_unavailable, lp_available);
     }
 }
-
 data {
   int<lower=1> J;  // sites within region
   int<lower=1> K;  // visits to sites
@@ -249,7 +246,6 @@ data {
   int<lower=0, upper=K> x[n,J];  // visits when species i was detected at site j
   int<lower=n> S;  // superpopulation size
 }
-
 parameters {
   real alpha;  //  site-level occupancy
   real beta;   //  site-level detection
@@ -259,26 +255,21 @@ parameters {
   vector<lower=0>[2] sigma_uv;    // sd of (occupancy, detection)
   vector[2] uv[S];                // species-level (occupancy, detection)
 }
-
 transformed parameters {
   vector[S] logit_psi;    // log odds  of occurrence
   vector[S] logit_theta;  // log odds of detection
   for (i in 1:S)
-    logit_psi[i] <- uv[i,1] + alpha;
+    logit_psi[i] = uv[i,1] + alpha;
   for (i in 1:S)
-    logit_theta[i] <- uv[i,2] + beta;
+    logit_theta[i] = uv[i,2] + beta;
 }
-
 model {
-
   // priors
   alpha ~ cauchy(0, 2.5);
   beta ~ cauchy(0, 2.5);
-
   sigma_uv ~ cauchy(0, 2.5);
   (rho_uv + 1) / 2 ~ beta(2, 2);
   uv ~ multi_normal(rep_vector(0, 2), cov_matrix_2d(sigma_uv, rho_uv));
-
   Omega ~ beta(2,2);
 
   // likelihood
@@ -286,45 +277,35 @@ model {
     1 ~ bernoulli(Omega); // observed, so available
     for (j in 1:J) {
       if (x[i,j] > 0)
-        increment_log_prob(
-            lp_observed(x[i,j], K, logit_psi[i], logit_theta[i]));
+        target += lp_observed(x[i,j], K, logit_psi[i], logit_theta[i]);
       else
-        increment_log_prob(
-            lp_unobserved(K, logit_psi[i], logit_theta[i]));
+        target += lp_unobserved(K, logit_psi[i], logit_theta[i]);
     }
   }
-
   for (i in (n + 1):S)
-    increment_log_prob(
-        lp_never_observed(J, K, logit_psi[i], logit_theta[i], Omega));
+    target += lp_never_observed(J, K, logit_psi[i], logit_theta[i], Omega);
 }
-
 generated quantities {
-  real<lower=0,upper=S> E_N;   // model-based expected number of species
-  int<lower=0,upper=S> E_N_2;  // posterior simulated number of species
+  real<lower=0,upper=S> E_N = S * Omega; // model-based expectation species
+  int<lower=0,upper=S> E_N_2;  // posterior simulated species
   vector[2] sim_uv;
   real logit_psi_sim;
   real logit_theta_sim;
 
-  E_N <- S * Omega; // pure expected by model
-
-  E_N_2 <- n;
+  E_N_2 = n;
   for (i in (n+1):S) {
-    real lp_unavailable;
-    real lp_available;
-    real Pr_available;
-    lp_unavailable <- bernoulli_log(0, Omega);
-    lp_available <- bernoulli_log(1, Omega)
+    real lp_unavailable = bernoulli_lpmf(0 | Omega);
+    real lp_available = bernoulli_lpmf(1 | Omega)
       + J * lp_unobserved(K, logit_psi[i], logit_theta[i]);
-    Pr_available <- exp(lp_available 
-                       - log_sum_exp(lp_unavailable, lp_available));
-    E_N_2 <- E_N_2 + bernoulli_rng(Pr_available);
+    real Pr_available = exp(lp_available
+                            - log_sum_exp(lp_unavailable, lp_available));
+    E_N_2 = E_N_2 + bernoulli_rng(Pr_available);
   }
 
-  sim_uv <- multi_normal_rng(rep_vector(0,2),
+  sim_uv = multi_normal_rng(rep_vector(0,2),
                              cov_matrix_2d(sigma_uv, rho_uv));
-  logit_psi_sim <- alpha + sim_uv[1];
-  logit_theta_sim <- beta + sim_uv[2];
+  logit_psi_sim = alpha + sim_uv[1];
+  logit_theta_sim = beta + sim_uv[2];
 }
 ";
 ```
@@ -346,15 +327,15 @@ The data and parameters are declared with appropriate constraints based on their
 
 The transformed parameters block defines the logit-scaled versions of $\psi$ and $\theta$ as vectors, again noting they do not vary by site in this model.
 
-The model block defines the priors directly as specified.  The expression `rep_vector(0, 2)` provides a zero-vector for the mean of the multivariate normal prior.  
+The model block defines the priors directly as specified.  The expression `rep_vector(0, 2)` provides a zero-vector for the mean of the multivariate normal prior.
 
 The model block then defines the likelihood by separating out the cases for $i \leq n$ and the cases $i > n$.  The former also branches using a conditional on `x[i,j] > 0` to determine whether to use the simplified form of log likelihood for the unobserved case.  Otherwise, the likelihood is just called directly.  The `increment_log_prob()` function is used to add directly to the log density defined by the Stan model block.
 
 The generated quantities block performs three calculations.  The generated quantities block is executed once per iteration, calculating the variables declared at the top of the block using the parameter values for the iteration.  This provides full Bayesian inference via MCMC for the following variables defined in the generated quantities block.
 
-* `E_N`, the expectation of $N$ using the simple formula $S \times \Omega$ suggested in the Dorazio et al. paper.  
+* `E_N`, the expectation of $N$ using the simple formula $S \times \Omega$ suggested in the Dorazio et al. paper.
 
-* `E_N_2`, which we assume is how Dorazio et al. actually estimated species occupancy.  This is carried out by reconstructing the expectations of the $w_i$ in the posterior for $i > n$ and adding the resulting sum to $n$, because we know $w_i = 1$ for $i \leq n$.  The log likelihood of availability and unavailability is calculated for each $i > n$, then normalized to define `Pr_available`, which is the posterior expectation of $w_i$ for species never detected for the parameter values being used.  
+* `E_N_2`, which we assume is how Dorazio et al. actually estimated species occupancy.  This is carried out by reconstructing the expectations of the $w_i$ in the posterior for $i > n$ and adding the resulting sum to $n$, because we know $w_i = 1$ for $i \leq n$.  The log likelihood of availability and unavailability is calculated for each $i > n$, then normalized to define `Pr_available`, which is the posterior expectation of $w_i$ for species never detected for the parameter values being used.
 
 * The third generated quantities is a set of simulated $(u,v)$ pairs for a new species, along with the logit-scaled $\psi$ and $\theta$ variables.  These are used for posterior predictive checking to see if the actual species are distributed as characterized by their prior.
 
@@ -365,7 +346,7 @@ Next up, we fit the model by running Stan and then printing the fit object produ
 
 A total of four Markov chains are simulated, each for 5000 iterations, with the default of 2500 warmup iterations being used for adaptation and discarded to produce the final sample, which will consist of the second-half of each chain, or a total of 10,000 draws.  The width of the print is increased before printing the fit because it's rather wide.
 
-### Running the Model 
+### Running the Model
 
 The model is fit by loading the RStan library, then calling the `stan()` function given the program, names of the data variables in the global environment, a control specification for Stan (optional), and a number of chains, iterations per chain, and random seed (the seed is also optional but will guarantee the same results across runs if provided).
 
@@ -394,9 +375,9 @@ An explicit list of parameters to print is provided to suppress the printing of 
 The traceplots can be shown for some of the parameters (incuding one $(u,v)$ pair for a detected species and one for an undetected species) and the log density (up to a constant).
 
 ```{r}
-traceplot(fit, 
+traceplot(fit,
           c("Omega", "alpha", "beta", "sigma_uv", "rho_uv",
-            "uv[1,1]", "uv[1,2]", "uv[30,1]", "uv[30,2]", 
+            "uv[1,1]", "uv[1,2]", "uv[30,1]", "uv[30,2]",
             "lp__"),
           inc_warmup=FALSE) +
   coord_cartesian(xlim = c(3001,3200)) +
@@ -417,17 +398,17 @@ This time, the warmup was included in the traceplot and only the first
 
 ### Pairs Plot and Posterior Covariance of Parameters
 
-Stan also provides a built-in pairs plot, which by default puts half the chains above the diagonal and half below, and can also be specialized to a subset of the parameters.  
+Stan also provides a built-in pairs plot, which by default puts half the chains above the diagonal and half below, and can also be specialized to a subset of the parameters.
 
 ```{r}
-# pairs(fit, pars = c("Omega", "alpha", "beta", "sigma_uv", "rho_uv", "lp__")); 
+# pairs(fit, pars = c("Omega", "alpha", "beta", "sigma_uv", "rho_uv", "lp__"));
 ```
 
 This plot is not turned on in the output because it produces a huge image with this many draws (there is a `condition` argument to `pairs()` that can be used to trim the input or reorganize what is printed above and below the diagonal based on user-defined conditions.
 
 ### Estimated Number of Species
 
-One of the key estimands of interest in the Dorazio et al. paper is the total number of species available.  How this is computed was already discussed above in the model section.  To recreate figure 6 from the Dorazio et al. paper, which plots the posterior estimates for total species, the following ggplot2 code suffices.  Before the plot is run, the simulations are extracted from the fit object and used to build up the frequency to be plotted. 
+One of the key estimands of interest in the Dorazio et al. paper is the total number of species available.  How this is computed was already discussed above in the model section.  To recreate figure 6 from the Dorazio et al. paper, which plots the posterior estimates for total species, the following ggplot2 code suffices.  Before the plot is run, the simulations are extracted from the fit object and used to build up the frequency to be plotted.
 
 ```{r}
 sims <- extract(fit);
@@ -443,8 +424,8 @@ dat <- cbind(1:S, dat);
 colnames(dat)[1] <- "N";
 dat <- dat[28:38, ];
 
-N_bar_plot <-  
-  ggplot(data=dat, aes(x=N, y=freq)) +  
+N_bar_plot <-
+  ggplot(data=dat, aes(x=N, y=freq)) +
   geom_bar(stat="identity") +
   scale_x_continuous(name="butteryfly species (N)",
                      breaks=c(28,30,32,34,36,38)) +
@@ -470,9 +451,9 @@ colnames(df_psi_theta)[1] <- "psi";
 colnames(df_psi_theta)[2] <- "theta";
 
 psi_density_plot <-
-  ggplot(df_psi_theta, aes(x=psi)) + 
+  ggplot(df_psi_theta, aes(x=psi)) +
   geom_line(stat = "density", adjust=1) +
-  scale_x_continuous(name="probability of occurrence", 
+  scale_x_continuous(name="probability of occurrence",
                      limits=c(0,1), breaks=(0.2 * (0:5))) +
   scale_y_continuous(name="probability density",
                      limits=c(0,4.5), breaks=(0:4)) +
@@ -485,10 +466,10 @@ To reproduce the right-hand side plot in figure 7 from the paper, the posterior 
 
 ```{r}
 theta_density_plot <-
-  ggplot(df_psi_theta, aes(x=theta)) + 
-  geom_line(stat = "density", adjust=1) +  
+  ggplot(df_psi_theta, aes(x=theta)) +
+  geom_line(stat = "density", adjust=1) +
   scale_x_continuous(name="probability of detection",
-    limits=c(0,1), breaks=(0.2 * (0:5))) + 
+    limits=c(0,1), breaks=(0.2 * (0:5))) +
   scale_y_continuous(name="probability density",
                      limits=c(0,4.5), breaks=(0:4)) +
   ggtitle("Posterior: Detection (theta)");
@@ -524,7 +505,7 @@ plot(alpha_beta_scatter_plot);
 
 ### Posterior Predictive Checking
 
-Going beyond the figures in the paper, we also provide a scatterplot of the posterior means for the estimates of the $\psi$ and $\theta$ parameters for the observed species with $i \leq n$, using the following code. 
+Going beyond the figures in the paper, we also provide a scatterplot of the posterior means for the estimates of the $\psi$ and $\theta$ parameters for the observed species with $i \leq n$, using the following code.
 
 
 ```{r}
@@ -545,7 +526,7 @@ psi_theta_hat_scatter_plot <-
   geom_hline(yintercept=0, colour="gray") +
   geom_point(size=1.5) +
   scale_x_continuous(name="occurrence log odds",
-                     limits=c(-8,8), breaks=2*(-4:4)) + 
+                     limits=c(-8,8), breaks=2*(-4:4)) +
   scale_y_continuous(name="detection log odds",
                      limits=c(-8,8), breaks=2*(-4:4)) +
   ggtitle("Posterior Means: Species Occurrence (psi) and Detection (theta)");
@@ -562,13 +543,13 @@ df_psi_theta_sim <-
 
 df_psi_theta_sim <- head(df_psi_theta_sim, 500);
 
-psi_theta_sim_scatter_plot <-             
+psi_theta_sim_scatter_plot <-
   ggplot(df_psi_theta_sim, aes(x=occurrence, y=detection)) +
   geom_vline(xintercept=0, colour="gray") +
   geom_hline(yintercept=0, colour="gray") +
   geom_point(size=1.5) +
   scale_x_continuous(name="occurrence log odds",
-                     limits=c(-8,8), breaks=2*(-4:4)) + 
+                     limits=c(-8,8), breaks=2*(-4:4)) +
   scale_y_continuous(name="detection log odds",
                      limits=c(-8,8), breaks=2*(-4:4)) +
   ggtitle("Posterior Predictive: Species Occurrence (psi) and Detection (theta)");
@@ -576,6 +557,13 @@ psi_theta_sim_scatter_plot <-
 plot(psi_theta_sim_scatter_plot);
 ```
 
-# Licensing
 
-All code in this document is licensed via the BSD 3-clause license.  
+## Acknowledgements
+
+Thanks to Mike Meredith for terminological and mathematical adjustments
+to the first version.
+
+
+## Licensing
+
+All code in this document is licensed via the BSD 3-clause license.
