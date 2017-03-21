@@ -49,7 +49,7 @@ for (i in 1:n) {
   }
 }
 K <- 18;   # read from paper, figure 5
-S <- 50;   # guessing from plot in figure 6
+S <- 50;   # more than adequate judging from plot in figure 6
 head(x_csv);
 ```
 
@@ -83,27 +83,27 @@ Unlike Dorazio et al.'s original plot, this version does not reorder the species
 
 ### Parameters
 
-The model involves parameters for the site (here the sites are considered exchangeable and considered to share a single parameter) that determine species abundance and detectability.
+The model involves parameters for the site (here the sites are considered exchangeable and considered to share a single parameter) that determine species occupancy and detectability.
 
-* $\alpha$ : site-level abundance (logit scaled)
+* $\alpha$ : site-level occupancy (logit scaled)
 
 * $\beta$ : site-level detection (logit scaled)
 
-There is a single parameter for the probabilty of a species being at the site:
+There is a single parameter for the probability of a species being in the region:
 
 * $\Omega \in (0,1)$: availability of species
 
-Then for each species $i$, there are a pair of parameters for species-specific abundance and detection
+Then for each species $i$, there are a pair of parameters for species-specific occupancy and detection
 
-* $u_i$ : species-level abundance (logit scaled)
+* $u_i$ : species-level occupancy (logit scaled)
 
 * $v_i$ : species-level detection (logit scaled)
 
 These species-level effects are given a hierarchical multivariate normal prior with zero mean and covariance matrix parameterized by three scalars,
 
-* $\sigma_u$ : std deviation of species abundance
+* $\sigma_u$ : std deviation of species occupancy
 * $\sigma_v$ : std deviation of species detection
-* $\rho_{uv}$ : correlation of species abundance and detection
+* $\rho_{uv}$ : correlation of species occupancy and detection
 
 so that the covariance matrix for the prior on $(u,v)$ pairs is defined as
 
@@ -135,11 +135,11 @@ Although we did not perform any prior sensitivity analysis, the results from the
 
 Dorazio et al. formulate the likelihood for $x_{i,j}$ in terms of two discrete variables, 
 
-* $z_{i,j} = \mbox{I}(x_{i,j} > 0)$, presence of species $i$ at site $j$
+* $z_{i,j} = 1$ if species $i$ is present at site $j$
 
-* $w_i = 1$ if species $i$ in supercommunity is avaialble
+* $w_i = 1$ if species $i$ in supercommunity is available
 
-By definition, for $i \in (n+1){:}S$, $x_{i,j} = 0$, because no members of species $i$ was detected for $i > n$. The values of $z_{i,j}$ for $i \leq n$ are observed, but the values for $i > n$ are latent.  Also by definition, $w_i = 1$ for $i \leq n$, because a species must be available if it was detected, whereas $w_i$ for $i > n$ is a latent parameter.  The availability of a species from the supercommunity is modeled by
+By definition, for $i \in (n+1){:}S$, $x_{i,j} = 0$, because no members of species $i$ was detected for $i > n$. Also by definition, $w_i = 1$ for $i \leq n$, because a species must be available if it was detected, whereas $w_i$ for $i > n$ is a latent parameter.  The availability of a species from the supercommunity is modeled by
 
 * $w_i \sim \mbox{Bernoulli}(\Omega)$.
 
@@ -157,7 +157,7 @@ The likelihood for the observed data is defined by marginalizing over the unobse
 
 where the detection probability is $\theta_i = \mbox{logit}^{-1}(v_i + \beta)$.  (As with $\psi$, this note simplifies Dorazio et al.'s notation by treating $\theta$ as a vector.)
 
-Note that if $z_{i,j} = 0$, then species $i$ is not present at site $j$ and hence $x_{i,j} = 0$ by definition. As pointed out in the paper, "if species $i$ is not detected at site $j$ (i.e., $x_{i,j} = 0$), species $i$ is either absent (with probability $1 - \psi_i$) or present but undetected (with probability $\psi_i (1 - \theta_i)$)."  
+Note that if $z_{i,j} = 0$, then species $i$ is not present at site $j$ and hence $x_{i,j} = 0$ by definition. As pointed out in the paper, "if species $i$ is not detected at site $j$ (i.e., $x_{i,j} = 0$), species $i$ is either absent (with probability $1 - \psi_i$) or present but undetected (with probability $\psi_i (1 - \theta_i)^K$)."  
 
 Marginalizing the $z_{i,j}$ from the above gives the following for $i \in 1{:}n$, which is explicitly conditioned on the species being available $w_i = 1$,
 
@@ -246,18 +246,18 @@ data {
   int<lower=1> J;  // sites within region
   int<lower=1> K;  // visits to sites
   int<lower=1> n;  // observed species
-  int<lower=0, upper=K> x[n,J];  // observed count of species i at site j
+  int<lower=0, upper=K> x[n,J];  // visits when species i was detected at site j
   int<lower=n> S;  // superpopulation size
 }
 
 parameters {
-  real alpha;  //  site-level abundance
+  real alpha;  //  site-level occupancy
   real beta;   //  site-level detection
   real<lower=0, upper=1> Omega;  // availability of species
 
-  real<lower=-1,upper=1> rho_uv;  // correlation of (abundance, detection)
-  vector<lower=0>[2] sigma_uv;    // sd of (abundance, detection)
-  vector[2] uv[S];                // species-level (abundance, detection)
+  real<lower=-1,upper=1> rho_uv;  // correlation of (occupancy, detection)
+  vector<lower=0>[2] sigma_uv;    // sd of (occupancy, detection)
+  vector[2] uv[S];                // species-level (occupancy, detection)
 }
 
 transformed parameters {
@@ -300,8 +300,8 @@ model {
 }
 
 generated quantities {
-  real<lower=0,upper=S> E_N;   // model-based expected population size
-  int<lower=0,upper=S> E_N_2;  // posterior simulated population size
+  real<lower=0,upper=S> E_N;   // model-based expected number of species
+  int<lower=0,upper=S> E_N_2;  // posterior simulated number of species
   vector[2] sim_uv;
   real logit_psi_sim;
   real logit_theta_sim;
@@ -354,7 +354,7 @@ The generated quantities block performs three calculations.  The generated quant
 
 * `E_N`, the expectation of $N$ using the simple formula $S \times \Omega$ suggested in the Dorazio et al. paper.  
 
-* `E_N_2`, which we assume is how Dorazio et al. actually estimated species abundance.  This is carrid out by reconstructing the expectations of the $w_i$ in the posterior for $i > n$ and adding the resulting sum to $n$, because we know $w_i = 1$ for $i \leq n$.  The log likelihood of availability and unavailaibility is calculated for each $i > n$, then normalized to define `Pr_available`, which is the posterior expectation of $w_i$ for the parameter values being used.  
+* `E_N_2`, which we assume is how Dorazio et al. actually estimated species occupancy.  This is carried out by reconstructing the expectations of the $w_i$ in the posterior for $i > n$ and adding the resulting sum to $n$, because we know $w_i = 1$ for $i \leq n$.  The log likelihood of availability and unavailability is calculated for each $i > n$, then normalized to define `Pr_available`, which is the posterior expectation of $w_i$ for species never detected for the parameter values being used.  
 
 * The third generated quantities is a set of simulated $(u,v)$ pairs for a new species, along with the logit-scaled $\psi$ and $\theta$ variables.  These are used for posterior predictive checking to see if the actual species are distributed as characterized by their prior.
 
@@ -455,10 +455,11 @@ N_bar_plot <-
 plot(N_bar_plot);
 ```
 
+The plot confirms that the choice of $S = 50$ is adequate; had the posterior mass extended up to 50, we would need to rerun the analysis with a higher value.
 
 ### Posterior Probabilities of Occurrence and Detection
 
-The following plots the posterior density of $\psi$ (probability of occurrence) on the original probability scale, which is the left-side plot in figure 7 in the Dorazio et al. paper;  the inverse logit function is defined to do the transform fromthe logit-scaled parameters.
+The following plots the posterior density of $\psi$ (probability of occurrence) on the original probability scale, which is the left-side plot in figure 7 in the Dorazio et al. paper;  the inverse logit function is defined to do the transform from the logit-scaled parameters.
 
 ```{r}
 ilogit <- function(u) { return(1 / (1 + exp(-u))); }
@@ -497,7 +498,7 @@ plot(theta_density_plot);
 
 ### Site-Level Parameter Posterior
 
-Although it duplicates the effort of the `pairs()` plot given above, here is a direct plot of just the posterior of the $\alpha$ (site-level abundance) and $\beta$ (site-level detection) parameters.  The posterior draws are subsetted so that only 500 draws are printed.  These draws are random across iterations and chains because Stan's `extract()` function permutes the draws by default.
+Although it duplicates the effort of the `pairs()` plot given above, here is a direct plot of just the posterior of the $\alpha$ (site-level occupancy) and $\beta$ (site-level detection) parameters.  The posterior draws are subsetted so that only 500 draws are printed.  These draws are random across iterations and chains because Stan's `extract()` function permutes the draws by default.
 
 
 ```{r}
@@ -514,9 +515,9 @@ alpha_beta_scatter_plot <-
   geom_point(size=2, alpha=0.25) +
   geom_vline(xintercept=0, colour="gray") +
   geom_hline(yintercept=0, colour="gray") +
-  scale_x_continuous(name="abundance log odds (alpha)", limits=c(-4,4)) +
+  scale_x_continuous(name="occupancy log odds (alpha)", limits=c(-4,4)) +
   scale_y_continuous(name="detection log odds (beta)", limits=c(-4,4)) +
-  ggtitle("Posterior: Site Abundance (alpha) vs. Detection (beta)");
+  ggtitle("Posterior: Site occupancy (alpha) vs. Detection (beta)");
 plot(alpha_beta_scatter_plot);
 ```
 
