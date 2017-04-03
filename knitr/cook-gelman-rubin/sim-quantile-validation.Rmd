@@ -1,0 +1,460 @@
+---
+title: "Validating Bayesian Model Implementations via Posterior
+Coverage with Simulated Data"
+author: "Bob Carpenter"
+date: "2 April 2017"
+output:
+  html_document:
+    fig_caption: yes
+    fig_height: 2
+    fig_width: 3
+    theme: cerulean
+    toc: yes
+    toc_depth: 1
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Abstract
+
+Clear specification and rigorous testing is the foundation of robust
+software development.  A general approach to testing the combination
+of a Bayesian model implementation and posterior sampling algorithm is
+to verify that under repeated simulations of parameters and data from
+the model, the posterior coverage is properly calibrated.  The
+following paper introduces a general test statistic for evaluating
+posterior calibration of sampling algorithms.
+
+* Cook, Samantha R., Andrew Gelman, and Donald
+  B. Rubin. 2006. [Validation of software for Bayesian models using
+  posterior
+  quantiles](http://stat.columbia.edu/~gelman/research/published/Cook_Software_Validation.pdf).
+  *Journal of Computational and Graphical Statistics* 15(3):675--692.
+
+This case study demonstrates how to carry out Cook et al.'s test for
+Bayesian models implemented as Stan programs and fit using Stan's
+samplers.
+
+## Outline
+
+The first section summarizes Cook et al.'s clever proof that Bayesian
+posterior inference is well calibrated in general.  The second section
+shows how they use this result to generate a test statistic to
+validate posterior inferences for the model.  The remainder of the
+case study illustrates the application of their method to Stan
+programs.
+
+# Bayesian Model Calibration
+
+
+### Bayesian model specification
+
+We will assume that a Bayesian model is provided as
+
+* a prior $p(\theta)$ over model parameters $\theta \in \mathbb{R}^K$, and
+
+* a sampling probability function $p(y \, | \, \theta)$ over a vector
+  $y \in \mathbb{R}^N$ of data given the model parameters.
+
+
+<div style="width:35%; float:right; padding:1em 1em 1em 1em">
+![<small>Figure 1. <i>The steps involved for one replication of Cook
+et al.'s validation process.  Image from Cook et al. (1996, Figure
+2)</i></small>.](cook-gelman-rubin-fig2.png)
+</div>
+
+### Simulating parameters and data
+
+Suppose we have a secondary program with which we
+
+* simulate parameters $\theta^{(0)}$ according to the prior
+  distribution $p(\theta)$, and
+
+* simulate data $y^{(0)}$ according to the sampling distribution
+  $p(y \, | \, \theta^{(0)})$.
+
+The chain rule shows that this is also
+
+* a draw $\left( y^{(0)}, \theta^{(0)} \right)$ from the joint distribution
+  $p(y, \theta) \propto p(y \, | \, \theta) \ p(\theta)$.
+
+From Bayes's rule, we see that we now have
+
+* a draw $\theta^{(0)}$ from the posterior distribution $p(\theta \, | \, y^{(0)}) \propto p(y^{(0)}, \theta)$.
+
+
+### MCMC calculation of quantiles
+
+Now suppose we have a way to
+
+* draw $\theta^{(1)}, \ldots, \theta^{(M)}$ from the posterior $p(\theta \, | \, y^{(0)})$
+
+Then we can estimate posterior quantiles for the components of
+$\theta^{(0)}$ based on the draws $\theta^{(1)}, \ldots \theta^{(M)}$, as
+
+
+\[
+\hat{q}_k
+\ \approx \
+\frac{1}{M} \sum_{m = 1}^M \mathrm{I}[ \theta^{(m)}_k < \theta^{(0)}_k ].
+\]
+
+
+### Distribution of quantiles
+
+Because $\theta^{(0)}$ is just a random draw from the posterior, any
+of its components is equally likely to land in any quantile in $(0,
+1)$.  The approximation to the true quantile improves with $M$, so
+that as $M \rightarrow \infty$,
+
+\[
+\hat{q}_k \ \sim \ \mathsf{Uniform}(0, 1).
+\]
+
+Cook et al. provide a more rigorous proof of this (their Thereom 1).
+For practical applications, convergence within a finite $M$ will
+require geometric ergodicity of the sampler for the model, a property
+which will be tested along with other aspects of the sampler and model
+implementation.
+
+### Ramification for Bayesian posterior calibration
+
+As a consequence of the quantiles being uniform, we automatically get calibrated posterior coverage.  Specifically, if we simulate $\theta^{(0)}$ from the prior and $y^{(0)}$ from the sampling distribution conditioned on $\theta^{(0)}$, the the posterior $p(\theta \, | \, y^{(0)})$ should have $p\%$ intervals that can be expected to contain the simulated parameter value $p\%$ of the time.
+
+
+# Test Statistic
+
+Cook et al. develop a test statistic for Bayesian posterior samplers
+based on the uniformity of the posterior quantile estimates $\hat{q}_k$.
+
+### Transforming quantiles to z-scores
+
+In general, if $u \sim \mathsf{Uniform}(0, 1)$, then
+
+\[
+z(u) = \Phi^{-1}(u) \sim \mathsf{Normal}(0, 1),
+\]
+
+where $\Phi$ is the standard normal cumulative distribution function,
+
+\[
+\Phi(v)
+\ = \
+\int_{-\infty}^v
+\mathsf{Normal}(w \, | \, 0, 1) \, \mathrm{d}w,
+\]
+and $\Phi^{-1}$ is its inverse (i.e., the function that maps a
+quantile value in $(0, 1)$ to the value in the standard normal
+distribution with that quantile).
+
+### Sum of squared z-scores is $\chi^2$
+
+Cook et al. define a test statitisic that is equal to the sum of the
+squared z-scores for $I$ replicated tests, each of which generates a
+new $\theta^{(0)}$ and $y^{(0)}$ and samples a sequence $\theta^{(1)},
+\ldots, \theta^{(M)}$ from the corresponding posterior $p(\theta \, |
+\, y^{(0)})$, to generate a posterior quantile estimate
+$\hat{q}^{(i)}_k$ for the $k$-th component of the posterior,
+
+\[
+X^2_{\theta_k} = \sum_{i=1}^I \left( \Phi^{-1}(\hat{q}^{(i)}_k) \right)^2.
+\]
+
+Because each of the terms is independently drawn as standard normal,
+the sum of their squares, $X^2_{\theta_k}$, will have a standard $\chi^2$
+distribution with $I$ degrees of freedom, i.e.,
+
+\[
+X^2_{\theta_k} \sim \mathsf{ChiSquare}(I, 0, 1).
+\]
+
+
+### Detecting problems with posterior sampling
+
+As Cook et al. note, the $X^2_{\theta_k}$ statistic can be used to calculate a $p$-value for the null hypotehsis that $X^2_{\theta_k}$ has a $\chi^2$ distribution with $I$ degrees of freedom.  Unexpectedly small $p$-values indicate a mismatch between the process used to generate the simulated data and parameters $y^{(0)}, \theta^{(0)}$, and the process used to generate posterior draws $\theta^{(1)}, \ldots, \theta^{(M)}$ conditioned on $y^{(0)}$.
+
+### Adjusting false alarm rate for multiple comparisons
+
+Cook et al. apply a so-called Bonferronni correction to control the
+false alarm rate under multiple comparisons.  Specifically, they
+multiply each $p$-value by $K$, because $K$ components are being
+tested.
+
+
+# Example 1: Hierarchical Normal
+
+We will illustrate Cook et al.'s approach with a variant of their
+simple varying-intercepts hierarchical model that more closely follows
+current thinking about priors.
+
+### Varying-intercepts hierarchical normal model
+
+The data consists of real-valued observations $y_{i, j}$ organized
+into $j \in 1{:}J$ groups with $N_j$ observations per group.  Given
+the parameters, the sampling distribution is
+
+* $y_{i, j} \sim \mathsf{Normal}(\alpha_j, \sigma)$ for $j \in 1{:}J$
+  and $i \in 1{:}N_j$
+
+with the intercept for group $j$ being drawn from the hierarchical
+prior
+
+* $\alpha_j \sim \mathsf{Normal}(\mu, \tau)$ for $j \in 1{:}J$.
+
+The prior for overall observation noise scale $\sigma > 0$ is
+
+* $\sigma \sim \mathsf{HalfNormal}(0, 5)$
+
+and the hyperpriors for the prior location $\mu$ and scale $\tau > 0$ are
+
+* $\mu \sim \mathrm{Normal}(5, 5)$, and
+
+* $\tau \sim \mathsf{HalfNormal}(0, 5)$.
+
+### Simulating data from the model
+
+We will simulate the data using R.  We could simulate the data using
+Stan, but there is a benefit to using two independent implementations
+in testing.
+
+First, we set the seed for replicability across runs of this knitr
+file and then simulate the data.
+
+```{r}
+set.seed(4321);
+J <- 6;
+N <- c(33, 21, 22, 22, 24, 11);
+mu <- rnorm(1, 5, 5);
+tau <- abs(rnorm(1, 0, 5));
+sigma <- abs(rnorm(1, 0, 5));
+alpha <- rnorm(J, mu, tau);
+y <- c();
+begin <- 1;
+for (j in 1:J) {
+  end <- begin + N[j] - 1;
+  y[begin:end] <- rnorm(N[j], alpha[j], sigma);
+  begin <- end + 1;
+}
+```
+
+This yields the following parameters
+
+```{r}
+print(sprintf("tau:   %4.1f", tau), quote=FALSE);
+print(sprintf("mu:    %4.1f", mu), quote=FALSE);
+print(sprintf("sigma: %4.1f", sigma), quote=FALSE);
+```
+
+The intercepts for the groups are
+
+```{r}
+print(sprintf("alpha[%1d]: %3.1f   ", 1:J, alpha), quote=FALSE);
+```
+
+Together, these yield the simulated observations,
+
+```{r}
+print(y, digits=1, quote=FALSE)
+```
+
+### Coding the model in Stan
+
+The Stan program reflects the model definition printed above with two
+caveats.  First, Stan does not provide a ragged array data structure,
+so there is a fiddly calculation of the group index for each
+observation in the transformed data block.  Second, the Stan program
+uses the non-centered parameterization for the varying intercepts
+<code>alpha</code> because we know there are not many observations for
+each parameter.  The full Stan program is as follows.
+
+```{r comment=NA, echo=FALSE, tidy=TRUE}
+file_path <- "norm-hier-nonctr.stan";
+lines <- readLines(file_path, encoding="ASCII");
+for (n in 1:length(lines)) cat(lines[n],'\n');
+```
+
+The centered parameterization of <code>alpha</code> is how the model
+was originally defined.  The centered parameterization would be coded
+in Stan as follows.
+
+```
+parameters {
+  vector[J] alpha;
+  ...
+model {
+  alpha ~ normal(mu, tau);
+```
+
+The centered parameterization mixes very poorly when the group
+observations do not tightly constrain the hierarchical parameters.
+The resulting posterior will vary greatly as <code>tau</code> varies
+and the <code>alpha</code> values depart from <code>mu</code>.
+
+The non-centered parameterization is much better behaved in such
+cases.  It uses the parameter <code>alpha_std</code> with a standard
+normal distribution and recovers <code>alpha</code> as a transformed
+parameter.
+
+```
+parameters {
+  vector[J] alpha_std;
+  ...
+transformed parameters {
+  vector[J] alpha = mu + alpha_std * tau;
+}
+model {
+  alpha_std ~ normal(0, 1);
+```
+
+The trick is that the non-centered parameterization removes the
+dependency in the prior between the low level parameters
+<code>alpha</code> and the hyperprior parameters <code>mu</code> and
+<code>tau</code>.
+
+
+### Fitting the model
+
+We can now fit the simulated model using Stan using the default
+configuration of four chains with 1000 warmup and 1000 sampling
+iterations each.
+```{r }
+library(rstan);
+rstan_options(auto_write = TRUE)
+options(mc.cores = 5);
+
+fit <- stan("norm-hier-nonctr.stan",
+            data = c("J", "N", "y"),
+            control = list(stepsize = 0.01,
+                           adapt_delta = 0.95),
+            seed = 12345,
+            refresh = 0);
+```
+
+and then print the results for the parameters of interest,
+
+```{r}
+print(fit, pars = c("mu", "tau", "sigma", "alpha"),
+      probs = c(0.1, 0.9),
+      digits = 2);
+```
+
+The fit exhibits no signs of failing to mix---all R-hat values near 1
+and all effective sample sizes near the number of posterior
+iterations.
+
+Next, we estimate the quantiles of our original simulations,
+
+```{r}
+q_hat <- function(fit) {
+  posterior_draws <- extract(fit);
+  qh <- c();
+  qh[1] <- mean(posterior_draws$mu > mu);
+  qh[2] <- mean(posterior_draws$tau > tau);
+  qh[3] <- mean(posterior_draws$sigma > sigma);
+  for (j in 1:J)
+    qh[3 + j] <- mean(posterior_draws$alpha[ , j] > alpha[j]);
+  return(qh);
+}
+```
+
+and provide the z-transform function for the fit,
+
+```{r}
+z_hat <- function(fit) {
+  return(qnorm(q_hat(fit)));
+}
+```
+
+Applied to the fit above, this yields the quantiles
+
+```{r}
+print(q_hat(fit), digits=2);
+```
+
+and the z-transformed quantiles
+
+```{r}
+print(z_hat(fit), digits=2);
+```
+
+### Replicating the simulation
+
+Now we can replicate the entire experiment 100 times and plot
+the results.
+
+```{R}
+q_hat_mu <- c();     q_hat_tau <- c();
+q_hat_sigma <- c();  q_hat_alpha1 <- c();
+
+z_hat_mu <- c();     z_hat_tau <- c();
+z_hat_sigma <- c();  z_hat_alpha1 <- c();
+
+I <- 20;
+for (i in 1:I) {
+  # simulate
+  J <- 6;
+  N <- c(33, 21, 22, 22, 24, 11);
+  mu <- rnorm(1, 5, 5);
+  tau <- abs(rnorm(1, 0, 5));
+  sigma <- abs(rnorm(1, 0, 5));
+  alpha <- rnorm(J, mu, tau);
+  y <- c();
+  begin <- 1;
+  for (j in 1:J) {
+    end <- begin + N[j] - 1;
+    y[begin:end] <- rnorm(N[j], alpha[j], sigma);
+    begin <- end + 1;
+  }
+
+  # fit
+  fit <- stan("norm-hier-nonctr.stan",
+              data = c("J", "N", "y"),
+              control = list(stepsize = 0.005,
+                             adapt_delta = 0.99),
+              iter = 5000,
+              refresh = 0);
+  draws <- extract(fit);
+
+  # need a bit of a prior here on the mean
+
+  # q_hat
+  q_hat_mu[i] <- mean(draws$mu > mu);
+  q_hat_tau[i] <- mean(draws$tau > tau);
+  q_hat_sigma[i] <- mean(draws$sigma > sigma);
+  q_hat_alpha1[i] <- mean(draws$alpha[, 1] > alpha[1]);
+
+  # z_hat
+  z_hat_mu[i] <- qnorm(q_hat_mu[i]);
+  z_hat_tau[i] <- qnorm(q_hat_tau[i]);
+  z_hat_sigma[i] <- qnorm(q_hat_sigma[i]);
+  z_hat_alpha1[i] <- qnorm(q_hat_alpha1[i]);
+}
+df_q_hat <- data.frame(q_hat_mu,    q_hat_tau,
+                       q_hat_sigma, q_hat_alpha1);
+df_z_hat <- data.frame(z_hat_mu,    z_hat_tau,
+                       z_hat_sigma, z_hat_alpha1);
+x_sq_mu = sum(z_hat_mu^2);
+x_sq_tau = sum(z_hat_tau^2);
+x_sq_sigma = sum(z_hat_sigma^2);
+x_sq_alpha1 = sum(z_hat_alpha1^2);
+
+p_mu = pchisq(x_sq_mu, I);
+p_tau = pchisq(x_sq_tau, I);
+p_sigma = pchisq(x_sq_sigma, I);
+p_alpha1 = pchisq(x_sq_alpha1, I);
+```
+
+
+# Misspecified Models and Real Data
+
+If it turns out that the data is *not* generated from the model's
+generated process, that is, if the model is misspecified, then all
+bets are off.  The posterior calibration results demonstrated in the
+first section are all conditional on using the true model to generate
+the data.
+
+
+
+
