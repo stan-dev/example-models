@@ -12,8 +12,8 @@ output:
 
 ### Abstract
 
-This case study illustrates the so-called "curse of dimensionality"
-starting from scratch and using simple example based on simulation.
+This case study illustrates the so-called "curse of dimensionality,"
+starting from scratch and using simple examples based on simulation.
 For example, generating points uniformly at random in a unit hypercube,
 it is easy to see how the average distance between random points
 increases with dimensionality.  Similarly, such points tend to
@@ -35,14 +35,12 @@ These properties of the standard normal distribution provides a segue
 into discussing the important information-theoretic concept of the
 typical set for a probability distribution, which is roughly defined
 as the central log density band into which almost all random draws
-from that distribution will fall.
-
-The rather surprising result is that for a normal distribution in high
-dimensions, the typical set does *not* include the volume around the
-mode.  The density is highest around the mode, but the volume is low,
-and the probability mass is determined as the product of the density
-and the volume (or more precisely, the integral of the density over
-the volume).
+from that distribution will fall.  The rather surprising result is
+that for a normal distribution in high dimensions, the typical set
+does *not* include the volume around the mode.  The density is highest
+around the mode, but the volume is low, and the probability mass is
+determined as the product of the density and the volume (or more
+precisely, the integral of the density over the volume).
 
 The standard normal log density is just negative squared Euclidean
 distance, which provides a straightforward demonstration of why
@@ -70,8 +68,8 @@ In words, the length of a vector is the square root of the sum of the
 squares of its elements.
 
 If we take $y = (y_1, \ldots, y_N)$ to be a row vector, then we see
-that the dot product of a vector with itself is its squared lenght,
-and length can be defined as
+that the dot product of a vector with itself is its squared length,
+so that 
 
 \[
 |\!| y |\!| = \sqrt{y \, y^{\top}}.
@@ -141,21 +139,16 @@ opposite corners at $\left( -\frac{1}{2}, -\frac{1}{2}, -\frac{1}{2}
 \right)$ and $\left( \frac{1}{2}, \frac{1}{2}, \frac{1}{2} \right)$,
 and unit volume.  And so on up the dimensions.
 
-As dimensionality grows, the number of corners increases.  There are 2
-corners in 1 dimension, 4 corners in 2 dimensions, 8 corners in 3
-dimensions, and so on---the number of corners grows exponentially.
-
-
 Now consider the biggest hypersphere you can inscribe in the
 hypercube.  It will be centered at the origin and have a radius of
 $\frac{1}{2}$ so that it extends to the sides of the hypercube.  A
 point $y$ is within this hypersphere if the distance to the origin is
-less than or equal to the radius, or in symbols, if $|\!|y|\!| <
-\frac{1}{2}$.  Topologically speaking, we have defined what is known
-as an open ball, i.e., the set of points within a hypersphere excluding the
-limit points at distance exactly $\frac{1}{2}$ (we could've worked
-with closed balls which include the limit points making up the surface
-of the ball because this surface (a hypersphere) has zero volume).
+less than the radius, or in symbols, if $|\!|y|\!| < \frac{1}{2}$.
+Topologically speaking, we have defined what is known as an open ball,
+i.e., the set of points within a hypersphere excluding the limit
+points at distance exactly $\frac{1}{2}$ (we could've worked with
+closed balls which include the limit points making up the surface of
+the ball because this surface (a hypersphere) has zero volume).
 
 In one dimension, the hypersphere is just the line from $-\frac{1}{2}$
 to $\frac{1}{2}$ and contains the entire hypercube.  In two
@@ -164,7 +157,7 @@ centered at the origin and extending to the center of all four sides.
 In three dimensions, it's a sphere that just fits in the cube,
 extending to the middle of all six sides.
 
-<div style="width:2.5in; float:right; padding: 1em; border: 2">
+<div style="width:3in; float:right; padding: 1em; border: 2">
 ![Monte Carlo Casino](img/Monte_Carlo_Casino.jpg) _<small>Monte Carlo
 Casino. From Wikipedia, with license CC BY 2.5.</small>_ </div>
 
@@ -172,9 +165,10 @@ Casino. From Wikipedia, with license CC BY 2.5.</small>_ </div>
 
 We know the volume of the unit hypercube is one, but what is the
 volume of the ball in the inscribed hypersphere?  You may have learned
-how to define an integral to calculate the answer in two dimensions as
-$\pi \frac{1}{2}^2$, and may even recall that in three dimensions it's
-$\frac{4}{3}\pi r^3$, but what about higher dimensions?  
+how to define an integral to calculate the answer for a ball of radius
+$r$ in two dimensions as $\pi r^2$, and may even recall that in three
+dimensions it's $\frac{4}{3}\pi r^3$.  But what about higher
+dimensions?
 
 We could evaluate harder and harder multiple integrals, but we'll
 instead use the need to solve these integrals as an opportunity to
@@ -193,16 +187,12 @@ assume they are random enough for our purposes in much the way we
 assume the functions we're dealing with are smooth enough).
 
 To use Monte Carlo methods to calculate the volume within a
- hypersphere inscribed in a hypercube, we need only:
-
-* generate draws at random in the hypercube the estimated volume is
-* the proportion of draws that fall in the hypersphere (i.e., are
-  within distance 0.5 from the origin).
-
-Because we deliberately constructed a hypercube of unit volume, the
-calculated proportion turns out to be the volume of the hypersphere.
-In general, we need to multiply by the volume of the set over which we
-are generating uniform random draws.  
+hypersphere inscribed in a hypercube, we need only generate draws at
+random in the hypercube and count the number of draws that fall in the
+hypersphere---our answer is the the proportion of draws that fall in
+the hypersphere.  That's because we deliberately constructed a
+hypercube of unit volume; in general, we need to multiply by the
+volume of the set over which we are generating uniform random draws.
 
 As the number of draws increases, the estimated volume converges to
 the true volume.  Because the draws are i.i.d., it follows from the
@@ -210,8 +200,8 @@ central limit theorem that the error goes down at a rate of
 $\mathcal{O}\left(  1 / \sqrt{n} \right)$.  That means each
 additional decimal place of accuracy requires multiplying the sample
 size by one hundred.  We can get rough answers with Monte Carlo
-methods, but many decimal places of accuracy requires a lot of
-simulation.  
+methods, but many decimal places of accuracy requires a prohibitive
+number of simulation draws.  
 
 We can draw the points at random from the hypercube by drawing
 each component independently according to
@@ -306,12 +296,13 @@ with more and more volume filling up the space between them."
 ## 3. Typical Sets
 
 Roughly speaking, the typical set is where draws from a given
-distribution tend to lie.  A bit more precisely, this particular
-choice of volume not only covers most of the mass of a distribution,
-its members reflect the properties of draws from that distribution.
-What we will see in this section is that the typical set is usually
-nowhere near the mode of the distribution, even for a multivariate
-normal (where the mode is the same as the mean).
+distribution tend to lie.  That is, it covers most of the mass of the
+distribution.  This particular choice of volume not only covers most
+of the mass of a distribution, its members reflect the properties of
+draws from that distribution.  What we will see in this section is
+that the typical set is usually nowhere near the mode of the
+distribution, even for a multivariate normal (where the mode is the
+same as the mean).
 
 #### A Discrete Example of Typicality
 
@@ -338,7 +329,7 @@ attempts).
 
 Then why is the most likely outcome 100 straight successes?  The
 probability of 100 straight successes is $0.8^{100}$ or about $2
-\times 10^{-10}.
+\times 10^{-10}$.
 
 In contrast, the probability of any given sequence with 80 successes
 is only $0.8^{80} \, 0.2^{20}$, or about $2 \times 10^{-22}$.  The
@@ -351,7 +342,7 @@ $10^{20}$).  So even though any given sequence of 80 success and 20
 failures is relatively improbable, there are so many such sequences
 that their overall mass is higher than that of the unique sequence
 with 100 success, because $10^{20} \times 2 \times 10^{-22}$ is a lot
-bigger than $1 \times 2 ]\times 10^{-10}$.  Same goes for sequences
+bigger than $1 \times 2 \times 10^{-10}$.  Same goes for sequences
 with 81 successes; each such sequence is more probably than any
 sequence with 80 successes, but $\binom{100}{81}$ is smaller than
 $\binom{100}{80}$.
@@ -424,13 +415,13 @@ F_Y(u)
 For discrete probability (mass) functions, this works out to
 
 \[
-F_Y(u) \ = \ \sum_{n = -\infty}^u p_Y(u),
+F_Y(u) \ = \ \sum_{y \, = \, -\infty}^u p_Y(y),
 \]
 
 and for continuous probability (density) functions,
 
 \[
-F_Y(u) = \int_{-\infty}^y p_Y(u) \, \mbox{d}u.
+F_Y(u) = \int_{-\infty}^u p_Y(y) \, \mbox{d}y.
 \]
 
 What we are going to need is the inverse CDF, $F_Y^{-1}$, or quantile
@@ -501,7 +492,7 @@ Below both of these plots is their product, the binomial probability
 mass function $\mathsf{Binomial}(y \mid N, \theta)$.  There are three
 sequences of plots, for $N = 25$, $N = 100$, and $N=400$.
 
-Just to get a sense of scale, there are $2^25$ (order $10^7$) binary
+Just to get a sense of scale, there are $2^{25}$ (order $10^7$) binary
 sequences of length 25, $2^{100}$ (order $10^{30}$) binary sequences
 of length 100, and $2^{400}$ (order $10^{120}$) binary sequences of
 length 400.
@@ -548,19 +539,19 @@ seq_plot <- function(df, logy = FALSE) {
     geom_point(size=0.4) +
     scale_x_continuous() +
     xlab("y");
-  if (logy) {
-    p <- p + scale_y_log10() +
+    if (logy) {
+      p <- p + scale_y_log10() +
            ylab("log theta^y * (1 - theta)^(N - y)") +
-          theme(axis.title.y = element_text(size=8),
-                axis.text.y=element_blank(),
-                axis.ticks.y=element_blank())
+           theme(axis.title.y = element_text(size=8),
+                 axis.text.y=element_blank(),
+                 axis.ticks.y=element_blank())
            ggtitle("plus sequence log probability ...");
-  } else {
-    p <- p + scale_y_continuous() +
+    } else {
+      p <- p + scale_y_continuous() +
            ylab("theta^y * (1 - theta)^(N - y)") +
-          theme(axis.title.y = element_text(size=8),
-                axis.text.y=element_blank(),
-                axis.ticks.y=element_blank())
+           theme(axis.title.y = element_text(size=8),
+                 axis.text.y=element_blank(),
+                 axis.ticks.y=element_blank())
            ggtitle("times sequence probability ...");
   }
   return(p);
@@ -614,6 +605,8 @@ df400 <- choose_df(0:400);
 plot_all(df400);
 ```
 
+Although it appears that way, the points are not getting heavier,
+there are just more of them in each subsequent plot.
 
 #### A Continuous Example of Typicality
 
@@ -742,7 +735,7 @@ i.i.d. standard normal draws $y = (y_1, \ldots, y_N)$, then
 \ = \
 -\frac{1}{2} yy^{\top}
 \ = \
-- |frac{1}{2} |\!| y |\!|^2
+- \frac{1}{2} |\!| y |\!|^2
 \]
 
 In words, the log density of a standard normal distribution is
@@ -993,20 +986,11 @@ value that maximizes the likelihood function,
 \mathrm{arg \, min}_{\mu} \sum_{n=1}^N \mathrm{d}(y_n, \mu)^2.
 \]
 
-The last step shows that the estimate that maximizes the likelihood is
-also the estimate that minimizes the sum of the square distances from
-the observations to the estimate of $\mu$.
-
-Removing the negation, dropping the constant factor, and converting
-from maximizing to minimizing shows that the maximum likelihood
-estimate (left hand side) is equal to the least squares estimate
-(right hand side):
-
-\[
-\mathrm{arg \, max}_{\mu} - \frac{1}{2} \, \sum_{n=1}^N \mathrm{d}(y_n, \mu)^2
-\ = \
-\mathrm{arg \, min}_{\mu} \sum_{n=1}^N \mathrm{d}(y_n, \mu)^2.
-\]
+The last step drops the negative constant multiplier, thus converting
+maximization to minimization and showing that the estimate that
+maximizes the likelihood is also the estimate that minimizes the sum
+of the square distances from the observations to the estimate of
+$\mu$.
 
 The estimate that minimizes squares is just the average of the observations,
 
@@ -1021,140 +1005,7 @@ theorem](https://en.wikipedia.org/wiki/Gauss–Markov_theorem) further
 establishes that the mean has the lowest variance among unbiased
 estimators (it also generalizes the result to linear regressions).
 
-## 7. Ensemble Methods are Doomed to Fail in High Dimensions
 
-*[Revised from [my blog
- post](http://andrewgelman.com/2017/03/15/ensemble-methods-doomed-fail-high-dimensions/)]
- on Andrew Gelman's <i>Statistical Modeling, Causal Inference, and
- Social Science</i> blog.]
-
-With an understanding of typical sets, it is clear why ensemble
-methods fail in high dimensions.  By ensemble methods, I mean
-approaches that scatter points in parameter space and then make moves
-by inteprolating or extrapolating among subsets of them.  Two
-prominent examples are the differential evolution sampler (ter Braak
-2006) and the walker sampler (Goodman and Weare 2010).
-
-#### Executive Summary of why Ensemble Methods Fail
-
-* The typical set is a thin shell a fixed radius from the mode in a
-  multivariate normal,
-
-* Interpolating or extrapolating two points in this shell
-  is unlikely to fall in this shell.
-
-* The only proposals that can be accepted will be near one of the
-  starting points.
-
-* Ensemble samplers devolve to diffusive random walks around points in
-  their ensemble.
-
-#### R Demonstration of Interpolating within the Typical Set
-
-OK, so let's see why they fail in practice.  I'm going to write some
-simple R code to do the job for us.  Here's an R function to generate
-a 100-dimensional standard isotropic normal variate (each element is
-generated normal(0, 1) independently):
-
-```{r}
-normal_rng <- function(K) rnorm(K);
-```
-
-This function computes the log density of a draw:
-
-```{r}
-normal_lpdf <- function(y) sum(dnorm(y, log=TRUE));
-```
-
-Next, we generate two draws from a 100-dimesnional version:
-
-```{r}
-K <- 100;
-y1 <- normal_rng(K);
-y2 <- normal_rng(K);
-```
-
-and then interpolate by choosing a point between them:
-
-```{r}
-lambda = 0.5;
-y12 <- lambda * y1 + (1 - lambda) * y2;
-```
-
-Now let's see what we get:
-
-```{r}
-print(normal_lpdf(y1), digits=1);
-print(normal_lpdf(y2), digits=1);
-print(normal_lpdf(y12), digits=1);
-```
-
-Hmm.  Why is the log density of the interpolated vector so much
-higher?  Given that it's a multivariate normal, the answer is that
-it's closer to the mode.  That should be a good thing, right?  No,
-it's not.  The typical set is defined as an area within "typical"
-density bounds.  When I take a random draw from a 100-dimensional
-standard normal, I expect log densities that hover between -140 and
--160 or so.  That interpolated vector y12 with a log density of -123
-<i>isn't in the typical set</i>!  It's a bad draw, even
-though it's closer to the mode.  Still confused?  Watch Michael's
-videos above.  Ironically, there's a description in the Goodman and
-Weare paper in a discussion of why they can use ensemble averages that
-also explains why their own sampler doesn't scale---the variance of
-averages is lower than the variance of individual draws; and we want
-to cover the actual posterior, not get closer to the mode.
-
-So let's put this in a little sharper perspective by simulating
-thousands of draws from a multivariate normal and thousands of draws
-interpolating between pairs of draws and plot them in two histograms.
-First, draw them and print a summary:
-
-```{r}
-lp1 <- vector();
-for (n in 1:1000) {
-  lp1[n] <- normal_lpdf(normal_rng(K));
-}
-print(summary(lp1));
-
-lp2 <- vector()
-for (n in 1:1000) {
-  lp2[n] <- normal_lpdf((normal_rng(K) + normal_rng(K))/2);
-}
-print(summary(lp2));
-```
-
-The discrepancy is even clearer with a faceted histogram.
-
-```{r}
-library(ggplot2);
-df <- data.frame(list(log_pdf = c(lp1, lp2),
-                      case=c(rep("Y1", 1000),
-                             rep("(Y1 + Y2)/2", 1000))));
-plot <- ggplot(df, aes(log_pdf)) +
-        geom_histogram(color="grey") +
-        facet_grid(case ~ .);
-plot;
-```
-
-The bottom plot shows the distribution of log densities in independent
-draws from the standard normal (these are pure Monte Carlo draws).
-The top plot shows the distribution of the log density of the vector
-resulting from interpolating two independent draws from the same
-distribution.  Obviously, the log densities of the averaged draws are
-much higher.  In other words, they are atypical of draws from the
-target standard normal density.
-
-#### How can the Ensemble Samplers Work?
-
-In the ensemble samplers, the interpolation/extrapolation step is used
-to propose a new value for the parameters.  A Metropolis-Hastings
-acceptance step is then applied to preserve detailed balance.  This
-means that this MH step must reject any proposals that are too close
-to the mode, as they are not in the typical set and shoudl thus not be
-a part of the stationary distribution of draws from the posterior.
-The result is that the ensemble elements can move, but if the proposal
-moves too far from one of the ensemble members, it'll fall outside of
-the typical set and be rejected.
 
 ## Acknowledgements
 
@@ -1162,11 +1013,6 @@ Thanks to Michael Betancourt for comments on an earlier draft of this
 paper and to the reader's of Andrew Gelman's blog for a long series of
 comments on typical sets in response to my [original post on ensemble
 methods](http://andrewgelman.com/2017/03/15/ensemble-methods-doomed-fail-high-dimensions/).
-It was also Michael who encouraged the blog post on ensemble methods;
-he made a donut in the air, pointed to two places on the doughut and
-then to the point between them where the hole would be in a real
-doughut, and said (and I paraphrase), "It's obvious ensemble methods
-won't work in high dimensions."
 
 ## References
 
@@ -1189,17 +1035,6 @@ implementations in MATLAB/Octave.
 * MacKay, David J. C.  2003.  *Information Theory, Inference and
   Learning Algorithms*. Cambridge University Press.
 
-The ensemble methods described in the post are
-
-* ter Braak, C. J. 2006. A Markov Chain Monte Carlo version of the
-  genetic algorithm Differential Evolution: easy Bayesian computing
-  for real parameter spaces. *Statistics and Computing*
-  16(3):239--249.
-
-* Goodman, J. and J. Weare. 2010. Ensemble samplers with affine
-  invariance. *Communications in Applied Mathematics and Computational
-  Science, 5(1):65--80.
-
 
 ## Exercises
 
@@ -1211,7 +1046,6 @@ likelihood estimate of $\mu$ for the model
 \[
 p(y \mid \mu) = \prod_{n=1}^N \mathsf{Normal}(y_n \mid \mu, 1)
 \]
-
 is just the average of the $y_n$ (i.e., $\mu^* = \bar{y}$, where
 $\bar{y}$ is standard notation for the average of $y$). Hint: show
 that the first derivative of the log likelihood with respect to $\mu$
@@ -1226,9 +1060,7 @@ known as the sample standard deviation, defined by
 \mathrm{sd}(y) = \sqrt{\frac{1}{N - 1} \sum_{n=1}^N (y_n - \bar{y})^2},
 \]
 with $\bar{y} = \frac{1}{N} \sum_{n=1}^N y_n$ being the average of the
-$y_n$ values.
-
-For a fixed scale $\sigma = 1$, show that the maximum likelihood
+$y_n$ values.  For a fixed scale $\sigma = 1$, show that the maximum likelihood
 estimate for a normal mean parameter is equal to the average of the
 observed $y$.
 
@@ -1282,14 +1114,11 @@ squared distance between $y$ and $\mu$ plus a constant.  In symbols,
 \mathrm{d}(y, \mu)^2 + \mathrm{constant}.
 \]
 
-1.  Using graphical plots, show how different scales affect the
-distribution of random draws from a normal distribution.
-
 1.  Show that the log density of a vector $y$ in a multivariate normal
 distribution with location $\mu$ and covariance matrix $\Sigma$ is
 half the distance between $y$ and $\mu$ in the Riemannian manifold for
 which the inverse covariance matrix $\Sigma^{-1}$ defines a metric
-tensor using the standard quadratic form,
+using the standard quadratic form,
 \[
 \mathrm{d}(y, \mu) = (y - \mu) \, \Sigma^{-1} \, (y - \mu)^{\top}.
 \]
@@ -1309,10 +1138,6 @@ with dimensions drawn as independent unit normals.  Use `qbinom` to do
 the same thing for binomial draws with an 80% chance of success to
 illustrate how atypical the all-success draw is.
 
-1.  What properties are required of a function to be well-behaved in
-the sense of having its expectation well approximated by computation
-over the typical set?
-
 1.  The smallest set by volume that contains $1 - \epsilon$ of the
 probability mass is called the highest probability set.  In a
 univariate, unimodal density, the highest probabilty set is the
@@ -1324,10 +1149,3 @@ highest probability set) quickly converges to zero.
 distribution tends toward a normal distribution as the number of
 degrees of freedom grows.
 
-1.  Check out what happens to the ensemble interpolation as (1) the
-number of dimensions K varies and (2) lambda varies within or outside
-of [0, 1].  <small>(<i>Hint: What you should see is that as lambda
-approaches 0 or 1, the draws get more and more typical, and more and
-more like random walk Metropolis with a small step size.  As
-dimensionality increases, the typical set becomes more attenuated and
-the lack of mixing becomes more pronounced.)</small>
