@@ -55,19 +55,21 @@ model {
 }
 
 generated quantities {
-  int occ_fs = occ_obs; // Number of occupied sites
-  // Number of sites observed as occupied
-  // + Number of sites occupied and not observed
+  int occ_fs;       // Number of occupied sites
+  real psi_con[R];  // prob occupied conditional on data
+  int z[R];         // occupancy indicator, 0/1
+  
   for (i in 1:R) {
-    if (sum_y[i] == 0) {
-      int z;
+    if (sum_y[i] == 0) {  // species not detected
       real psi = inv_logit(logit_psi[i]);
-      vector[T] p = inv_logit(logit_p[i])';
-
-      z = bernoulli_rng(psi);
-      for (t in 1:T)
-        z = z * (1 - bernoulli_rng(p[t]));
-      occ_fs = occ_fs + z;
+      vector[T] q = inv_logit(-logit_p[i])';  // q = 1 - p
+      real qT = prod(q[]);
+      psi_con[i] = (psi * qT) / (psi * qT + (1 - psi));
+      z[i] = bernoulli_rng(psi_con[i]);
+    } else {             // species detected at least once
+      psi_con[i] = 1;
+      z[i] = 1;
     }
   }
+  occ_fs = sum(z);
 }
