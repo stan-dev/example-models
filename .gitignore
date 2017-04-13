@@ -1,4 +1,11 @@
+# R files
 .Rproj.user
 .Rhistory
 .RData
 *.rda
+
+# jupyter notebook checkpoints
+.ipynb_checkpoints
+
+# vim swap files
+.sw[op]
