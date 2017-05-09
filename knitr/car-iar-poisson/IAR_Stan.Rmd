@@ -104,6 +104,9 @@ the density simplifies to the "pairwise difference form", which is easily evalua
 $$ f (\mathbf{w} \vert \Theta) \propto \tau^{(N−1)/2}
 exp\left( -\,\frac{1}{2} \sum_{j \sim i}( w_i − w_j)^2 \right) $$
 
+When the neighborhood graph contians disconnected subsets, term $tau^{(N−1)/2}$
+must be changed to $tau^{(N−k)/2}$ where $k$ is the number of distinct subsets.
+
 _NOTE:  this is only valid when all the regions in the adjacency matrix have at least 1 neighbor,
 i.e., all diagonal elements are strictly positive._
 
@@ -168,11 +171,6 @@ The following data, libraries, options needed for R are:
 library(rstan)  
 rstan_options(auto_write = TRUE) 
 options(mc.cores = parallel::detectCores())
-
-source("nyc_ped_subset.data.R");
-y = observed_all_2001
-x = expected_all_2001
-N = length(y)
 ```
 
 ### Stan 101:  Poisson GLM
@@ -180,6 +178,11 @@ N = length(y)
 Use R to fit a Poisson model to NYC ped tract data for 2001.
 
 ```{r glm-poisson, echo = TRUE, message = FALSE, warning = FALSE}
+source("nyc_ped_subset.data.R");
+y = observed_all_2001
+x = expected_all_2001
+N = length(y)
+
 r_glm_poisson = glm(y~x,family="poisson")
 print(r_glm_poisson)
 ```
@@ -358,8 +361,8 @@ print(m5_fit,pars=c("lp__","beta_2", "tau","sigma","mu[1]","mu[2]","mu[3]","h[1]
 traceplot(m5_fit,pars=c("lp__", "beta_2","tau","sigma","h[1]", "re_nc[1]"));
 ```
 
+### Discussion
 
-
-
-
+Due to the improper prior, IAR models are not generative; therefore we cannot create simulated data
+with which to develop and test this model.
 
