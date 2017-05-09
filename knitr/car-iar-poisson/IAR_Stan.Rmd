@@ -1,0 +1,365 @@
+---
+title: "Spatial Models in Stan: Conditional and Intrinsic Auto-Regressive Models for Areal Data"
+author: "Mitzi Morris"
+output: 
+  html_document:
+    keep_md: true
+---
+
+## Spatial Models in Stan:  Conditional and Intrinsic Auto-Regressive Models for Areal Data
+
+When data has a spatio-temporal structure and when observations from
+neighboring regions exhibit higher correlation than observations between
+distant regions,  this correlation can be accounted for using the class
+of spatial models called "CAR" models introduced by Besag and collaborators.
+This case study covers how to efficiently code these models in Stan.
+
+### Spatial Data as a Gaussian Random Field Model
+
+The following math and its notation is taken from
+"Gaussian Random Field Models for Spatial Data" by Murali Haran,
+which is Chapter 18 of the "Handbook of Markov Chain Monte Carlo".
+
+Besag (1974) shows that by encoding the neighbor relations
+between spatial regions as a lattice, results from
+the physics of lattice systems of particles
+and the Hammersly-Clifford theorem provide an equivalence between
+a local specification of the conditional distribution of each particle
+given its neighboring particles and the global specification
+of the joint distribution of all particles.
+This specification of the joint distribution via the local specification
+of the conditional distributions of the individual variables
+is a Markov random field specification.
+
+Therefore, given a set of observations taken at $n$ different subregions
+of a region with a number of dimensions $D$
+(for spatio-temporal data, the number of dimensions is usually between 1 and 4),
+spatial interactions between regions $n_i$ and $n_j$ can be modelled conditionally
+as a spatial random variable $\mathbf{w}$ as follows:
+
+- Let $w_{-i}$ denote the $n$-length vector $w$ excluding $w_i$.
+
+- We model each $w_i$ in terms of its full conditional distribution which is
+its distribution given the remaining random variables, $\mathbf{w}_{-i}$:
+$$ w_i \,\vert\, \mathbf{w}_{-i}, \Theta \sim N
+\left( \sum_{j=0}^n {c}_{ij} w_j,\kappa_i^{-1} \right),
+i= 1,\ldots,n $$
+where $c_{ij}$ describes the neighborhood structure such that  $c_{ij}$ is nonzero
+only if $i$ and $j$ are neighbors and $\kappa$ is the precision (inverse variance) parameter.
+
+The neighborhood structure of the $\kappa$ and $c_{ij}$ elements can be stored
+in an $n \times n$ matrix $Q$ where the diagonal elements
+represent each of the $n$ subregions with value $\kappa_i$
+and the off-diagonal elements contain $-\kappa_i c_{ij}$ 
+if subregions $i$ and $j$ are adjacent and 0 otherwise.
+
+#### CAR Models
+
+When the matrix $Q$ is symmetric and positive definite, this specifies a valid joint distribution,
+$$ w \,\vert\, \Theta \sim  N(0, Q^{-1}) $$
+with $\Theta$ the vector of the precision parameters.
+This provides a proper prior for a CAR model.
+However evaluation of $w$ requires computing the covariance matrix $Q^{-1}$,
+which is computationally expensive for large values of $n$.
+
+See the Stan case study 
+[Exact sparse CAR models in Stan](http://mc-stan.org/documentation/case-studies/mbjoseph-CARStan.html),
+for further discussion of this model.
+
+#### IAR Models
+
+An "intrinsic Gaussian Markov random field" (Besag and Kooperberg 1995)
+are a subclass of CAR models which have an improper prior.
+Spatial models which use this improper prior are most correctly called IAR models,
+although often they are just called CAR models.
+
+For this class of models, Q is a positive _semidefinite_ matrix.
+Usually a common precision parameter $\tau$, is assumed,
+where ${\kappa}_i = \tau$ for all $i$.
+The off-diagonals are  $-{\tau}c_{ij}$
+and the value of the $i^{th}$ diagonal element is $\sum_{j} c_{ij}$.
+
+This intrinsic GMRF model corresponds to the following conditional specification:
+
+$$ f(w_j \vert \mathbf{w}_{-i}, \tau) \sim N \left(
+\frac{ \sum_{j \in N(i)}^n w_j} {n},
+\frac{1}{n_i,\tau} \right) $$
+
+The individual spatial RV $w_j$ for region $n_j$ with neighbors $N(i)$
+is normally distributed with a mean equal to the average of its neighbors.
+The variance decreases as the number of neighbors increases.
+
+Although this is an improper prior, given data, this results in a proper posterior density.
+Computing this density in Stan is computationally tractable due to the fact that
+Stan is computing proportional densities, allowing constant terms to drop out.
+The density of the RV $\mathbf{w}$ is:
+
+$$ f (\mathbf{w} \vert \Theta) \propto \tau^{(N−1)/2}  exp(−\mathbf{w}^TQ(\tau)w) $$
+
+For subregion $n_i$, the expression $j \sim i$ denotes the set of its neighbors.
+When the value of the off-diagonal elements of Q $c_{ij}$ is 1
+if $n_i$ and $n_j$ are neighbors and 0 otherwise, 
+the density simplifies to the "pairwise difference form", which is easily evaluated:
+
+$$ f (\mathbf{w} \vert \Theta) \propto \tau^{(N−1)/2}
+exp\left( -\,\frac{1}{2} \sum_{j \sim i}( w_i − w_j)^2 \right) $$
+
+_NOTE:  this is only valid when all the regions in the adjacency matrix have at least 1 neighbor,
+i.e., all diagonal elements are strictly positive._
+
+An efficient representation of a sparse adjacency matrix for a set of $N$ subregions
+as an array of length $N$ which contains the number of neighbors for each region together
+with an $L \times 3$ array where $L$ is the number of 
+non-zero off-diagonal elements of the adjacency matrix, where the first two columns
+provide the $i,j$ region ids respectively, and the 3rd column contains the weight value $c_{ij}$.
+In the case where this value is always `-1`, the 3rd column can be omitted altogether.
+Given this data structure,
+the following fragment of a Stan program shows how to estimate
+the IAR component `h` is estimated in the model block:
+
+```
+data {
+  int<lower=1> D_W[N_regions];  // diag - num neighbors
+  int N_links; // number of non-zero entries in adj matrix
+  int<lower=1> off_diag_coords[N_links,2]; // ij coords of off-diag entries
+}
+parameters {
+  vector[N_regions] h;  // CAR
+  real<lower=0> tau;  // precision param
+}
+transformed parameters {
+  real neg_tau_div_2 = -tau / 2;
+}
+model {
+  ...
+  tau ~ normal_lpdf(0, 5);
+  for (k in 1:N_links) {   // off-diagonals
+    target += neg_tau_div_2 *
+      (-1.0) * h[off_diag_coords[k,1]] * h[off_diag_coords[k,2]];
+  }
+  for (k in 1:N_regions) { // diagonals
+    target += neg_tau_div_2 * square(h[k]) * D_W[k];
+  }
+  ...
+}
+```
+
+### Spatial Models for Areal Count Data:  Poisson-CAR and Friends
+
+Adding a CAR spatially structured error term to a multi-level GLM
+as a random-effects multi-variate Gaussian 
+provides spatial smoothing of the resulting estimates.
+For count data, e.g. incidents of disease or accidents,
+Poisson CAR models are available via R, BUGS, and JAGS
+as well as INLA (Integrated Nested Laplace Approximation)
+which is a fast alternative to MCMC.
+
+For this case study, we show how to
+create the Stan equivalent a Poisson GLM with an IAR component
+using a subset of the dataset from
+[Small-area spatiotemporal analysis of pedestrian and bicyclist injuries in New York City](https://www.ncbi.nlm.nih.gov/pubmed/25643104).
+
+#### Preliminaries
+
+All commands are run from working directory containing the data and models.
+The following data, libraries, options needed for R are:
+
+```{r loadstuff, message = FALSE, warning = FALSE}
+library(rstan)  
+rstan_options(auto_write = TRUE) 
+options(mc.cores = parallel::detectCores())
+
+source("nyc_ped_subset.data.R");
+y = observed_all_2001
+x = expected_all_2001
+N = length(y)
+```
+
+### Stan 101:  Poisson GLM
+
+Use R to fit a Poisson model to NYC ped tract data for 2001.
+
+```{r glm-poisson, echo = TRUE, message = FALSE, warning = FALSE}
+r_glm_poisson = glm(y~x,family="poisson")
+print(r_glm_poisson)
+```
+
+The Stan equivalent of `glm(y~x,family="poisson")` for `N` observations worth of data
+is in file "m1_poisson.stan":
+
+```
+data {
+  int<lower=0> N;
+  int<lower=0> y[N];
+  vector[N] x;
+}
+parameters {
+  real beta_1;
+  real beta_2;
+}
+model {
+  y ~ poisson_log(beta_1 + beta_2 * x);
+}
+generated quantities {
+  vector[N] mu = exp(beta_1 + beta_2 * x);
+}
+```
+
+To check that this model gets the same answer as the R `glm` version, we estimate
+the parameters from the data without sampling.
+
+```{r rstan-poisson-estimate, echo = TRUE, message = FALSE}
+m1_poisson = stan_model("m1_poisson.stan")
+m1_est = optimizing(m1_poisson,data=list(N,y,x))
+m1_est$par[1:2]
+```
+
+Now we fit the model using the NUTS sampler (the default sampler for Rstan):
+
+```{r rstan-poisson-fit, echo = TRUE, message = FALSE}
+m1_fit = stan("m1_poisson.stan",data=list(N,y,x))
+print(m1_fit,pars=c("beta_1","beta_2"))
+plot(m1_fit,pars=c("beta_1","beta_2"))
+traceplot(m1_fit,pars=c("lp__","beta_1","beta_2"))
+```
+
+The Stan model fits the data.
+Out of a total of 4000 draws during sampling (4 chains, 1000 draws each),
+the `Rhat` statistic indicates that the chains have converged, and 
+the number of effective samples for the slope `alpha` and intercept `beta` are OK.
+The traceplot shows good mixing of the chains.
+
+
+### Adding the IAR component
+
+We add the IAR component to the Poisson model using data structures
+and programming techniques shown above:
+
+```
+data {
+  int<lower=1> N_tracts; // number of census tracts in study
+  int<lower=0> y[N_tracts];
+  vector[N_tracts] x;
+  int<lower=1> D_W[N_tracts]; // weights == num_neighbors
+  int<lower=1> N_links; // number of non-zero entries in adj matrix
+  int<lower=1> off_diag_coords[N_links,2]; // ij coords of off-diag entries
+}
+transformed data {
+  vector[N_tracts] x_nonzero = x + 0.001;
+}
+parameters {
+  real beta_1;
+  real beta_2;
+  vector[N_tracts] h;  // CAR component
+  real<lower=0> tau;  // precision param
+}
+transformed parameters {
+  real neg_tau_div_2 = -tau / 2;
+}
+model {
+  y ~ poisson_log(h + beta_1 + beta_2 * x_nonzero);
+  beta_1 ~ normal(0, 10);
+  beta_2 ~ normal(0, 2.5);
+  tau ~ normal(0, 5);
+  for (k in 1:N_links) {   // off-diagonals
+    target += neg_tau_div_2 *
+      (-1.0) * h[off_diag_coords[k,1]] * h[off_diag_coords[k,2]];
+  }
+  for (k in 1:N_tracts) { // diagonals
+    target += neg_tau_div_2 * square(h[k]) * D_W[k];
+  }
+  target += ((N_tracts - 1) / 2.0) * log(tau);
+}
+generated quantities {
+  vector[N_tracts] mu = exp(h + beta_1 + beta_2 * x_nonzero);
+}
+```
+
+In order to run this on the NYC ped data, we restrict our attention to Brooklyn tracts only.
+The spatial information for the census tracts is obtained via the R `maptools` and `spdep` packages.
+For the Stan program, we need to create inputs:  `N_tracts`, `x`, `y`, `N_links`, `D_W`, `off_diag_coords`.
+
+First we create an `nb` object which is a list of all neighbors for each census tract.
+Each list entry is itself a list containing the relative index of the neighboring regions.
+The following R helper function takes an `nb` object which lists the neighbors for each census tract
+as a list of lists and munges this into a sparse array structure required for the
+input `off_diag_coords` in the above Stan program:
+
+```
+get_nb_off_diags = function(x) {
+     n_tracts = length(x);
+     n_links = sum(card(x));
+     idx_i = vector(mode="numeric",length=n_links);
+     idx_j = vector(mode="numeric",length=n_links);
+     idx = 1;
+     for (i in 1:n_tracts) {
+        if (x[[i]][1] != 0) {
+           for (j in 1:length(x[[i]])) {
+              idx_i[idx] = i;
+              idx_j[idx] = x[[i]][j];
+              idx = idx + 1;
+           }
+        }
+     }
+     return(cbind(idx_i,idx_j));
+}
+```
+
+The following script computes these values:
+
+```{r munge-bk, echo = TRUE, message = FALSE, warning = FALSE}
+library(maptools);  
+library(spdep);
+source("munge_data_helper.R") 
+source("nyc_ped_subset.data.R");
+
+# bk_tractIDs - in data file
+# census tracts spatial info
+nyc_all_tracts.shp<-readShapePoly("nycTracts10/nycTracts10");
+# restrict to tracts in study, reorder 
+bk_tracts <- nyc_all_tracts.shp$GEOID10 %in% bk_tractIDs;
+bk_tracts.shp <- nyc_all_tracts.shp[bk_tracts,]
+bk_tracts.shp <- bk_tracts.shp[order(bk_tracts.shp$GEOID10),]
+nb_bk = poly2nb(bk_tracts.shp);
+
+N_tracts = length(nb_bk);
+y = observed_all_2001[all_tractIDs %in% bk_tractIDs];
+x = expected_all_2001[all_tractIDs %in% bk_tractIDs];
+D_W = card(nb_bk);  
+N_links = sum(card(nb_bk));  
+off_diag_coords = get_nb_off_diags(nb_bk);
+```
+
+Now let's try to fit the model:
+
+```{r fit-poisson-car, echo = TRUE, message = FALSE}
+m4_fit = stan("m4_poisson_CAR.stan",data=list(N_tracts,y,x,D_W,N_links,off_diag_coords), iter = 6000, warmup = 5000);
+print(m4_fit,pars=c("lp__", "beta_1", "beta_2", "tau","mu[1]","mu[2]","mu[3]","h[1]","h[2]","h[3]"));
+traceplot(m4_fit,pars=c("lp__", "beta_1", "beta_2","tau","h[1]"));
+```
+
+This model fails to fit - it cannot estimate both the group-level intercept `beta_1`
+and the spatial component `h` - these provide a textbook example of non-identifiablity.
+Dropping the group-level intercept allows the model to fit:
+
+```{r fit-poisson-car-v2, echo = TRUE, message = FALSE}
+m4_v2_fit = stan("m4_v2.stan",data=list(N_tracts,y,x,D_W,N_links,off_diag_coords), iter = 6000, warmup = 5000);
+print(m4_v2_fit,pars=c("lp__","beta_2", "tau","mu[1]","mu[2]","mu[3]","h[1]","h[2]","h[3]"));
+traceplot(m4_v2_fit,pars=c("lp__","beta_2","tau","h[1]"));
+```
+
+Add in a random-effects component as well - this adds a whole lot more parameters to estimate,
+so model fitting and sampling takes noticably longer.
+
+
+```{r fit-poisson-car-re, echo = TRUE, message = FALSE}
+m5_fit = stan("m5_poisson_CAR_re_nc.stan",data=list(N_tracts,y,x,D_W,N_links,off_diag_coords), iter = 6000, warmup = 5000);
+print(m5_fit,pars=c("lp__","beta_2", "tau","sigma","mu[1]","mu[2]","mu[3]","h[1]","h[2]","h[3]"));
+traceplot(m5_fit,pars=c("lp__", "beta_2","tau","sigma","h[1]", "re_nc[1]"));
+```
+
+
+
+
+
+
