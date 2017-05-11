@@ -6,15 +6,13 @@ output:
     keep_md: true
 ---
 
-## Spatial Models in Stan:  Conditional and Intrinsic Auto-Regressive Models for Areal Data
-
 When data has a spatio-temporal structure and when observations from
 neighboring regions exhibit higher correlation than observations between
 distant regions,  this correlation can be accounted for using the class
 of spatial models called "CAR" models introduced by Besag and collaborators.
 This case study covers how to efficiently code these models in Stan.
 
-### Spatial Data as a Gaussian Random Field Model
+## Spatial Data as a Gaussian Random Field Model
 
 The following math and its notation is taken from
 "Gaussian Random Field Models for Spatial Data" by Murali Haran,
@@ -33,7 +31,8 @@ is a Markov random field specification.
 
 Therefore, given a set of observations taken at $n$ different subregions
 of a region with a number of dimensions $D$
-(for spatio-temporal data, the number of dimensions is usually between 1 and 4),
+(for spatio-temporal data, the number of dimensions is usually between 1 and 4,
+i.e., 1-3 spatial dimensions and 1 time dimension),
 spatial interactions between regions $n_i$ and $n_j$ can be modelled conditionally
 as a spatial random variable $\mathbf{w}$ as follows:
 
@@ -53,7 +52,7 @@ represent each of the $n$ subregions with value $\kappa_i$
 and the off-diagonal elements contain $-\kappa_i c_{ij}$ 
 if subregions $i$ and $j$ are adjacent and 0 otherwise.
 
-#### CAR Models
+### CAR Models
 
 When the matrix $Q$ is symmetric and positive definite, this specifies a valid joint distribution,
 $$ w \,\vert\, \Theta \sim  N(0, Q^{-1}) $$
@@ -66,7 +65,7 @@ See the Stan case study
 [Exact sparse CAR models in Stan](http://mc-stan.org/documentation/case-studies/mbjoseph-CARStan.html),
 for further discussion of this model.
 
-#### IAR Models
+### IAR Models
 
 An "intrinsic Gaussian Markov random field" (Besag and Kooperberg 1995)
 are a subclass of CAR models which have an improper prior.
@@ -85,14 +84,14 @@ $$ f(w_j \vert \mathbf{w}_{-i}, \tau) \sim N \left(
 \frac{ \sum_{j \in N(i)}^n w_j} {n},
 \frac{1}{n_i,\tau} \right) $$
 
-The individual spatial RV $w_j$ for region $n_j$ with neighbors $N(i)$
+The individual spatial random variable $w_j$ for region $n_j$ with neighbors $N(i)$
 is normally distributed with a mean equal to the average of its neighbors.
 The variance decreases as the number of neighbors increases.
 
 Although this is an improper prior, given data, this results in a proper posterior density.
 Computing this density in Stan is computationally tractable due to the fact that
 Stan is computing proportional densities, allowing constant terms to drop out.
-The density of the RV $\mathbf{w}$ is:
+The density of the random variable $\mathbf{w}$ is:
 
 $$ f (\mathbf{w} \vert \Theta) \propto \tau^{(N−1)/2}  exp(−\mathbf{w}^TQ(\tau)w) $$
 
@@ -104,8 +103,8 @@ the density simplifies to the "pairwise difference form", which is easily evalua
 $$ f (\mathbf{w} \vert \Theta) \propto \tau^{(N−1)/2}
 exp\left( -\,\frac{1}{2} \sum_{j \sim i}( w_i − w_j)^2 \right) $$
 
-When the neighborhood graph contians disconnected subsets, term $tau^{(N−1)/2}$
-must be changed to $tau^{(N−k)/2}$ where $k$ is the number of distinct subsets.
+When the neighborhood graph contians disconnected subsets, term $\tau^{(N−1)/2}$
+must be changed to $\tau^{(N−k)/2}$ where $k$ is the number of distinct subsets.
 
 _NOTE:  this is only valid when all the regions in the adjacency matrix have at least 1 neighbor,
 i.e., all diagonal elements are strictly positive._
@@ -147,7 +146,7 @@ model {
 }
 ```
 
-### Spatial Models for Areal Count Data:  Poisson-CAR and Friends
+## Spatial Models for Areal Count Data:  Poisson-CAR and Friends
 
 Adding a CAR spatially structured error term to a multi-level GLM
 as a random-effects multi-variate Gaussian 
@@ -155,19 +154,21 @@ provides spatial smoothing of the resulting estimates.
 For count data, e.g. incidents of disease or accidents,
 Poisson CAR models are available via R, BUGS, and JAGS
 as well as INLA (Integrated Nested Laplace Approximation)
-which is a fast alternative to MCMC.
+which is a fast alternative to MCMC,
+(INLA trades speed and scalability for accuracy,
+per the "no free lunch" principle).
 
 For this case study, we show how to
 create the Stan equivalent a Poisson GLM with an IAR component
 using a subset of the dataset from
 [Small-area spatiotemporal analysis of pedestrian and bicyclist injuries in New York City](https://www.ncbi.nlm.nih.gov/pubmed/25643104).
 
-#### Preliminaries
+### Preliminaries
 
 All commands are run from working directory containing the data and models.
 The following data, libraries, options needed for R are:
 
-```{r loadstuff, message = FALSE, warning = FALSE}
+```{r loadstuff, comment = NA, message = FALSE, warning = FALSE}
 library(rstan)  
 rstan_options(auto_write = TRUE) 
 options(mc.cores = parallel::detectCores())
@@ -177,7 +178,7 @@ options(mc.cores = parallel::detectCores())
 
 Use R to fit a Poisson model to NYC ped tract data for 2001.
 
-```{r glm-poisson, echo = TRUE, message = FALSE, warning = FALSE}
+```{r glm-poisson, echo = TRUE, comment = NA, message = FALSE, warning = FALSE}
 source("nyc_ped_subset.data.R");
 y = observed_all_2001
 x = expected_all_2001
@@ -211,7 +212,7 @@ generated quantities {
 To check that this model gets the same answer as the R `glm` version, we estimate
 the parameters from the data without sampling.
 
-```{r rstan-poisson-estimate, echo = TRUE, message = FALSE}
+```{r rstan-poisson-estimate, echo = TRUE, comment = NA, message = FALSE}
 m1_poisson = stan_model("m1_poisson.stan")
 m1_est = optimizing(m1_poisson,data=list(N,y,x))
 m1_est$par[1:2]
@@ -219,7 +220,7 @@ m1_est$par[1:2]
 
 Now we fit the model using the NUTS sampler (the default sampler for Rstan):
 
-```{r rstan-poisson-fit, echo = TRUE, message = FALSE}
+```{r rstan-poisson-fit, echo = TRUE, comment = NA, message = FALSE}
 m1_fit = stan("m1_poisson.stan",data=list(N,y,x))
 print(m1_fit,pars=c("beta_1","beta_2"))
 plot(m1_fit,pars=c("beta_1","beta_2"))
@@ -310,7 +311,7 @@ get_nb_off_diags = function(x) {
 
 The following script computes these values:
 
-```{r munge-bk, echo = TRUE, message = FALSE, warning = FALSE}
+```{r munge-bk, echo = TRUE, comment = NA, message = FALSE, warning = FALSE}
 library(maptools);  
 library(spdep);
 source("munge_data_helper.R") 
@@ -335,7 +336,7 @@ off_diag_coords = get_nb_off_diags(nb_bk);
 
 Now let's try to fit the model:
 
-```{r fit-poisson-car, echo = TRUE, message = FALSE}
+```{r fit-poisson-car, echo = TRUE, comment = NA, message = FALSE}
 m4_fit = stan("m4_poisson_CAR.stan",data=list(N_tracts,y,x,D_W,N_links,off_diag_coords), iter = 6000, warmup = 5000);
 print(m4_fit,pars=c("lp__", "beta_1", "beta_2", "tau","mu[1]","mu[2]","mu[3]","h[1]","h[2]","h[3]"));
 traceplot(m4_fit,pars=c("lp__", "beta_1", "beta_2","tau","h[1]"));
@@ -345,7 +346,7 @@ This model fails to fit - it cannot estimate both the group-level intercept `bet
 and the spatial component `h` - these provide a textbook example of non-identifiablity.
 Dropping the group-level intercept allows the model to fit:
 
-```{r fit-poisson-car-v2, echo = TRUE, message = FALSE}
+```{r fit-poisson-car-v2, echo = TRUE, comment = NA, message = FALSE}
 m4_v2_fit = stan("m4_v2.stan",data=list(N_tracts,y,x,D_W,N_links,off_diag_coords), iter = 6000, warmup = 5000);
 print(m4_v2_fit,pars=c("lp__","beta_2", "tau","mu[1]","mu[2]","mu[3]","h[1]","h[2]","h[3]"));
 traceplot(m4_v2_fit,pars=c("lp__","beta_2","tau","h[1]"));
@@ -355,7 +356,7 @@ Add in a random-effects component as well - this adds a whole lot more parameter
 so model fitting and sampling takes noticably longer.
 
 
-```{r fit-poisson-car-re, echo = TRUE, message = FALSE}
+```{r fit-poisson-car-re, echo = TRUE, comment = NA, message = FALSE}
 m5_fit = stan("m5_poisson_CAR_re_nc.stan",data=list(N_tracts,y,x,D_W,N_links,off_diag_coords), iter = 6000, warmup = 5000);
 print(m5_fit,pars=c("lp__","beta_2", "tau","sigma","mu[1]","mu[2]","mu[3]","h[1]","h[2]","h[3]"));
 traceplot(m5_fit,pars=c("lp__", "beta_2","tau","sigma","h[1]", "re_nc[1]"));
@@ -366,3 +367,15 @@ traceplot(m5_fit,pars=c("lp__", "beta_2","tau","sigma","h[1]", "re_nc[1]"));
 Due to the improper prior, IAR models are not generative; therefore we cannot create simulated data
 with which to develop and test this model.
 
+#### Licenses
+
+<small>
+**Code:** Copyright (2017) Columbia University.  Released under the
+[BSD 3-clause license](https://opensource.org/licenses/BSD-3-Clause).
+</small>
+
+<small>
+**Text:** Copyright (2017) Mitzi Morris.  Released under the
+the [CC BY-NC 4.0
+license](https://creativecommons.org/licenses/by-nc/4.0/).
+</small>
