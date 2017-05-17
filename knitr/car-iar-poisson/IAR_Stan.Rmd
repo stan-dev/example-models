@@ -46,13 +46,15 @@ i= 1,\ldots,n $$
 where $c_{ij}$ describes the neighborhood structure such that  $c_{ij}$ is nonzero
 only if $i$ and $j$ are neighbors and $\kappa$ is the precision (inverse variance) parameter.
 
+### CAR Models
+
 The neighborhood structure of the $\kappa$ and $c_{ij}$ elements can be stored
 in an $n \times n$ matrix $Q$ where the diagonal elements
 represent each of the $n$ subregions with value $\kappa_i$
 and the off-diagonal elements contain $-\kappa_i c_{ij}$ 
 if subregions $i$ and $j$ are adjacent and 0 otherwise.
-
-### CAR Models
+Usually a common precision parameter $\tau$, is assumed,
+where ${\kappa}_i = \tau$ for all $i$.
 
 When the matrix $Q$ is symmetric and positive definite, this specifies a valid joint distribution,
 $$ w \,\vert\, \Theta \sim  N(0, Q^{-1}) $$
@@ -71,13 +73,9 @@ An "intrinsic Gaussian Markov random field" (Besag and Kooperberg 1995)
 are a subclass of CAR models which have an improper prior.
 Spatial models which use this improper prior are most correctly called IAR models,
 although often they are just called CAR models.
-
 For this class of models, Q is a positive _semidefinite_ matrix.
-Usually a common precision parameter $\tau$, is assumed,
-where ${\kappa}_i = \tau$ for all $i$.
-The off-diagonals are  $-{\tau}c_{ij}$
-and the value of the $i^{th}$ diagonal element is $\sum_{j} c_{ij}$.
-
+The off-diagonals of Q are  $-{\tau} c_{ij}$
+and the value of the $i^{th}$ diagonal element is $\tau \sum_{j} c_{ij}$.
 This intrinsic GMRF model corresponds to the following conditional specification:
 
 $$ f(w_j \vert \mathbf{w}_{-i}, \tau) \sim N \left(
@@ -93,21 +91,13 @@ Computing this density in Stan is computationally tractable due to the fact that
 Stan is computing proportional densities, allowing constant terms to drop out.
 The density of the random variable $\mathbf{w}$ is:
 
-$$ f (\mathbf{w} \vert \Theta) \propto \tau^{(N−1)/2}  exp(−\mathbf{w}^TQ(\tau)w) $$
-
-For subregion $n_i$, the expression $j \sim i$ denotes the set of its neighbors.
-When the value of the off-diagonal elements of Q $c_{ij}$ is 1
-if $n_i$ and $n_j$ are neighbors and 0 otherwise, 
-the density simplifies to the "pairwise difference form", which is easily evaluated:
-
-$$ f (\mathbf{w} \vert \Theta) \propto \tau^{(N−1)/2}
-exp\left( -\,\frac{1}{2} \sum_{j \sim i}( w_i − w_j)^2 \right) $$
+$$ f (\mathbf{w} \vert \Theta) \propto \tau^{(N−1)/2}  exp(−\mathbf{w}^TQ(\tau)\mathbf{w}) $$
 
 When the neighborhood graph contians disconnected subsets, term $\tau^{(N−1)/2}$
 must be changed to $\tau^{(N−k)/2}$ where $k$ is the number of distinct subsets.
 
 _NOTE:  this is only valid when all the regions in the adjacency matrix have at least 1 neighbor,
-i.e., all diagonal elements are strictly positive._
+that is, for all subregions $n_i$, the set $j \sim i$ is non-empty._
 
 An efficient representation of a sparse adjacency matrix for a set of $N$ subregions
 as an array of length $N$ which contains the number of neighbors for each region together
@@ -115,20 +105,27 @@ with an $L \times 3$ array where $L$ is the number of
 non-zero off-diagonal elements of the adjacency matrix, where the first two columns
 provide the $i,j$ region ids respectively, and the 3rd column contains the weight value $c_{ij}$.
 In the case where this value is always `-1`, the 3rd column can be omitted altogether.
-Given this data structure,
-the following fragment of a Stan program shows how to estimate
-the IAR component `h` is estimated in the model block:
 
+The following Stan program fragments shows how to compute this in Stan.
+The sparse adjacency matrix is passed in as data:
 ```
 data {
   int<lower=1> D_W[N_regions];  // diag - num neighbors
   int N_links; // number of non-zero entries in adj matrix
   int<lower=1> off_diag_coords[N_links,2]; // ij coords of off-diag entries
 }
+```
+The IAR spatial component parameters are:
+```
 parameters {
   vector[N_regions] h;  // CAR
   real<lower=0> tau;  // precision param
 }
+```
+The model block computes $\tau^{(N−1)/2}  exp(−\mathbf{w}^TQ(\tau)\mathbf{w})$.
+The diagonal and off-diagonal elements are stored seperately,
+and therefore computed seperately:
+```
 transformed parameters {
   real neg_tau_div_2 = -tau / 2;
 }
