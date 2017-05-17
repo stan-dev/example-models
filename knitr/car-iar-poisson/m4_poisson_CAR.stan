@@ -12,7 +12,7 @@ transformed data {
 parameters {
   real beta_1;
   real beta_2;
-  vector[N_tracts] h;  // CAR component
+  vector[N_tracts] h;  // individual-level spatial effect (CAR)
   real<lower=0> tau;  // precision param
 }
 transformed parameters {

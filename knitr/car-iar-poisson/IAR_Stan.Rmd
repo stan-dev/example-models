@@ -118,11 +118,13 @@ data {
 The IAR spatial component parameters are:
 ```
 parameters {
-  vector[N_regions] h;  // CAR
+  vector[N_regions] h;  // individual-level spatial effect (CAR)
   real<lower=0> tau;  // precision param
 }
 ```
-The model block computes $\tau^{(N−1)/2}  exp(−\mathbf{w}^TQ(\tau)\mathbf{w})$.
+
+Stan computes the log density, i.e.,
+${(N−1)/2}\tau + (−\mathbf{w}^TQ(\tau)\mathbf{w})$.
 The diagonal and off-diagonal elements are stored seperately,
 and therefore computed seperately:
 ```
@@ -139,7 +141,7 @@ model {
   for (k in 1:N_regions) { // diagonals
     target += neg_tau_div_2 * square(h[k]) * D_W[k];
   }
-  ...
+  target += ((N_tracts - 1) / 2.0) * log(tau);
 }
 ```
 
@@ -166,10 +168,53 @@ All commands are run from working directory containing the data and models.
 The following data, libraries, options needed for R are:
 
 ```{r loadstuff, comment = NA, message = FALSE, warning = FALSE}
+library(maptools);  
+library(spdep);
+library(dplyr) 
+library(ggplot2) 
+
 library(rstan)  
 rstan_options(auto_write = TRUE) 
 options(mc.cores = parallel::detectCores())
 ```
+
+### Data
+
+Sample data is in file `nyc_ped_subset.data.R` which contains
+census tract id, the count of observed accidents per tract
+and the population-adjusted rate of expected accidents per tract.
+Spatial information is in a set of files in directory `nycTracts10`.
+
+We use R packages `maptools`, `spdep`, and `ggplot2`
+to manipulate and plot spatial relationships.
+First we plot the observed data and the population-adjusted exposure:
+
+```{r nyc-data, echo = TRUE, comment = NA, message = FALSE, warning = FALSE}
+# bk_tractIDs - in data file
+source("nyc_ped_subset.data.R");
+
+# census tracts spatial info
+nyc_all_tracts.shp<-readShapePoly("nycTracts10/nycTracts10");
+# restrict to tracts in study, reorder 
+bk_tracts <- nyc_all_tracts.shp$GEOID10 %in% bk_tractIDs;
+bk_tracts.shp <- nyc_all_tracts.shp[bk_tracts,]
+bk_tracts.shp <- bk_tracts.shp[order(bk_tracts.shp$GEOID10),]
+bkfort <- fortify(bk_tracts.shp, region="GEOID10")
+
+# plot observerd accidents
+bk_observed = observed_all_2001[bk_tracts]
+df1 = data.frame(bk_tractIDs,bk_observed)
+p1 = left_join(bkfort,df1,by=c("id" = "bk_tractIDs"))
+ggplot() + geom_polygon(data=p1, aes(x=long, y=lat, group=group,fill=bk_observed)) + coord_map() + coord_fixed()  + scale_fill_gradientn(colors=blues9, limits=c(0,50))
+
+
+# plot population-adjusted-rate for brooklyn
+bk_expected = expected_all_2001[bk_tracts]
+df2 = data.frame(bk_tractIDs,bk_expected)
+p2 = left_join(bkfort,df2,by=c("id" = "bk_tractIDs"))
+ggplot() + geom_polygon(data=p2, aes(x=long, y=lat, group=group, fill=bk_expected)) + coord_map() + coord_fixed()  + scale_fill_gradientn(colors=blues9, limits=c(0,50))
+```
+
 
 ### Stan 101:  Poisson GLM
 
@@ -251,7 +296,7 @@ transformed data {
 parameters {
   real beta_1;
   real beta_2;
-  vector[N_tracts] h;  // CAR component
+  vector[N_tracts] h;  // individual-level spatial effect (CAR)
   real<lower=0> tau;  // precision param
 }
 transformed parameters {
@@ -306,23 +351,12 @@ get_nb_off_diags = function(x) {
 }
 ```
 
-The following script computes these values:
+The following sequence of R commands creates these inputs
+for the Brooklyn subset of the data:
 
 ```{r munge-bk, echo = TRUE, comment = NA, message = FALSE, warning = FALSE}
-library(maptools);  
-library(spdep);
 source("munge_data_helper.R") 
-source("nyc_ped_subset.data.R");
-
-# bk_tractIDs - in data file
-# census tracts spatial info
-nyc_all_tracts.shp<-readShapePoly("nycTracts10/nycTracts10");
-# restrict to tracts in study, reorder 
-bk_tracts <- nyc_all_tracts.shp$GEOID10 %in% bk_tractIDs;
-bk_tracts.shp <- nyc_all_tracts.shp[bk_tracts,]
-bk_tracts.shp <- bk_tracts.shp[order(bk_tracts.shp$GEOID10),]
 nb_bk = poly2nb(bk_tracts.shp);
-
 N_tracts = length(nb_bk);
 y = observed_all_2001[all_tractIDs %in% bk_tractIDs];
 x = expected_all_2001[all_tractIDs %in% bk_tractIDs];
@@ -357,6 +391,14 @@ so model fitting and sampling takes noticably longer.
 m5_fit = stan("m5_poisson_CAR_re_nc.stan",data=list(N_tracts,y,x,D_W,N_links,off_diag_coords), iter = 6000, warmup = 5000);
 print(m5_fit,pars=c("lp__","beta_2", "tau","sigma","mu[1]","mu[2]","mu[3]","h[1]","h[2]","h[3]"));
 traceplot(m5_fit,pars=c("lp__", "beta_2","tau","sigma","h[1]", "re_nc[1]"));
+
+# plot smoothed estimates
+mnames <- paste("mu[",c(1:709),"]")
+mu_samples <- as.data.frame(m5_fit,pars=mnames)
+mean_spatial_smoothed_exposure <- apply(mu_samples,2,mean)
+df3 = data.frame(bk_tractIDs,mean_spatial_smoothed_exposure)
+p3 = left_join(bkfort,df3,by=c("id" = "bk_tractIDs"))
+ggplot() + geom_polygon(data=p3, aes(x=long, y=lat, group=group, fill=mean_spatial_smoothed_exposure)) + coord_map() + coord_fixed() + scale_fill_gradientn(colors=blues9, limits=c(0,50))
 ```
 
 ### Discussion

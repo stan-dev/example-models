@@ -13,7 +13,7 @@ parameters {
   real beta_2;
   vector[N_tracts] re_nc;  // individual-level random effect
   real<lower=0> sigma;   // scale of random effect
-  vector[N_tracts] h;  // CAR component
+  vector[N_tracts] h;  // individual-level spatial effect (CAR)
   real<lower=0> tau;  // precision param
 }
 transformed parameters {
