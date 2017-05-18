@@ -3,7 +3,7 @@ title: "Spatial Models in Stan: Conditional and Intrinsic Auto-Regressive Models
 author: "Mitzi Morris"
 output: 
   html_document:
-    keep_md: true
+    keep_md: false
 ---
 
 When data has a spatio-temporal structure and when observations from
@@ -181,13 +181,15 @@ options(mc.cores = parallel::detectCores())
 ### Data
 
 Sample data is in file `nyc_ped_subset.data.R` which contains
-census tract id, the count of observed accidents per tract
-and the population-adjusted rate of expected accidents per tract.
+census tract id, the count of events per tract
+and the population-adjusted mortality rate per tract.
 Spatial information is in a set of files in directory `nycTracts10`.
 
 We use R packages `maptools`, `spdep`, and `ggplot2`
 to manipulate and plot spatial relationships.
-First we plot the observed data and the population-adjusted exposure:
+We make two plots of the Brooklyn census tracts in the study:
+the observed event counts and the mortality rate.
+Note that some Brooklyn census tracts are not in the study.
 
 ```{r nyc-data, echo = TRUE, comment = NA, message = FALSE, warning = FALSE}
 # bk_tractIDs - in data file
@@ -201,18 +203,17 @@ bk_tracts.shp <- nyc_all_tracts.shp[bk_tracts,]
 bk_tracts.shp <- bk_tracts.shp[order(bk_tracts.shp$GEOID10),]
 bkfort <- fortify(bk_tracts.shp, region="GEOID10")
 
-# plot observerd accidents
-bk_observed = observed_all_2001[bk_tracts]
-df1 = data.frame(bk_tractIDs,bk_observed)
+# plot events
+bk_events = events_all_2001[bk_tracts]
+df1 = data.frame(bk_tractIDs,bk_events)
 p1 = left_join(bkfort,df1,by=c("id" = "bk_tractIDs"))
-ggplot() + geom_polygon(data=p1, aes(x=long, y=lat, group=group,fill=bk_observed)) + coord_map() + coord_fixed()  + scale_fill_gradientn(colors=blues9, limits=c(0,50))
+ggplot() + geom_polygon(data=p1, aes(x=long, y=lat, group=group,fill=bk_events)) + coord_map() + coord_fixed()  + scale_fill_gradientn(colors=blues9, limits=c(0,50))
 
-
-# plot population-adjusted-rate for brooklyn
-bk_expected = expected_all_2001[bk_tracts]
-df2 = data.frame(bk_tractIDs,bk_expected)
+# plot rate
+bk_rate = rate_all_2001[bk_tracts]
+df2 = data.frame(bk_tractIDs,bk_rate)
 p2 = left_join(bkfort,df2,by=c("id" = "bk_tractIDs"))
-ggplot() + geom_polygon(data=p2, aes(x=long, y=lat, group=group, fill=bk_expected)) + coord_map() + coord_fixed()  + scale_fill_gradientn(colors=blues9, limits=c(0,50))
+ggplot() + geom_polygon(data=p2, aes(x=long, y=lat, group=group, fill=bk_rate)) + coord_map() + coord_fixed()  + scale_fill_gradientn(colors=blues9, limits=c(0,50))
 ```
 
 
@@ -222,8 +223,8 @@ Use R to fit a Poisson model to NYC ped tract data for 2001.
 
 ```{r glm-poisson, echo = TRUE, comment = NA, message = FALSE, warning = FALSE}
 source("nyc_ped_subset.data.R");
-y = observed_all_2001
-x = expected_all_2001
+y = events_all_2001
+x = rate_all_2001
 N = length(y)
 
 r_glm_poisson = glm(y~x,family="poisson")
@@ -279,7 +280,7 @@ The traceplot shows good mixing of the chains.
 ### Adding the IAR component
 
 We add the IAR component to the Poisson model using data structures
-and programming techniques shown above:
+and programming techniques shown above, file `m4_poisson.stan`
 
 ```
 data {
@@ -289,9 +290,6 @@ data {
   int<lower=1> D_W[N_tracts]; // weights == num_neighbors
   int<lower=1> N_links; // number of non-zero entries in adj matrix
   int<lower=1> off_diag_coords[N_links,2]; // ij coords of off-diag entries
-}
-transformed data {
-  vector[N_tracts] x_nonzero = x + 0.001;
 }
 parameters {
   real beta_1;
@@ -303,7 +301,7 @@ transformed parameters {
   real neg_tau_div_2 = -tau / 2;
 }
 model {
-  y ~ poisson_log(h + beta_1 + beta_2 * x_nonzero);
+  y ~ poisson_log(h + beta_1 + beta_2 * x);
   beta_1 ~ normal(0, 10);
   beta_2 ~ normal(0, 2.5);
   tau ~ normal(0, 5);
@@ -317,8 +315,10 @@ model {
   target += ((N_tracts - 1) / 2.0) * log(tau);
 }
 generated quantities {
-  vector[N_tracts] mu = exp(h + beta_1 + beta_2 * x_nonzero);
+  vector[N_tracts] mu = exp(h + beta_1 + beta_2 * x);
 }
+
+
 ```
 
 In order to run this on the NYC ped data, we restrict our attention to Brooklyn tracts only.
@@ -358,8 +358,8 @@ for the Brooklyn subset of the data:
 source("munge_data_helper.R") 
 nb_bk = poly2nb(bk_tracts.shp);
 N_tracts = length(nb_bk);
-y = observed_all_2001[all_tractIDs %in% bk_tractIDs];
-x = expected_all_2001[all_tractIDs %in% bk_tractIDs];
+y = events_all_2001[all_tractIDs %in% bk_tractIDs];
+x = rate_all_2001[all_tractIDs %in% bk_tractIDs];
 D_W = card(nb_bk);  
 N_links = sum(card(nb_bk));  
 off_diag_coords = get_nb_off_diags(nb_bk);
@@ -392,13 +392,13 @@ m5_fit = stan("m5_poisson_CAR_re_nc.stan",data=list(N_tracts,y,x,D_W,N_links,off
 print(m5_fit,pars=c("lp__","beta_2", "tau","sigma","mu[1]","mu[2]","mu[3]","h[1]","h[2]","h[3]"));
 traceplot(m5_fit,pars=c("lp__", "beta_2","tau","sigma","h[1]", "re_nc[1]"));
 
-# plot smoothed estimates
+# plot spatially smoothed rates for bk census tracts
 mnames <- paste("mu[",c(1:709),"]")
 mu_samples <- as.data.frame(m5_fit,pars=mnames)
-mean_spatial_smoothed_exposure <- apply(mu_samples,2,mean)
-df3 = data.frame(bk_tractIDs,mean_spatial_smoothed_exposure)
+mean_spatial_rate <- apply(mu_samples,2,mean)
+df3 = data.frame(bk_tractIDs,mean_spatial_rate)
 p3 = left_join(bkfort,df3,by=c("id" = "bk_tractIDs"))
-ggplot() + geom_polygon(data=p3, aes(x=long, y=lat, group=group, fill=mean_spatial_smoothed_exposure)) + coord_map() + coord_fixed() + scale_fill_gradientn(colors=blues9, limits=c(0,50))
+ggplot() + geom_polygon(data=p3, aes(x=long, y=lat, group=group, fill=mean_spatial_rate)) + coord_map() + coord_fixed() + scale_fill_gradientn(colors=blues9, limits=c(0,50))
 ```
 
 ### Discussion

@@ -6,9 +6,6 @@ data {
   int<lower=1> N_links; // number of non-zero entries in adj matrix
   int<lower=1> off_diag_coords[N_links,2]; // ij coords of off-diag entries
 }
-transformed data {
-  vector[N_tracts] x_nonzero = x + 0.001;
-}
 parameters {
   real beta_1;
   real beta_2;
@@ -19,7 +16,7 @@ transformed parameters {
   real neg_tau_div_2 = -tau / 2;
 }
 model {
-  y ~ poisson_log(h + beta_1 + beta_2 * x_nonzero);
+  y ~ poisson_log(h + beta_1 + beta_2 * x);
   beta_1 ~ normal(0, 10);
   beta_2 ~ normal(0, 2.5);
   tau ~ normal(0, 5);
@@ -33,7 +30,7 @@ model {
   target += ((N_tracts - 1) / 2.0) * log(tau);
 }
 generated quantities {
-  vector[N_tracts] mu = exp(h + beta_1 + beta_2 * x_nonzero);
+  vector[N_tracts] mu = exp(h + beta_1 + beta_2 * x);
 }
 
 
