@@ -1,0 +1,22 @@
+\begin{thebibliography}{1}
+\providecommand{\url}[1]{\texttt{#1}}
+\providecommand{\urlprefix}{URL }
+
+\bibitem{stan}
+Carpenter, B., Gelman, A., Hoffman, M., Lee, D., Goodrich, B., Betancourt, M.,
+  Brubaker, M.A., Guo, J., Li, P. and Riddel, A.
+\newblock Stan: A probablistic programming language.
+\newblock \emph{Journal of Statistical Software (in press)}  (2016).
+
+\bibitem{matrixExp}
+Moler, C. and Van~Loan, C.
+\newblock Nineteen dubious ways to compute the exponential of a matrix,
+  twenty-five years later.
+\newblock \emph{SIAM Review}  (2003).
+
+\bibitem{2364}
+Friberg, L.E. and Karlsson, M.O.
+\newblock Mechanistic models for myelosuppression.
+\newblock \emph{Invest New Drugs} \textbf{21} (2003):183--194.
+
+\end{thebibliography}
