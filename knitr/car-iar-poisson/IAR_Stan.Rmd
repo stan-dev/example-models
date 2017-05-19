@@ -9,7 +9,8 @@ output:
 When data has a spatio-temporal structure and when observations from
 neighboring regions exhibit higher correlation than observations between
 distant regions,  this correlation can be accounted for using the class
-of spatial models called "CAR" models introduced by Besag and collaborators.
+of spatial models called "CAR" models (Conditional Auto-Regressive)
+introduced by Besag and collaborators.
 This case study covers how to efficiently code these models in Stan.
 
 ## Spatial Data as a Gaussian Random Field Model
@@ -69,10 +70,13 @@ for further discussion of this model.
 
 ### IAR Models
 
-An "intrinsic Gaussian Markov random field" (Besag and Kooperberg 1995)
-are a subclass of CAR models which have an improper prior.
+Intrisic Auto-Regressive models are 
+intrinsic Gaussian Markov random fields,
+(see Besag and Kooperberg 1995).
+They are a subclass of CAR models which have an improper prior.
 Spatial models which use this improper prior are most correctly called IAR models,
 although often they are just called CAR models.
+
 For this class of models, Q is a positive _semidefinite_ matrix.
 The off-diagonals of Q are  $-{\tau} c_{ij}$
 and the value of the $i^{th}$ diagonal element is $\tau \sum_{j} c_{ij}$.
@@ -92,7 +96,7 @@ Stan is computing proportional densities, allowing constant terms to drop out;
 among these is the term which requires computation of the determinant of this matrix.
 The density of the random variable $\mathbf{w}$ is:
 
-$$ f (\mathbf{w} \vert \Theta) \propto \tau^{(N−1)/2}  exp(−\mathbf{w}^TQ(\tau)\mathbf{w}) $$
+$$ f (\mathbf{w} \vert \Theta) \propto \tau^{(N−1)/2}  \exp(−\mathbf{w}^TQ(\tau)\mathbf{w}) $$
 
 When the neighborhood graph contains disconnected subsets, term $\tau^{(N−1)/2}$
 must be changed to $\tau^{(N−k)/2}$ where $k$ is the number of distinct subsets.
