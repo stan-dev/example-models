@@ -30,6 +30,7 @@ model {
 }
 generated quantities {
   vector[N_tracts] mu = exp(beta_2 * x + h);
+  vector[N_tracts] SMRhat = 100.0 * mu ./ x;
 }
 
 

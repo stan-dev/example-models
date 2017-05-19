@@ -1,7 +1,7 @@
 data {
   int<lower=0> N;
   int<lower=0> y[N];
-  vector[N] x;
+  vector<lower=0>[N] x;
 }
 parameters {
   real beta_1;
