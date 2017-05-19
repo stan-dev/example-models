@@ -1,3 +1,5 @@
+// model doesn't fit
+// group-level slope and intercept plus individual random effects
 data {
   int<lower=0> N;
   int<lower=0> y[N];

@@ -10,7 +10,7 @@ parameters {
 model {
   y ~ poisson_log(beta_1 + beta_2 * x);
   beta_1 ~ normal(0,10);
-  beta_2 ~ normal(0,2);
+  beta_2 ~ normal(0,2.5);
 }
 generated quantities {
   vector[N] mu = exp(beta_1 + beta_2 * x);
