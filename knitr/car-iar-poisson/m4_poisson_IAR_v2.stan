@@ -12,7 +12,7 @@ parameters {
   real<lower=0> tau;  // precision param
 }
 transformed parameters {
-  real neg_tau_div_2 = -tau / 2;
+  real neg_tau_div_2 = -tau * 0.5;
 }
 model {
   real off_diag_weight = -1.0;
@@ -23,10 +23,10 @@ model {
     target += neg_tau_div_2 * square(h[i]) * diag_weights[i];
   }
   for (j in 1:N_links) {   // off-diagonals
-    target += neg_tau_div_2 *
-    h[off_diag_coords[j,1]] * h[off_diag_coords[j,2]] * off_diag_weight;
+    target += neg_tau_div_2
+              * h[off_diag_coords[j,1]] * h[off_diag_coords[j,2]] * off_diag_weight;
   }
-  target += ((N_tracts - 1) / 2.0) * log(tau);
+  target += ((N_tracts - 1) * 0.5) * log(tau);
 }
 generated quantities {
   vector[N_tracts] mu = exp(beta_2 * x + h);
