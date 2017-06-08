@@ -70,15 +70,16 @@ for further discussion of this model.
 
 ### IAR Models
 
-Intrisic Auto-Regressive models are 
+Intrinsic Auto-Regressive models are 
 intrinsic Gaussian Markov random fields,
 (see Besag and Kooperberg 1995).
 They are a subclass of CAR models which have an improper prior.
 Spatial models which use this improper prior are most correctly called IAR models,
-although often they are just called CAR models.
+but the distinction between CAR and IAR models is often not made,
+especially in software packages which implement these models.
 
-For this class of models, Q is a positive _semidefinite_ matrix.
-The off-diagonals of Q are  $-{\tau} c_{ij}$
+For this class of models, $Q$ is a positive _semidefinite_ matrix.
+The off-diagonals of $Q$ are  $-{\tau} c_{ij}$
 and the value of the $i^{th}$ diagonal element is $\tau \sum_{j} c_{ij}$.
 This intrinsic GMRF model corresponds to the following conditional specification:
 
@@ -104,18 +105,29 @@ must be changed to $\tau^{(N−k)/2}$ where $k$ is the number of distinct subset
 _NOTE:  this is only valid when all the regions in the adjacency matrix have at least 1 neighbor,
 that is, for all subregions $n_i$, the set $j \sim i$ is non-empty._
 
+On the log scale, this is computed as:
+
+$$\frac{(N−1)}{2}log(\tau) + −\mathbf{w}^TQ(\tau)\mathbf{w}$$
+
+Although the computation of the matrix determinant has been eliminated, we still
+need to do matrix multiplication.
 An efficient representation of a sparse adjacency matrix for a set of $N$ subregions
 is:
 
-- an array of length $N$ which contains the number of neighbors for each region
+- an array of length $N$ which contains the number of neighbors for each region;
+this is used to compute the diagonal elements of $Q$.
 
 - an $L \times 3$ array where $L$ is the number of the non-zero off-diagonal elements of the adjacency matrix.
 The first two columns provide the $i,j$ region ids respectively, and the 3rd column contains
 the value $c_{ij}$, (the weight contributed by this neighbor).
-In the case where this value is always `-1`, the 3rd column can be omitted altogether.
+This 3rd column can be omitted altogether when all weights are the same.
 
 The following Stan program fragments shows how to compute this in Stan.
-The sparse adjacency matrix is passed in as data:
+
+The sparse adjacency matrix is passed in as data.
+The diagonal and off-diagonal elements are stored separately.
+Since all off-diagonal values in the adjacency matrix are -1,
+we only need to store the $i,j$ coordinates of the off-diagonal elements:
 ```
 data {
   int<lower=1> diag_weights[N_regions];  // weights == num_neighbors
@@ -130,21 +142,19 @@ parameters {
   real<lower=0> tau;  // precision param
 }
 ```
-
-Stan computes the log density, i.e.,
-$\frac{(N−1)}{2}log(\tau) + −\mathbf{w}^TQ(\tau)\mathbf{w}$.
-The diagonal and off-diagonal elements are stored separately,
-and therefore computed separately.
-Because all off-diagonal values in the adjacency matrix are -1,
-we specify this value directly as part of the model:
+Stan computes the contribution of 
+$\frac{(N−1)}{2}log(\tau) + −\mathbf{w}^TQ(\tau)\mathbf{w}$
+to the log density as shown below.
+The diagonal and off-diagonal elements are computed separately.
+The weight of the off-diagonal elements is always -1.
 ```
 transformed parameters {
-  real neg_tau_div_2 = -tau / 2;
+  real neg_tau_div_2 = -tau * 0.5;
 }
 model {
   real off_diag_weight = -1.0;
   ...
-  tau ~ normal(0, 5);
+  target += ((N_tracts - 1) / 2.0) * log(tau);
   for (i in 1:N_tracts) { // diagonals
     target += neg_tau_div_2 * square(h[i]) * diag_weights[i];
   }
@@ -152,14 +162,13 @@ model {
     target += neg_tau_div_2 *
     h[off_diag_coords[j,1]] * h[off_diag_coords[j,2]] * off_diag_weight;
   }
-  target += ((N_tracts - 1) / 2.0) * log(tau);
   ...
 }
 ```
 
-## Spatial Models for Areal Count Data:  Poisson-CAR and Friends
+## Multi-level Poisson GLMs for Areal Count Data
 
-Adding the CAR (or IAR) spatially structured error term to a multi-level GLM
+Adding a CAR (or IAR) spatially structured error term to a multi-level GLM
 as a random-effects multi-variate Gaussian 
 provides spatial smoothing of the resulting estimates.
 For count data, e.g. incidents of disease or accidents,
@@ -169,139 +178,256 @@ which is a fast alternative to MCMC,
 (INLA trades speed and scalability for accuracy,
 per the "no free lunch" principle).
 
-For this case study, we show how to
-create the Stan equivalent a Poisson GLM with an IAR component
-using a subset of the dataset from
-[Small-area spatiotemporal analysis of pedestrian and bicyclist injuries in New York City](https://www.ncbi.nlm.nih.gov/pubmed/25643104).
+### The Besag York Mollié Model
+
+A commonly-used model in biostatistical and epidemiology used for count data
+is a lognormal Poisson model proposed in Besag York Mollié 1991, which
+includes both an IAR component for spatial smoothing as well as an
+ordinary random-effects component for non-spatial heterogeneity.
+Banerjee Carlin and Gelfand 2003, section 5.4, provides a good discussion
+this model and its difficulties, together with a WinBUGS implementation (Figure 5.11),
+which they use to fit the Scottish lip cancer dataset from Clayton and Kaldor 1987.
+Their formulation of the Besag York Mollié model is:
+
+$$ Y_i\, |\, {\psi}_i \sim Poisson ( E_i,e^{\psi_i}) , $$
+$$ where\ \ {\psi}_i = {x'}_i\, \beta + \theta_i + \phi_i$$
+
+The ${x'}_i$ are the explanatory spatial covariates having parameter coefficients \beta.
+The $\theta_i$ are the ordinary random-effects components.
+The $\phi_i$ is an IAR spatial component.
+
+As noted above, the IAR prior is an improper prior.
+Besag and Kooperberg 1995 show that the IAR prior is a
+_pairwise difference prior_ which is identified up to
+an additive constant.
+Thus, models which include both the IAR prior and an intercept term are non-identifiable.
+Constraining the random effects to sum to zero
+and specifying a separate intercept term with a location invariant Uniform($-\infty$, $+\infty$)
+prior is equivalent to the unconstrained parameterization with no separate intercept. 
+WinBUGS 1.4 includes a distribution called `dflat()` which corresponds to an improper (flat)
+prior on the whole real line, which must always be used as the prior for the intercept term
+in a model which includes an IAR component, and the WinBUGS and GeoBUGS packages function
+`CAR.normal` perform the recentering of $\phi$.
+Because Stan works on the unconstrained parameters scale, we can drop
+the group-level intercept `beta_1` from the model, and then 
+construct the intercept term in the generated quantities block.
+
+
+Another challenge for this model is determining how much extra-Poisson variability
+should be allocated to the spatial \phi and non-spatial \theta random effects components.
+Banerjee et al investigate the use of different gamma hyperpriors for both $\phi$ and $\theta$.
+
+### A Stan Implementation of the BYM Model
 
 All models and data files are available in the Stan example-models GitHub repo for Stan case studies:
 [car-iar-poisson](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson).
+All commands should be run from the GitHub repo
+`stan-dev/example-models`  directory `knitr/car-iar-poisson`.
 
-### Preliminaries
+We build a Stan version of the BYM model for the Scotland Lip cancer dataset,
+distributed as part of the
+[CARBayesdata R package](https://cran.r-project.org/web/packages/CARBayesdata/CARBayesdata.pdf).
+This dataset consists of:
 
-All commands are run from working directory containing the data and models.
-The following data, libraries, options needed for R are:
+- `y`: the observed lip cancer case counts on a per-county basis
+- `x_aff`: an area-specific continuous covariate that represents the proportion
+of the population employed in agriculture, fishing, or forestry (AFF)
+- `e_pop`: the an expected number of cases, used as an offset,
 
-```{r loadstuff, comment = NA, message = FALSE, warning = FALSE}
+In Stan, we would write the Poisson regression as:
+
+```
+  y ~ poisson_log(beta_1 + beta_2 * x_aff + log(e_pop));
+```
+
+where `beta_1` and `beta_2` are the regression intercept and slope parameters to be estimated.
+The Stan program `scotland_bym.stan`, included in the GitHub repo,
+expands this model to include both a non-centered random-effects component and an IAR spatial component.
+As noted above, we compute the intercept term in the generated quantities block, instead of
+estimating it as part of the model.
+
+The spatial information is coded as a sparse matrix and the IAR component is computed as described above:
+```
+data {
+  int<lower=1> N_areas;
+  int<lower=0> y[N_areas]; // number of events per area
+  vector[N_areas] x_aff;  // covariate: pct pop employed in AFF
+  vector[N_areas] e_pop;  // exposure: population
+  int<lower=1> diag_weights[N_areas]; // weights == num_neighbors
+  int<lower=1> N_links; // number of non-zero entries in adj matrix
+  int<lower=1> off_diag_coords[N_links,2]; // ij coords of off-diag entries
+}
+transformed data {
+  vector[N_areas] log_e_pop = log(e_pop);
+}
+parameters {
+  real beta_2;   // slope
+  vector[N_areas] h;  // individual-level spatial effect (IAR)
+  real<lower=0> tau;  // precision param
+  vector[N_areas] re_nc;  // individual-level random effect
+  real<lower=0> sigma;   // scale of random effect
+}
+transformed parameters {
+  real neg_tau_div_2 = -tau * 0.5;
+}
+model {
+  real off_diag_weight = -1.0;
+  y ~ poisson_log(beta_2 * x_aff + log_e_pop + h + re_nc * sigma);
+  beta_2 ~ normal(0, 1);
+  tau ~ gamma(1.0, 1.0);  // following Banerjee et al 2003
+  re_nc ~ normal(0, 1);
+  sigma ~ gamma(3.3, 1.8);   // following Banerjee et al 2003
+  target += ((N_areas - 1) * 0.5) * log(tau);
+  for (i in 1:N_areas) { // diagonals
+    target += neg_tau_div_2 * square(h[i]) * diag_weights[i];
+  }
+  for (j in 1:N_links) {   // off-diagonals
+    target += neg_tau_div_2
+              * h[off_diag_coords[j,1]] * h[off_diag_coords[j,2]] * off_diag_weight;
+  }
+}
+generated quantities {
+  real beta_1;
+  vector[N_areas] eta = h + re_nc * sigma;
+  vector[N_areas] mu = exp(beta_2 * x_aff + log_e_pop + eta);
+  vector[N_areas] intercepts;
+  for (i in 1:N_areas) {
+    intercepts[i] = y[i] - mu[i];
+  }
+  beta_1 = mean(intercepts);
+}
+```
+
+To run this program with the data, we need to load the following R packages:
+
+```{r loadpkgs, comment = NA, message = FALSE, warning = FALSE}
 library(gpclib);
 library(maptools);  
 library(spdep);
 gpclibPermit()
 
-library(dplyr) 
-library(ggplot2) 
-library(gridExtra)
-
 library(rstan)  
 rstan_options(auto_write = TRUE) 
 options(mc.cores = parallel::detectCores())
 ```
+The Scotland data from the CARBayes package is included in the directory `scotland_data`:
 
-### Data
+```{r loaddata, comment = NA, message = FALSE, warning = FALSE}
+scotland_shp = readShapePoly('scotland_data/scotland');
+scotland_shp = scotland_shp[order(scotland_shp$ID),];
+x_aff = scotland_shp$pcaff;
+y = scotland_shp$Observed;
+e_pop = scotland_shp$Expected;
+```
+The `scotland_data` includes the geolocation information used to create
+the adjacency matrix, using functions from the R `maptools` and `spdep` packages.
+We use `spdep` package function `poly2nb` to get a sparse representation of the
+adjacency matrix coded up as an `nb` object which is a list of lists of
+the adjacent counties for each tract, referenced by county id.
+We have written an R script which factors this `nb` object into the
+array of i,j coordinates for the off-diagonal elements of this matrix.
+Given this, we create inputs: `N_areas`, `N_links`,
+`diag_weights`, `off_diag_coords` as follows:
 
-Sample data is in file `nyc_ped_subset.data.R` which contains
-census tract id, the count of events per tract (`y`),
-and the population per tract (`x`).
-Spatial information is in a set of files in directory `nycTracts10`.
+```{r shpdata, comment = NA, message = FALSE, warning = FALSE}
+scotland_nb = poly2nb(scotland_shp); 
+source("munge_data_helper.R") 
+off_diag_coords = get_nb_off_diags(scotland_nb);
+N_areas = length(scotland_nb);
+diag_weights = card(scotland_nb);  
+N_links = nrow(off_diag_coords);
+```
+We use RStan to fit the Stan model `scotland_bym.stan` with this data:
+
+```{r fitscotbym, comment = NA, message = FALSE, warning = FALSE, eval=FALSE}
+scot_fit = stan("scotland_bym.stan",
+   data=list(N_areas, y, x_aff, e_pop, diag_weights, N_links, off_diag_coords),
+   iter = 10000, warmup = 9000, control = list("adapt_delta=0.99"));
+
+traceplot(scot_fit,
+pars=c("lp__",  "beta_2", "tau", "sigma", "h[1]",  "h[2]",  "re_nc[1]",  "re_nc[2]"));
+
+print(scot_fit,
+  pars=c("lp__",  "beta_1",  "beta_2", "tau", "sigma", "eta[1]", "eta[56]"),
+  probs=c(0.025, 0.5, 0.975));
+```
+
+The traceplot indicates that the model has converged; likewise,
+the summary of the model parameters shows Rhat of 1, and good effective
+sample size for all estimated parameters.
+
+To check our work, we compare these results to those obtained by using the
+CARBayes implementation of the BYM model, available via function `S.CARbym`:
+
+```{r setupCARBays, comment = NA, message = FALSE, warning = FALSE}
+library(CARBayes);
+library(CARBayesdata);
+
+## Read in the Scottish Lipcancer
+data(lipdata)
+
+# munge shpfile components to get weights matrix
+data(lipdbf)
+data(lipshp)
+lipdbf$dbf <- lipdbf$dbf[ ,c(2,1)]
+data.combined <- combine.data.shapefile(data=lipdata, shp=lipshp, dbf=lipdbf)
+W.nb <- poly2nb(data.combined, row.names = rownames(lipdata))
+W.mat <- nb2mat(W.nb, style="B")
+# run CARbayes version of BYM
+formula = y ~ x_aff + offset(log(e_pop));
+```
+
+We run this model via command:
+
+
+```{r runCARBays, comment = NA, message = FALSE, warning = FALSE, results = "hide" }
+model = S.CARbym(formula = formula, family="poisson", W=W.mat, burnin=20000, n.sample=100000);
+````
+
+```{r summaryCARBays, comment = NA, message = FALSE, warning = FALSE}
+# check the fit
+model$summary.results
+```
+
+Both Stan and CARBayes produce roughly the same estimates of the slope and intercept regression parameters.
+
+
+## From 56 Counties in Scotland to 709 Census Tracts in Brooklyn
+
+To demonstrate the scalability of using Stan to compute a spatial IAR component,
+analyze the Brooklyn subset of the dataset from
+[Small-area spatiotemporal analysis of pedestrian and bicyclist injuries in New York City](https://www.ncbi.nlm.nih.gov/pubmed/25643104).
+This dataset contains a record of all reported traffic accidents involving a car and either a pedestrian or bicyclist
+in New York City in 2001, localized to the census tract level.
+
+The traffic accident data is in the file `nyc_ped_subset.data.R`.
+It contains a list of census tract IDs,
+the count of events per tract (`y`),
+and the rate-adjusted population per tract (`x`).
+
+The Stan program is in the file `brooklyn_bym.stan`,
+which is a variant of `scotland_bym.stan`, differing only in that
+since the population has already been rate-adjusted and scaled,
+there's no need for an offset term, or for the transformed data block.
+
+In order to run this on the NYC study data, we restrict our attention to Brooklyn tracts only,
+which meets the criteria that all regions have at least one neighbor.
 
 ```{r nyc-data-xy-plot, echo = FALSE, comment = NA, message = FALSE, warning = FALSE}
 source("nyc_ped_subset.data.R");
 y = events_all_2001[all_tractIDs %in% bklyn_tractIDs];
 x = pop_adj_2001[all_tractIDs %in% bklyn_tractIDs];
 
-plot(x,y,xlab="population (scaled)",ylab="observed events");
+plot(x,y,xlab="rate-adjusted population (scaled)",ylab="observed events");
 ```
 
-### Stan 101:  Poisson GLM
-
-Use R to fit a Poisson model to NYC ped tract data for 2001.
-
-```{r glm-poisson, echo = TRUE, comment = NA, message = FALSE, warning = FALSE}
-source("nyc_ped_subset.data.R");
-y = events_all_2001[all_tractIDs %in% bklyn_tractIDs];
-x = pop_adj_2001[all_tractIDs %in% bklyn_tractIDs];
-
-r_glm_poisson = glm(y~x,family="poisson")
-print(r_glm_poisson)
-```
-
-The Stan equivalent of `glm(y~x,family="poisson")` for `N` observations worth of data
-is in file "m1_poisson.stan":
-
-```
-data {
-  int<lower=0> N;
-  int<lower=0> y[N];
-  vector[N] x;
-}
-parameters {
-  real beta_1;
-  real beta_2;
-}
-model {
-  y ~ poisson_log(beta_1 + beta_2 * x);
-}
-generated quantities {
-  vector[N] mu = exp(beta_1 + beta_2 * x);
-}
-```
-We fit this model using the NUTS sampler (the default sampler for Rstan):
-
-```{r rstan-poisson-fit, echo = TRUE, comment = NA, message = FALSE}
-source("nyc_ped_subset.data.R");
-y = events_all_2001[all_tractIDs %in% bklyn_tractIDs];
-x = pop_adj_2001[all_tractIDs %in% bklyn_tractIDs];
-N = length(bklyn_tractIDs);
-
-m1_fit = stan("m1_poisson.stan",data=list(N,y,x))
-print(m1_fit,pars=c("beta_1","beta_2"),probs=c(0.025,0.5,0.975))
-traceplot(m1_fit,pars=c("lp__","beta_1","beta_2"))
-```
-
-The Stan model fits the data and produces the estimates for the
-intercept (`beta_1`) and slope (`beta_2`) are the same as the R GLM estimates.
-Out of a total of 4000 draws during sampling (4 chains, 1000 draws each),
-the `Rhat` statistic is 1.00, indicating that the chains have converged and
-the number of effective samples for the slope `alpha` and intercept `beta` are OK.
-The traceplot shows good mixing of the chains.
-(Rhat should be very close to 1.00 - values below 0.9 or above 1.1 are indicative of a problem).
-
-### Adding the IAR component
-
-We add the IAR component to the Poisson model using data structures
-and programming techniques shown above to the model shown above,
-see file `m4_poisson_IAR.stan`
-
-In order to run this on the NYC ped data, we restrict our attention to Brooklyn tracts only.
+Spatial information is in a set of files in directory `nycTracts10`.
 The spatial information for the census tracts is obtained via the R `maptools` and `spdep` packages.
-For the Stan program, we need to create inputs:  `N_tracts`, `x`, `y`, `N_links`, `diag_weights`, `off_diag_coords`.
+The spatial data required for the Stan program is:
+`N_areas`, `N_links`, `diag_weights`, `off_diag_coords`.
 
 First we create an `nb` object which is a list of all neighbors for each census tract.
 Each list entry is itself a list containing the relative index of the neighboring regions.
-The following R helper function takes an `nb` object which lists the neighbors for each census tract
-as a list of lists and munges this into a sparse array structure required for the
-input `off_diag_coords` in the above Stan program:
-
-```
-get_nb_off_diags = function(x) {
-     n_tracts = length(x);
-     n_links = sum(card(x));
-     idx_i = vector(mode="numeric",length=n_links);
-     idx_j = vector(mode="numeric",length=n_links);
-     idx = 1;
-     for (i in 1:n_tracts) {
-        if (x[[i]][1] != 0) {
-           for (j in 1:length(x[[i]])) {
-              idx_i[idx] = i;
-              idx_j[idx] = x[[i]][j];
-              idx = idx + 1;
-           }
-        }
-     }
-     return(cbind(idx_i,idx_j));
-}
-```
-
 The following sequence of R commands creates these inputs
 for the Brooklyn subset of the data:
 
@@ -316,120 +442,52 @@ nb_bk = poly2nb(bklyn_tracts.shp);
 
 # munge nb object into Stan model inputs
 source("munge_data_helper.R") 
-N_tracts = length(nb_bk);
+N_areas = length(nb_bk);
 diag_weights = card(nb_bk);  
-N_links = sum(card(nb_bk));  
 off_diag_coords = get_nb_off_diags(nb_bk);
+N_links = nrow(off_diag_coords);
 ```
 
-Now let's try to fit a Poisson model which has a spatial effects component `h`
-in addition to the Poisson GLM coefficients `beta_1` and `beta_2`.
+The model diagnostics and trace plots indicate that the model fits the data,
+given proper amounts of warm-up iterations
+and increasing the value of the NUTS sampler's `adapt_delta` setting, which 
+controls the target average proposal acceptance probability during Stan’s adaptation period.
 
-```{r fit-poisson-car, echo = TRUE, comment = NA, message = FALSE}
-m4_fit = stan("m4_poisson_IAR.stan",data=list(N_tracts,y,x,diag_weights,N_links,off_diag_coords), iter = 5000, warmup = 4000);
-print(m4_fit,pars=c("lp__", "beta_1", "beta_2", "tau","h[1]","h[2]","h[3]","h[4]","h[5]","h[6]"),probs=c(0.025,0.5,0.975));
-traceplot(m4_fit,pars=c("lp__", "beta_1", "beta_2","tau","h[1]","h[2]"));
+```{r fit-brooklyn, echo = TRUE, comment = NA, message = FALSE}
+brooklyn_fit = stan("brooklyn_bym.stan", data=list(N_areas, y, x, diag_weights, N_links, off_diag_coords), iter = 6000, warmup = 5000, control = list("adapt_delta=0.98"));
+print(brooklyn_fit, pars=c("lp__", "beta_1", "beta_2", "tau", "h[1]", "h[2]", "h[3]", "h[4]", "h[5]", "h[6]"), probs=c(0.025, 0.5, 0.975));
+traceplot(brooklyn_fit, pars=c("lp__", "beta_2", "tau", "h[1]", "h[2]", "h[3]"));
 ```
 
-This model fails to fit - it cannot estimate both the group-level intercept `beta_1`
-and the spatial component `h` - these provide a textbook example of non-identifiability.
-(Note that adding individual-level random effects component, centered or un-centered,
-doesn't produce this problem, see models `m2_poisson_re.stan` and `m3_poisson_re_nc.stan`
-included in the GitHub repo for this case study.)
-
-Dropping the group-level intercept `beta_1` allows the model to fit.
-In file `m4_poisson_IAR_v2.stan` we remove the parameter `beta_1`, so
-the Poisson GLM is fit using just the rate and the spatial component `h`:
-```
-data {
-  int<lower=1> N_tracts; // number of census tracts in study
-  int<lower=0> y[N_tracts];
-  vector[N_tracts] x;
-  int<lower=1> diag_weights[N_tracts]; // weights == num_neighbors
-  int<lower=1> N_links; // number of non-zero entries in adj matrix
-  int<lower=1> off_diag_coords[N_links,2]; // ij coords of off-diag entries
-}
-parameters {
-  real beta_2;
-  vector[N_tracts] h;  // individual-level spatial effect (IAR)
-  real<lower=0> tau;  // precision param
-}
-transformed parameters {
-  real neg_tau_div_2 = -tau * 0.5;
-}
-model {
-  real off_diag_weight = -1.0;
-  y ~ poisson_log(beta_2 * x + h);
-  beta_2 ~ normal(0, 2.5);
-  tau ~ normal(0, 5);
-  for (i in 1:N_tracts) { // diagonals
-    target += neg_tau_div_2 * square(h[i]) * diag_weights[i];
-  }
-  for (j in 1:N_links) {   // off-diagonals
-    target += neg_tau_div_2
-              * h[off_diag_coords[j,1]] * h[off_diag_coords[j,2]] * off_diag_weight;
-  }
-  target += ((N_tracts - 1) * 0.5) * log(tau);
-}
-generated quantities {
-  vector[N_tracts] mu = exp(beta_2 * x + h);
-}
-```
-
-The model diagnostics and trace plots indicate that the model fits the data, given proper amounts of warm-up iterations.
-
-```{r fit-poisson-car-v2, echo = TRUE, comment = NA, message = FALSE}
-m4_v2_fit = stan("m4_poisson_IAR_v2.stan",data=list(N_tracts,y,x,diag_weights,N_links,off_diag_coords), iter = 10000, warmup = 9000);
-print(m4_v2_fit,pars=c("lp__","beta_2", "tau","h[1]","h[2]","h[3]","h[4]","h[5]","h[6]"),probs=c(0.025,0.5,0.975));
-traceplot(m4_v2_fit,pars=c("lp__","beta_2","tau","h[1]","h[2]","h[3]"));
-```
-
-This model fits the data, although the group-level and some of the 
-some of the individual-level spatial effects parameters (`h[1]` et. al.)
-have low numbers of effective samples (EFF).
-
-We add a individual-level random-effects component.
-There are 709 census tracts in the Brooklyn dataset we're using, so this brings the number of
-parameters to estimate to 1421.
-Model fitting and sampling takes noticeably longer.
-
-```{r fit-poisson-car-re, echo = TRUE, comment = NA, message = FALSE}
-m5_fit = stan("m5_poisson_IAR_re_nc.stan",data=list(N_tracts,y,x,diag_weights,N_links,off_diag_coords), iter = 10000, warmup = 9000);
-print(m5_fit,pars=c("lp__","beta_2", "tau","sigma","h[1]","h[2]","h[3]","h[4]","h[5]","h[6]"),probs=c(0.025,0.5,0.975));
-traceplot(m5_fit,pars=c("lp__", "beta_2","tau","sigma","h[1]", "h[2]", "re_nc[1]", "re_nc[2]"));
-```
-
-We `ggplot2` and friends to plot spatial relationships to plot
+We use `ggplot2` and related packages to plot
 the Brooklyn census tracts colored by event counts, scaled population,
-and the generated quantity "Mu" from models `m4_poisson_IAR_v2.stan`
-and `m4_poisson_IAR_re_nc.stan`, where Mu is the number of
-events based on the data and estimated model pameters.
+and the generated quantity "mu" from models `brooklyn_bym.stan`,
+mu is the number of events based on the data and estimated model parameters.
 Note that some Brooklyn census tracts are not in the study.
 
 ```{r plot-poisson-car, echo = TRUE, comment = NA, message = FALSE}
-# get estimates from fits for m4 and m5
-mu_names = paste("mu[",c(1:709),"]")
-mu4_samples = as.data.frame(m4_v2_fit,pars=mu_names)
-mu4_means = apply(mu4_samples,2,mean)
-mu5_samples = as.data.frame(m5_fit,pars=mu_names)
-mu5_means = apply(mu5_samples,2,mean)
+library(dplyr) 
+library(ggplot2) 
+library(gridExtra)
+
+mu_names = paste("mu[", c(1:709), "]")
+brooklyn_samples = as.data.frame(brooklyn_fit, pars=mu_names)
+brooklyn_means = apply(brooklyn_samples, 2, mean)
 
 # prepare dfs for ggplot2
 bklyn_events = events_all_2001[bklyn_tracts]
 bklyn_pop = pop_adj_2001[bklyn_tracts]
-df1 = data.frame(bklyn_tractIDs,bklyn_events,bklyn_pop,mu4_means,mu5_means)
+df1 = data.frame(bklyn_tractIDs, bklyn_events, bklyn_pop, brooklyn_means)
 bkfort = fortify(bklyn_tracts.shp, region="GEOID10")
-pdata = left_join(bkfort,df1,by=c("id" = "bklyn_tractIDs"))
+pdata = left_join(bkfort, df1, by=c("id" = "bklyn_tractIDs"))
 
-events_plot = ggplot() + geom_polygon(data=pdata, aes(x=long, y=lat, group=group,fill=bklyn_events)) +  coord_map() + coord_fixed() + scale_fill_gradientn(limits=c(0,30), colors=blues9, oob=scales::squish,guide=guide_legend(title="")) + theme(axis.text.x=element_blank(),axis.text.y=element_blank(),axis.title.x=element_blank(),axis.title.y=element_blank()) + ggtitle("Events")
+events_plot = ggplot() + geom_polygon(data=pdata, aes(x=long, y=lat, group=group, fill=bklyn_events)) +  coord_map() + coord_fixed() + scale_fill_gradientn(limits=c(0, 30), colors=blues9, oob=scales::squish, guide=guide_legend(title="")) + theme(axis.text.x=element_blank(), axis.text.y=element_blank(), axis.title.x=element_blank(), axis.title.y=element_blank()) + ggtitle("Events")
 
-pop_plot = ggplot() + geom_polygon(data=pdata, aes(x=long, y=lat, group=group, fill=bklyn_pop)) + coord_map() + coord_fixed()  + scale_fill_gradientn(limits=c(0,30), colors=blues9, oob=scales::squish,guide=guide_legend(title="")) + theme(axis.text.x=element_blank(),axis.text.y=element_blank(),axis.title.x=element_blank(),axis.title.y=element_blank()) + ggtitle("Population (rescaled)")
+pop_plot = ggplot() + geom_polygon(data=pdata, aes(x=long, y=lat, group=group, fill=bklyn_pop)) + coord_map() + coord_fixed()  + scale_fill_gradientn(limits=c(0, 30), colors=blues9, oob=scales::squish, guide=guide_legend(title="")) + theme(axis.text.x=element_blank(), axis.text.y=element_blank(), axis.title.x=element_blank(), axis.title.y=element_blank()) + ggtitle("Population (rescaled)")
 
-m4_mu_plot = ggplot() + geom_polygon(data=pdata, aes(x=long, y=lat, group=group, fill=mu4_means)) + coord_map() + coord_fixed()  + scale_fill_gradientn(limits=c(0,30), colors=blues9, oob=scales::squish,guide=guide_legend(title="")) + theme(axis.text.x=element_blank(),axis.text.y=element_blank(),axis.title.x=element_blank(),axis.title.y=element_blank()) + ggtitle("Mu (estimated events), model m4")
+brooklyn_plot = ggplot() + geom_polygon(data=pdata, aes(x=long, y=lat, group=group, fill=brooklyn_means)) + coord_map() + coord_fixed()  + scale_fill_gradientn(limits=c(0, 30), colors=blues9, oob=scales::squish, guide=guide_legend(title="")) + theme(axis.text.x=element_blank(), axis.text.y=element_blank(), axis.title.x=element_blank(), axis.title.y=element_blank()) + ggtitle("Brooklyn BYM estimated events")
 
-m5_mu_plot = ggplot() + geom_polygon(data=pdata, aes(x=long, y=lat, group=group, fill=mu5_means)) + coord_map() + coord_fixed()  + scale_fill_gradientn(limits=c(0,30), colors=blues9, oob=scales::squish,guide=guide_legend(title="")) + theme(axis.text.x=element_blank(),axis.text.y=element_blank(),axis.title.x=element_blank(),axis.title.y=element_blank()) + ggtitle("Mu (estimated events), model m5")
-
-grid.arrange(events_plot, pop_plot, m4_mu_plot, m5_mu_plot, ncol=2)
+grid.arrange(events_plot, pop_plot, brooklyn_plot, ncol=2)
 ```
 
 ### Discussion
@@ -450,11 +508,16 @@ matrices provides substantial speedup over trying to compute using a full $N \ti
 
 ### References
 
-#### Papers
+
+#### Literature
+
+* Banerjee, Sudipto, Alan E. Gelfand, and Bradley P. Carlin. "Hierarchical modeling and analysis for spatial data." (2003).
 
 * Besag, Julian. "Spatial interaction and the statistical analysis of lattice systems." Journal of the Royal Statistical Society. Series B (Methodological) (1974): 192-236.
 
 * Besag, Julian, and Charles Kooperberg. "On conditional and intrinsic autoregression." Biometrika (1995): 733-746.
+
+* Besag, J., J. York, and A. Mollie. "Bayesian image restoration with two applications in spatial statistics (with discussion) Ann Inst Stat Math. 1991; 43: 1–59. doi: 10.1007." BF00116466.[Cross Ref].
 
 * Haran, Murali. "Gaussian random field models for spatial data." Handbook of Markov Chain Monte Carlo (2011): 449-478.
 
@@ -462,7 +525,7 @@ matrices provides substantial speedup over trying to compute using a full $N \ti
 
 * Statistics: [RStan](http://mc-stan.org/rstan.html)
 
-* Plots: [ggplot2](http://ggplot2.org), [dplyr](https://cran.r-project.org/web/packages/dplyr)
+* Plots: [ggplot2](http://ggplot2.org), [dplyr](https://cran.r-project.org/web/packages/dplyr), [gridExtra](https://cran.r-project.org/web/packages/gridExtra)
 
 * Spatial Data: [maptools](https://cran.r-project.org/web/packages/maptools),
 [spdep](https://cran.r-project.org/web/packages/spdep),
