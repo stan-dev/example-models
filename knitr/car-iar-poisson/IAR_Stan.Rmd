@@ -13,6 +13,10 @@ of spatial models called "CAR" models (Conditional Auto-Regressive)
 introduced by Besag and collaborators.
 This case study covers how to efficiently code these models in Stan.
 
+All models and data files are available in the Stan example-models GitHub repo for Stan case studies:
+[car-iar-poisson](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson).
+All commands should be run from the directory `stan-dev/example-models/knitr/car-iar-poisson`.
+
 ## Spatial Data as a Gaussian Random Field Model
 
 The following math and its notation is taken from
@@ -178,16 +182,16 @@ which is a fast alternative to MCMC,
 (INLA trades speed and scalability for accuracy,
 per the "no free lunch" principle).
 
-### The Besag York Mollié Model
+### The Besag York Mollié (BYM) Model
 
-A commonly-used model in biostatistical and epidemiology used for count data
-is a lognormal Poisson model proposed in Besag York Mollié 1991, which
+A popular model for count data in biostatistics and epidemiology is a
+lognormal Poisson model proposed in Besag York Mollié 1991 which
 includes both an IAR component for spatial smoothing as well as an
 ordinary random-effects component for non-spatial heterogeneity.
-Banerjee Carlin and Gelfand 2003, section 5.4, provides a good discussion
-this model and its difficulties, together with a WinBUGS implementation (Figure 5.11),
-which they use to fit the Scottish lip cancer dataset from Clayton and Kaldor 1987.
-Their formulation of the Besag York Mollié model is:
+Banerjee Carlin and Gelfand 2003, section 5.4, presents the details of
+this model and its difficulties, together with a WinBUGS implementation (Figure 5.11)
+which is used to fit the Scottish lip cancer dataset from Clayton and Kaldor 1987.
+Using the notation of Banerjee et al., the Besag York Mollié model is:
 
 $$ Y_i\, |\, {\psi}_i \sim Poisson ( E_i,e^{\psi_i}) , $$
 $$ where\ \ {\psi}_i = {x'}_i\, \beta + \theta_i + \phi_i$$
@@ -198,31 +202,23 @@ The $\phi_i$ is an IAR spatial component.
 
 As noted above, the IAR prior is an improper prior.
 Besag and Kooperberg 1995 show that the IAR prior is a
-_pairwise difference prior_ which is identified up to
-an additive constant.
+_pairwise difference prior_ which is identified up to an additive constant.
 Thus, models which include both the IAR prior and an intercept term are non-identifiable.
-Constraining the random effects to sum to zero
-and specifying a separate intercept term with a location invariant Uniform($-\infty$, $+\infty$)
-prior is equivalent to the unconstrained parameterization with no separate intercept. 
-WinBUGS 1.4 includes a distribution called `dflat()` which corresponds to an improper (flat)
-prior on the whole real line, which must always be used as the prior for the intercept term
-in a model which includes an IAR component, and the WinBUGS and GeoBUGS packages function
-`CAR.normal` perform the recentering of $\phi$.
-Because Stan works on the unconstrained parameters scale, we can drop
-the group-level intercept `beta_1` from the model, and then 
-construct the intercept term in the generated quantities block.
 
+The intercept term can be estimated by constraining the random effects to sum to zero and
+specifying a separate intercept term with a location invariant Uniform($-\infty$, $+\infty$) prior.
+(The example WinBUGS program does this: the prior `dflat()` corresponds to an improper (flat)
+prior on the whole real line; the function `CAR.normal` perform the recentering of $\phi$.)
+This is equivalent to the unconstrained parameterization with no separate intercept,
+Since Stan works on the unconstrained parameters scale, we omit the intercept term
+from the model and compute it in the generated quantities block.
 
-Another challenge for this model is determining how much extra-Poisson variability
-should be allocated to the spatial \phi and non-spatial \theta random effects components.
-Banerjee et al investigate the use of different gamma hyperpriors for both $\phi$ and $\theta$.
+Another challenge for the BYM model is determining how much extra-Poisson variability
+should be allocated to the spatial $\phi$ and non-spatial $\theta$ random effects components.
+Banerjee et al. investigate the use of different gamma hyperpriors for both $\phi$ and $\theta$.
+
 
 ### A Stan Implementation of the BYM Model
-
-All models and data files are available in the Stan example-models GitHub repo for Stan case studies:
-[car-iar-poisson](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson).
-All commands should be run from the GitHub repo
-`stan-dev/example-models`  directory `knitr/car-iar-poisson`.
 
 We build a Stan version of the BYM model for the Scotland Lip cancer dataset,
 distributed as part of the
@@ -241,7 +237,9 @@ In Stan, we would write the Poisson regression as:
 ```
 
 where `beta_1` and `beta_2` are the regression intercept and slope parameters to be estimated.
-The Stan program `scotland_bym.stan`, included in the GitHub repo,
+
+The Stan program
+[scotland_bym.stan](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/scotland_bym.stan).
 expands this model to include both a non-centered random-effects component and an IAR spatial component.
 As noted above, we compute the intercept term in the generated quantities block, instead of
 estimating it as part of the model.
@@ -300,7 +298,7 @@ generated quantities {
 
 To run this program with the data, we need to load the following R packages:
 
-```{r loadpkgs, comment = NA, message = FALSE, warning = FALSE}
+```{r loadpkgs, comment = NA, message = FALSE, warning = FALSE, results="hide"}
 library(gpclib);
 library(maptools);  
 library(spdep);
@@ -312,7 +310,7 @@ options(mc.cores = parallel::detectCores())
 ```
 The Scotland data from the CARBayes package is included in the directory `scotland_data`:
 
-```{r loaddata, comment = NA, message = FALSE, warning = FALSE}
+```{r loaddata, comment = NA, message = FALSE, warning = FALSE, results="hide"}
 scotland_shp = readShapePoly('scotland_data/scotland');
 scotland_shp = scotland_shp[order(scotland_shp$ID),];
 x_aff = scotland_shp$pcaff;
@@ -329,7 +327,7 @@ array of i,j coordinates for the off-diagonal elements of this matrix.
 Given this, we create inputs: `N_areas`, `N_links`,
 `diag_weights`, `off_diag_coords` as follows:
 
-```{r shpdata, comment = NA, message = FALSE, warning = FALSE}
+```{r shpdata, comment = NA, message = FALSE, warning = FALSE, results="hide"}
 scotland_nb = poly2nb(scotland_shp); 
 source("munge_data_helper.R") 
 off_diag_coords = get_nb_off_diags(scotland_nb);
@@ -339,7 +337,7 @@ N_links = nrow(off_diag_coords);
 ```
 We use RStan to fit the Stan model `scotland_bym.stan` with this data:
 
-```{r fitscotbym, comment = NA, message = FALSE, warning = FALSE, eval=FALSE}
+```{r fitscotbym, comment = NA, message = FALSE, warning = FALSE}
 scot_fit = stan("scotland_bym.stan",
    data=list(N_areas, y, x_aff, e_pop, diag_weights, N_links, off_diag_coords),
    iter = 10000, warmup = 9000, control = list("adapt_delta=0.99"));
@@ -359,7 +357,7 @@ sample size for all estimated parameters.
 To check our work, we compare these results to those obtained by using the
 CARBayes implementation of the BYM model, available via function `S.CARbym`:
 
-```{r setupCARBays, comment = NA, message = FALSE, warning = FALSE}
+```{r setupCARBays, comment = NA, message = FALSE, warning = FALSE, results = "hide" }
 library(CARBayes);
 library(CARBayesdata);
 
@@ -405,13 +403,13 @@ It contains a list of census tract IDs,
 the count of events per tract (`y`),
 and the rate-adjusted population per tract (`x`).
 
-The Stan program is in the file `brooklyn_bym.stan`,
-which is a variant of `scotland_bym.stan`, differing only in that
+The Stan program is in the file
+[brooklyn_bym.stan](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/brooklyn_bym.stan).
+This program is a variant of `scotland_bym.stan`; the only difference is that
 since the population has already been rate-adjusted and scaled,
-there's no need for an offset term, or for the transformed data block.
+it doesn't include an offset term.
 
-In order to run this on the NYC study data, we restrict our attention to Brooklyn tracts only,
-which meets the criteria that all regions have at least one neighbor.
+We run this on the Brooklyn census tracts only, so that all areas have at least on neighbor.
 
 ```{r nyc-data-xy-plot, echo = FALSE, comment = NA, message = FALSE, warning = FALSE}
 source("nyc_ped_subset.data.R");
@@ -431,7 +429,7 @@ Each list entry is itself a list containing the relative index of the neighborin
 The following sequence of R commands creates these inputs
 for the Brooklyn subset of the data:
 
-```{r munge-bk, echo = TRUE, comment = NA, message = FALSE, warning = FALSE}
+```{r munge-bk, echo = TRUE, comment = NA, message = FALSE, warning = FALSE, results = "hide" }
 # census tracts spatial info
 nyc_all_tracts.shp<-readShapePoly("nycTracts10/nycTracts10");
 # restrict to tracts in study, reorder
@@ -465,7 +463,7 @@ and the generated quantity "mu" from models `brooklyn_bym.stan`,
 mu is the number of events based on the data and estimated model parameters.
 Note that some Brooklyn census tracts are not in the study.
 
-```{r plot-poisson-car, echo = TRUE, comment = NA, message = FALSE}
+```{r setup-plot-data, echo = TRUE, comment = NA, message = FALSE, results = "hide" }
 library(dplyr) 
 library(ggplot2) 
 library(gridExtra)
@@ -480,7 +478,8 @@ bklyn_pop = pop_adj_2001[bklyn_tracts]
 df1 = data.frame(bklyn_tractIDs, bklyn_events, bklyn_pop, brooklyn_means)
 bkfort = fortify(bklyn_tracts.shp, region="GEOID10")
 pdata = left_join(bkfort, df1, by=c("id" = "bklyn_tractIDs"))
-
+```
+```{r plot-brooklyn, echo = TRUE, comment = NA, message = FALSE}
 events_plot = ggplot() + geom_polygon(data=pdata, aes(x=long, y=lat, group=group, fill=bklyn_events)) +  coord_map() + coord_fixed() + scale_fill_gradientn(limits=c(0, 30), colors=blues9, oob=scales::squish, guide=guide_legend(title="")) + theme(axis.text.x=element_blank(), axis.text.y=element_blank(), axis.title.x=element_blank(), axis.title.y=element_blank()) + ggtitle("Events")
 
 pop_plot = ggplot() + geom_polygon(data=pdata, aes(x=long, y=lat, group=group, fill=bklyn_pop)) + coord_map() + coord_fixed()  + scale_fill_gradientn(limits=c(0, 30), colors=blues9, oob=scales::squish, guide=guide_legend(title="")) + theme(axis.text.x=element_blank(), axis.text.y=element_blank(), axis.title.x=element_blank(), axis.title.y=element_blank()) + ggtitle("Population (rescaled)")

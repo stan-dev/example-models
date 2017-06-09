@@ -23,7 +23,7 @@ transformed parameters {
 model {
   real off_diag_weight = -1.0;
   y ~ poisson_log(beta_2 * x_aff + log_e_pop + h + re_nc * sigma);
-  beta_2 ~ normal(0, 1);
+  beta_2 ~ normal(0, 2.5);
   tau ~ gamma(1.0, 1.0);  // following Banerjee et al 2003
   re_nc ~ normal(0, 1);
   sigma ~ gamma(3.3, 1.8);   // following Banerjee et al 2003
