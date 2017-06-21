@@ -1,0 +1,22 @@
+carlin_bym <- function() {
+for (i in 1 : regions) {
+      O[i] ~ dpois(mu[i])
+      log(mu[i]) <- log(E[i]) + beta0 + beta1*aff[i]/10 + phi[i] + theta[i]
+      theta[i] ~ dnorm(0.0,tau.h)
+      xi[i] <- theta[i] + phi[i]
+      SMRhat[i] <- 100 * mu[i] / E[i]
+      SMRraw[i] <- 100* O[i] / E[i]
+   }
+   phi[1:regions] ~ car.normal(adj[], weights[], num[], tau.c)
+
+   beta0 ~ dnorm(0.0, 1.0E-5)  # vague prior on grand intercept
+   beta1 ~ dnorm(0.0, 1.0E-5)  # vague prior on covariate effect
+
+   tau.h ~ dgamma(3.2761, 1.81)
+   tau.c ~ dgamma(1.0, 1.0)
+
+   sd.h <- sd(theta[]) # marginal SD of heterogeneity effects
+   sd.c <- sd(phi[])   # marginal SD of clustering (spatial) effects
+
+   alpha <- sd.c / (sd.h + sd.c)
+}
