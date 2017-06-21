@@ -1,179 +1,121 @@
 ---
-title: "Spatial Models in Stan: Conditional and Intrinsic Auto-Regressive Models for Areal Data"
+title: "Spatial Models in Stan: Intrinsic Auto-Regressive Models for Areal Data"
 author: "Mitzi Morris"
 output: 
   html_document:
     keep_md: false
 ---
+<style type="text/css">
+.table {
+
+    width: 40%;
+
+}
+</style>
 
 When data has a spatio-temporal structure and when observations from
 neighboring regions exhibit higher correlation than observations between
 distant regions,  this correlation can be accounted for using the class
 of spatial models called "CAR" models (Conditional Auto-Regressive)
-introduced by Besag and collaborators.
+introduced by Besag (Besag 1974).
+Intrinsic Auto-Regressive (IAR) models are a subclass of CAR models.
+The Besag York Mollié (BYM) model is a lognormal Poisson model which
+includes both an IAR component for spatial smoothing and an ordinary
+random-effects component for non-spatial heterogeneity.
 This case study covers how to efficiently code these models in Stan.
 
 All models and data files are available in the Stan example-models GitHub repo for Stan case studies:
 [car-iar-poisson](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson).
 All commands should be run from the directory `stan-dev/example-models/knitr/car-iar-poisson`.
 
-## Spatial Data as a Gaussian Random Field Model
+## Formulations of CAR and IAR models
 
-The following math and its notation is taken from
-"Gaussian Random Field Models for Spatial Data" by Murali Haran,
-which is Chapter 18 of the "Handbook of Markov Chain Monte Carlo".
+Given a set of observations taken at $n$ different areal units
+of a region with a number of dimensions $D$
+(for spatio-temporal data, this number is between 1 and 4
+as there are 1-3 spatial dimensions and 1 time dimension),
+spatial interactions between regions $n_i$ and $n_j$ can be modelled conditionally
+as a spatial random variable $\mathbf{\phi}$, which is an $n$-length vector
+$\mathbf{\phi} = ({\phi}_1, \ldots, {\phi}_n)^T$.
 
-Besag (1974) shows that by encoding the neighbor relations
-between spatial regions as a lattice, results from
-the physics of lattice systems of particles
-and the Hammersly-Clifford theorem provide an equivalence between
+We represent spatial relationship between the $n$ areal units
+as an adjacency matrix $W$ with dimensions $n \times n$
+where entries $w_{ij}$ and $w_{ji}$ are positive when regions ${n_i}$ and ${n_j}$ are neighbors
+and zero otherwise.
+The _neighbor_ relationship $i \sim j$ is defined in terms of this matrix:
+the neighbors of region $i$ are those regions who have non-zero entries in row or column $i$.
+This encoding defines a lattice structure over the $n$ areal units.
+
+Besag (1974) uses results from the physics of lattice systems of particles
+and the Hammersley-Clifford theorem provide an equivalence between
 a local specification of the conditional distribution of each particle
 given its neighboring particles and the global specification
 of the joint distribution of all particles.
 This specification of the joint distribution via the local specification
 of the conditional distributions of the individual variables
-is a Markov random field specification.
+is a Markov random field (MRF) specification.
+The conditional distribution for each ${\phi}_i$ is specified in terms of a mean
+and precision parameter $\tau$ as:
 
-Therefore, given a set of observations taken at $n$ different subregions
-of a region with a number of dimensions $D$
-(for spatio-temporal data, the number of dimensions is usually between 1 and 4,
-i.e., 1-3 spatial dimensions and 1 time dimension),
-spatial interactions between regions $n_i$ and $n_j$ can be modelled conditionally
-as a spatial random variable $\mathbf{w}$ as follows:
+$$ p \left( { \phi }_i \, \vert\, {\phi}_j \, j \neq i, {{\tau}_i}^{-1} \right)
+= \mathit{N} \left( \alpha \sum_{i \sim j} {w}_{ij} {\phi}_j,\tau_i^{-1} \right), i,j = 1, \ldots, n $$
 
-- Let $w_{-i}$ denote the $n$-length vector $w$ excluding $w_i$.
+The corresponding joint distribution can be uniquely determined from
+the set of full conditional distributions by
+introducing a fixed point from the support of $p$
+and then using Brook’s Lemma to factor the set of conditional distributions
+into a joint distribution which is determined up to a proportionality constant
+(see Banerjee, Carlin, and Gelfand, 2004, sec. 3.2):
 
-- We model each $w_i$ in terms of its full conditional distribution which is
-its distribution given the remaining random variables, $\mathbf{w}_{-i}$:
-$$ w_i \,\vert\, \mathbf{w}_{-i}, \Theta \sim N
-\left( \sum_{j=0}^n {c}_{ij} w_j,\kappa_i^{-1} \right),
-i= 1,\ldots,n $$
-where $c_{ij}$ describes the neighborhood structure such that  $c_{ij}$ is nonzero
-only if $i$ and $j$ are neighbors and $\kappa$ is the precision (inverse variance) parameter.
+$$ \mathbf{\phi} \sim \mathit{N} \left(\mathbf{0}, \left[D_{\tau}(I - \alpha B)\right]^{-1} \right) $$
 
-### CAR Models
+where
 
-The neighborhood structure of the $\kappa$ and $c_{ij}$ elements can be stored
-in an $n \times n$ matrix $Q$ where the diagonal elements
-represent each of the $n$ subregions with value $\kappa_i$
-and the off-diagonal elements contain $-\kappa_i c_{ij}$ 
-if subregions $i$ and $j$ are adjacent and 0 otherwise.
-Usually a common precision parameter $\tau$, is assumed,
-where ${\kappa}_i = \tau$ for all $i$.
+- $B$ is an $n \times n$ matrix where entries $\{i,i\}$ are zero and the off-diagonal elements
+describe the spatial proximity of regions $n_i$ and $n_j$.
+- $I$ is an $n \times n$ identity matrix
+- $D_{\tau} = \tau D$ where D is an $n \times n$ diagonal matrix.
 
-When the matrix $Q$ is symmetric and positive definite, this specifies a valid joint distribution,
-$$ w \,\vert\, \Theta \sim  N(0, Q^{-1}) $$
-with $\Theta$ the vector of the precision parameters.
-This provides a proper prior for a CAR model.
-However evaluation of $w$ requires computing the covariance matrix $Q^{-1}$,
-which is computationally expensive for large values of $n$.
+The construction of the spatial proximity matrix $B$ determines the class of CAR model structure.
+The model is an Intrinsic Auto-Regressive (IAR) model when:
 
-See the Stan case study 
-[Exact sparse CAR models in Stan](http://mc-stan.org/documentation/case-studies/mbjoseph-CARStan.html),
-for further discussion of this model.
+- $\alpha = 1$
+- $D$ is an $n \times n$ diagonal matrix where $d_{ii}$ = the number of neighbors for region $n_i$
+- $W$ is the adjacency matrix where $w_{ii} = 0, w_{ij} = 1$ if $i$ is a neighbor of $j$, and $w_{ij}=0$ otherwise
+- $B = D^{-1} W$, i.e., $B$ is the scaled adjacency matrix
 
-### IAR Models
+The corresponding conditional distribution specification is:
 
-Intrinsic Auto-Regressive models are 
-intrinsic Gaussian Markov random fields,
-(see Besag and Kooperberg 1995).
-They are a subclass of CAR models which have an improper prior.
-Spatial models which use this improper prior are most correctly called IAR models,
-but the distinction between CAR and IAR models is often not made,
-especially in software packages which implement these models.
+$$ p \left( { \phi }_i \, \vert\, {\phi}_j \, j \neq i, {{\tau}_i}^{-1} \right)
+= \mathit{N} \left( \frac{\sum_{i \sim j} {\phi}_{i}}{d_{ii}}, \frac{1}{d_{ii} {\tau}_i} \right)$$
 
-For this class of models, $Q$ is a positive _semidefinite_ matrix.
-The off-diagonals of $Q$ are  $-{\tau} c_{ij}$
-and the value of the $i^{th}$ diagonal element is $\tau \sum_{j} c_{ij}$.
-This intrinsic GMRF model corresponds to the following conditional specification:
-
-$$ f(w_j \vert \mathbf{w}_{-i}, \tau) \sim N \left(
-\frac{ \sum_{j \in N(i)}^n w_j} {n},
-\frac{1}{n_i,\tau} \right) $$
-
-The individual spatial random variable $w_j$ for region $n_j$ with neighbors $N(i)$
+where $d_{ii}$ is the number of neighbors for region $n_i$.
+Intuitively, the individual spatial random variable ${\phi}_j$ for region $n_j$ with neighbors $N(i)$
 is normally distributed with a mean equal to the average of its neighbors.
-The variance decreases as the number of neighbors increases.
+Its variance decreases as the number of neighbors increases.
 
-Although this is an improper prior, given data, this results in a proper posterior density.
-Computing this density in Stan is computationally tractable due to the fact that
-Stan is computing proportional densities, allowing constant terms to drop out;
-among these is the term which requires computation of the determinant of this matrix.
-The density of the random variable $\mathbf{w}$ is:
+The joint distribution simplifies to the _pairwise difference_ formulation:
 
-$$ f (\mathbf{w} \vert \Theta) \propto \tau^{(N−1)/2}  \exp(−\mathbf{w}^TQ(\tau)\mathbf{w}) $$
+$$\phi \sim N(0, [\tau \, (D - W)]^{-1}).$$
 
-When the neighborhood graph contains disconnected subsets, term $\tau^{(N−1)/2}$
-must be changed to $\tau^{(N−k)/2}$ where $k$ is the number of distinct subsets.
+which rewrites to:
 
-_NOTE:  this is only valid when all the regions in the adjacency matrix have at least 1 neighbor,
-that is, for all subregions $n_i$, the set $j \sim i$ is non-empty._
+$$ p(\phi | \tau) \propto \frac{1}{{\tau}^\frac{n}{2}} \exp \left\{ {- \frac{1}{2\tau}} \sum_{i \sim j}{({\phi}_i - {\phi}_j)}^2 \right\} $$
 
-On the log scale, this is computed as:
+The above conditions for the IAR model produce an improper distribution
+because setting $\alpha = 1$ creates a singular matrix $(D - W)$, see Besag and Kooperberg 1995.
+Furthermore, the pairwise distance formulation of the joint distribution is non-centered;
+adding any constant to all of the elements of $\phi$ leaves the joint distribution unchanged.
+To correct this, we add the constraint $\sum_{i} {\phi}_i = 0$.
 
-$$\frac{(N−1)}{2}log(\tau) + −\mathbf{w}^TQ(\tau)\mathbf{w}$$
+While this IAR model is non-generating in that it cannot be used as a model for the data,
+it can be used as a prior as part of a hierarchical model, which is the role it plays in
+the BYM model.
 
-Although the computation of the matrix determinant has been eliminated, we still
-need to do matrix multiplication.
-An efficient representation of a sparse adjacency matrix for a set of $N$ subregions
-is:
 
-- an array of length $N$ which contains the number of neighbors for each region;
-this is used to compute the diagonal elements of $Q$.
+## Multi-level Poisson GLMs: the Besag York Mollié (BYM) Model
 
-- an $L \times 3$ array where $L$ is the number of the non-zero off-diagonal elements of the adjacency matrix.
-The first two columns provide the $i,j$ region ids respectively, and the 3rd column contains
-the value $c_{ij}$, (the weight contributed by this neighbor).
-This 3rd column can be omitted altogether when all weights are the same.
-
-The following Stan program fragments shows how to compute this in Stan.
-
-The sparse adjacency matrix is passed in as data.
-The diagonal and off-diagonal elements are stored separately.
-Since all off-diagonal values in the adjacency matrix are -1,
-we only need to store the $i,j$ coordinates of the off-diagonal elements:
-```
-data {
-  int<lower=1> diag_weights[N_regions];  // weights == num_neighbors
-  int N_links; // number of non-zero entries in adj matrix
-  int<lower=1> off_diag_coords[N_links,2]; // ij coords of off-diag entries
-}
-```
-The IAR spatial component parameters are:
-```
-parameters {
-  vector[N_regions] h;  // individual-level spatial effect (IAR)
-  real<lower=0> tau;  // precision param
-}
-```
-Stan computes the contribution of 
-$\frac{(N−1)}{2}log(\tau) + −\mathbf{w}^TQ(\tau)\mathbf{w}$
-to the log density as shown below.
-The diagonal and off-diagonal elements are computed separately.
-The weight of the off-diagonal elements is always -1.
-```
-transformed parameters {
-  real neg_tau_div_2 = -tau * 0.5;
-}
-model {
-  real off_diag_weight = -1.0;
-  ...
-  target += ((N_tracts - 1) / 2.0) * log(tau);
-  for (i in 1:N_tracts) { // diagonals
-    target += neg_tau_div_2 * square(h[i]) * diag_weights[i];
-  }
-  for (j in 1:N_links) {   // off-diagonals
-    target += neg_tau_div_2 *
-    h[off_diag_coords[j,1]] * h[off_diag_coords[j,2]] * off_diag_weight;
-  }
-  ...
-}
-```
-
-## Multi-level Poisson GLMs for Areal Count Data
-
-Adding a CAR (or IAR) spatially structured error term to a multi-level GLM
-as a random-effects multi-variate Gaussian 
+Adding a CAR spatially structured error term to a multi-level GLM
 provides spatial smoothing of the resulting estimates.
 For count data, e.g. incidents of disease or accidents,
 Poisson CAR models are available via R, BUGS, and JAGS
@@ -182,213 +124,247 @@ which is a fast alternative to MCMC,
 (INLA trades speed and scalability for accuracy,
 per the "no free lunch" principle).
 
-### The Besag York Mollié (BYM) Model
-
-A popular model for count data in biostatistics and epidemiology is a
-lognormal Poisson model proposed in Besag York Mollié 1991 which
-includes both an IAR component for spatial smoothing as well as an
+The lognormal Poisson model proposed in Besag York Mollié 1991
+is used for count data in biostatistics and epidemiology.
+It includes both an IAR component for spatial smoothing and an
 ordinary random-effects component for non-spatial heterogeneity.
 Banerjee Carlin and Gelfand 2003, section 5.4, presents the details of
-this model and its difficulties, together with a WinBUGS implementation (Figure 5.11)
-which is used to fit the Scottish lip cancer dataset from Clayton and Kaldor 1987.
+this model and its difficulties, together with a WinBUGS implementation
+which they use to fit the Scottish lip cancer dataset from Clayton and Kaldor 1987.
 Using the notation of Banerjee et al., the Besag York Mollié model is:
 
-$$ Y_i\, |\, {\psi}_i \sim Poisson ( E_i,e^{\psi_i}) , $$
-$$ where\ \ {\psi}_i = {x'}_i\, \beta + \theta_i + \phi_i$$
+$$
+Y_i \vert \psi_i \sim Poisson ( E_i \, e^{\psi_i}),
+$$
 
-The ${x'}_i$ are the explanatory spatial covariates having parameter coefficients \beta.
-The $\theta_i$ are the ordinary random-effects components.
-The $\phi_i$ is an IAR spatial component.
+for $i \in 1:N$, where 
 
-As noted above, the IAR prior is an improper prior.
-Besag and Kooperberg 1995 show that the IAR prior is a
-_pairwise difference prior_ which is identified up to an additive constant.
-Thus, models which include both the IAR prior and an intercept term are non-identifiable.
+$$
+\psi = x \beta + \theta + \phi
+$$
 
-The intercept term can be estimated by constraining the random effects to sum to zero and
-specifying a separate intercept term with a location invariant Uniform($-\infty$, $+\infty$) prior.
-(The example WinBUGS program does this: the prior `dflat()` corresponds to an improper (flat)
-prior on the whole real line; the function `CAR.normal` perform the recentering of $\phi$.)
-This is equivalent to the unconstrained parameterization with no separate intercept,
-Since Stan works on the unconstrained parameters scale, we omit the intercept term
-from the model and compute it in the generated quantities block.
+where
 
-Another challenge for the BYM model is determining how much extra-Poisson variability
-should be allocated to the spatial $\phi$ and non-spatial $\theta$ random effects components.
-Banerjee et al. investigate the use of different gamma hyperpriors for both $\phi$ and $\theta$.
+- $x$ is the matrix of explanatory spatial covariates, so that $x_i$ is
+the vector of covariates for areal unit $i$.  The coefficients $\beta$ are
+often called "fixed effects."
+
+- $\theta_i$ is an ordinary random-effects components for non-spatial heterogeneity.
+
+- $\phi_i$ is an IAR spatial component.
+
+The pairwise difference formulation of the IAR spatial component $\phi$ is non-centered,
+thus models with include both the IAR spatial effects component are non-identifiable.
+Adding the constraint that $\phi$ must sum to zero centers it, allowing the model to
+fit both the fixed-effect intercept $\beta\_0$ as well as $\phi$ and $\theta$.
+
+### A WinBUGS Implementation of the BYM Model
+
+The program and data for the WinBUGS model, are available from
+[Brad Carlin's software page](http://www.biostat.umn.edu/~brad/data2.html),
+in file "Lipsbrad.odc".
+
+The WinBUGS model is in file [carlin_bym.txt](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/carlin_bym.txt).
+
+```{r print-bugs-scot-bym, comment='', echo = FALSE}
+cat(readLines('carlin_bym.txt'), sep = '\n')
+```
+
+The data file [carlin_data.R](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/carlin_data.R)
+contains the following objects:
+
+- `O`: the observed lip cancer case counts on a per-county basis
+- `aff`: an area-specific continuous covariate that represents the proportion
+of the population employed in agriculture, fishing, or forestry (AFF)
+- `E`: the an expected number of cases, used as an offset,
+- `adj`: a list of region ids for adjacent regions
+- `num`: a list of the number of neighbors for each region
+
+Data items `adj` and `num` are used as input to the WinBUGS function `car.normal` which
+computes the values of the elements for the zero-centered spatial component $\phi$.
+
+In the WinBUGS program, the formula for the Poisson regression is:
+
+```
+O[i] ~ dpois(mu[i])
+log(mu[i]) <- log(E[i]) + beta0 + beta1*aff[i]/10 + phi[i] + theta[i]
+```
+
+Note that the covariate term `aff` is divided by 10.
 
 
 ### A Stan Implementation of the BYM Model
 
-We build a Stan version of the BYM model for the Scotland Lip cancer dataset,
-distributed as part of the
-[CARBayesdata R package](https://cran.r-project.org/web/packages/CARBayesdata/CARBayesdata.pdf).
-This dataset consists of:
+A Stan model which implements the BYM model for univariate data plus offset is in the file
+[bym_predictor_plus_offset.stan](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/bym_predictor_plus_offset.stan).
 
-- `y`: the observed lip cancer case counts on a per-county basis
-- `x_aff`: an area-specific continuous covariate that represents the proportion
-of the population employed in agriculture, fishing, or forestry (AFF)
-- `e_pop`: the an expected number of cases, used as an offset,
 
-In Stan, we would write the Poisson regression as:
-
-```
-  y ~ poisson_log(beta_1 + beta_2 * x_aff + log(e_pop));
+```{r print-stan-bym, comment='', echo = FALSE}
+cat(readLines('bym_predictor_plus_offset.stan'), sep = '\n')
 ```
 
-where `beta_1` and `beta_2` are the regression intercept and slope parameters to be estimated.
+#### Encoding the Adjacency Matrix
 
-The Stan program
-[scotland_bym.stan](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/scotland_bym.stan).
-expands this model to include both a non-centered random-effects component and an IAR spatial component.
-As noted above, we compute the intercept term in the generated quantities block, instead of
-estimating it as part of the model.
+Given the above specification of the IAR model, the information needed to compute the
+spatial variance component of the model is:
 
-The spatial information is coded as a sparse matrix and the IAR component is computed as described above:
+- $D$ - the $n \times n$ diagonal matrix where $d_{ii}$ = the number of neighbors for region $n_i$
+- $W$ - the adjacency matrix where $w_{ii} = 0, w_{ij} = 1$ if $i$ is a neighbor of $j$, and $w_{ij}=0$ otherwise
+
+A straightforward encoding of the adjacency matrix is as a
+square matrix with dimensions equal to the number of areal units.
+Depending on the regularity or irregularity of areal boundaries, the number of neighbors
+for each region may vary.  In a completely regular grid structure each region will have
+4 neighbors with which it shares an edge and another 4 regions diagonally adjacent.
+The size of the adjacency matrix grows quadratically, while the number of non-zero entries
+in any given row or column is 4 or 8, thus the matrix quickly becomes very sparse.
+Representing a sparse matrix as a full matrix is computationally expensive both
+in terms of storage and computation.  
+An adjacency matrix for $n$ areal units requires $n^2$ units of memory, and
+walking over all entries in this matrix requires many needless lookups.
+
+The information needed from $D$ for the IAR spatial component is
+an array or vector of length $n$ where each entry $n_i$ contains the 
+number of neighbors for region $n_i$.
+
+The information needed from the adjacency matrix is a list of the {i,j}
+coordinates of the non-zero entries in this matrix.
+Since these entries all have value $1$, we don't need to store this value itself.
+Since the adjacency matrix is symmetric, we only need store the entries in the
+upper or lower triangular matrix.
+
+The data block of the Stan model declares these structures as:
+
 ```
-data {
-  int<lower=1> N_areas;
-  int<lower=0> y[N_areas]; // number of events per area
-  vector[N_areas] x_aff;  // covariate: pct pop employed in AFF
-  vector[N_areas] e_pop;  // exposure: population
-  int<lower=1> diag_weights[N_areas]; // weights == num_neighbors
-  int<lower=1> N_links; // number of non-zero entries in adj matrix
-  int<lower=1> off_diag_coords[N_links,2]; // ij coords of off-diag entries
-}
-transformed data {
-  vector[N_areas] log_e_pop = log(e_pop);
-}
+  int<lower=0> N;                 // num regions
+  int<lower=0> N_edges;           // num edges, (undirected)
+  int<lower=1, upper=N> node1[N_edges];  // node1[i] adjacent to node2[i]
+  int<lower=1, upper=N> node2[N_edges];  // node1[i] adjacent to node2[i]
+```
+
+We have written an R program
+[mungeCARdata4stan.R](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/mungeCARdata4stan.R)
+which defines a function of the same name that takes the
+two inputs used for the WinBUGS `car.normal` function
+and returns a list containing the input data objects `N`, `N_edges`, `node1`, and `node2`.
+The conditional on the innermost loop does the equivalent work of restricting
+the edges recorded in the parallel arrays `node1` and `node2` to entries in the
+upper triangular part of the adjacency matrix.
+
+#### Computing the Poisson-IAR Model
+
+The model block specifies the vectorized Poisson regression, working on the log scale:
+```
+  y ~ poisson_log(log_E + beta0 + beta1 * x + theta + phi);
+```
+
+The values for the priors are the same as in the Carlin model.
+```
+  beta0 ~ normal(0, inv(sqrt(1e-5)));
+  beta1 ~ normal(0, inv(sqrt(1e-5)));
+  theta_std ~ normal(0, 1);
+  tau_theta ~ gamma(3.2761, 1.81);
+  tau_phi ~ gamma(1, 1);
+```
+
+Computation of the IAR spatial component $\phi$ is distributed across the
+transformed parameters block and the model block.
+
+$\phi$ is constrained $\sum_{i} {\phi}_i = 0$.
+To meet the sum-to-zero constraint we declare the parameter vector `phi_std_raw` of length $N-1$.
+In the transformed parameters block we declare the $N$-length vector `phi` and ensure that it is
+centered on zero:
+```
 parameters {
-  real beta_2;   // slope
-  vector[N_areas] h;  // individual-level spatial effect (IAR)
-  real<lower=0> tau;  // precision param
-  vector[N_areas] re_nc;  // individual-level random effect
-  real<lower=0> sigma;   // scale of random effect
+  ...
+  vector[N - 1] phi_std_raw; // raw, standardized spatial effects
+  ...
 }
 transformed parameters {
-  real neg_tau_div_2 = -tau * 0.5;
-}
-model {
-  real off_diag_weight = -1.0;
-  y ~ poisson_log(beta_2 * x_aff + log_e_pop + h + re_nc * sigma);
-  beta_2 ~ normal(0, 1);
-  tau ~ gamma(1.0, 1.0);  // following Banerjee et al 2003
-  re_nc ~ normal(0, 1);
-  sigma ~ gamma(3.3, 1.8);   // following Banerjee et al 2003
-  target += ((N_areas - 1) * 0.5) * log(tau);
-  for (i in 1:N_areas) { // diagonals
-    target += neg_tau_div_2 * square(h[i]) * diag_weights[i];
-  }
-  for (j in 1:N_links) {   // off-diagonals
-    target += neg_tau_div_2
-              * h[off_diag_coords[j,1]] * h[off_diag_coords[j,2]] * off_diag_weight;
-  }
-}
-generated quantities {
-  real beta_1;
-  vector[N_areas] eta = h + re_nc * sigma;
-  vector[N_areas] mu = exp(beta_2 * x_aff + log_e_pop + eta);
-  vector[N_areas] intercepts;
-  for (i in 1:N_areas) {
-    intercepts[i] = y[i] - mu[i];
-  }
-  beta_1 = mean(intercepts);
+  ...
+  phi[1:(N - 1)] = phi_std_raw;
+  phi[N] = -sum(phi_std_raw);
+  ...
 }
 ```
 
-To run this program with the data, we need to load the following R packages:
+Computation of the pairwise difference is done in the model block.
+From above, $\phi$ is a multivariate normal, with variance $[\tau (D - W)]^{-1}$, which rewrites to:
 
-```{r loadpkgs, comment = NA, message = FALSE, warning = FALSE, results="hide"}
-library(gpclib);
-library(maptools);  
-library(spdep);
-gpclibPermit()
+$$ p(\phi | \tau) \propto \frac{1}{{\tau}^\frac{n}{2}} \exp \left\{ {- \frac{1}{2\tau}} \sum_{i \sim j}{({\phi}_i - {\phi}_j)}^2 \right\} $$
 
-library(rstan)  
-rstan_options(auto_write = TRUE) 
-options(mc.cores = parallel::detectCores())
+The corresponding Stan statement is:
 ```
-The Scotland data from the CARBayes package is included in the directory `scotland_data`:
-
-```{r loaddata, comment = NA, message = FALSE, warning = FALSE, results="hide"}
-scotland_shp = readShapePoly('scotland_data/scotland');
-scotland_shp = scotland_shp[order(scotland_shp$ID),];
-x_aff = scotland_shp$pcaff;
-y = scotland_shp$Observed;
-e_pop = scotland_shp$Expected;
-```
-The `scotland_data` includes the geolocation information used to create
-the adjacency matrix, using functions from the R `maptools` and `spdep` packages.
-We use `spdep` package function `poly2nb` to get a sparse representation of the
-adjacency matrix coded up as an `nb` object which is a list of lists of
-the adjacent counties for each tract, referenced by county id.
-We have written an R script which factors this `nb` object into the
-array of i,j coordinates for the off-diagonal elements of this matrix.
-Given this, we create inputs: `N_areas`, `N_links`,
-`diag_weights`, `off_diag_coords` as follows:
-
-```{r shpdata, comment = NA, message = FALSE, warning = FALSE, results="hide"}
-scotland_nb = poly2nb(scotland_shp); 
-source("munge_data_helper.R") 
-off_diag_coords = get_nb_off_diags(scotland_nb);
-N_areas = length(scotland_nb);
-diag_weights = card(scotland_nb);  
-N_links = nrow(off_diag_coords);
-```
-We use RStan to fit the Stan model `scotland_bym.stan` with this data:
-
-```{r fitscotbym, comment = NA, message = FALSE, warning = FALSE}
-scot_fit = stan("scotland_bym.stan",
-   data=list(N_areas, y, x_aff, e_pop, diag_weights, N_links, off_diag_coords),
-   iter = 10000, warmup = 9000, control = list("adapt_delta=0.99"));
-
-traceplot(scot_fit,
-pars=c("lp__",  "beta_2", "tau", "sigma", "h[1]",  "h[2]",  "re_nc[1]",  "re_nc[2]"));
-
-print(scot_fit,
-  pars=c("lp__",  "beta_1",  "beta_2", "tau", "sigma", "eta[1]", "eta[56]"),
-  probs=c(0.025, 0.5, 0.975));
+  target += -dot_self(phi[node1] - phi[node2]);
 ```
 
-The traceplot indicates that the model has converged; likewise,
-the summary of the model parameters shows Rhat of 1, and good effective
-sample size for all estimated parameters.
+The expression `phi[node1] - phi[node2]` uses Stan's multiple indexing feature to specify
+an array of integer indexes, thus this is a vectorized subtraction operation, the result of which is a vector.
+The `dot_self` function which returns the dot product of this vector with itself, thus computing sum of the squares.
+Because Stan is computing $\phi$ on the unit scale, $\tau$ is 1, and drops out.
+The $\frac{1}{2}$ drops out because of symmetry:  by using only the upper triangular entries in the
+adjacency matrix, we want to count them twice.
+Thus by clever construction of the prior, the data, vectorization, and the fact that Stan computes
+densities on the unit scale only up to a proportional constant, we can efficiently compute
+the IAR spatial component $\phi$.
 
-To check our work, we compare these results to those obtained by using the
-CARBayes implementation of the BYM model, available via function `S.CARbym`:
 
-```{r setupCARBays, comment = NA, message = FALSE, warning = FALSE, results = "hide" }
-library(CARBayes);
-library(CARBayesdata);
+#### Fitting the Model to the Scotland Lip Cancer Dataset
 
-## Read in the Scottish Lipcancer
-data(lipdata)
-
-# munge shpfile components to get weights matrix
-data(lipdbf)
-data(lipshp)
-lipdbf$dbf <- lipdbf$dbf[ ,c(2,1)]
-data.combined <- combine.data.shapefile(data=lipdata, shp=lipshp, dbf=lipdbf)
-W.nb <- poly2nb(data.combined, row.names = rownames(lipdata))
-W.mat <- nb2mat(W.nb, style="B")
-# run CARbayes version of BYM
-formula = y ~ x_aff + offset(log(e_pop));
+To match the Carlin model, where covariate `aff` is divided by 10, we multiply the `x` covariate by 0.1,
+as multiplication is more efficient than division.
+A Stan model which matches the Carlin model is in the file
+[bym_carlin_scotland.stan](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/bym_carlin_scotland.stan).
+It is exactly the same as the above model, save for the Poisson regression which is:
+```
+  y ~ poisson_log(log_E + beta0 + 0.1 * beta1 * x + theta + phi);
 ```
 
-We run this model via command:
+We run this program using the Rstan interface via the R script:
+[fit_scot_stan.R](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/fit_scot_stan.R)
+```{r fit-scot-stan, echo = FALSE, comment = NA, message = FALSE, results = "hide", warning = FALSE}
+source("fit_scot_stan.R")
+```
+After running this script, we print a subset of the fitted parameters to check that the sampler was
+able to fit the data; all Rhat values should be very close to 1.0, and the number of effective samples
+should be in the thousands.
 
 
-```{r runCARBays, comment = NA, message = FALSE, warning = FALSE, results = "hide" }
-model = S.CARbym(formula = formula, family="poisson", W=W.mat, burnin=20000, n.sample=100000);
-````
-
-```{r summaryCARBays, comment = NA, message = FALSE, warning = FALSE}
-# check the fit
-model$summary.results
+```{r print-fit-scot-stan, echo = FALSE, comment = NA, message = FALSE, warning = FALSE}
+print(bym_stanfit, digits=4,
+pars=c("lp__", "beta0", "beta1", "tau_theta", "tau_phi", "sigma_theta", "sigma_phi", "psi", "eta[1]", "eta[2]"),
+probs=c(0.025, 0.975))
 ```
 
-Both Stan and CARBayes produce roughly the same estimates of the slope and intercept regression parameters.
+As a comparison, we include an R script to run the WinBUGS model in OpenBUGS on the same data:
+[fit_scot_bugs.R](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/fit_scot_bugs.R)
+After running the model, we use the function `rstan::monitor` to compare the Stan fit with OpenBUGS fit of
+the WinBUGS model.
+The WinBUGS model uses the suffix ".h" for the heterogeneous random effects component which is "theta"
+in the Stan model, and it uses the suffix ".c" for the IAR spatial effect component which is "phi" in the Stan model.
+The WinBUGS program "alpha" corresponds to the Stan quantity "psi" and the WinBUGS "xi"
+corresponds to the Stan quantities "eta".
 
+```
+                mean  se_mean      sd      2.5%        25%        50%        75%     97.5% n_eff   Rhat
+beta0      -0.292821 0.004952 0.16362  -0.62310  -0.402500  -0.291000 -1.829e-01   0.02528  1092 1.0024
+beta1       0.430032 0.005346 0.15983   0.11229   0.324500   0.431900  5.372e-01   0.73861   894 1.0032
+tau.h       4.630522 0.025351 1.28887   2.50900   3.712500   4.490000  5.402e+00   7.52117  2585 1.0055
+tau.c       2.517394 0.026565 1.00376   1.07000   1.790000   2.348000  3.057e+00   4.92312  1428 1.0014
+sd.h        0.428034 0.001392 0.06218   0.31800   0.384600   0.424000  4.663e-01   0.56290  1996 1.0064
+sd.c        0.576708 0.002922 0.09117   0.40339   0.514800   0.574900  6.357e-01   0.76640   974 1.0058
+alpha       0.572579 0.001709 0.05567   0.45330   0.537900   0.576200  6.115e-01   0.67130  1061 1.0103
+xi[1]       1.232006 0.004781 0.34157   0.53658   1.009000   1.239000  1.469e+00   1.88002  5104 1.0007
+xi[2]       1.066722 0.004442 0.20843   0.66020   0.925175   1.068000  1.208e+00   1.47402  2202 1.0011
+```
+
+We have not yet determined whether or not this is due to differences in the specification of the model
+or differences in the samplers. 
+
+We note that this model is extremely sensitive to the priors on `tau_theta` and `tau_phi`.
+In the Stan model, when these priors are set to normal(0, 1) priors, the fitted model agrees more closely
+with the WinBUGS model.
+In particular, it greatly lowers the value of `tau_phi`.
 
 ## From 56 Counties in Scotland to 709 Census Tracts in Brooklyn
 
@@ -403,14 +379,6 @@ It contains a list of census tract IDs,
 the count of events per tract (`y`),
 and the rate-adjusted population per tract (`x`).
 
-The Stan program is in the file
-[brooklyn_bym.stan](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/brooklyn_bym.stan).
-This program is a variant of `scotland_bym.stan`; the only difference is that
-since the population has already been rate-adjusted and scaled,
-it doesn't include an offset term.
-
-We run this on the Brooklyn census tracts only, so that all areas have at least on neighbor.
-
 ```{r nyc-data-xy-plot, echo = FALSE, comment = NA, message = FALSE, warning = FALSE}
 source("nyc_ped_subset.data.R");
 y = events_all_2001[all_tractIDs %in% bklyn_tractIDs];
@@ -419,42 +387,44 @@ x = pop_adj_2001[all_tractIDs %in% bklyn_tractIDs];
 plot(x,y,xlab="rate-adjusted population (scaled)",ylab="observed events");
 ```
 
+The Stan program is in the file
+[bym_pred_only_norm_priors.stan](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/bym_pred_only_norm_priors.stan).
+This program implements the BYM model for univariate data without an offset term, with normal priors on `tau_theta` and `tau_sigma`.
+
 Spatial information is in a set of files in directory `nycTracts10`.
 The spatial information for the census tracts is obtained via the R `maptools` and `spdep` packages.
-The spatial data required for the Stan program is:
-`N_areas`, `N_links`, `diag_weights`, `off_diag_coords`.
-
-First we create an `nb` object which is a list of all neighbors for each census tract.
+We use these packages to
+create an `nb` object which is a list of all neighbors for each census tract.
 Each list entry is itself a list containing the relative index of the neighboring regions.
-The following sequence of R commands creates these inputs
-for the Brooklyn subset of the data:
+We have written an R helper function `nbdata4stan` that take an `nb` object as input
+and returns a list containing the input data objects `N`, `N_edges, `node1`, and `node2`.
 
-```{r munge-bk, echo = TRUE, comment = NA, message = FALSE, warning = FALSE, results = "hide" }
-# census tracts spatial info
-nyc_all_tracts.shp<-readShapePoly("nycTracts10/nycTracts10");
-# restrict to tracts in study, reorder
-bklyn_tracts <- nyc_all_tracts.shp$GEOID10 %in% bklyn_tractIDs;
-bklyn_tracts.shp <- nyc_all_tracts.shp[bklyn_tracts,]
-bklyn_tracts.shp <- bklyn_tracts.shp[order(bklyn_tracts.shp$GEOID10),]
-nb_bk = poly2nb(bklyn_tracts.shp);
-
-# munge nb object into Stan model inputs
-source("munge_data_helper.R") 
-N_areas = length(nb_bk);
-diag_weights = card(nb_bk);  
-off_diag_coords = get_nb_off_diags(nb_bk);
-N_links = nrow(off_diag_coords);
+We fit this model using only the Brooklyn census tracts, so that all areal units have at least one neighbor.
+There are 709 census tracts, more than 10x's the number of counties in the Scotland lip cancer dataset.
+We assemble the Brooklyn data and fit the model Rstan interface via the R script:
+[fit_brooklyn.R](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/fit_brooklyn.R)
+```{r fit-brooklyn, echo = FALSE, comment = NA, message = FALSE, results = "hide", warning = FALSE}
+source("fit_brooklyn.R")
 ```
 
-The model diagnostics and trace plots indicate that the model fits the data,
-given proper amounts of warm-up iterations
-and increasing the value of the NUTS sampler's `adapt_delta` setting, which 
-controls the target average proposal acceptance probability during Stan’s adaptation period.
+This script uses R's `proc.time()` function to measure how long this model takes to fit the data.
+On a MacBook Pro with 8G of memory and 2 processors, the reported times in seconds are:
+```
+   user  system elapsed 
+ 21.097   1.632 200.232 
+```
 
-```{r fit-brooklyn, echo = TRUE, comment = NA, message = FALSE}
-brooklyn_fit = stan("brooklyn_bym.stan", data=list(N_areas, y, x, diag_weights, N_links, off_diag_coords), iter = 6000, warmup = 5000, control = list("adapt_delta=0.98"));
-print(brooklyn_fit, pars=c("lp__", "beta_1", "beta_2", "tau", "h[1]", "h[2]", "h[3]", "h[4]", "h[5]", "h[6]"), probs=c(0.025, 0.5, 0.975));
-traceplot(brooklyn_fit, pars=c("lp__", "beta_2", "tau", "h[1]", "h[2]", "h[3]"));
+The Rhat and Neff numbers indicates that the model has fit the data:
+```{r print-brooklyn-fit, echo = FALSE, comment = NA, message = FALSE, warning = FALSE}
+print(bk_stanfit,
+      pars=c("lp__", "beta0", "beta1", "tau_theta", "tau_phi", "sigma_theta", "sigma_phi", "psi", "eta[1]", "eta[2]", "eta[3]", "eta[4]", "eta[709]"),
+      probs=c(0.025, 0.5, 0.975));
+```
+
+We can compare these results to using a simple Poisson GLM to fit this data:
+```{r brooklyn-poisson-glm-fit, echo = FALSE, comment = NA, message = FALSE, warning = FALSE}
+r_glm_poisson = glm(y~x,family="poisson")
+print(r_glm_poisson)
 ```
 
 We use `ggplot2` and related packages to plot
@@ -464,12 +434,16 @@ mu is the number of events based on the data and estimated model parameters.
 Note that some Brooklyn census tracts are not in the study.
 
 ```{r setup-plot-data, echo = TRUE, comment = NA, message = FALSE, results = "hide" }
+library(gpclib);
+library(maptools);  
+library(spdep);
+gpclibPermit()
 library(dplyr) 
 library(ggplot2) 
 library(gridExtra)
 
 mu_names = paste("mu[", c(1:709), "]")
-brooklyn_samples = as.data.frame(brooklyn_fit, pars=mu_names)
+brooklyn_samples = as.data.frame(bk_stanfit, pars=mu_names)
 brooklyn_means = apply(brooklyn_samples, 2, mean)
 
 # prepare dfs for ggplot2
@@ -492,16 +466,13 @@ grid.arrange(events_plot, pop_plot, brooklyn_plot, ncol=2)
 ### Discussion
 
 The models developed in this case study allow for analysis of relatively large datasets;
-for the last model in this case study, given a dataset with 709 subregions,
+for the last model in this case study, given a dataset with 709 areal units,
 the fitted model had approximately 1400 parameters.
-Running this on a 2-core MacBook Pro took approximately 5 minutes.
-Due to the improper prior, IAR models are not generative;
-therefore we cannot create simulated data with which to develop and test this model.
 
-The scalability of IAR models, as noted at the outset, derives from the nature of the
-covariance matrix Q and the fact that Stan computes proportional densities, so that
+The scalability of IAR models derives from the nature of the covariance matrix
+and the fact that Stan computes proportional densities, so that
 constant terms drop out.  Furthermore, because spatial adjacency matrices are sparse
-for large numbers of subregions $N$, efficient representations of the contents of these
+for large numbers of areal units $N$, efficient representations of the contents of these
 matrices provides substantial speedup over trying to compute using a full $N \times N$ matrix.
 
 
