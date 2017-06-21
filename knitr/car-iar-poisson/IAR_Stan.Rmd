@@ -429,11 +429,11 @@ print(r_glm_poisson)
 
 We use `ggplot2` and related packages to plot
 the Brooklyn census tracts colored by event counts, scaled population,
-and the generated quantity "mu" from models `brooklyn_bym.stan`,
-mu is the number of events based on the data and estimated model parameters.
+and the generated quantity "mu" which recovers
+the number of events based on the data and the samples.
 Note that some Brooklyn census tracts are not in the study.
 
-```{r setup-plot-data, echo = FALSE, comment = NA, message = FALSE, results = "hide" }
+```{r setup-plot-data, include = FALSE, echo = FALSE, comment = NA, message = FALSE, results = "hide" }
 library(gpclib);
 library(maptools);  
 library(spdep);
