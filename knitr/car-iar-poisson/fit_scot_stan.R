@@ -21,4 +21,8 @@ bym_stanfit = stan("bym_carlin_scotland.stan",
 #print(bym_stanfit, digits=4);
 
 print(bym_stanfit, digits=4,
-pars=c("lp__", "beta0", "beta1", "tau_theta", "tau_phi", "sigma_theta", "sigma_phi", "psi", "eta[1]", "eta[2]"))
+pars=c("lp__", "beta0", "beta1", "tau_theta", "tau_phi", "sigma_phi", "psi", "eta[1]", "eta[2]"))
+
+# pars=c("lp__", "beta0", "beta1", "tau_theta", "tau_phi", "sigma_theta", "sigma_phi", "psi", "eta[1]", "eta[2]"))
+
+
