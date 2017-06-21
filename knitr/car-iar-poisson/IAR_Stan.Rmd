@@ -388,8 +388,8 @@ plot(x,y,xlab="rate-adjusted population (scaled)",ylab="observed events");
 ```
 
 The Stan program is in the file
-[bym_pred_only_norm_priors.stan](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/bym_pred_only_norm_priors.stan).
-This program implements the BYM model for univariate data without an offset term, with normal priors on `tau_theta` and `tau_sigma`.
+[bym_predictor_only.stan](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/bym_predictor_only.stan).
+This program implements the BYM model for univariate data without an offset term.
 
 Spatial information is in a set of files in directory `nycTracts10`.
 The spatial information for the census tracts is obtained via the R `maptools` and `spdep` packages.
@@ -433,7 +433,7 @@ and the generated quantity "mu" from models `brooklyn_bym.stan`,
 mu is the number of events based on the data and estimated model parameters.
 Note that some Brooklyn census tracts are not in the study.
 
-```{r setup-plot-data, echo = TRUE, comment = NA, message = FALSE, results = "hide" }
+```{r setup-plot-data, echo = FALSE, comment = NA, message = FALSE, results = "hide" }
 library(gpclib);
 library(maptools);  
 library(spdep);
@@ -452,14 +452,15 @@ bklyn_pop = pop_adj_2001[bklyn_tracts]
 df1 = data.frame(bklyn_tractIDs, bklyn_events, bklyn_pop, brooklyn_means)
 bkfort = fortify(bklyn_tracts.shp, region="GEOID10")
 pdata = left_join(bkfort, df1, by=c("id" = "bklyn_tractIDs"))
-```
-```{r plot-brooklyn, echo = TRUE, comment = NA, message = FALSE}
+
 events_plot = ggplot() + geom_polygon(data=pdata, aes(x=long, y=lat, group=group, fill=bklyn_events)) +  coord_map() + coord_fixed() + scale_fill_gradientn(limits=c(0, 30), colors=blues9, oob=scales::squish, guide=guide_legend(title="")) + theme(axis.text.x=element_blank(), axis.text.y=element_blank(), axis.title.x=element_blank(), axis.title.y=element_blank()) + ggtitle("Events")
 
 pop_plot = ggplot() + geom_polygon(data=pdata, aes(x=long, y=lat, group=group, fill=bklyn_pop)) + coord_map() + coord_fixed()  + scale_fill_gradientn(limits=c(0, 30), colors=blues9, oob=scales::squish, guide=guide_legend(title="")) + theme(axis.text.x=element_blank(), axis.text.y=element_blank(), axis.title.x=element_blank(), axis.title.y=element_blank()) + ggtitle("Population (rescaled)")
 
 brooklyn_plot = ggplot() + geom_polygon(data=pdata, aes(x=long, y=lat, group=group, fill=brooklyn_means)) + coord_map() + coord_fixed()  + scale_fill_gradientn(limits=c(0, 30), colors=blues9, oob=scales::squish, guide=guide_legend(title="")) + theme(axis.text.x=element_blank(), axis.text.y=element_blank(), axis.title.x=element_blank(), axis.title.y=element_blank()) + ggtitle("Brooklyn BYM estimated events")
+```
 
+```{r plot-brooklyn, echo = TRUE, comment = NA, message = FALSE}
 grid.arrange(events_plot, pop_plot, brooklyn_plot, ncol=2)
 ```
 
@@ -474,6 +475,10 @@ and the fact that Stan computes proportional densities, so that
 constant terms drop out.  Furthermore, because spatial adjacency matrices are sparse
 for large numbers of areal units $N$, efficient representations of the contents of these
 matrices provides substantial speedup over trying to compute using a full $N \times N$ matrix.
+
+### Acknowledgements
+
+Many thanks to Daniel Simpson, Rob Trangucci, Imad Ali, Andrew Gelman, and Bob Carpenter for all their help and encouragement.
 
 
 ### References
