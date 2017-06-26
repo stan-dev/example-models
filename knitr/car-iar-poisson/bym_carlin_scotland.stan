@@ -10,6 +10,7 @@ data {
 }
 transformed data {
   vector[N] log_E = log(E);
+  vector[N] x_div_10 = 0.1 * x;
 }
 parameters {
   real beta0;                // intercept
@@ -32,9 +33,9 @@ transformed parameters {
   phi = phi * sigma_phi;    // non-centered parameterization
 }
 model {
-  y ~ poisson_log(log_E + beta0 + 0.1 * beta1 * x + theta + phi);
+  y ~ poisson_log(log_E + beta0 + beta1 * x_div_10 + theta + phi);
 
-  target += -dot_self(phi[node1] - phi[node2]);
+  target += -0.5 * dot_self(phi[node1] - phi[node2]);
 
   beta0 ~ normal(0, inv(sqrt(1e-5)));   // Carlin WinBUGS priors
   beta1 ~ normal(0, inv(sqrt(1e-5)));
@@ -44,6 +45,7 @@ model {
 }
 generated quantities {
   vector[N] eta = phi + theta;
+  real sum_phi = sum(phi);
   real sd_phi = sd(phi);
   real sd_theta = sd(theta);
   real psi = sd_phi / (sd_theta + sd_phi);  // stat from Banerjee et al.

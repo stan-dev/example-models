@@ -28,7 +28,7 @@ transformed parameters {
 model {
   y ~ poisson_log(beta0 + beta1 * x + theta + phi);
 
-  target += -dot_self(phi[node1] - phi[node2]);
+  target += -0.5 * dot_self(phi[node1] - phi[node2]);
 
   beta0 ~ normal(0, inv(sqrt(1e-5)));
   beta1 ~ normal(0, inv(sqrt(1e-5)));
