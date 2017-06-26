@@ -1,11 +1,11 @@
 carlin_bym <- function() {
 for (i in 1 : N) {
       y[i] ~ dpois(mu[i])
-      log(mu[i]) <- log(E[i]) + beta0 + beta1*x[i]/10 + phi[i]*tau_phi + theta[i]*tau_theta
+      log(mu[i]) <- log(E[i]) + beta0 + beta1*x[i]/10 + phi[i] + theta[i]*tau_theta
       theta[i] ~ dnorm(0.0, 1.0)  # non-centered theta, std normal
       eta[i] <- theta[i] + phi[i]
    }
-   phi[1:N] ~ car.normal(adj[], weights[], num[], 1)
+   phi[1:N] ~ car.normal(adj[], weights[], num[], tau_phi)
 
    beta0 ~ dnorm(0.0, 1.0E-5)  # vague prior on grand intercept
    beta1 ~ dnorm(0.0, 1.0E-5)  # vague prior on covariate effect
