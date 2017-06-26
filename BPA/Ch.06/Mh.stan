@@ -20,7 +20,13 @@ parameters {
   real<lower=0,upper=5> sigma;
   // In case a weakly informative prior is used
   //  real<lower=0> sigma;
-  real<lower=-16,upper=16> eps[M];  // Individual random effects
+  vector[M] sigma_raw;
+}
+
+transformed parameters {
+  vector[M] eps;
+
+  eps = logit(mean_p) + sigma * sigma_raw;
 }
 
 model {
@@ -34,10 +40,8 @@ model {
   //  sigma ~ normal(2.5, 1.25);
 
   // Likelihood
+  sigma_raw ~ normal(0, 1);
   for (i in 1:M) {
-    eps[i] ~ normal(logit(mean_p), sigma) T[-16, 16];
-	     // See web appendix A in Royle (2009)
-
     if (y[i] > 0) {
       // z[i] == 1
       target += bernoulli_lpmf(1 | omega)

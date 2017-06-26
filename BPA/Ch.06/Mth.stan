@@ -22,18 +22,20 @@ parameters {
   real<lower=0,upper=5> sigma;
   // In case a weakly informative prior is used
   //  real<lower=0> sigma;
-  real eps[M];                          // Random effects
+  vector[M] sigma_raw;
 }
 
 transformed parameters {
+  vector[M] eps;                          // Random effects
   real mean_lp[T];
-  vector<lower=0,upper=1>[T] p[M];
+  vector[T] logit_p[M];
 
+  eps = sigma * sigma_raw;
   for (j in 1:T)
     mean_lp[j] = logit(mean_p[j]); // Define logit
   for (i in 1:M)
     for (j in 1:T)
-      p[i][j] = inv_logit(mean_lp[j] + eps[i]);
+      logit_p[i, j] = mean_lp[j] + eps[i];
 }
 
 model {
@@ -45,20 +47,18 @@ model {
   //  sigma ~ normal(2.5, 1.25);
 
   // Likelihood
+  sigma_raw ~ normal(0, 1);
   for (i in 1:M) {
-    eps[i] ~ normal(0, sigma) T[-16, 16];
-             // See web appendix A in Royle (2009)
-
     if (s[i] > 0) {
       // z[i] == 1
       target += bernoulli_lpmf(1 | omega)
-              + bernoulli_lpmf(y[i] | p[i]);
+              + bernoulli_logit_lpmf(y[i] | logit_p[i]);
     } else { // s[i] == 0
       real lp[2];
 
       // z[i] == 1
       lp[1] = bernoulli_lpmf(1 | omega)
-            + bernoulli_lpmf(0 | p[i]);
+            + bernoulli_logit_lpmf(0 | logit_p[i]);
       // z[i] == 0
       lp[2] = bernoulli_lpmf(0 | omega);
       target += log_sum_exp(lp[1], lp[2]);
@@ -67,16 +67,22 @@ model {
 }
 
 generated quantities {
+  vector<lower=0,upper=1>[T] p[M];
   int<lower=0,upper=1> z[M];
   int<lower=C> N;
 
   for (i in 1:M) {
+    for (j in 1:T)
+      p[i, j] = inv_logit(logit_p[i, j]);
+
     if(s[i] > 0) {  // animal was detected at least once
       z[i] = 1;
     } else {        // animal was never detected
       real pr;      // prob never detected given present
+
       pr = prod(rep_vector(1.0, T) - p[i]);
       z[i] = bernoulli_rng(omega * pr / (omega * pr + (1 - omega)));
     }
   }
-  N = sum(z);}
+  N = sum(z);
+}

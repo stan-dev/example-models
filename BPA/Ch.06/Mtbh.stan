@@ -23,27 +23,25 @@ parameters {
   real<lower=0,upper=3> sigma;
   // In case a weakly informative prior is used
   //  real<lower=0> sigma;
-  real<lower=-16,upper=16> eps[M];
+  vector[M] sigma_raw;
 }
 
 transformed parameters {
+  vector[M] eps;
   real alpha[T];
-  vector<lower=0,upper=1>[T] p[M];
+  vector[T] logit_p[M];
 
+  eps = sigma * sigma_raw;
   for (j in 1:T)
     alpha[j] = logit(mean_p[j]); // Define logit
   for (i in 1:M) {
-    real logit_p;
 
     // First occasion: no term for recapture (gamma)
-    logit_p = alpha[1] + eps[i];
-    p[i][1] = inv_logit(logit_p);
+    logit_p[i, 1] = alpha[1] + eps[i];
 
     // All subsequent occasions: includes recapture term (gamma)
-    for (j in 2:T) {
-      logit_p = alpha[j] + eps[i] + gamma * y[i, j - 1];
-      p[i][j] = inv_logit(logit_p);
-    }
+    for (j in 2:T)
+      logit_p[i, j] = alpha[j] + eps[i] + gamma * y[i, j - 1];
   }
 }
 
@@ -58,20 +56,19 @@ model {
   //  sigma ~ normal(1.5, 0.75);
 
   // Likelihood
+  sigma_raw ~ normal(0, 1);
+
   for (i in 1:M) {
     real lp[2];
-
-    eps[i] ~ normal(0, sigma) T[-16, 16];
-             // See web appendix A in Royle (2009)
 
     if (s[i] > 0) {
       // z[i] == 1
       target += bernoulli_lpmf(1 | omega)
-              + bernoulli_lpmf(y[i] | p[i]);
+              + bernoulli_logit_lpmf(y[i] | logit_p[i]);
     } else { // s[i] == 0
       // z[i] == 1
       lp[1] = bernoulli_lpmf(1 | omega)
-            + bernoulli_lpmf(0 | p[i]);
+            + bernoulli_logit_lpmf(0 | logit_p[i]);
       // z[i] == 0
       lp[2] = bernoulli_lpmf(0 | omega);
       target += log_sum_exp(lp[1], lp[2]);
@@ -80,10 +77,14 @@ model {
 }
 
 generated quantities {
+  vector<lower=0,upper=1>[T] p[M];
   int<lower=0,upper=1> z[M];
   int<lower=C> N;
 
   for (i in 1:M) {
+    for (j in 1:T)
+      p[i, j] = inv_logit(logit_p[i, j]);
+
     if(s[i] > 0) {  // animal was detected at least once
       z[i] = 1;
     } else {        // animal never detected
