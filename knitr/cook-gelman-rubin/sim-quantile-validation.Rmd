@@ -1,8 +1,7 @@
 ---
-title: "Validating Bayesian Model Implementations via Posterior
-Coverage with Simulated Data"
+title: "Validating Bayesian Samplers with Simulated Data"
 author: "Bob Carpenter"
-date: "2 April 2017"
+date: "30 May 2017"
 output:
   html_document:
     fig_caption: yes
@@ -20,22 +19,24 @@ knitr::opts_chunk$set(echo = TRUE)
 ## Abstract
 
 Clear specification and rigorous testing is the foundation of robust
-software development.  A general approach to testing the combination
-of a Bayesian model implementation and posterior sampling algorithm is
-to verify that under repeated simulations of parameters and data from
-the model, the posterior coverage is properly calibrated.  The
-following paper introduces a general test statistic for evaluating
-posterior calibration of sampling algorithms.
+software development.  This case study demonstrates a general approach
+to testing Bayesian sampling algorithms due to Cook, Gelman, and Rubin
+and oultined in
 
 * Cook, Samantha R., Andrew Gelman, and Donald
   B. Rubin. 2006. [Validation of software for Bayesian models using
   posterior
-  quantiles](http://stat.columbia.edu/~gelman/research/published/Cook_Software_Validation.pdf).
-  *Journal of Computational and Graphical Statistics* 15(3):675--692.
+  quantiles](http://stat.columbia.edu/~gelman/research/published/Cook_Software_Validation.pdf).  *Journal of Computational and Graphical Statistics* 15(3):675--692.
 
-This case study demonstrates how to carry out Cook et al.'s test for
-Bayesian models implemented as Stan programs and fit using Stan's
-samplers.
+The basic idea is to repeatedly simulate data from a specific Bayesian
+model; this is done by simulating parameters from the prior and then
+simulating observed data from the sampling distribution.  If the
+software is working correctly, the posteriors it produces will be
+properly calibrated under repeated simulation. For example, roughly
+50% of the 50% intervals will contain the simulated parameter value.
+Cook et al. convert this into a statistical test, the calculation of
+which we demonstrate in R for Bayesian models implemented in Stan.
+
 
 ## Outline
 
@@ -51,17 +52,19 @@ programs.
 
 ### Bayesian model specification
 
-We will assume that a Bayesian model is provided as
+We will assume that a Bayesian model is provided in the usual way as a
+prior and sampling distribution.  Specifically we assume that
 
-* a prior $p(\theta)$ over model parameters $\theta \in \mathbb{R}^K$, and
+* the prior is given as a probability function $p(\theta)$
+  over model parameters $\theta \in \mathbb{R}^K$, and
 
-* a sampling probability function $p(y \, | \, \theta)$ over a vector
-  $y \in \mathbb{R}^N$ of data given the model parameters.
-
+* the sampling idstirbution is given as a probability function $p(y
+  \mid \theta)$ over a vector $y \in \mathbb{R}^N$ of data given the
+  model parameters $\theta$.
 
 <div style="width:35%; float:right; padding:1em 1em 1em 1em">
 ![<small>Figure 1. <i>The steps involved for one replication of Cook
-et al.'s validation process.  Image from Cook et al. (1996, Figure
+et al.'s validation process.  Image from (Cook et al. 2006, figure
 2)</i></small>.](cook-gelman-rubin-fig2.png)
 </div>
 
@@ -73,30 +76,30 @@ Suppose we have a secondary program with which we
   distribution $p(\theta)$, and
 
 * simulate data $y^{(0)}$ according to the sampling distribution
-  $p(y \, | \, \theta^{(0)})$.
+  $p(y \mid \theta^{(0)})$.
 
 The chain rule shows that this is also
 
 * a draw $\left( y^{(0)}, \theta^{(0)} \right)$ from the joint distribution
-  $p(y, \theta) \propto p(y \, | \, \theta) \ p(\theta)$.
+  $p(y, \theta) \propto p(y \mid \theta) \ p(\theta)$.
 
 From Bayes's rule, we see that we now have
 
-* a draw $\theta^{(0)}$ from the posterior distribution $p(\theta \, | \, y^{(0)}) \propto p(y^{(0)}, \theta)$.
+* a draw $\theta^{(0)}$ from the posterior distribution $p(\theta \mid y^{(0)}) \propto p(y^{(0)}, \theta) \, = \, p(y^{(0)} \mid \theta) \, p(\theta)$.
 
 
-### MCMC calculation of quantiles
+### MCMC calculation of posterior quantiles
 
-Now suppose we have a way to
+Now suppose we have a proposed method for sampling, the goal of which is to
 
-* draw $\theta^{(1)}, \ldots, \theta^{(M)}$ from the posterior $p(\theta \, | \, y^{(0)})$
+* draw $\theta^{(1)}, \ldots, \theta^{(M)}$ from the posterior $p(\theta \mid y^{(0)})$
 
 Then we can estimate posterior quantiles for the components of
 $\theta^{(0)}$ based on the draws $\theta^{(1)}, \ldots \theta^{(M)}$, as
 
 
 \[
-\hat{q}_k
+{\hat{q}}{\mbox{}_k}
 \ \approx \
 \frac{1}{M} \sum_{m = 1}^M \mathrm{I}[ \theta^{(m)}_k < \theta^{(0)}_k ].
 \]
@@ -113,7 +116,7 @@ that as $M \rightarrow \infty$,
 \hat{q}_k \ \sim \ \mathsf{Uniform}(0, 1).
 \]
 
-Cook et al. provide a more rigorous proof of this (their Thereom 1).
+Cook et al. provide a slightly more rigorous proof of this (their Thereom 1).
 For practical applications, convergence within a finite $M$ will
 require geometric ergodicity of the sampler for the model, a property
 which will be tested along with other aspects of the sampler and model
@@ -121,7 +124,7 @@ implementation.
 
 ### Ramification for Bayesian posterior calibration
 
-As a consequence of the quantiles being uniform, we automatically get calibrated posterior coverage.  Specifically, if we simulate $\theta^{(0)}$ from the prior and $y^{(0)}$ from the sampling distribution conditioned on $\theta^{(0)}$, the the posterior $p(\theta \, | \, y^{(0)})$ should have $p\%$ intervals that can be expected to contain the simulated parameter value $p\%$ of the time.
+As a consequence of the quantiles being uniform, we automatically get calibrated posterior coverage.  Specifically, if we simulate $\theta^{(0)}$ from the prior and $y^{(0)}$ from the sampling distribution conditioned on $\theta^{(0)}$, the the posterior $p(\theta \mid y^{(0)})$ should have $p\%$ intervals that can be expected to contain the simulated parameter value $p\%$ of the time.
 
 
 # Test Statistic
@@ -143,7 +146,7 @@ where $\Phi$ is the standard normal cumulative distribution function,
 \Phi(v)
 \ = \
 \int_{-\infty}^v
-\mathsf{Normal}(w \, | \, 0, 1) \, \mathrm{d}w,
+\mathsf{Normal}(w \mid 0, 1) \, \mathrm{d}w,
 \]
 and $\Phi^{-1}$ is its inverse (i.e., the function that maps a
 quantile value in $(0, 1)$ to the value in the standard normal
@@ -154,8 +157,7 @@ distribution with that quantile).
 Cook et al. define a test statitisic that is equal to the sum of the
 squared z-scores for $I$ replicated tests, each of which generates a
 new $\theta^{(0)}$ and $y^{(0)}$ and samples a sequence $\theta^{(1)},
-\ldots, \theta^{(M)}$ from the corresponding posterior $p(\theta \, |
-\, y^{(0)})$, to generate a posterior quantile estimate
+\ldots, \theta^{(M)}$ from the corresponding posterior $p(\theta \mid y^{(0)})$, to generate a posterior quantile estimate
 $\hat{q}^{(i)}_k$ for the $k$-th component of the posterior,
 
 \[
@@ -326,10 +328,10 @@ options(mc.cores = 5);
 
 fit <- stan("norm-hier-nonctr.stan",
             data = c("J", "N", "y"),
-            control = list(stepsize = 0.01,
-                           adapt_delta = 0.95),
+            control = list(stepsize = 0.001,
+                           adapt_delta = 0.99),
             seed = 12345,
-            refresh = 0);
+            refresh = 0, open_progress=FALSE);
 ```
 
 and then print the results for the parameters of interest,
@@ -391,14 +393,14 @@ q_hat_sigma <- c();  q_hat_alpha1 <- c();
 z_hat_mu <- c();     z_hat_tau <- c();
 z_hat_sigma <- c();  z_hat_alpha1 <- c();
 
-I <- 20;
+I <- 4;
 for (i in 1:I) {
   # simulate
   J <- 6;
   N <- c(33, 21, 22, 22, 24, 11);
-  mu <- rnorm(1, 5, 5);
-  tau <- abs(rnorm(1, 0, 5));
-  sigma <- abs(rnorm(1, 0, 5));
+  mu <- rnorm(1, 5, 2);
+  tau <- abs(rnorm(1, 0, 3));
+  sigma <- abs(rnorm(1, 0, 2.5));
   alpha <- rnorm(J, mu, tau);
   y <- c();
   begin <- 1;
@@ -411,10 +413,10 @@ for (i in 1:I) {
   # fit
   fit <- stan("norm-hier-nonctr.stan",
               data = c("J", "N", "y"),
-              control = list(stepsize = 0.005,
+              control = list(stepsize = 0.001,
                              adapt_delta = 0.99),
               iter = 5000,
-              refresh = 0);
+              refresh = 0, open_progress=FALSE);
   draws <- extract(fit);
 
   # need a bit of a prior here on the mean
