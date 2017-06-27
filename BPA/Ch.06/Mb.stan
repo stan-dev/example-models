@@ -29,11 +29,11 @@ transformed parameters {
 
   for (i in 1:M) {
     // First occasion
-    p_eff[i][1] = p;
+    p_eff[i, 1] = p;
 
     // All subsequent occasions
     for (j in 2:T)
-      p_eff[i][j] = (1 - y[i, j - 1]) * p + y[i, j - 1] * c;
+      p_eff[i, j] = (1 - y[i, j - 1]) * p + y[i, j - 1] * c;
   }
 }
 
@@ -43,32 +43,21 @@ model {
   //  p ~ uniform(0, 1);
 
   // Likelihood
-  for (i in 1:M) {
-    real lp[2];
-
-    if (s[i] > 0) {
+  for (i in 1:M)
+    if (s[i] > 0)
       // z[i] == 1
       target += bernoulli_lpmf(1 |  omega)
               + bernoulli_lpmf(y[i] |  p_eff[i]);
-    } else { // s[i] == 0
-      // z[i] == 1
-      lp[1] = bernoulli_lpmf(1 |  omega)
-            + bernoulli_lpmf(0 | p_eff[i]);
-      // z[i] == 0
-      lp[2] = bernoulli_lpmf(0 | omega);
-      target += log_sum_exp(lp[1], lp[2]);
-    }
-  }
+    else // s[i] == 0
+      target += log_sum_exp(bernoulli_lpmf(1 |  omega)   // z[i] == 1
+                            + bernoulli_lpmf(0 | p_eff[i]),
+                            bernoulli_lpmf(0 | omega));  // z[i] == 0
 }
 
 generated quantities {
-  int<lower=C, upper=M> N;
-  real trap_response;
-  real omega_nd;  // prob present given never detected
+  // prob present given never detected
   // animals never detected have not been detected before, so p.eff == p
-  omega_nd = (omega * (1 - p)^T) / (omega * (1 - p)^T + (1 - omega));
-
-  N = C + binomial_rng(M - C, omega_nd);
-
-  trap_response = c - p;
+  real omega_nd = (omega * (1 - p)^T) / (omega * (1 - p)^T + (1 - omega));
+  int<lower=C, upper=M> N = C + binomial_rng(M - C, omega_nd);
+  real trap_response = c - p;
 }

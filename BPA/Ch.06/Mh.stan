@@ -20,37 +20,32 @@ parameters {
   real<lower=0,upper=5> sigma;
   // In case a weakly informative prior is used
   //  real<lower=0> sigma;
-  real<lower=-16,upper=16> eps[M];  // Individual random effects
+  vector[M] eps_raw;
+}
+
+transformed parameters {
+  vector[M] eps = logit(mean_p) + sigma * eps_raw;
 }
 
 model {
-  real lp[2];
-
   // Priors are implicitly defined.
   //  omega ~ uniform(0, 1);
   //  mean_p ~ uniform(0, 1);
   //  sigma ~ uniform(0, 5);
   // In case a weakly informative is used
   //  sigma ~ normal(2.5, 1.25);
+  eps_raw ~ normal(0, 1);
 
   // Likelihood
-  for (i in 1:M) {
-    eps[i] ~ normal(logit(mean_p), sigma) T[-16, 16];
-	     // See web appendix A in Royle (2009)
-
-    if (y[i] > 0) {
+  for (i in 1:M)
+    if (y[i] > 0)
       // z[i] == 1
       target += bernoulli_lpmf(1 | omega)
               + binomial_logit_lpmf(y[i] | T, eps[i]);
-    } else { // y[i] == 0
-      // z[i] == 1
-      lp[1] = bernoulli_lpmf(1 | omega)
-            + binomial_logit_lpmf(0 | T, eps[i]);
-      // z[i] == 0
-      lp[2] = bernoulli_lpmf(0 | omega);
-      target += log_sum_exp(lp[1], lp[2]);
-    }
-  }
+    else // y[i] == 0
+      target += log_sum_exp(bernoulli_lpmf(1 | omega)   // z[i] == 1
+                            + binomial_logit_lpmf(0 | T, eps[i]),
+                            bernoulli_lpmf(0 | omega)); // z[i] == 0
 }
 
 generated quantities {
