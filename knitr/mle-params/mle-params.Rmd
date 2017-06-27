@@ -1,10 +1,10 @@
 ---
-title: "Impact of reparameterization on point estimates"
+title: "The Impact of Reparameterization on Point Estimates"
 author: "Bob Carpenter"
 date: "24 April 2016"
-output: 
-  html_document: 
-    theme: cerulean
+output:
+  html_document:
+    theme: readable
 ---
 
 ### Abstract
@@ -34,9 +34,9 @@ against").  If $\theta = 0.5$, then the odds are $1{:}1$, or "even".
 
 The log odds is just the logarithm of the odds, and the function
 $\mathrm{logit}:(0,1) \rightarrow \mathbb{R}$ converts chance of
-success to log odds by 
+success to log odds by
 \[
- \mathrm{logit}(\theta) 
+ \mathrm{logit}(\theta)
 \ = \
 \log \frac{\theta}{1 - \theta}.
 \]
@@ -47,7 +47,7 @@ are just $\log 3$, or about $1.10$, whereas if the chance of success
 is $0.25$, the log odds are just $\log \frac{1}{3} = -\log 3$, or
 about $-1.10$. The log-odds transform has the symmetry
 \[
-\mathrm{logit}(\theta) 
+\mathrm{logit}(\theta)
 \ = \
 -\mathrm{logit}(1 - \theta),
 \]
@@ -119,7 +119,7 @@ statistic and note that the binomial coefficients are constant).
 The first model involves a direct parameterization of the joint
 density of the chance-of-success $\theta$ and observed data $y$.
 \[
-p(\theta, y \, | \, N) 
+p(\theta, y \, | \, N)
 \ \propto \
 p(y \, | \, \theta, N) \, p(\theta)
 \]
@@ -133,9 +133,9 @@ p(y \, | \, \theta, N)
 We can assume a uniform prior for the sake of simplicity, but it is
 not a critical detail.
 \[
-p(\theta) 
+p(\theta)
 \ = \
-\mathsf{Uniform}(\theta \, | \, 0, 1) 
+\mathsf{Uniform}(\theta \, | \, 0, 1)
 \ = \
 1.
 \]
@@ -190,7 +190,7 @@ As the prior is uniform in $\theta$, the posterior mode for $\theta$ is equal to
 likelihood estimate $\theta^*$ calculated analytically above.
 
 Next, we can fit the same model using Stan's default MCMC algorithm for
-Bayesian posteriors. 
+Bayesian posteriors.
 
 ```{r comment=NA}
 fit_bayes_prob <- sampling(model_prob, data=c("N", "y"),
@@ -298,11 +298,11 @@ the distribution of a variable $\alpha = f(\theta)$.  To preserve
 probability mass (intervals in the univariate setting) under change
 of variables, the resulting density is
 \[
-p(\alpha) 
+p(\alpha)
 \ = \
 p(f^{-1}(\alpha))
 \,
-\left|  
+\left|
 \frac{d}{d\alpha} f^{-1}(\alpha)
 \right|,
 \]
@@ -328,7 +328,7 @@ adjustment is
 \]
 Writing it out in full,
 \[
-p(\alpha) 
+p(\alpha)
 \ = \
 p(\mathrm{logit}^{-1}(\alpha))
 \times \mathrm{logit}^{-1}(\alpha)
@@ -424,7 +424,7 @@ $\mathrm{logit}(\theta)$ has a unit logistic distribution.  We have
 already derived the probability density function, which is simply the
 uniform probability distribution times the Jacobian, or in symbols,
 \[
-\mathsf{Logistic}(y) 
+\mathsf{Logistic}(y)
 \ = \
 \mathrm{logit}^{-1}(y) \times (1 - \mathrm{logit}^{-1}(y))
 \ = \
@@ -477,6 +477,13 @@ Bayesian quantity](https://en.wikipedia.org/wiki/No_true_Scotsman).
 <br />
 
 <hr />
+
+## Acknowledgements
+
+Thanks to Stijn de Waele for corrections and clarifications on the
+first version of this document.
+
+<br />
 
 ##### Licensing
 

@@ -7,14 +7,14 @@ data {
 }
 
 transformed data {
-  int<lower=0,upper=T> sum_y[R];  // Number of occupation for each site
+  int<lower=0,upper=T> sum_y[R];  // Number of detections for each site
   int<lower=0,upper=R> occ_obs;   // Number of observed occupied sites
 
-  occ_obs <- 0;
+  occ_obs = 0;
   for (i in 1:R) {
-    sum_y[i] <- sum(y[i]);
+    sum_y[i] = sum(y[i]);
     if (sum_y[i])
-      occ_obs <- occ_obs + 1;
+      occ_obs = occ_obs + 1;
   }
 }
 
@@ -33,19 +33,19 @@ model {
       1 ~ bernoulli(psi);
       y[i] ~ bernoulli(p);
     } else {
-                                     // Occurred and not observed
-      increment_log_prob(log_sum_exp(bernoulli_log(1, psi)
-                                     + bernoulli_log(0, p) * T,
-                                     // Not occurred
-                                     bernoulli_log(0, psi)));
+                            // Occurred and not observed
+      target += log_sum_exp(bernoulli_lpmf(1 | psi)
+                            + bernoulli_lpmf(0 | p) * T,
+                            // Not occurred
+                            bernoulli_lpmf(0 | psi));
     }
   }
 }
 
 generated quantities {
-  real<lower=occ_obs> occ_fs;
-
-  // Observed number of occupied sites
-  // + Number of sites occupied and not observed
-  occ_fs <- occ_obs + binomial_rng(R, psi * (1.0 - p)^T);
+  int<lower=occ_obs, upper=R> occ_fs;
+  real psi_nd;  // prob occurred given not detected
+  
+  psi_nd = (psi * (1 - p)^T) / (psi * (1 - p)^T + (1 - psi));
+  occ_fs = occ_obs + binomial_rng(R - occ_obs, psi_nd);
 }

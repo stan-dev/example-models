@@ -36,7 +36,8 @@ inits <- lapply(1:nc, function(i)
 ipm_pred <- stan("ipm_pred.stan",
                  data = stan_data, init = inits, pars = params,
                  chains = nc, iter = ni, warmup = nb, thin = nt,
-                 seed = 4,
-                 control = list(adapt_delta = 0.95),
+                 seed = 1,
+                 control = list(adapt_delta = 0.99),
                  open_progress = FALSE)
+## Divergent transitions after warmup may occur.
 print(ipm_pred, digits = 3)

@@ -62,16 +62,13 @@ model {
 }
 
 generated quantities {
-  int<lower=0,upper=1> zero[M];
-  int<lower=C> N;
+  int<lower=C, upper=M> N;
   real trap_response;
+  real omega_nd;  // prob present given never detected
+  // animals never detected have not been detected before, so p.eff == p
+  omega_nd = (omega * (1 - p)^T) / (omega * (1 - p)^T + (1 - omega));
 
-  for (i in 1:M) {
-    real pr;
+  N = C + binomial_rng(M - C, omega_nd);
 
-    pr = prod(rep_vector(1.0, T) - p_eff[i]);
-    zero[i] = bernoulli_rng(omega * pr);
-  }
-  N = C + sum(zero);
   trap_response = c - p;
 }

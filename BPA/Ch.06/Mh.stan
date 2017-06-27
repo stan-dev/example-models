@@ -54,14 +54,17 @@ model {
 }
 
 generated quantities {
-  int<lower=0,upper=1> zero[M];
+  int<lower=0,upper=1> z[M];
   int<lower=C> N;
 
   for (i in 1:M) {
-    real pr;
-
-    pr = (1.0 - inv_logit(eps[i]))^T;
-    zero[i] = bernoulli_rng(omega * pr);
+    if(y[i] > 0) {  // animal was detected at least once
+      z[i] = 1;
+    } else {        // animal was never detected
+      real qT;
+      qT = (inv_logit(-eps[i]))^T;  // q^T where q = 1 - p; prob never detected given present
+      z[i] = bernoulli_rng(omega * qT / (omega * qT + (1 - omega)));
+    }
   }
-  N = C + sum(zero);
+  N = sum(z);
 }

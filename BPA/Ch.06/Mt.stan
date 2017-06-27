@@ -47,8 +47,10 @@ model {
 
 generated quantities {
   int<lower=C> N;
-  real pr;
-
+  real pr;        // prob never captured given present
+  real omega_nd;  // prob present given never captured; same for all animals
+  
   pr = prod(rep_vector(1.0, T) - p);
-  N = C + binomial_rng(M, omega * pr);
+  omega_nd = (omega * pr) / (omega * pr + (1 - omega));
+  N = C + binomial_rng(M - C, omega_nd);
 }

@@ -10,17 +10,17 @@ functions {
    *
    * @return Log probability
    */
-  real real_poisson_log(real n, real lambda) {
+  real real_poisson_lpdf(real n, real lambda) {
     real lp;
 
     if (lambda < 0) {
       reject("lambda must be non-negative; found lambda=", lambda);
-    } else if (n < 0.0) {
+    } else if (n < 0) {
       reject("n must not be negative; found n=", n);
     } else {
-      return n * log(lambda) - lambda - lgamma(n + 1);
+      lp = n * log(lambda) - lambda - lgamma(n + 1);
     }
-    return negative_infinity();
+    return lp;
   }
 
   /**
@@ -33,7 +33,7 @@ functions {
    *
    * @return Log probability
    */
-  real real_binomial_log(real n, real N, real theta) {
+  real real_binomial_lpdf(real n, real N, real theta) {
     real lp;
 
     if (N < 0) {
@@ -41,93 +41,102 @@ functions {
     } else if (theta < 0 || theta > 1) {
       reject("theta must be in [0,1]; found theta=", theta);
     } else if (n < 0 || n > N) {
-      reject("n must be in [0:N]; found n=", n);
+      reject("n must be in [0,N]; found n=", n);
     } else {
-      return binomial_coefficient_log(N, n)
-        + n * log(theta) + (N - n) * log(1.0 - theta);
+      lp = lchoose(N, n) + n * log(theta) + (N - n) * log(1 - theta);
     }
-    return negative_infinity();
+    return lp;
   }
 
   /**
-   * Return m-array of juveniles
+   * Return m-array  cell probabilities for juveniles
    *
    * @param nyears Number of years
    * @param phij   Survival probability
    * @param p      Recapture probability
    *
-   * @return m-array
+   * @return m-array cell probabilities for juveniles
    */
   vector[] marray_juveniles(int nyears, vector phij, vector phia, vector p) {
-    vector[nyears] pr_j[nyears - 1];
-    vector[nyears-1] q;
+    int ny_minus_1 = nyears - 1;
+    vector[nyears] pr_j[ny_minus_1];
+    vector[ny_minus_1] q = 1 - p;
+    real prod_phi;
+    real prod_q;
 
-    q <- 1.0 - p;
-
-    // m-array cell probabilities for juveniles
-    for (t in 1:(nyears - 1)) {
-
+    for (t in 1:ny_minus_1) {
       // Main diagonal
-      pr_j[t, t] <- phij[t] * p[t];
+      pr_j[t, t] = phij[t] * p[t];
 
       // Above main diagonal
-      for (j in (t + 1):(nyears - 1))
-        pr_j[t, j] <- phij[t] * prod(phia[(t + 1):j])
-          * prod(q[t:(j - 1)]) * p[j];
-
+      prod_phi = 1;
+      prod_q = 1;
+      for (j in (t + 1):ny_minus_1) {
+        prod_phi = prod_phi * phia[j];
+        prod_q = prod_q * q[j - 1];
+        pr_j[t, j] = phij[t] * prod_phi * prod_q * p[j];
+      }
       // Below main diagonal
       for (j in 1:(t - 1))
-        pr_j[t, j] <- 0.0;
+        pr_j[t, j] = 0;
 
       // Last column: probability of non-recapture
-      pr_j[t, nyears] <- 1.0 - sum(pr_j[t, 1:(nyears - 1)]);
-    } //t
+      pr_j[t, nyears] = 1 - sum(pr_j[t, 1:(nyears - 1)]);
+    }
     return pr_j;
   }
 
   /**
-   * Return m-array of adults
+   * Return m-array cell probabilities for adults
    *
    * @param nyears Number of years
    * @param phia   Survival probability
    * @param p      Recapture probability
    *
-   * @return m-array
+   * @return m-array cell probabilities for adults
    */
   vector[] marray_adults(int nyears, vector phia, vector p) {
-    vector[nyears] pr_a[nyears - 1];
-    vector[nyears-1] q;
+    int ny_minus_1 = nyears - 1;
+    vector[nyears] pr_a[ny_minus_1];
+    vector[nyears-1] q = 1 - p;
+    real prod_phi;
+    real prod_q;
 
-    q <- 1.0 - p;
-
-    // m-array cell probabilities for adults
     for (t in 1:(nyears - 1)) {
-
       // Main diagonal
-      pr_a[t, t] <- phia[t] * p[t];
+      pr_a[t, t] = phia[t] * p[t];
 
       // Above main diagonal
-      for (j in (t + 1):(nyears - 1))
-        pr_a[t, j] <- prod(phia[t:j]) * prod(q[t:(j - 1)]) * p[j];
+      prod_phi = phia[t];
+      prod_q = 1;
+      for (j in (t + 1):(nyears - 1)) {
+        prod_phi = prod_phi * phia[j];
+        prod_q = prod_q * q[j - 1];
+        pr_a[t, j] = prod_phi * prod_q * p[j];
+      }
 
       // Below main diagonal
       for (j in 1:(t - 1))
-        pr_a[t, j] <- 0.0;
+        pr_a[t, j] = 0;
 
       // Last column
-      pr_a[t, nyears] <- 1.0 - sum(pr_a[t, 1:(nyears - 1)]);
-    } //t
+      pr_a[t, nyears] = 1 - sum(pr_a[t, 1:(nyears - 1)]);
+    }
     return pr_a;
   }
 }
 
 data {
-  int nyears;                      // Number of years
-  int y[nyears];                   // Population counts
-  int J[nyears-1];                 // Productivity data
-  int R[nyears-1];
-  int marray_j[nyears-1, nyears];  // m-array for juveniles
-  int marray_a[nyears-1, nyears];  // m-array for adults
+  int nyears;                        // Number of years
+  int y[nyears];                     // Population counts
+  int J[nyears - 1];                 // Productivity data
+  int R[nyears - 1];
+  int marray_j[nyears - 1, nyears];  // Data in m-array format for juveniles
+  int marray_a[nyears - 1, nyears];  // Data in m-array format for adults
+}
+
+transformed data {
+  int ny_minus_1 = nyears - 1;
 }
 
 parameters {
@@ -139,10 +148,10 @@ parameters {
   real l_mfec;
   real l_mim;
   real l_p;
-  vector[nyears-1] epsilon_phij_raw;
-  vector[nyears-1] epsilon_phia_raw;
-  vector[nyears-1] epsilon_fec_raw;
-  vector[nyears-1] epsilon_im_raw;
+  vector[ny_minus_1] epsilon_phij_raw;
+  vector[ny_minus_1] epsilon_phia_raw;
+  vector[ny_minus_1] epsilon_fec_raw;
+  vector[ny_minus_1] epsilon_im_raw;
   real<lower=0> sig_phij;
   real<lower=0> sig_phia;
   real<lower=0> sig_fec;
@@ -150,45 +159,45 @@ parameters {
 }
 
 transformed parameters {
-  vector[nyears-1] epsilon_phij;
-  vector[nyears-1] epsilon_phia;
-  vector[nyears-1] epsilon_fec;
-  vector[nyears-1] epsilon_im;
-  vector<lower=0,upper=1>[nyears-1] phij;  // Juv. apparent survival
-  vector<lower=0,upper=1>[nyears-1] phia;  // Adult apparent survival
-  vector<lower=0>[nyears-1]         f;     // Productivity
-  vector<lower=0>[nyears-1]         omega; // Immigration
-  vector<lower=0,upper=1>[nyears-1] p;     // Recapture probability
-  vector<lower=0>[nyears] Ntot;            // Number of total individuals
-  vector<lower=0>[nyears-1] rho;
-  simplex[nyears] pr_j[nyears-1];
-  simplex[nyears] pr_a[nyears-1];
+  vector[ny_minus_1] epsilon_phij;
+  vector[ny_minus_1] epsilon_phia;
+  vector[ny_minus_1] epsilon_fec;
+  vector[ny_minus_1] epsilon_im;
+  vector<lower=0,upper=1>[ny_minus_1] phij;  // Juv. apparent survival
+  vector<lower=0,upper=1>[ny_minus_1] phia;  // Adult apparent survival
+  vector<lower=0>[ny_minus_1]         f;     // Productivity
+  vector<lower=0>[ny_minus_1]         omega; // Immigration
+  vector<lower=0,upper=1>[ny_minus_1] p;     // Recapture probability
+  vector<lower=0>[nyears] Ntot;              // Number of total individuals
+  vector<lower=0>[ny_minus_1] rho;
+  simplex[nyears] pr_j[ny_minus_1];
+  simplex[nyears] pr_a[ny_minus_1];
 
   // Distribution of error terms
-  epsilon_phij <- sig_phij * epsilon_phij_raw;
-  epsilon_phia <- sig_phia * epsilon_phia_raw;
-  epsilon_fec <- sig_fec * epsilon_fec_raw;
-  epsilon_im <- sig_im * epsilon_im_raw;
+  epsilon_phij = sig_phij * epsilon_phij_raw;
+  epsilon_phia = sig_phia * epsilon_phia_raw;
+  epsilon_fec = sig_fec * epsilon_fec_raw;
+  epsilon_im = sig_im * epsilon_im_raw;
 
   // Constrain parameters
   for (t in 1:(nyears - 1)) {
-    phij[t] <- inv_logit(l_mphij + epsilon_phij[t]);
-    phia[t] <- inv_logit(l_mphia + epsilon_phia[t]);
-    f[t] <- exp(l_mfec + epsilon_fec[t]);
-    omega[t] <- exp(l_mim + epsilon_im[t]);
-    p[t] <- inv_logit(l_p);
+    phij[t] = inv_logit(l_mphij + epsilon_phij[t]);
+    phia[t] = inv_logit(l_mphia + epsilon_phia[t]);
+    f[t] = exp(l_mfec + epsilon_fec[t]);
+    omega[t] = exp(l_mim + epsilon_im[t]);
+    p[t] = inv_logit(l_p);
   }
 
   // Total number of individuals
-  Ntot <- NadSurv + Nadimm + N1;
+  Ntot = NadSurv + Nadimm + N1;
 
   // m-array
-  pr_j <- marray_juveniles(nyears, phij, phia, p);
-  pr_a <- marray_adults(nyears, phia, p);
+  pr_j = marray_juveniles(nyears, phij, phia, p);
+  pr_a = marray_adults(nyears, phia, p);
 
   // Productivity
-  for (t in 1:(nyears - 1))
-    rho[t] <- R[t] * f[t];
+  for (t in 1:ny_minus_1)
+    rho[t] = R[t] * f[t];
 }
 
 model {
@@ -218,13 +227,11 @@ model {
   // Likelihood for population population count data (state-space model)
   // System process
   for (t in 2:nyears) {
-    real mean1;
-    real mpo;
+    real mean1 = 0.5 * f[t - 1] * phij[t - 1] * Ntot[t - 1];
+    real mpo = Ntot[t - 1] * omega[t - 1];
 
-    mean1 <- 0.5 * f[t - 1] * phij[t - 1] * Ntot[t - 1];
     N1[t] ~ real_poisson(mean1);
     NadSurv[t] ~ real_binomial(Ntot[t - 1], phia[t - 1]);
-    mpo <- Ntot[t - 1] * omega[t - 1];
     Nadimm[t] ~ real_poisson(mpo);
   }
 
@@ -243,22 +250,17 @@ model {
 }
 
 generated quantities {
-  real<lower=0,upper=1> mphij;       // Mean juv. survival prob.
-  real<lower=0,upper=1> mphia;       // Mean adult survival prob.
-  real<lower=0> mfec;                // Mean productivity
-  real<lower=0> mim;                 // Mean immigration rate
-  vector<lower=0>[nyears-1] lambda;  // Population growth rate
-  vector[nyears-1] logla;
+  real<lower=0,upper=1> mphij = inv_logit(l_mphij); // Mean juv. survival prob.
+  real<lower=0,upper=1> mphia = inv_logit(l_mphia); // Mean adult survival prob.
+  real<lower=0> mfec = exp(l_mfec);    // Mean productivity
+  real<lower=0> mim = exp(l_mim);      // Mean immigration rate
+  vector<lower=0>[ny_minus_1] lambda;  // Population growth rate
+  vector[ny_minus_1] logla;
   real<lower=0> mlam;
 
-  mphij <- inv_logit(l_mphij);
-  mphia <- inv_logit(l_mphia);
-  mfec <- exp(l_mfec);
-  mim <- exp(l_mim);
-
   // Population growth rate
-  lambda[1:(nyears - 1)] <- Ntot[2:nyears] ./ Ntot[1:(nyears - 1)];
-  logla <- log(lambda);
+  lambda[1:(nyears - 1)] = Ntot[2:nyears] ./ Ntot[1:(nyears - 1)];
+  logla = log(lambda);
   // Geometric mean
-  mlam <- exp((1.0 / (nyears - 1)) * sum(logla));
+  mlam = exp(1.0 / ny_minus_1 * sum(logla));
 }

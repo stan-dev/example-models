@@ -10,7 +10,7 @@ transformed data {
   int<lower=0> max_y[R];
 
   for (i in 1:R)
-    max_y[i] <- max(y[i]);
+    max_y[i] = max(y[i]);
 }
 
 parameters {
@@ -27,12 +27,11 @@ model {
 
   // Likelihood
   for (i in 1:R) {
-    vector[K+1] lp;
+    vector[K - max_y[i] + 1] lp;
 
-    for (n in max_y[i]:K) {
-      lp[n + 1] <- poisson_log(n, lambda)
-        + binomial_log(y[i], n, p);
-    }
-    increment_log_prob(log_sum_exp(lp[(max_y[i] + 1):(K + 1)]));
+    for (j in 1:(K - max_y[i] + 1))
+      lp[j] = poisson_lpmf(max_y[i] + j - 1 | lambda)
+             + binomial_lpmf(y[i] | max_y[i] + j - 1, p);
+    target += log_sum_exp(lp);
   }
 }

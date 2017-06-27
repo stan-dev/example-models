@@ -15,14 +15,14 @@ transformed data {
   matrix[R, T] DATES2;
   matrix[R, T] HOURS2;
 
-  occ_obs <- 0;
+  occ_obs = 0;
   for (i in 1:R) {
-    sum_y[i] <- sum(y[i]);
+    sum_y[i] = sum(y[i]);
     if (sum_y[i])
-      occ_obs <- occ_obs + 1;
+      occ_obs = occ_obs + 1;
   }
-  DATES2 <- DATES .* DATES;
-  HOURS2 <- HOURS .* HOURS;
+  DATES2 = DATES .* DATES;
+  HOURS2 = HOURS .* HOURS;
 }
 
 parameters {
@@ -40,8 +40,8 @@ transformed parameters {
   matrix[R, T] logit_p; // Logit detection prob.
 
   for (i in 1:R)
-    logit_psi[i] <- alpha_psi + beta_psi * edge[i];
-  logit_p <- alpha_p
+    logit_psi[i] = alpha_psi + beta_psi * edge[i];
+  logit_p = alpha_p
       + beta1_p * DATES + beta2_p * DATES2
       + beta3_p * HOURS + beta4_p * HOURS2;
 }
@@ -59,35 +59,35 @@ model {
   // Likelihood
   for (i in 1:R) {
     if (sum_y[i]) { // Occupied and observed
-      increment_log_prob(bernoulli_logit_log(1, logit_psi[i])
-                         + bernoulli_logit_log(y[i, 1:last[i]],
-                                               logit_p[i, 1:last[i]]));
+      target += bernoulli_logit_lpmf(1 |  logit_psi[i])
+        + bernoulli_logit_lpmf(y[i, 1:last[i]] | logit_p[i, 1:last[i]]);
     } else {        // Never observed
-                                     // Occupied and not observed
-      increment_log_prob(log_sum_exp(bernoulli_logit_log(1, logit_psi[i])
-                                     + bernoulli_logit_log(0, logit_p[i, 1:last[i]]),
-                                     // Not occupied
-                                     bernoulli_logit_log(0, logit_psi[i])));
+                            // Occupied and not observed
+      target += log_sum_exp(bernoulli_logit_lpmf(1 | logit_psi[i])
+                            + bernoulli_logit_lpmf(0 | logit_p[i, 1:last[i]]),
+                            // Not occupied
+                            bernoulli_logit_lpmf(0 | logit_psi[i]));
     }
   }
 }
 
 generated quantities {
-  real<lower=0,upper=1> mean_p;
-  int<lower=0,upper=1> z[R];
-  int<lower=0> occ_fs;                  // Number of occupied sites
-
-  mean_p <- inv_logit(alpha_p);
-
-  // Full simulation without condition of
-  // observed y
-  // Note: the result will disperse wider than
-  //       that of the book.
+  real<lower=0,upper=1> mean_p = inv_logit(alpha_p);
+  int occ_fs;       // Number of occupied sites
+  real psi_con[R];  // prob present | data
+  int z[R];         // occupancy indicator, 0/1
+  
   for (i in 1:R) {
-    real psi;
-
-    psi <- inv_logit(logit_psi[i]);
-    z[i] <- bernoulli_rng(psi);
+    if (sum_y[i] == 0) {  // species not detected
+      real psi = inv_logit(logit_psi[i]);
+      vector[last[i]] q = inv_logit(-logit_p[i, 1:last[i]])';  // q = 1 - p
+      real qT = prod(q[]);
+      psi_con[i] = (psi * qT) / (psi * qT + (1 - psi));
+      z[i] = bernoulli_rng(psi_con[i]);
+    } else {             // species detected at least once
+      psi_con[i] = 1;
+      z[i] = 1;
+    }
   }
-  occ_fs <- sum(z);
+  occ_fs = sum(z);
 }

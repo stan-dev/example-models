@@ -1,0 +1,1167 @@
+---
+title: "Typical Sets and the Curse of Dimensionality"
+author: "Bob Carpenter"
+date: "11 April 2017"
+output:
+  html_document:
+    fig_caption: yes
+    theme: cerulean
+---
+
+<hr />
+
+### Abstract
+
+This case study illustrates the so-called "curse of dimensionality,"
+starting from scratch and using simple examples based on simulation.
+For example, generating points uniformly at random in a unit hypercube,
+it is easy to see how the average distance between random points
+increases with dimensionality.  Similarly, such points tend to
+increasingly fall outside the hypersphere inscribed within the unit
+hypercube, showing that in higher dimensions, almost all of the volume
+is in the corners of the hypercube.
+
+Similarly, generating standard normal variates (zero mean, unit
+standard deviation) leads to draws that concentrate in a thin shell of
+increasing distance from the mean as dimensionality increases.  The
+squared distance of a standard normal draw from the mode follows a
+standard chi-square distribution with degrees of freedom equal to the
+dimensionality.  This allows the the precise bounds of the thin shell
+to be calculated using tail statistics, showing just how unlikely it
+is to get near the mode with a random draw from a standard
+multivariate normal.
+
+These properties of the standard normal distribution provides a segue
+into discussing the important information-theoretic concept of the
+typical set for a probability distribution, which is roughly defined
+as the central log density band into which almost all random draws
+from that distribution will fall.  The rather surprising result is
+that for a normal distribution in high dimensions, the typical set
+does *not* include the volume around the mode.  The density is highest
+around the mode, but the volume is low, and the probability mass is
+determined as the product of the density and the volume (or more
+precisely, the integral of the density over the volume).
+
+The standard normal log density is just negative squared Euclidean
+distance, which provides a straightforward demonstration of why
+the maximum likelihood estimate for a normal regression is identical
+to the least squares solution.
+
+<hr />
+
+
+## 1. Euclidean Length and Distance
+
+### Euclidean Length
+
+Consider a vector $y = (y_1, \ldots, y_N)$ with $N$ elements (we call
+such vectors $N$-vectors).  The Euclidean length of a vector $y$ is
+written as $|\!| y |\!|$, and defined by a generalizing the Pythagorean
+theorem,
+
+\[
+|\!| y |\!|
+\ = \ \sqrt{y_1^2 + y_2^2 + \cdots + y_N^2}.
+\]
+
+In words, the length of a vector is the square root of the sum of the
+squares of its elements.
+
+If we take $y = (y_1, \ldots, y_N)$ to be a row vector, then we see
+that the dot product of a vector with itself is its squared length,
+so that 
+
+\[
+|\!| y |\!| = \sqrt{y \, y^{\top}}.
+\]
+
+#### Calculating Vector Length in R
+
+The following function computes vector length in R.
+
+```{r comment=NA}
+euclidean_length <- function(u) sqrt(sum(u * u));
+```
+
+In R, the operator `*` operates elementwise rather than as vector
+multiplication.  To test the function on a simple case, we can verify
+the first example of the Pythagorean theorem everyone learns in
+school, namely $|\!| (3, 4) |\!| = 5$.
+
+```{r comment=NA}
+euclidean_length(c(3, 4));
+```
+
+In R, the function `length()` returns the number of elements in a
+vector rather than the vector's Euclidean length.
+
+```{r comment=NA}
+length(c(3, 4));
+```
+
+### Euclidean Distance
+
+The Euclidean distance between two $N$-vectors, $x = (x_1, \ldots,
+x_N)$ and $y = (y_1, \ldots, y_N)$, written $\mathrm{d}(x,y)$, is the
+Euclidean length of the vector $x - y$ connecting them,
+
+\[
+\mathrm{d}(x, y)
+\ = \
+|\!| x - y |\!|
+\ = \
+\sqrt{(x_1 - y_1)^2 + \cdots + (x_N - y_N)^2}.
+\]
+
+
+
+## 2.  All of the Volume is in the Corners
+
+Suppose we have a square and inscribe a circle in it, or that we have
+a cube and a sphere inscribed in it.  When we extend this construction
+to higher dimensions, we get hyperspheres inscribed in hypercubes.
+This section illustrates the curious fact that as the dimensionality
+grows, most of the points in the hypercube lie outside the inscribed
+hypersphere.
+
+Suppose we have an $N$-dimensional hypercube, with unit-length sides
+centered around the origin $\mathbf{0} = (0, \ldots, 0)$.  The
+hypercube will have $2^N$ corners at the points $\left( \pm
+\frac{1}{2}, \ldots, \pm \frac{1}{2} \right)$.  Because its sides are
+length 1, it will have also have unit volume, because $1^N = 1$.
+
+If $N=1$, the hypercube is a line from $-\frac{1}{2}$ to
+$\frac{1}{2}$ of unit length (i.e., length 1).  If $N=2$, the
+hypercube is a square of unit area with opposite corners at $\left(
+-\frac{1}{2}, -\frac{1}{2} \right)$ and $\left( \frac{1}{2},
+\frac{1}{2} \right)$.  With $N=3$, we have a cube of unit volume, with
+opposite corners at $\left( -\frac{1}{2}, -\frac{1}{2}, -\frac{1}{2}
+\right)$ and $\left( \frac{1}{2}, \frac{1}{2}, \frac{1}{2} \right)$,
+and unit volume.  And so on up the dimensions.
+
+Now consider the biggest hypersphere you can inscribe in the
+hypercube.  It will be centered at the origin and have a radius of
+$\frac{1}{2}$ so that it extends to the sides of the hypercube.  A
+point $y$ is within this hypersphere if the distance to the origin is
+less than the radius, or in symbols, if $|\!|y|\!| < \frac{1}{2}$.
+Topologically speaking, we have defined what is known as an open ball,
+i.e., the set of points within a hypersphere excluding the limit
+points at distance exactly $\frac{1}{2}$ (we could've worked with
+closed balls which include the limit points making up the surface of
+the ball because this surface (a hypersphere) has zero volume).
+
+In one dimension, the hypersphere is just the line from $-\frac{1}{2}$
+to $\frac{1}{2}$ and contains the entire hypercube.  In two
+dimensions, the hypersphere is a circle of radius $\frac{1}{2}$
+centered at the origin and extending to the center of all four sides.
+In three dimensions, it's a sphere that just fits in the cube,
+extending to the middle of all six sides.
+
+<div style="width:3in; float:right; padding: 1em; border: 2">
+![Monte Carlo Casino](img/Monte_Carlo_Casino.jpg) _<small>Monte Carlo
+Casino. From Wikipedia, with license CC BY 2.5.</small>_ </div>
+
+#### The Monte Carlo Method for Integration
+
+We know the volume of the unit hypercube is one, but what is the
+volume of the ball in the inscribed hypersphere?  You may have learned
+how to define an integral to calculate the answer for a ball of radius
+$r$ in two dimensions as $\pi r^2$, and may even recall that in three
+dimensions it's $\frac{4}{3}\pi r^3$.  But what about higher
+dimensions?
+
+We could evaluate harder and harder multiple integrals, but we'll
+instead use the need to solve these integrals as an opportunity to
+introduce the fundamental machinery of using sampling to calculate
+integrals.  Such methods are called "Monte Carlo methods" because they
+involve random quantities and there is a famous casino in Monte Carlo.
+They are at the very heart of modern statistical computing (Bayesian
+and otherwise).
+
+Monte Carlo integration allows us to calculate the value of a definite
+integral by averaging draws from a random number generator.
+(Technically, the random number generators we have on computers, like
+used in R, are pseudorandom number generators in the sense that
+they're underlyingingly deterministic; for the sake of argument, we
+assume they are random enough for our purposes in much the way we
+assume the functions we're dealing with are smooth enough).
+
+To use Monte Carlo methods to calculate the volume within a
+hypersphere inscribed in a hypercube, we need only generate draws at
+random in the hypercube and count the number of draws that fall in the
+hypersphere---our answer is the the proportion of draws that fall in
+the hypersphere.  That's because we deliberately constructed a
+hypercube of unit volume; in general, we need to multiply by the
+volume of the set over which we are generating uniform random draws.
+
+As the number of draws increases, the estimated volume converges to
+the true volume.  Because the draws are i.i.d., it follows from the
+central limit theorem that the error goes down at a rate of
+$\mathcal{O}\left(  1 / \sqrt{n} \right)$.  That means each
+additional decimal place of accuracy requires multiplying the sample
+size by one hundred.  We can get rough answers with Monte Carlo
+methods, but many decimal places of accuracy requires a prohibitive
+number of simulation draws.  
+
+We can draw the points at random from the hypercube by drawing
+each component independently according to
+
+\[
+y_n \sim  \mathsf{Uniform}\left(-\frac{1}{2}, \frac{1}{2}\right).
+\]
+Then we count the proportion of draws that lie within the hypersphere.
+Recall that a point $y$ lies in the hypersphere if $|\!| y |\!| < \frac{1}{2}$.
+
+#### Using Monte Carlo methods to compute &pi;
+
+We'll first look at the case where $N = 2$, just to make sure we get
+the right answer.  We know the area inside the inscribed circle is
+$\pi r^2$, so with $r = \frac{1}{2}$, that's $\frac{\pi}{4}$.  Let's
+see if we get the right result.
+
+```{r comment=NA}
+N <- 2;
+M <- 1e6;
+y <- matrix(runif(M * N, -0.5, 0.5), M, N);
+p <- sum(sqrt(y[ , 1]^2 + y[ , 2]^2) < 0.5) / M;
+print(4 * p, digits=3);
+print(pi, digits=3);
+```
+
+Now, let's generalize and calculate the volume of the hypersphere
+inscribed in the unit hypercube (which has unit volume by
+construction) for increasing dimensions.
+
+```{r comment=NA}
+M <- 1e5;
+N_MAX = 10;
+Pr_inside <- rep(NA, N_MAX);
+for (N in 1:N_MAX) {
+  y <- matrix(runif(M * N, -0.5, 0.5), M, N);
+  inside <- 0;
+  for (m in 1:M) {
+    if (euclidean_length(y[m,]) < 0.5) {
+      inside <- inside + 1;
+    }
+  }
+  Pr_inside[N] <- inside / M;
+}
+df = data.frame(dims = 1:N_MAX, volume = Pr_inside);
+print(df, digits=1);
+```
+
+Although we actually calculate the probability that a point drawn at
+random is inside the hyperphere inscribed in the unit hypercube, this
+quantity gives the volume inside the inscribed hypersphere. 
+
+Here's the result as a plot.
+
+```{r}
+library(ggplot2);
+plot_corners <-
+  ggplot(df, aes(x = dims, y = Pr_inside)) +
+  scale_x_continuous(breaks=c(1, 3, 5, 7, 9)) +
+  geom_line(colour="gray") +
+  geom_point() +
+  ylab("volume of inscribed hyperball") + 
+  xlab("dimensions") +
+  ggtitle("Volume of Hyperball Inscribed in Unit Hypercube")
+plot_corners;
+```
+
+### All points are far away from each other
+
+Another way of looking at this is that in higher dimensions, the
+points on average become further and further away from the center of
+the hypercube.  They also become further and further away from each
+other (see the exercises). The volume of the hypersphere is the proportion of
+points in the hypercube that are within distance $\frac{1}{2}$ from
+the center of the hypercube;  with inreasing dimension, vanishingly
+few points are within distance $\frac{1}{2}$ of the center of the
+hypercube. 
+
+As Bernhard Schölkopf <a
+href="https://twitter.com/bschoelkopf/status/503554842829549568">said
+on Twitter</a>, "a high-dimensional space is a lonely place."  What he
+meant by this is that not only are the points increasingly far from
+the mean on average, they are also increasingly far from each other.
+As Michael Betancourt noted in a comment on the pull request for this
+case study, "Take two points that are translated from each other by 1
+unit in each direction — the distance between them grows as $\sqrt{N}$
+so as the dimension grows the points appear further from each other,
+with more and more volume filling up the space between them."
+
+
+
+## 3. Typical Sets
+
+Roughly speaking, the typical set is where draws from a given
+distribution tend to lie.  That is, it covers most of the mass of the
+distribution.  This particular choice of volume not only covers most
+of the mass of a distribution, its members reflect the properties of
+draws from that distribution.  What we will see in this section is
+that the typical set is usually nowhere near the mode of the
+distribution, even for a multivariate normal (where the mode is the
+same as the mean).
+
+#### A Discrete Example of Typicality
+
+Typicality is easiest to illustrate with a binomial example.  Consider
+a binary trial with an eighty percent chance of success (i.e., draws
+from a $\mathsf{Bernoulli}(0.80)$ distribution).  Now consider
+repeating such a trial one hundred times, drawing $y_1, \ldots,
+y_{100}$ independently according to
+
+\[
+y_n \sim \mathsf{Bernoulli}(0.8).
+\]
+
+Two questions frame the discussion:
+
+1. What is the most likely value for $y_1, \ldots, y_{100}$?  
+
+2. How many $y_n$ do you expect to be 1?  
+
+Let's answer the second question first.  If you have an 80% chance of
+success and make 100 attemps, the expected number of successes is just
+80 (in general, it's the probability of success times the number of
+attempts).
+
+Then why is the most likely outcome 100 straight successes?  The
+probability of 100 straight successes is $0.8^{100}$ or about $2
+\times 10^{-10}$.
+
+In contrast, the probability of any given sequence with 80 successes
+is only $0.8^{80} \, 0.2^{20}$, or about $2 \times 10^{-22}$.  The
+chance of 100 straight successes is a whopping $10^{12}$ times more
+probable than any specific sequence with 80 successes and 20 failures!
+
+On the other hand, there are a lot of sequences with 80 successes and
+20 failures---a total of $\binom{100}{80}$ of them to be exact (around
+$10^{20}$).  So even though any given sequence of 80 success and 20
+failures is relatively improbable, there are so many such sequences
+that their overall mass is higher than that of the unique sequence
+with 100 success, because $10^{20} \times 2 \times 10^{-22}$ is a lot
+bigger than $1 \times 2 \times 10^{-10}$.  Same goes for sequences
+with 81 successes; each such sequence is more probably than any
+sequence with 80 successes, but $\binom{100}{81}$ is smaller than
+$\binom{100}{80}$.
+
+The binomial distribution is the distribution of counts, so that if
+$y_1, \ldots, y_N$ is such that each $y_n \sim
+\mathsf{Bernoulli}(\theta)$, then
+
+\[
+(y_1 + \cdots + y_N) \sim \mathsf{Binomial}(N, \theta).
+\]
+
+The binomial aggregates the multiple trials by multiplying through by
+the possible ways in which $y$ successes can arise in $N$ trials,
+namely
+
+\[
+\mathsf{Binomial}(y \mid N, \theta)
+= \binom{N}{y} \, \theta^y \, (1 - \theta)^{(N - y)},
+\]
+
+where the binomial coefficient that normalizes the distribution is
+defined as the number of binary sequences of length $N$ that contain
+exactly $y$ elements equal to 1,
+
+\[
+\binom{N}{y} = \frac{N!}{y! \, (N - y)!}.
+\]
+
+In words, $\mathsf{Binomial}(y \mid N, \theta)$ is the probability of
+$y$ successes in $N$ independent Bernoulli trials if each trial has
+a chance of success $\theta$.
+
+To make sure we're right in expecting around 80 succeses, we can
+simulate a million binomial outcomes from 100 trials with an 80%
+chance of success as
+
+
+```{r}
+z <- rbinom(1e6, 100, 0.8);
+```
+
+with a summary
+
+```{r}
+summary(z);
+```
+
+and 99% interval
+
+```{r}
+quantile(z, probs=c(0.005, 0.995));
+```
+
+The most probable outcome as a sequence of Bernoulli trials, namely
+$(1, 1, \ldots, 1)$, has a very improbable number of successes, namely
+$N$. A much more typical number of successes is 80.  In fact, 100
+isn't even in the 99% interval of 100 trials with an 80% success rate.
+We can see that analytically using the quantile (inverse cumulative
+distribution function).  Suppose we have a random variable $Y$ with
+mass or density function $p_Y(y)$.  Then the cumulative distribution
+function (CDF) is defined by
+
+\[
+F_Y(u)
+\ = \
+\mbox{Pr}[Y \leq u].
+\]
+
+For discrete probability (mass) functions, this works out to
+
+\[
+F_Y(u) \ = \ \sum_{y \, = \, -\infty}^u p_Y(y),
+\]
+
+and for continuous probability (density) functions,
+
+\[
+F_Y(u) = \int_{-\infty}^u p_Y(y) \, \mbox{d}y.
+\]
+
+What we are going to need is the inverse CDF, $F_Y^{-1}$, or quantile
+function, which maps a quantile $\alpha \in (0, 1)$ to the value $y$
+such that $\mbox{Pr}[Y \leq y] = \alpha$ (this needs to be rounded in
+the discrete case to deal with the the fact that the inverse CDF is
+only technically defined for a countable number of quantiles).
+
+Luckily, this is all built into R, and we can calculate the quantiles
+that bound the central 99.9999% interval,
+
+
+```{r}
+qbinom(c(0.0000005, 0.9999995), 100, 0.8)
+```
+
+This tells us that 99.9999% of the draws (i.e, 999,999 out of
+1,000,000 draws) from $\mathsf{Binomial}(100, 0.8)$ lie in the range
+$(59, 97)$.  This demonstrates just how atypical the most probable
+sequences are.
+
+We next reproduce a graphical illustration from David J.&nbsp;C. MacKay's
+*Information Theory, Inference, and Learning Algorithms* (Cambridge,
+2003, section 4.4) of how the typical set of the binomial arises as a
+product of 
+
+1. the Bernoulli trial probability of a sequence with a given number
+ of successes, and
+
+2.  the number of sequences with that many successes.
+
+  Suppose we have a binary sequence of $N$ elements, $z = z_1, \ldots,
+z_N$, with $z_n \in \{ 0, 1 \}$ and let 
+
+\[
+y = \sum_{n=1}^N z_n
+\]
+
+be the total number of successes.  The repeated Bernoulli trial
+probability of $z$ with a chance of success $\theta \in [0, 1]$ is
+given by the probability mass function
+
+\[
+p(z \mid \theta)
+\ = \
+\prod_{n=1}^N \mathsf{Bernoulli}(z_n \mid \theta)
+\ = \
+\theta^y \, (1 - \theta)^{(N - y)}.
+\]
+
+The number of ways in which a binary sequence with a total of $y$
+successes out of $N$ trials can arise is the total number of ways
+a subset of $y$ elements may be chosen out of a set of $N$ elements,
+which is given by the binomial coefficient,
+
+\[
+\binom{N}{y} = \frac{N!}{y! \, (N - y)!}.
+\]
+
+The following plots show how the binomial probability mass function
+arises as a product of the binomial coefficient and the probability of
+a single sequence with a given number of successess.  The left column
+contains plots on the linear scale and the right column plots on the
+log scale.  The top plots are of the binomial coefficient,
+$\binom{N}{y}$.  Below that is the plot the probability of a single
+sequence with $y$ successes, namely $\theta^y \, (1 - \theta)^{N-y}$.
+Below both of these plots is their product, the binomial probability
+mass function $\mathsf{Binomial}(y \mid N, \theta)$.  There are three
+sequences of plots, for $N = 25$, $N = 100$, and $N=400$.
+
+Just to get a sense of scale, there are $2^{25}$ (order $10^7$) binary
+sequences of length 25, $2^{100}$ (order $10^{30}$) binary sequences
+of length 100, and $2^{400}$ (order $10^{120}$) binary sequences of
+length 400.
+
+
+```{r}
+choose_df <- function(Ys, theta=0.2) {
+  N <- max(Ys);
+  Ns <- rep(N, length(Ys));
+  Cs <- choose(N, Ys);
+  Ls <- theta^Ys * (1 - theta)^(N - Ys);
+  Ps <- Cs * Ls;
+  data.frame(list(y = Ys, N = Ns, combos = Cs, L = Ls, P = Ps));
+}
+
+choose_plot <- function(df, logy = FALSE) {
+  p <-
+    ggplot(df, aes(x = y, y = combos)) +
+    geom_line(size=0.2, color="darkgray") +
+    geom_point(size=0.4) +
+    scale_x_continuous() +
+    xlab("y");
+  if (logy) {
+    p <- p + scale_y_log10() +
+      ylab("log (N choose y)") +
+      theme(axis.title.y = element_text(size=8),
+            axis.text.y=element_blank(),
+            axis.ticks.y=element_blank())
+      ggtitle("sequence log permutations ...");
+  } else {
+    p <- p + scale_y_continuous() +
+      ylab("(N choose y)") +
+      theme(axis.title.y = element_text(size=8),
+            axis.text.y=element_blank(),
+            axis.ticks.y=element_blank())
+      ggtitle("sequence permutations ...");
+  }
+  return(p);
+}
+seq_plot <- function(df, logy = FALSE) {
+  p <-
+    ggplot(df, aes(x = y, y = L)) +
+    geom_line(size=0.2, color="darkgray") +
+    geom_point(size=0.4) +
+    scale_x_continuous() +
+    xlab("y");
+    if (logy) {
+      p <- p + scale_y_log10() +
+           ylab("log theta^y * (1 - theta)^(N - y)") +
+           theme(axis.title.y = element_text(size=8),
+                 axis.text.y=element_blank(),
+                 axis.ticks.y=element_blank())
+           ggtitle("plus sequence log probability ...");
+    } else {
+      p <- p + scale_y_continuous() +
+           ylab("theta^y * (1 - theta)^(N - y)") +
+           theme(axis.title.y = element_text(size=8),
+                 axis.text.y=element_blank(),
+                 axis.ticks.y=element_blank())
+           ggtitle("times sequence probability ...");
+  }
+  return(p);
+}
+joint_plot <- function(df, logy = FALSE) {
+  p <- ggplot(df, aes(x = y, y = P)) +
+    geom_line(size = 0.25, color = "darkgray") +
+    geom_point(size = 0.25) +
+    scale_x_continuous() +
+    xlab("y");
+  if (logy) {
+    p <- p + scale_y_log10() +
+           ylab("log binom(y | N, theta)") +
+          theme(axis.title.y = element_text(size=8),
+                axis.text.y=element_blank(),
+                axis.ticks.y=element_blank())
+           ggtitle("equals count log probability");
+  } else {
+    p <- p + scale_y_continuous() +
+          ylab("binom(y | N, theta)") +
+          theme(axis.title.y = element_text(size=8),
+                axis.text.y=element_blank(),
+                axis.ticks.y=element_blank())
+          ggtitle("equals count probability");
+  }
+  return(p);
+}
+library("grid")
+library("gridExtra");
+plot_all <- function(df) {
+  cp <- choose_plot(df, logy = FALSE);
+  pp <- seq_plot(df, logy = FALSE);
+  jp <- joint_plot(df, logy = FALSE);
+  lcp <- choose_plot(df, logy = TRUE);
+  lpp <- seq_plot(df, logy = TRUE);
+  ljp <- joint_plot(df, logy = TRUE);
+  grid.newpage();
+  grid.arrange(ggplotGrob(cp), ggplotGrob(lcp),
+               ggplotGrob(pp), ggplotGrob(lpp),
+               ggplotGrob(jp), ggplotGrob(ljp),
+               ncol = 2);
+}
+
+df25 <- choose_df(0:25);
+plot_all(df25);
+
+df100 <- choose_df(0:100)
+plot_all(df100);
+
+df400 <- choose_df(0:400);
+plot_all(df400);
+```
+
+Although it appears that way, the points are not getting heavier,
+there are just more of them in each subsequent plot.
+
+#### A Continuous Example of Typicality
+
+All of the computations of interest in Bayesian statistics are
+formulated as posterior expectations.  For example, Bayesian parameter
+estimates minimizing expected square error are expectations of the
+value of a parameter $\theta$ in the posterior (conditioned on data
+$y$), 
+
+\[
+\hat{\theta} = \mathbb{E}[\theta \mid y] = \int_{\Theta} \theta \,
+p(\theta \mid y) \, \mathrm{d}\theta,
+\]
+
+where we integrate over the legal values of $\theta \in \Theta$.
+
+Posterior event probabilities are expectations of the indicator
+function $I[\theta \in E]$ that indicates whether a parameter value
+$\theta$ is in the event $E$, 
+
+\[
+\mbox{Pr}[E \mid y]
+\ = \
+\mathbb{E}[\, I[\theta \in E] \mid y \, ]
+\ = \
+\int_{\Theta} I[\theta \in E] \ p(\theta \mid y) \, \mathrm{d}\theta.
+\]
+
+Rather than integrating over the support $\Theta$ of $\theta$ in the
+posterior, it suffices to integrate over the typical set (the typical
+set is not the only such set; see the exercises for a discussion of
+the highest probability set).  That is, if $\Theta$ is the support for
+a density $p(\theta)$, then the typical set $T \subseteq \Theta$ has
+the property that for "well-behaved" functions,
+
+\[
+\mathbb{E}[f(\theta) \mid y]
+\ = \
+\int_{\Theta} f(\theta) \, p(\theta \mid y) \, \mathrm{d}\theta
+\ \approx \
+\int_{T}  f(\theta) \, p(\theta \mid y) \, \mathrm{d}\theta
+\]
+
+That is, we can restrict attention to the typical set when computing
+expectations.  The fact that typical sets exist is why we are able to
+compute posterior expectations using Monte Carlo methods---the draws
+from the posterior distribution we make with Monte Carlo methods will
+almost all fall in the typical set and we know that will be
+sufficient.
+
+We saw in the first plot in section 4 (draws are nowhere near the
+mode) that if we have $D$ i.i.d. draws from a standard normal, that the
+typical set was well bounded away from the posterior mode, which is at
+the origin.  There's no built-in R function to compute the quantiles
+directly, but the next section shows that the distance from the mode
+reduces to a well-known distribution.
+
+#### Definition of the Typical Set
+
+The formal definition of typicality is for sequences $x_1, \ldots,
+x_N$ of i.i.d. draws with probability function $p(x)$ (density
+function for continuous variables, mass function for discrete
+variables).  Such a sequence is said to be "typical" if its average
+probability is near the (differential) entropy of the distribution.  A
+sequence $(x_1, \ldots, x_N)$ is in the typical set $A^N_{\epsilon}$
+for a distribution with probability function $p(x)$ if
+
+\[
+\left| \frac{1}{N} \sum_{n=1}^N \log p(x_n)  - \mathrm{H}[ X ] \right|
+\leq \epsilon,
+\]
+
+where $\mathrm{H}[X]$ is the discrete entropy if $X$ is discrete and the
+differential entropy if $X$ is continuous.  It can be established that
+such a set covers most such sequences, in that
+
+\[
+\mathrm{Pr}\left[
+(X_1, \ldots, X_N) \in A_\epsilon^N
+\right] > 1 - \epsilon.
+\]
+
+assuming the $X_n$ are independent and each has probability function
+$p(x)$.
+
+
+## 3. The Normal Distribution
+
+The normal log density for a variate $y \in \mathbb{R}$ with location
+$\mu \in \mathbb{R}$ and scale $\sigma \in \mathbb{R}^+$ is defined by
+
+\[
+\mathsf{Normal}(y \mid \mu, \sigma)
+= \frac{1}{\sqrt{2 \pi}}
+  \, \frac{1}{\sigma}
+  \, \exp
+       \left(
+         -\frac{1}{2}
+         \, \left( \frac{y - \mu}{\sigma} \right)^2
+       \right).
+\]
+
+For the standard normal, $\mathsf{Normal}(0, 1)$, many terms drop out, and
+we are left with
+
+\[
+\mathsf{Normal}(y \mid 0, 1)
+= \frac{1}{\sqrt{2 \pi}}
+  \, \exp \left( -\frac{1}{2} \ y^2 \right).
+\]
+
+Converting to the log scale, we have
+
+\[
+\log \mathsf{Normal}(y \mid 0, 1)
+\ = \ -\frac{1}{2} \ y^2 + \mathrm{constant}
+\]
+
+where the constant does not depend on $y$.  In this form, it's easy to
+see the relation between the standard normal and distance.  For multiple
+i.i.d. standard normal draws $y = (y_1, \ldots, y_N)$, then
+\[
+\log p(y) 
+\ = \
+\sum_{n=1}^N -\frac{1}{2} y_n^2
+\ = \
+-\frac{1}{2} yy^{\top}
+\ = \
+- \frac{1}{2} |\!| y |\!|^2
+\]
+
+In words, the log density of a standard normal distribution is
+proportional to half the squared distaince from the origin.  This is
+why the maximum likelihood estimate is equal to the least squares
+estimate for normal distributions.
+
+## 4. Vectors of Random Unit Normals
+
+We are now going to generate a random vector $y = (y_1, \ldots, y_D)
+\in \mathbb{R}^D$ by generating each dimension independently as
+
+\[
+y_d \sim \mathsf{Normal}(0, 1).
+\]
+
+The density over vectors is then defined by
+
+\[
+p(y)
+\ = \
+\prod_{d=1}^D p(y_d)
+\ = \
+\prod_{d=1}^D \mathsf{Normal}(y_d \mid 0, 1).
+\]
+
+On the log scale, that's
+
+\[
+\log p(y)
+\ = \
+\sum_{d=1}^D -\frac{1}{2} \, y_d^2 + \mathrm{const}
+\ = \
+-\frac{1}{2} \, {|\!| y |\!|}^2 + \mathrm{const}.
+\]
+
+Equivalently, we could generate the vector $y$ all at once from a
+multivariate normal with unit covariance matrix,
+
+\[
+y \sim \mathsf{MultiNormal}(\mathbf{0}, \mathbf{I}),
+\]
+
+where $\mathbf{0}$ is a $D$-vector of zero values, and $\mathbf{I}$ is
+the $D \times D$ unit covariance matrix with unit values on the diagonal
+and zero values off diagonal (i.e., unit scale and no correlation).
+
+To generate a random vector $y$ in R, we can use the `rnorm()`
+function, which generates univariate random draws from a normal
+distribution.
+
+```{r comment=NA}
+D <- 10;
+u <- rnorm(D, 0, 1);
+print(u, digits=2);
+```
+
+It is equally straightforward to compute the Euclidean length of `u`
+given the function we defined above:
+
+```{r comment=NA}
+print(euclidean_length(u), digits=3);
+```
+
+What is the distribution of the lengths of vectors generated this way
+as a function of the dimensionality?  We answer the question
+analytically in the next section, but for now, we'll get a handle on
+what's going on through simulation as the dimensionality $D$ grows.
+The following code draws from normal distributions of dimensionality 1
+to 256, then plots them with 99% intervals using ggplot. 
+
+```{r comment=NA}
+log_sum_exp <- function(u) max(u) + log(sum(exp(u - max(u))));
+N <- 1e4;
+dim <- c(1, 2, 4, 5, 8, 11, 16, 22, 32, 45, 64, 90, 128, 181, 256);
+D <- length(dim);
+lower <- rep(NA, D);
+middle <- rep(NA, D);
+upper <- rep(NA, D);
+lower_ll <- rep(NA, D);
+middle_ll <- rep(NA, D);
+upper_ll <- rep(NA, D);
+
+mean_ll <- rep(NA, D);
+max_ll <- rep(NA, D);
+for (k in 1:D) {
+  d <- dim[k];
+  y <- rep(NA, N);
+  for (n in 1:N) y[n] <- euclidean_length(rnorm(d, 0, 1));
+
+  qs <- quantile(y, probs=c(0.005, 0.500, 0.995));
+  lower[k] <- qs[[1]];
+  middle[k] <- qs[[2]];
+  upper[k] <- qs[[3]];
+
+  ll <- rep(NA, N);
+  for (n in 1:N) ll[n] <- sum(dnorm(rnorm(d, 0, 1), 0, 1, log=TRUE));
+
+  qs_ll <- quantile(ll, probs=c(0.005, 0.500, 0.995));
+  lower_ll[k] <- qs_ll[[1]];
+  middle_ll[k] <- qs_ll[[2]];
+  upper_ll[k] <- qs_ll[[3]];
+
+  mean_ll[k] <- log_sum_exp(ll) - log(N);
+  max_ll[k] <- sum(dnorm(rep(0, d), 0, 1, log=TRUE));
+}
+df <- data.frame(list(dim = dim, lb = lower, mid = middle, ub = upper,
+                      lb_ll = lower_ll, mid_ll = middle_ll,
+                      ub_ll = upper_ll, mean_ll = mean_ll, max_ll = max_ll));
+print(df, digits = 1);
+```
+
+Then we can plot the 99% intervals of the draws using ggplot.
+
+```{r}
+library(ggplot2);
+
+plot1 <-
+  ggplot(df, aes(dim)) +
+  geom_ribbon(aes(ymin = lb, ymax = ub), fill="lightyellow") +
+  geom_line(aes(y = mid)) +
+  geom_point(aes(y = mid)) +
+  scale_x_log10(breaks=2^(0:D)) +
+  ylab("Euclidean distance from origin (mode)") +
+  xlab("number of dimensions") +
+  ggtitle("Draws are Nowhere Near the Mode\n(median draw with 99% intervals)");
+plot1;
+```
+
+Even in 16 dimensions, the 99% intervals are far away from zero, which
+is the mode (highest density point) of the 16-dimensional unit normal
+distribution.
+
+##### Concentration of measure
+
+Not only are the intervals moving away from the mode, they are
+concentrating into a narrow band in higher dimensions.  This result
+follows here from the central limit theorem in this example and in
+more generality from concentration of measure (Terry Tao blogged a <a
+href="https://terrytao.wordpress.com/2010/01/03/254a-notes-1-concentration-of-measure/">nice
+introduction</a>).
+
+How does the log density of random draws compare to the log density at
+the mode (i.e., the location at which density is maximized)?  The
+following plot of the median log density and 99% intervals along with
+the density at the mode illustrates.
+
+```{r}
+plot2 <-
+  ggplot(df, aes(dim)) +
+  geom_ribbon(aes(ymin = lb_ll, ymax = ub_ll), fill="lightyellow") +
+  geom_line(aes(y = mid_ll)) +
+  geom_point(aes(y = mid_ll)) +
+  geom_line(aes(y = max_ll), color="red") +
+  geom_point(aes(y = max_ll), color="red") +
+  scale_x_log10(breaks=c(2^(0:D))) +
+  scale_y_continuous() +
+  ylab("log density") +
+  xlab("number of dimensions") +
+  ggtitle("Draws have Much Lower Density than the Mode
+(median and 99% intervals of random draws; mode in red)");
+plot2;
+```
+
+#### No individual is average
+
+Somewhat counterintuitively, although easy to see in retrospect given
+the above graphs, the average member of a population is an outlier.
+How could an item with every feature being average be unusual?
+Precisely because it is unusual to have so many features that close to
+average.
+
+In comments on an earlier draft, Michael Betancourt mentioned that
+physicists like to use an average of a population as a representative,
+calling such a representative an "Asimov data set" (the name derives
+from Isaac Asimov's 1955 short story
+[Franchise](https://en.wikipedia.org/wiki/Franchise_(short_story)), in
+which a single elector is chosen to represent a population).  Because
+of the atypicality of the average member of the population, this
+technique is ripe for misuse.  As we saw above, the average member of
+a population might be located at the mode, whereas the average
+distance of a population member to the mode is much greater.
+
+## 5. Squared Distance of Normal Draws is Chi-Square
+
+Suppose $y = (y_1, \ldots, y_D) \in \mathbb{R}^D$ and that for each $d
+\in 1{:}D$,
+
+\[
+y_d \sim \mathsf{Normal}(0, 1),
+\]
+
+is drawn independently.  The distribution of the sum of the squared
+elements of $y$ is well known to have a chi-square distribution,
+
+\[
+(y_1^2 + \cdots + y_D^2) \sim \mathsf{ChiSquare}(D).
+\]
+
+In other words, the squared length of a unit normal draw has a
+chi-square distribution,
+
+\[
+{|\!| y |\!|}^2 \sim \mathsf{ChiSquare}(D).
+\]
+
+This means we could have drawn the plot out analytically rather than
+using Monte Carlo methods by using the inverse cumulative distribution
+function for the chi-square distibution (see the exercises).
+
+
+
+## 6.  Maximum Likelihood and Least Squares
+
+Gauss recognized the intimate relation between (squared Euclidean)
+distance and the normal distribution.  The connection led him to
+develop the maximum likelihood principle and show that the maximum
+likelihood estimate of the mean of a normal distribution was the
+average, and that such an estimate also minimized the sum of square
+distances to the data points.
+
+Suppose we observe $y = (y_1, \ldots, y_N) \in \mathbb{R}^N$ and we
+assume they come from a normal distribution with unit scale $\sigma =
+1$ and unknown location $\mu$.  Then the log density is
+
+\[
+\log p(y \mid \mu, 1)
+\ \propto \
+\sum_{n=1}^N \log \mathsf{Normal}(y_n \mid \mu, 1)
+\ \propto \
+-\frac{1}{2} \sum_{n=1}^N \left( y_n - \mu \right)^2
+\ \propto \
+-\frac{1}{2} \sum_{n=1}^N \mathrm{d}(y_n, \mu)^2.
+\]
+
+The maximum likelihood estimate for the location $\mu$ is just the
+value that maximizes the likelihood function,
+
+\[
+\mu^*
+\ = \
+\mathrm{arg \, max}_{\mu} \ p(y \mid \mu)
+\ = \
+\mathrm{arg\, max}_{\mu} \ \log p(y \mid \mu)
+\ = \
+\mathrm{arg \, max}_{\mu} - \frac{1}{2} \, \sum_{n=1}^N \mathrm{d}(y_n, \mu)^2
+\ = \
+\mathrm{arg \, min}_{\mu} \sum_{n=1}^N \mathrm{d}(y_n, \mu)^2.
+\]
+
+The last step drops the negative constant multiplier, thus converting
+maximization to minimization and showing that the estimate that
+maximizes the likelihood is also the estimate that minimizes the sum
+of the square distances from the observations to the estimate of
+$\mu$.
+
+The estimate that minimizes squares is just the average of the observations,
+
+\[
+\mu^*
+\ = \
+\frac{1}{N} \sum_{n=1}^N y_n.
+\]
+
+The [Gauss-Markov
+theorem](https://en.wikipedia.org/wiki/Gauss–Markov_theorem) further
+establishes that the mean has the lowest variance among unbiased
+estimators (it also generalizes the result to linear regressions).
+
+
+
+## Acknowledgements
+
+Thanks to Michael Betancourt for comments on an earlier draft of this
+paper and to the reader's of Andrew Gelman's blog for a long series of
+comments on typical sets in response to my [original post on ensemble
+methods](http://andrewgelman.com/2017/03/15/ensemble-methods-doomed-fail-high-dimensions/).
+
+## References
+
+Cover and Thomas (2006) is the standard reference for information
+theory and provides full definitions of entropy, differential entropy,
+highest probability sets, typical sets, and the connection of the
+typical set to the asymptotic equipartition property (AEP).  Robert
+and Casella (2005) cover a range of statistical applications of Monte
+Carlo methods; they also published a companion version with R code.
+MacKay (2003) provides a more computationally oriented introduction to
+both Monte Carlo methods and information theory, with straightforward
+implementations in MATLAB/Octave.
+
+* Cover, T. M., and Thomas, J. A. 2006. *Elements of Information
+  Theory*.  2nd Edition. John Wiley & Sons.
+
+* Robert, C. P. and G. Casella. 2005.  *Monte Carlo Statistical
+  Methods*.   Springer.
+
+* MacKay, David J. C.  2003.  *Information Theory, Inference and
+  Learning Algorithms*. Cambridge University Press.
+
+
+## Exercises
+
+1. Define an R function for the Euclidean distance between two vectors.
+What happens if you use R's matrix multiplication, such as `u %*% v`?
+
+1.  Given $y_n \in \mathbb{R}$ for $n \in 1{:}N$, the maximum
+likelihood estimate of $\mu$ for the model
+\[
+p(y \mid \mu) = \prod_{n=1}^N \mathsf{Normal}(y_n \mid \mu, 1)
+\]
+is just the average of the $y_n$ (i.e., $\mu^* = \bar{y}$, where
+$\bar{y}$ is standard notation for the average of $y$). Hint: show
+that the first derivative of the log likelihood with respect to $\mu$
+is zero and the second derivative is negative.
+
+1.  For the model in the previous question, show that the maximum
+likelihood estimate for $\mu$ is the same no matter what $\sigma$ is.
+Use this fact to derive the maximum likelihood estimate for $\sigma$.
+How does the maximum likelihood estimate differ from the statistic
+known as the sample standard deviation, defined by
+\[
+\mathrm{sd}(y) = \sqrt{\frac{1}{N - 1} \sum_{n=1}^N (y_n - \bar{y})^2},
+\]
+with $\bar{y} = \frac{1}{N} \sum_{n=1}^N y_n$ being the average of the
+$y_n$ values.  For a fixed scale $\sigma = 1$, show that the maximum likelihood
+estimate for a normal mean parameter is equal to the average of the
+observed $y$.
+
+1. Show that the Euclidean length of a vector $y$ is its distance to
+the origin, i.e.,
+\[
+|\!| y |\!| = \mathrm{d}(y, \mathbf{0}),
+\]
+where $\mathbf{0} = (0, \ldots, 0)$ is the zero vector.
+
+1.  Repeat the computational distance calculations for the
+$\mathrm{L}_1$ norm, defined by
+\[
+{|\!| y |\!|}_1 = | y_1 | + | y_2 | + \cdots + | y_D |.
+\]
+and the taxicab distance, defined by
+\[
+d_1(u, v) = {|\!| u - v |\!|}_1.
+\]
+The taxicab distance (or Manhattan distance) is so-called because it
+may be thought of as a path in Euclidean distance that follows the
+axes, going from $(0,0)$ to $(3, 4)$ by way of $(3,0)$ or $(0, 4)$
+(that is, along the streets and avenues).
+
+1.  Use random number generation and plotting to show what happens to
+the distance between two points generated uniformly at random in a
+unit hypercube as the number of dimensions increases.
+
+1.  Show how the double exponential distribution (aka Laplace
+distribution) plays the same role with respect to the $\mathrm{L}_1$
+norm and taxicab distance as the normal distribution plays with
+respect to the $\mathrm{L}_2$ norm and Euclidean distance.
+
+1.  Repeat the computational distance calcuations for the
+$\mathrm{L}_{\infty}$ norm and associated distance function, defined by
+\[
+{|\!|y|\!|}_{\infty} = \max \{ | y_1 |, \ldots, | y_D | \}.
+\]
+If the elements of $y$ are independently drawn from a unit normal
+distribution, the $\mathrm{L}_{\infty}$ norm has the distribution of the
+$D$-th order statistic for the normal.
+
+1.  Recreate the curves in the first few plots using the inverse
+cumulative distribution function for the chi-square distribution.
+
+1.  Show that the log density for a multivariate distribution with
+unit covariance and mean vector $\mu$ is equal to half
+squared distance between $y$ and $\mu$ plus a constant.  In symbols,
+\[
+\log \mathsf{MultiNorm}(y \mid \mu, \mathbf{I}) = \frac{1}{2} \,
+\mathrm{d}(y, \mu)^2 + \mathrm{constant}.
+\]
+
+1.  Show that the log density of a vector $y$ in a multivariate normal
+distribution with location $\mu$ and covariance matrix $\Sigma$ is
+half the distance between $y$ and $\mu$ in the Riemannian manifold for
+which the inverse covariance matrix $\Sigma^{-1}$ defines a metric
+using the standard quadratic form,
+\[
+\mathrm{d}(y, \mu) = (y - \mu) \, \Sigma^{-1} \, (y - \mu)^{\top}.
+\]
+
+1.  The $\mathrm{L}_p$ norm is defined for a vector $y = (y_1, \ldots,
+y_N)$ and $p > 0$ by
+\[
+|\!|y|\!|_p = \left( \sum_{n=1}^N {|y_n|}^p \right)^\frac{1}{p}
+\]
+Show that Euclidean distance is defined by the $\mathrm{L}_2$ norm and
+the taxicab distance by the $\mathrm{L}_1$ norm.  What happens in the
+limits as $p \rightarrow 0$ and $p \rightarrow \infty$?
+
+1.  Use the `qchisq` function in R to generate the median and 99% (or
+more extreme) intervals for the distribution of lengths of vectors
+with dimensions drawn as independent unit normals.  Use `qbinom` to do
+the same thing for binomial draws with an 80% chance of success to
+illustrate how atypical the all-success draw is.
+
+1.  The smallest set by volume that contains $1 - \epsilon$ of the
+probability mass is called the highest probability set.  In a
+univariate, unimodal density, the highest probabilty set is the
+highest density interval (HDI).  Show that the probability of a random
+draw falling in the difference between these sets (typical set and
+highest probability set) quickly converges to zero.
+
+1.  Use the central limit theorem to show why a chi-square
+distribution tends toward a normal distribution as the number of
+degrees of freedom grows.
+
+<br />
+&nbsp;
+<hr />
+
+#### Licenses
+
+<small>
+**Code:** Copyright (2017) Columbia University.  Released under the
+[BSD 3-clause license](https://opensource.org/licenses/BSD-3-Clause).
+</small>
+
+<small>
+**Text:** Copyright (2017) Bob Carpenter.  Released under the
+the [CC BY-NC 4.0
+license](https://creativecommons.org/licenses/by-nc/4.0/).
+</small>

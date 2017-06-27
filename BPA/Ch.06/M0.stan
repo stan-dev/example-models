@@ -46,7 +46,9 @@ model {
 }
 
 generated quantities {
-  int<lower=C> N;
+  int<lower=C, upper=M> N;
+  real omega_nd;  // prob present given never detected
+  omega_nd = (omega * (1 - p)^T) / (omega * (1 - p)^T + (1 - omega));
 
-  N = C + binomial_rng(M, omega * (1 - p)^T);
+  N = C + binomial_rng(M - C, omega_nd);
 }

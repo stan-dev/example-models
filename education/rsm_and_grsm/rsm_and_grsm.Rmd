@@ -1,0 +1,446 @@
+---
+title: "Rating scale and generalized rating scale models with latent regression"
+author: "Daniel C. Furr"
+date: "`r gsub('(^.* )(0)([0-9], .*)', '\\1\\3', format(Sys.time(), '%B %d, %Y'))`"
+output:
+  html_document:
+    toc: true
+    number_sections: true
+    fig_caption: true
+    css: ../styles.css
+bibliography: ../bibliography.bib
+---
+
+```{r knitr_opts, include = FALSE}
+set.seed(80)
+
+knitr::opts_chunk$set(tidy = FALSE, cache = FALSE, message = FALSE)
+
+nand <- function(x) {
+  l <- length(x)
+  if(l == 1) {
+    return(x)
+  } else if(l == 2) {
+    return(paste(x, collapse = " and "))
+  } else if(l > 2) {
+    part <- paste(x[-l], collapse = ", ")
+    return(paste(c(part, x[l]), collapse = ", and "))
+  }
+}
+```
+
+This case study uses **Stan** to fit the Rating Scale Model (RSM) and Generalized Rating Scale Model (GRSM), including a latent regression for person ability for both. Analysis is performed with **R**, making use of the **rstan** and **edstan** packages. **rstan** is the implementation of **Stan** for **R**, and **edstan** provides **Stan** models for item response theory and several convenience functions. 
+
+The **edstan** package is available on **CRAN**, but a more up to date version may often be found on Github. The following **R** code may be used to install the package from Github.
+
+```{r github, eval = FALSE}
+# Install edstan from Github rather than CRAN
+install.packages("devtools")
+devtools::install_github("danielcfurr/edstan")
+```
+
+The following **R** code loads the necessary packages and then sets some **rstan** options, which causes the compiled **Stan** model to be saved for future use and the MCMC chains to be executed in parallel.
+
+```{r, warning=FALSE, results="hide"}
+# Load R packages
+library(rstan)
+library(ggplot2)
+library(edstan)
+library(ltm)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+```
+
+The case study uses 
+**R** version `r getRversion()`,
+**rstan** version `r packageVersion("rstan")`, 
+**ggplot2** version `r packageVersion("ggplot2")`, and
+**edstan** version `r packageVersion("edstan")`.
+Also, the example data are from
+**TAM** version `r packageVersion("ltm")`.
+Readers may wish to check the versions for their installed packages using the `packageVersion()` function.
+
+
+# Rating scale model with latent regression
+
+## Overview of the model
+
+The rating scale model [@andrich1978rating] is appropriate for item response data that involves Likert scale responses. The version presented includes a latent regression. However, the latent regression part of the model may be restricted to an intercept only, resulting in the standard rating scale model.
+
+$$
+\Pr(Y_{ij} = y,~y > 0 | \theta_j, \beta_i, \kappa_s) =
+\frac{\exp \sum_{s=1}^y (\theta_j - \beta_i - \kappa_s)}
+     {1 + \sum_{k=1}^{m} \exp \sum_{s=1}^k (\theta_j - \beta_i - \kappa_s)}
+$$
+$$
+\Pr(Y_{ij} = y,~y = 0 | \theta_j, \beta_i, \kappa_s) =
+\frac{1}
+     {1 + \sum_{k=1}^{m} \exp \sum_{s=1}^k (\theta_j - \beta_i - \kappa_s)}
+$$
+$$
+\theta_j \sim \mathrm{N}(w_{j}' \lambda, \sigma^2)
+$$
+
+Variables:
+
+* $i = 1 \ldots I$ indexes items.
+* $j = 1 \ldots J$ indexes persons.
+* $Y_{ij} \in \{ 0 \ldots m \}$ is the response of person $j$ to item $i$
+* $m$ is simultaneously the maximum score and number of step difficulty parameters per item.
+* $w_{j}$ is the vector of covariates for person $j$, the first element of which *must* equal one for a model intercept. $w_{j}$ may be assembled into a $J$-by-$K$ covariate matrix $W$, where $K$ is number of elements in $w_j$.
+
+Parameters:
+
+* $\beta_i$ is the item-specific difficulty for item $i$.
+* $\kappa_s$ is the $s$-th step difficulty, constant across items.
+* $\theta_j$ is the ability for person $j$.
+* $\lambda$ is a vector of latent regression parameters of length $K$.
+* $\sigma^2$ is the variance for the ability distribution.
+
+Constraints:
+
+* The last item difficulty parameter, $\beta_I$, is constrained to be the negative sum of the other difficulties, resulting in the average item difficulty parameter being zero.
+* The last step difficulty parameter, $\kappa_m$, is likewise constrained to be the negative sum of the other step difficulties, resulting in the average step difficulty being zero.
+
+Priors:
+
+* $\sigma \sim \mathrm{Exp}(.1)$ is weakly informative for the person standard deviation.
+* $\beta_i \sim \mathrm{N}(0, 9)$ is also weakly informative.
+* $\kappa_s \sim \mathrm{N}(0, 9)$ is weakly informative.
+* $\lambda \sim t_3(0, 1)$, where $t_3$ is the Student's $t$ distribution with three degrees of freedom, *and* the covariates have been transformed as follows: (1) continuous covariates are mean-centered and then divided by two times their standard deviations, (2) binary covariates are mean-centered and divided their maximum minus minimum values, and (3) no change is made to the constant, set to one, for the model intercept. This approach to setting priors is similar to one that has been suggested for logistic regression [@gelman2008weakly]. It is possible to adjust the  coefficients back to the scales of the original covariates.
+
+
+## **Stan** code for a simple rating scale model
+
+A simple **Stan** model is described before discussing the complete model, as the code for the complete model is somewhat cumbersome. The simpler model, printed below, omits the latent regression and so does not require rescaling of the person covariates or `lambda`. The mean of the person distribution is set to zero and the constraint is removed from the item difficulties, which also differs from the complete model.
+
+```{r simple_rsm_code, comment=""}
+# Print the simple RSM from the edstan package
+simple_rsm_file <- system.file("extdata/rsm_simple.stan", 
+                               package = "edstan")
+cat(readLines(simple_rsm_file), sep = "\n")
+```
+
+The functions block includes a user-specified function `rsm()`, which accepts a response `y`, a value for `theta`, a scalar `beta` for one item, and the vector `kappa`. With these inputs, it returns the model-predicted log probability for the response. Later, in the model block, `rsm()` is used to get the likelihood of the observed item responses.
+
+Looking to the data block, data are fed into the model in vector form. That is, `y` is a long vector of scored item responses, and `ii` and `jj` indicate with which item and person each element in `y` is associated. These three vectors are of length `N`, which is either equal to `I` times `J` or less if there are missing responses. Then in the transformed data block, the variable `m` is created, which represents the number of steps per item.
+
+In the parameters block, `kappa_free` is declared as a vector of length `m - 1` and represents the unconstrained step parameters. In the transformed parameters block, the constrained step parameter is appened to `kappa_free` to make `kappa`, which is the complete vector of step difficulties. The other parameters are handled in conventional ways, with `sigma` being assigned a lower bound of zero because it is a standard deviation.
+
+The model block indicates the priors and the likelihood. The `target += ...` syntax for the prior on `kappa` is a manual way of incrementing the log posterior used when the prior is placed on a transformed parameter. The likelihood uses similar syntax along with the `rsm()` function.
+
+
+## **Stan** code for the rating scale model with latent regression
+
+The RSM with latent regression will be discussed in relation to the simpler model, and both models are equivalent when the latent regression is restricted to an intercept only. The model with latent regression, which is featured in **edstan**, is printed below. It is more complicated than is typically necessary for a **Stan** model because it is written to apply sensible priors automatically for parameters associated with arbitrarily scaled covariates.
+
+```{r rsm_code, comment="", echo=FALSE}
+rsm_file <- system.file("extdata/rsm_latent_reg.stan", 
+                        package = "edstan")
+cat(readLines(rsm_file), sep = "\n")
+```
+
+The complete model adds `obtain_adjustments()` to the functions block, which is used to adjust the covariate matrix. In brief, the model operates on the adjusted covariate matrix, `W_adj`, and then in the generated quantities block determines what the latent regression coefficients would be on the original scale of the covariates. For a more in depth discussion of `obtain_adjustments()` and the transformations related to the latent regression, see the [Rasch and 2PL case study](http://mc-stan.org/documentation/case-studies/rasch_and_2pl.html).
+
+In the data block, the number of covariates (plus the intercept) `K` is now required, as is the matrix of covariates `W`. The parameters `beta_free`, `kappa_free`, `theta`, `sigma`, and `lambda` are declared in the parameters block. The unconstrained item parameters are contained in `beta_free`. In the transformed parameters block, `beta` is created by appending the constrained item difficulty to `beta_free`. The model block contains the priors and the likelihood.
+
+
+## Simulation for parameter recovery
+
+The **Stan** model is fit to a simulated dataset to evaluate it's ability to recover the generating parameter values. The **R** code that follows simulates a dataset conforming to the model.
+
+```{r sim_data}
+# Set parameters for the simulated data
+J <- 500
+sigma <- 1.2
+lambda <- c(-10*.05, .05, .5, -.025)
+w_2 <- rnorm(J, 10, 5)
+w_3 <- rbinom(J, 1, .5)
+W <- cbind(1, w_2, w_3, w_2*w_3)
+
+# Set item parameters
+I <- 20  # Number of items
+S <- 5   # Number of response catetories
+beta <- seq(from = -1, to = 1, length.out = I)
+kappa <- seq(from = -1, to = 1, length.out = S - 1)
+
+# A function to simulate responses from the model
+simulate_response <- function(theta, beta, kappa) {
+  unsummed <- c(0, theta - beta - kappa)
+  numerators <- exp(cumsum(unsummed))
+  denominator <- sum(numerators)
+  response_probs <- numerators/denominator
+  simulated_y <- sample(1:length(response_probs) - 1, size = 1,
+                        prob = response_probs)
+  return(simulated_y)
+}
+
+# Calculate or sample remaining variables and parameters
+N <- I*J
+ii <- rep(1:I, times = J)
+jj <- rep(1:J, each = I)
+rsm_theta <-  rnorm(J, W %*% matrix(lambda), sigma)
+rsm_y <- numeric(N)
+for(n in 1:N) {
+  rsm_y[n] <- simulate_response(rsm_theta[jj[n]], beta[ii[n]], kappa)
+}
+
+# Assemble the data list using an edstan function
+sim_rsm_list <- irt_data(y = rsm_y, ii = ii, jj = jj, 
+                         covariates = as.data.frame(W), 
+                         formula = NULL)
+```
+
+The simulated data consists of `r I` items having 3 response categories and `r J` persons. The person covariate vectors $w_j$ include (1) a value of one for the model intercept, (2) a random draw from a normal distribution with mean of 10 and standard deviation of 5, (3) an indicator variable taking values of zero and one, and (4) an interaction between the two. These are chosen to represent a difficult case for assigning automatic priors for the latent regression coefficients. The generating coefficients $\lambda$ for the latent regression are `r nand(lambda)`. The abilities $\theta$ are random draws from a normal distribution with a mean generated from the latent regression and a standard deviation $\sigma = `r sigma`$.
+
+```{r rsm_sim_theta_plot, fig.cap="Mean of generated abilities as a function of the continuous covariate. A line is shown separately for the two groups identified by the binary variable."}
+# Plot mean ability conditional on the covariates
+f1 <- function(x) lambda[1] + x*lambda[2]
+f2 <- function(x) lambda[1] + lambda[3] + x*(lambda[2] + lambda[4])
+ggplot(data.frame(w2 = c(0, 20))) +
+  aes(x = w2) +
+  stat_function(fun = f1, color = "red") +
+  stat_function(fun = f2, color = "blue") +
+  ylab("Mean generated ability") +
+  xlab("Value for continous covariate")
+```
+
+The simulated dataset is next fit with **Stan** using `irt_stan()` from the **edstan** package. `irt_stan()` is merely a wrapper for `stan()` in **rstan**. Using 1,000 posterior draws per chain may be somewhat excessive as we are mainly interested in the posterior means of the parameters. However, as parameter recovery will be evaluated using the 2.5th and 97.5th percentiles of the posterior, the large number of posterior samples is warranted.
+
+```{r rsm_sim_fit, results="hide"}
+#Fit model to simulated data
+sim_rsm_fit <- irt_stan(sim_rsm_list, model = "rsm_latent_reg.stan", 
+                        chains = 4, iter = 1000)
+```
+
+```{r sim_rsm_rhat, echo = FALSE}
+# Fit model to simulated data using an edstan function
+rsm_sim_max_rhat <- max(summary(sim_rsm_fit)$summary[,"Rhat"])
+```
+
+The highest value for $\hat R$ was 
+`r round(rsm_sim_max_rhat, 3)` 
+for all parameters and the log posterior, suggesting that the chains have converged.
+The **Stan** model is evaluated in terms of its ability to recover the generating values of the parameters. The R code below prepares a plot in which the points indicate the difference between the posterior means and generating values for the parameters of main interest. This difference is referred to as discrepancy. The lines indicate the 95% poster intervals for the difference, defined as the 2.5th and 97.5th percentiles of the posterior draws. Ideally, (nearly) all the 95% intervals would include zero.
+
+```{r sim_rsm_dif, fig.height=6, fig.cap="Discrepancies between estimated and generating parameters. Points indicate the difference between the posterior means and generating values for a parameter, and horizontal lines indicate 95% posterior intervals for the difference. Most of the discrepancies are about zero, indicating that **Stan** successfully recovers the true parameters."}
+# Get estimated and generating values for wanted parameters
+rsm_generating_values <- c(beta, kappa, lambda, sigma)
+rsm_estimated_values <- summary(sim_rsm_fit,  
+                                pars = c("beta", "kappa", "lambda", "sigma"),
+                                probs = c(.025, .975))
+rsm_estimated_values <- rsm_estimated_values[["summary"]]
+
+# Make a data frame of the discrepancies
+rsm_discrep <- data.frame(par = rownames(rsm_estimated_values),
+                          mean = rsm_estimated_values[, "mean"],
+                          p025 = rsm_estimated_values[, "2.5%"],
+                          p975 = rsm_estimated_values[, "97.5%"],
+                          gen = rsm_generating_values)
+rsm_discrep$par <- with(rsm_discrep, factor(par, rev(par)))
+rsm_discrep$lower <- with(rsm_discrep, p025 - gen)
+rsm_discrep$middle <- with(rsm_discrep, mean - gen)
+rsm_discrep$upper <- with(rsm_discrep, p975 - gen)
+
+# Plot the discrepancies
+ggplot(rsm_discrep) +
+  aes(x = par, y = middle, ymin = lower, ymax = upper) +
+  scale_x_discrete() +
+  labs(y = "Discrepancy", x = NULL) +
+  geom_abline(intercept = 0, slope = 0, color = "white") +
+  geom_linerange() +
+  geom_point(size = 2) +
+  theme(panel.grid = element_blank()) +
+  coord_flip()
+```
+
+
+# Generalized rating scale model with latent regression
+
+## Overview of the model
+
+The GRSM extends the RSM by including a discrimination term. The version presented includes a latent regression. However, the latent regression may be restricted to a model intercept, resulting in the standard generalized rating scale model.
+
+$$
+\Pr(Y_{ij} = y,~y > 0 | \theta_j, \alpha_i, \beta_i, \kappa_s) =
+\frac{\exp \sum_{s=1}^y (\alpha_i \theta_j - \beta_i - \kappa_s)}
+     {1 + \sum_{k=1}^{m} \exp \sum_{s=1}^k (\alpha_i \theta_j - \beta_i - \kappa_s)}
+$$
+$$
+\Pr(Y_{ij} = y,~y = 0 | \theta_j, \alpha_i, \alpha_i, \beta_i) =
+\frac{1}
+     {1 + \sum_{k=1}^{m} \exp \sum_{s=1}^k (\alpha_i \theta_j - \beta_i - \kappa_s)}
+$$
+$$
+\theta_j \sim \mathrm{N}(w_{j}' \lambda, 1)
+$$
+
+Many aspects of the GRSM are similar to the RSM described earlier. Parameters $\beta_i$, $\kappa_s$, $\theta_j$, and $\lambda$ have the same interpretation, but the GRSM adds a discrimination parameter $\alpha_i$ and constrains the variance of $\theta_j$ to one. The prior $\alpha_i \sim \mathrm{log~N}(1, 1)$ is added, which is weakly informative but assumes positive discriminations. The same priors are placed on $\beta_i$, $\kappa_s$, and $\lambda$, and the same constraints are placed on $\beta_I$ and $\kappa_s$.
+
+
+## **Stan** code for the generalized rating scale model with latent regression
+
+The **Stan** code for the GRSM is similar to that for the RSM except for the addition of the discrimination parameters.
+
+```{r latreg_grsm_code, comment=""}
+# Print the latent regression GRSM model from the edstan package
+grsm_latreg_file <- system.file("extdata/grsm_latent_reg.stan", 
+                                package = "edstan")
+cat(readLines(grsm_latreg_file), sep = "\n")
+```
+
+
+## Simulation for parameter recovery
+
+The **Stan** model is fit to a simulated dataset to evaluate it's ability to recover the generating parameter values. The **R** code that follows simulates a dataset conforming to the model. The step difficulties and some other elements are borrowed from the RSM simulation.
+
+```{r sim_grsm_data}
+# Set alpha, and otherwise use parameters from the previous simulation
+alpha <- rep(c(.8, 1.2),  length.out = I)
+
+# Calculate or sample remaining variables and parameters where needed
+grsm_theta <-  W %*% matrix(lambda) + rnorm(J, 0, 1)
+grsm_y <- numeric(N)
+for(n in 1:N) {
+  grsm_y[n] <- simulate_response(alpha[ii[n]]*grsm_theta[jj[n]], 
+                                 beta[ii[n]], kappa)
+}
+
+# Assemble the data list using an edstan function
+sim_grsm_list <- irt_data(y = grsm_y, ii = ii, jj = jj, 
+                          covariates = as.data.frame(W), 
+                          formula = NULL)
+```
+
+The simulated dataset is next fit with **Stan** using `irt_stan()` from the **edstan** package.
+
+```{r sim_grsm_fit, results="hide", message=FALSE}
+# Fit model to simulated data using an edstan function
+sim_grsm_fit <- irt_stan(sim_grsm_list, model = "grsm_latent_reg.stan",
+                         chains = 4, iter = 1000)
+```
+
+```{r sim_grsm_rhat, echo = FALSE}
+# Fit model to simulated data using an edstan function
+grsm_sim_max_rhat <- max(summary(sim_grsm_fit)$summary[,"Rhat"])
+```
+
+The highest value for $\hat R$ was 
+`r round(grsm_sim_max_rhat, 3)`
+for all parameters and the log posterior. 
+The **Stan** model is evaluated in terms of its ability to recover the generating values of the parameters. The R code below prepares a plot in which the points indicate the difference between the posterior means and generating values for the parameters of main interest. This difference is referred to as discrepancy. The lines indicate the 95% poster intervals for the difference, defined as the 2.5th and 97.5th percentiles of the posterior draws. Ideally, (nearly) all the 95% intervals would include zero.
+
+```{r sim_grsm_dif, fig.height=8, fig.cap="Discrepancies between estimated and generating parameters. Points indicate the difference between the posterior means and generating values for a parameter, and horizontal lines indicate 95% posterior intervals for the difference. Most of the discrepancies are about zero, indicating that **Stan** successfully recovers the true parameters."}
+# Get estimated and generating values for wanted parameters
+grsm_generating_values <- c(alpha, beta, kappa, lambda)
+grsm_estimated_values <- summary(sim_grsm_fit,  
+                                 pars = c("alpha", "beta", "kappa", "lambda"),
+                                 probs = c(.025, .975))
+grsm_estimated_values <- grsm_estimated_values[["summary"]]
+
+# Make a data frame of the discrepancies
+grsm_discrep <- data.frame(par = rownames(grsm_estimated_values),
+                           mean = grsm_estimated_values[, "mean"],
+                           p025 = grsm_estimated_values[, "2.5%"],
+                           p975 = grsm_estimated_values[, "97.5%"],
+                           gen = grsm_generating_values)
+grsm_discrep$par <- with(grsm_discrep, factor(par, rev(par)))
+grsm_discrep$lower <- with(grsm_discrep, p025 - gen)
+grsm_discrep$middle <- with(grsm_discrep, mean - gen)
+grsm_discrep$upper <- with(grsm_discrep, p975 - gen)
+
+# Plot the discrepancies
+ggplot(grsm_discrep) +
+  aes(x = par, y = middle, ymin = lower, ymax = upper) +
+  scale_x_discrete() +
+  labs(y = "Discrepancy", x = NULL) +
+  geom_abline(intercept = 0, slope = 0, color = "white") +
+  geom_linerange() +
+  geom_point(size = 2) +
+  theme(panel.grid = element_blank()) +
+  coord_flip()
+```
+
+
+# Example application
+
+## Data
+
+The example data are from the Consumer Protection and Perceptions of Science and Technology section of the 1992 Euro-Barometer Survey [@Karlheinz1992]. Because these data do not include person covariates, the latent regression aspect of the model will include an intercept only.
+
+```{r example_data}
+# Convert the example dataset to an integer matrix with values 0 ... 3
+M <- matrix(NA, ncol = ncol(Science), nrow = nrow(Science))
+for(i in 1:ncol(M)) M[, i] <- as.integer(Science[, i]) - 1
+```
+
+The dataset contains `r ncol(Science)` items and `r nrow(Science)` persons with no missing responses. The items pertain to attitudes towards science and technology, and responses are scored on a 4-point Likert scale. For example, the text of the first item reads, "Science and technology are making our lives healthier, easier and more comfortable." The response options are *strongly disagree*, *disagree*, *agree*, and *strongly agree*.
+
+Before fitting the model, the response frequencies for each item are considered.
+
+```{r example_freqs}
+# Frequencies for each item
+freqs <- t(apply(M, 2, table))
+rownames(freqs) <- names(Science)
+freqs
+```
+
+The data are now formatted into a data list.
+
+```{r example_data_list, result="hide"}
+# Assemble data list for Stan
+ex_list <- irt_data(M)
+```
+
+
+## Rating scale model results
+
+The data list is used to fit the rating scale model.
+
+```{r example_rsm_fit, results="hide", message=FALSE}
+# Run Stan model
+ex_rsm_fit <- irt_stan(ex_list, "rsm_latent_reg.stan", chains = 4, iter = 300)
+```
+
+As discussed above, convergence of the chains is assessed for every parameter, and also the log posterior density, using $\hat{R}$.
+
+```{r ex_rsm_converge, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the example. All values should be less than 1.1 to infer convergence."}
+# Plot of convergence statistics
+stan_columns_plot(ex_rsm_fit)
+```
+
+Next we view a summary of the parameter posteriors.
+
+```{r example_rsm_print}
+# View table of parameter posteriors
+print_irt_stan(ex_rsm_fit, ex_list)
+```
+
+
+## Generalized rating scale model results
+
+The data list is used to fit the generalized rating scale model.
+
+```{r example_grsm_fit, results="hide", message=FALSE}
+# Run Stan model
+ex_grsm_fit <- irt_stan(ex_list, "grsm_latent_reg.stan", chains = 4, iter = 300)
+```
+
+As discussed above, convergence of the chains is assessed for every parameter, and also the log posterior density, using $\hat{R}$.
+
+```{r ex_grsm_converge, fig.cap="Convergence statistics ($\\hat{R}$) by parameter for the example. All values should be less than 1.1 to infer convergence."}
+# Plot of convergence statistics
+stan_columns_plot(ex_grsm_fit)
+```
+
+Next we view a summary of the parameter posteriors.
+
+```{r example_grsm_print}
+# View table of parameter posteriors
+print_irt_stan(ex_grsm_fit, ex_list)
+```
+
+
+# References
+
+<!-- This comment causes section to be numbered -->
