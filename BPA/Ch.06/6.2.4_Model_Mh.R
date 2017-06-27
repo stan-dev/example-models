@@ -12,6 +12,7 @@ set.seed(1234)
 ## The data generation code is in bpa-code.txt, available at
 ## http://www.vogelwarte.ch/de/projekte/publikationen/bpa/complete-code-and-data-files-of-the-book.html
 stan_data <- read_rdump("Mh.data.R")
+
 ## Initial values
 inits <- function() list(mean_p = 0.5, sigma = runif(1, 0.5, 0.9))
 
@@ -29,7 +30,6 @@ out <- stan("Mh.stan",
             data = stan_data, init = inits, pars = params,
             chains = nc, iter = ni, warmup = nb, thin = nt,
             seed = 1,
-            control = list(adapt_delta = 0.8),
             open_progress = FALSE)
 
 ## Summarize posteriors

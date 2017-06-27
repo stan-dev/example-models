@@ -51,6 +51,7 @@ outX <- stan("MtX.stan",
              data = stan_data, init = inits, pars = params,
              chains = nc, iter = ni, warmup = nb, thin = nt,
              seed = 1,
+             control = list(max_treedepth = 15),
              open_progress = FALSE)
 
 ## Summarize posteriors
