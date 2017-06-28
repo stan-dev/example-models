@@ -27,28 +27,19 @@ model {
   //  p ~ uniform(0, 1);
 
   // Likelihood
-  for (i in 1:M) {
-    real lp[2];
-
-    if (s[i] > 0) {
+  for (i in 1:M)
+    if (s[i] > 0)
       // z[i] == 1
       target += bernoulli_lpmf(1 | omega)
               + binomial_lpmf(s[i] | T, p);
-    } else { // s[i] == 0
-      // z[i] == 1
-      lp[1] = bernoulli_lpmf(1 | omega)
-            + binomial_lpmf(0 | T, p);
-      // z[i] == 0
-      lp[2] = bernoulli_lpmf(0 | omega);
-      target += log_sum_exp(lp[1], lp[2]);
-    }
-  }
+    else // s[i] == 0
+      target += log_sum_exp( bernoulli_lpmf(1 | omega)   // z[i] == 1
+                             + binomial_lpmf(0 | T, p),
+                             bernoulli_lpmf(0 | omega)); // z[i] == 0
 }
 
 generated quantities {
-  int<lower=C, upper=M> N;
-  real omega_nd;  // prob present given never detected
-  omega_nd = (omega * (1 - p)^T) / (omega * (1 - p)^T + (1 - omega));
-
-  N = C + binomial_rng(M - C, omega_nd);
+  // prob present given never detected
+  real omega_nd = (omega * (1 - p)^T) / (omega * (1 - p)^T + (1 - omega));
+  int<lower=C, upper=M> N = C + binomial_rng(M - C, omega_nd);
 }

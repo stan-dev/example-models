@@ -20,9 +20,9 @@ inits <- function() list(sigma = runif(1, 0.5, 0.9))
 params <- c("N", "mean_p", "mean_lp", "sigma", "omega")
 
 ## MCMC settings
-ni <- 15000
-nt <- 10
-nb <- 5000
+ni <- 10000
+nt <- 9
+nb <- 1000
 nc <- 4
 
 ## Call Stan from R
@@ -30,9 +30,7 @@ out <- stan("Mth.stan",
             data = stan_data, init = inits, pars = params,
             chains = nc, iter = ni, warmup = nb, thin = nt,
             seed = 2,
-            control = list(adapt_delta = 0.95),
             open_progress = FALSE)
-## Note: There may be divergent transitions after warmup.
 
 ## Summarize posteriors
 print(out, digits = 3)

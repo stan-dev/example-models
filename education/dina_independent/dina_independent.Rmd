@@ -1,0 +1,452 @@
+---
+title: "Cognitive Diagnosis Model"
+subtitle: "DINA model with independent attributes"
+author: "Seung Yeon Lee"
+date: "`r gsub('(^.* )(0)([0-9], .*)', '\\1\\3', format(Sys.time(), '%B %d, %Y'))`"
+bibliography: bibliography.bib
+output:
+  html_document:
+    toc: true
+    number_sections: true
+    fig_caption: true
+    css: styles.css
+verbose: true
+---
+
+# DINA Model
+
+This case study uses **Stan** to fit the *deterministic inputs, noisy "and" gate* (DINA) model. Analysis is performed with **R**, making use of the **rstan**, which is the implementation of **Stan** for **R**. The following **R** code loads the necessary packages and then sets some **rstan** options, which causes the compiled **Stan** model to be saved for future use and the MCMC chains to be executed in parallel.
+
+```{r, warning=FALSE, message=FALSE, results='hide'}
+# Load R packages
+library(rstan)
+library(ggplot2)
+library(knitr)
+library(CDM)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+```
+
+The case study uses 
+**R** version `r getRversion()`,
+**rstan** version `r packageVersion("rstan")`, 
+**ggplot2** version `r packageVersion("ggplot2")`, and
+**knitr** version `r packageVersion("knitr")`.
+Also, the example data are from
+**CDM** version `r packageVersion("CDM")`.
+Readers may wish to check the versions for their installed packages using the `packageVersion()` function.
+
+## Overview {#overview}
+In educational measurement, cognitive diagnosis models (CDMs) have been used to evaluate the strengths and weaknesses in a particular content domain by identifying the presence or absence of multiple fine-grained attributes (or skills). The presence and absence of attributes are referred to as *"mastery"* and *"non-mastery"* respectively. A respondent's knowledge is represented by a binary vector, referred to as *"attribute profile"*, to indicate which attributes have been mastered or have not.  
+
+The *deterministic inputs, noisy "and"" gate* (DINA) model [@Junker2001] is a popular conjunctive CDM, which assumes that a respondent must have mastered all required attributes in order to correctly respond to an item on an assessment.
+
+To estimate respondents' knowledge of attributes, we need information about which attributes are required for each item. For this, we use a Q-matrix which is an $I \times K$ matrix where $q_{ik}$=1 if item $i$ requires attribute $k$ and 0 if not. $I$ is the number of items and $K$ is the number of attributes in the assessment. 
+
+A binary latent variable $\alpha_{jk}$ indicates respondent $j$'s knowledge of attribute $k$, where $\alpha_{jk}=1$ if respondent $j$ has mastered attribute $k$ and 0 if he or she has not. Then, an underlying attribute profile of respondent $j$, $\boldsymbol{\alpha_j}$, is a binary vector of length $K$ that indicates whether or not the respondent has mastered each of the $K$ attributes. 
+
+The deterministic element of the DINA model is a latent variable $\xi_{ij}$ that indicates whether or not respondent $j$ has mastered all attributes required for item $i$:
+$$
+\xi_{ij}=\prod_{k=1}^{K}\alpha_{jk}^{q_{ik}}
+$$
+If respondent $j$ has mastered all attributes required for item $i$, $\xi_{ij}=1$; if the respondent has not mastered all of the attributes, $\xi_{ij}=0$.
+
+The model allows for slipping and guessing defined in terms of conditional probabilities of answering items correctly ($Y_{ij}=1$) and incorrectly ($Y_{ij}=0$)
+$$
+s_i=\mathrm{Pr}(Y_{ij}=0\, | \, \xi_{ij}=1)
+$$
+$$
+g_i=\mathrm{Pr}(Y_{ij}=1 \, | \, \xi_{ij}=0).
+$$
+
+The slip parameter $s_i$ is the probability that respondent $j$ responds incorrectly to item $i$ although he or she has mastered all required attributes. The guess parameter $g_i$ is the probability that respondent $j$ responds correctly to item $i$ although he or she has not mastered all the required attributes. 
+
+It follows that the probability $\pi_{ij}$ of a correct response of respondent $j$ to item $i$ is 
+$$
+\pi_{ij}=\mathrm{Pr}(Y_{ij}=1 \, | \, \boldsymbol{\alpha_j}, s_i, g_i)=(1-s_{i})^{\xi_{ij}}g_{i}^{1-\xi_{ij}}.
+$$
+
+## Model specification for **Stan** {#modelforstan}
+In [Section 1.1](#overview), respondents' knowledge was defined in terms of $\alpha_{jk}$ and $\xi_{ij}$ which are discrete latent variables. However, **Stan** does not support sampling discrete parameters. Instead, such models that involve bounded discrete parameters can be coded by marginalizing out the discrete parameters (See Chapter 14 in Stan reference 2.15.0. for more information on latent discrete parameters).
+
+The purpose of the DINA model is to estimate an attribute profile of each respondent. In the framework of latent class models, respondents are viewed as belonging to latent classes that determine the attribute profiles. In this sense, $\alpha_{jk}$ and $\xi_{ij}$ can alternatively be expressed at the level of the latent class subscripted by $c$. Each possible attribute profile corresponds to a latent class and the corresponding attribute profiles are labeled $\boldsymbol{\alpha_c}$ with elements $\alpha_{ck}$. The global attribute mastery indicator for respondents in latent class $c$ is defined by 
+$$
+\xi_{ic}=\prod_{k=1}^{K}\alpha_{ck}^{q_{ik}}
+$$
+where $\alpha_{ck}$ represents the attribute variable for respondents in latent class $c$ that indicates whether respondents in this class have mastered attribute $k$ $(\alpha_{ck}=1)$ or not $(\alpha_{ck}=0)$, and $q_{ik}$ represents the binary entry in the Q-matrix for item $i$ and attribute $k$. Although $\xi_{ij}$ for respondent $j$ is latent, $\xi_{ic}$ is determined and known for each possible attribute profile as a type of characteristic of each latent class. 
+
+Then, the probability of a correct response to item $i$ for a respondent in latent class $c$ is represented as follows:
+$$
+\pi_{ic}=\mathrm{Pr}(Y_{ic}=1 \, | \, \boldsymbol{\alpha_c}, s_i, g_i)=(1-s_{i})^{\xi_{ic}}g_{i}^{1-\xi_{ic}}
+$$
+where $Y_{ic}$ is the observed response to item $i$ of a respondent in latent class $c$.
+
+The marginal probability of a respondent's observed responses across all items becomes a finite mixture model as follows: 
+$$
+\begin{aligned}
+\mathrm{Pr}({Y}_j=\boldsymbol{y}_j) &= \sum_{c=1}^{C}\nu_c\prod_{i=1}^I\mathrm{Pr}(Y_{ij}=y_{ij} \, | \, \boldsymbol{\alpha_c}, s_i, g_i) \\
+&=\sum_{c=1}^{C}\nu_c\prod_{i=1}^I\pi_{ic}^{y_{ij}}(1-\pi_{ic})^{1-y_{ij}} \\
+&= \sum_{c=1}^{C}\nu_c\prod_{i=1}^I{[}(1-s_{i})^{\xi_{ic}}g_{i}^{1-\xi_{ic}}{]}^{y_{ij}}{[}1-\{(1-s_{i})^{\xi_{ic}}g_{i}^{1-\xi_{ic}}\}{]}^{1-y_{ij}}
+\end{aligned}
+$$
+where $\boldsymbol{y}_j$ is the vector of observed responses $y_{ij} (i=1,...,I)$, $\nu_c$ is the probability of membership in latent class $c$, and $\pi_{ic}$ is the probability of a correct response to item $i$ by a respondent in latent class $c$. In **Stan**, such mixture distributions can be specified using the function `target +=`. 
+
+The probability $\nu_c$ of membership in latent class $c$ is the joint probability of the components of $\boldsymbol{\alpha_c}=(\alpha_{c1},\alpha_{c2},...,\alpha_{cK})'$ and can be structured in different ways. The simplest approach is the independence model which assumes that the attributes are independent of each other. Then $\nu_c$ is simply a product of probabilities for individual attributes (See [Section 2.1](#stan_ind_code)). However, the independence assumption is usually implausible in practice. For example, the attributes can often be viewed as specific aspects of a more broadly-defined continuous latent trait. In this case, we can model the joint distribution of $\boldsymbol{\alpha_c}$ as depending on a higher-order latent trait so that the attributes are independent conditional on the higher-order latent trait. In some situations, the attributes can have prerequisite relationships where some attributes cannot be mastered before other attributes are mastered. The attribute hierarchy assumption reduces the number of possible latent classes and $\nu_c$ can be structured in different ways. 
+
+## Prediction of respondents' attribute profiles
+As we have seen, estimation of finite mixture models in Stan does not involve drawing realizations of the respondents' class membership (i.e., attribute profiles) from the posterior distribution. Therefore, additional Stan code is necessary for obtaining the posterior probabilities of the respondents' class membership. 
+
+We will begin by conditioning on the parameters $\nu_c$, ($c=1,...,C$), $s_i$ and $g_i$, ($i=1,...,I$). The parameter $\nu_c$ represents the 'prior' probability that respondent $j$ belongs to class $c$, not conditioning on the respondent's response vector $\boldsymbol{y}_j$. Since classes are defined by the response vectors $\boldsymbol{\alpha_c}$, we can write this probability as
+$$
+\mathrm{Pr}(\boldsymbol{\alpha_j}=\boldsymbol{\alpha_c})=\nu_c.
+$$
+The corresponding posterior probability of respondent $j$'s class membership, given the response vector $\boldsymbol{y}_j$ , becomes
+$$
+\mathrm{Pr}(\boldsymbol{\alpha_j}=\boldsymbol{\alpha_c} \, | \, \boldsymbol{y}_j)=\frac{\mathrm{Pr}(\boldsymbol{\alpha_j}=\boldsymbol{\alpha_c})\mathrm{Pr}(\boldsymbol{Y}_j=\boldsymbol{y}_j \, | \, \boldsymbol{\alpha_c})}{\mathrm{Pr}(\boldsymbol{Y}_j=\boldsymbol{y}_j)}=\frac{\nu_c\prod_{i=1}^I\pi_{ic}^{y_{ij}}(1-\pi_{ic})^{1-y_{ij}}}{\sum_{c=1}^{C}\nu_c\prod_{i=1}^I\pi_{ic}^{y_{ij}}(1-\pi_{ic})^{1-y_{ij}}}.
+$$
+
+From these joint posterior probabilities of the attribute vectors, we can also derive the posterior probabilities of mastery of the individual attributes as
+$$
+\mathrm{Pr}(\alpha_{jk}=1 \, | \, \boldsymbol{y}_j)=\sum_{c=1}^{C}\mathrm{Pr}(\boldsymbol{\alpha_j}=\boldsymbol{\alpha_c} \, | \, \boldsymbol{y}_j)\times\alpha_{ck}.
+$$
+
+Instead of conditioning on the parameters $\nu_c,s_i,g_i$ to obtain $\mathrm{Pr}(\boldsymbol{\alpha_j}=\boldsymbol{\alpha_c}|\boldsymbol{Y}_j=\boldsymbol{y}_j)$, we want to derive the posterior probabilities, averaged over the posterior distribution of the parameters. This is achieved by evaluating the expressions above for posterior draws of the parameters and averaging these over the MCMC iterations. Let the vector of all parameters be denoted $\boldsymbol{\theta}$ and let the posterior draw in iteration $s$ be denoted $\boldsymbol{\theta}^{(s)}_{.}$ Then we estimate the posterior probability, not conditioning on the parameters, as
+$$
+\frac{1}{S}\sum_{s=1}^{S}\mathrm{Pr}(\boldsymbol{\alpha_j}=\boldsymbol{\alpha_c} \, | \, \boldsymbol{y}_j,\boldsymbol{\theta}^{(s)}).
+$$
+
+In [Section 1.4](#stan_nostructure), we introduce the **Stan** program with no structure for $\nu_c$. [Section 2](#stan_ind) describes modification of this **Stan** program to specify the independence model for $\nu_c$ and presents simulation results. 
+
+## **Stan** program with no structure for $\nu_c${#stan_nostructure}
+The **Stan** program without any structure for $\nu_c$ is given in *dina_nostructure.stan*.
+
+As described in [Section 1.2](#modelforstan), the marginal probability of a respondent's observed responses across all items, $\mathrm{Pr}(\boldsymbol{Y}_j=\boldsymbol{y}_j)$, is a mixture of the $C$ mixture components which are conditional probabilities given latent class $c$ , $\prod_{i=1}^I\mathrm{Pr}(Y_{ij}=y_{ij}\, | \,\boldsymbol{\alpha_c}, s_i, g_i)$, with mixing proportions $\nu_c$. The mixing proportion parameter `nu` is declared to be a unit $C$-simplex in the `parameters` block. In the `model` block, we declare a local array variable `ps` to be size $C$ and use it to accumulate the contributions from the mixture components. In the loop over respondents $J$, for each respondent, the log of $\nu_c\prod_{i=1}^I\mathrm{Pr}(Y_{ij}=y_{ij}\, | \,\boldsymbol{\alpha_c}, s_i, g_i)$ is calculated using the expression $\mathrm{log}\nu_c+\sum_{i=1}^{I}\{y_{ij}\mathrm{log}\pi_{ic}+(1-y_{ij})\mathrm{log}(1-\pi_{ic})\}$ and added to `ps`. Then the log probability is incremented with the log sum of exponentials of the values of `ps` by `target += log_sum_exp(ps)`.
+
+For slip and guess parameters, we assign beta priors. Beta(5,25) corresponds to the prior expectation that respondents who have the required attributes answer an item incorrectly by slipping 1/6 (=5/(5+25)) of the time and respondents who do not have the required attributes answer correctly to an item by guessing 1/6 of the time. 
+
+In  the `generated quantities` block, we predict respondents' attribute profiles. `prob_resp_class` is defined to be a $J \times C$ matrix for posterior probabilities of respondent $j$ being in latent class $c$, $\mathrm{Pr}(\boldsymbol{\alpha_j}=\boldsymbol{\alpha_c}\, | \,\boldsymbol{y}_j)$, and a $J \times K$ matrix `prob_resp_attr` is then defined to calculate posterior probabilities of respondent $j$ being a master of attribute $k$, $\mathrm{Pr}(\alpha_{jk}=1\, | \,\boldsymbol{y}_j)$.
+
+```{r stan_code_class, tidy = TRUE, comment="", echo=FALSE}
+cat(readLines("dina_nostructure.stan"), sep = "\n")
+```
+
+# DINA with independent attributes{#stan_ind}
+
+## **Stan** program{#stan_ind_code}
+When the attributes are independent of each other, $\nu_c$ is a function of the probabilities of mastery of each attribute, $\eta_k=\mathrm{Pr}(\alpha_k=1)$. The probability of each attribute profile, $\nu_c$ for latent class $c$, is then constructed by multiplying the corresponding probabilities: we multiply $\eta_k$ if attribute $k$ has been mastered and $1-\eta_k$ if not mastered, $\nu_c=\prod_{k=1}^{K}\eta_k^{\alpha_{ck}}(1-\eta_k)^{(1-\alpha_{ck})}$. For example, if attributes $A_1$ and $A_2$ are independent and the probabilities of each attribute mastery are $0.3$ and $0.6$ respectively. Then the probability of attribute profile $(A_1,A_2)=(1,0)$ is $0.12 (= 0.3 \times (1-0.6))$.
+
+The **Stan** program for the independence model is given in *dina_independent.stan*.
+
+When the attributes are independent of each other, we consider $C=2^K$ attribute profiles. In the `parameters` block, `eta` is defined to be a row vector of length $K$ for the probabilities of mastery of each attribute. Then the `transformed parameters` block defines `nu` as a function of `eta` and `alpha.` 
+
+```{r stan_code_ind, tidy = TRUE, comment="", echo=FALSE}
+cat(readLines("dina_independent.stan"), sep = "\n")
+```
+
+
+## Simulation
+
+In this simulation, we consider 20 items and 5 attributes that are independent of each other. 
+The Q-matrix for the simulated data is as follows:
+```{r qmatrix_ind, cache=TRUE, echo=TRUE, tidy=TRUE}
+Q <- matrix(0,20,5)
+Q[c(2,5,6,7,15,19),1] <- 1
+Q[c(4,7,9,10,11,13,14,16:20),2] <- 1
+Q[c(1:3,5,6,13),3] <- 1
+Q[c(3,4,8,10,11,17:20),4] <- 1
+Q[c(2,4,5,10,12,19,20),5] <- 1
+rownames(Q) <- paste0("Item", 1:20)
+colnames(Q) <- paste0("A", 1:5)
+Q <- as.matrix(Q)
+Q
+```
+
+We consider $32 (=2^5)$ attribute profiles $\boldsymbol{\alpha_c},~ c=1,...,32.$  
+```{r attr_prof_ind, cache=TRUE, echo=TRUE, tidy=TRUE}
+alpha_patt <- expand.grid(c(0,1),c(0,1),c(0,1),c(0,1),c(0,1))
+colnames(alpha_patt) <- paste0("A", 1:5)
+alpha_patt
+```
+
+The following code defines probabilities $\eta_k$ that respondents master each skill $k$. 
+```{r each_skill_ind, cache=TRUE, echo=TRUE, tidy=TRUE}
+eta <- c()
+eta[1] <- 0.3
+eta[2] <- 0.6
+eta[3] <- 0.8
+eta[4] <- 0.2
+eta[5] <- 0.7
+eta
+```
+
+We then define the probabilities $\nu_c$ for the 32 attribute profiles as follows:
+```{r class_prob_ind, cache=TRUE, echo=TRUE, tidy=TRUE}
+alpha_prob <- rep(1,nrow(alpha_patt))
+for (i in 1:nrow(alpha_patt)){
+  for (j in 1:ncol(alpha_patt)){
+    alpha_prob[i] <- alpha_prob[i] * eta[j]^alpha_patt[i,j] * (1-eta[j])^(1-alpha_patt[i,j])  
+  }    
+}
+alpha_prob
+```
+
+Slip and guess parameters $s_i,~g_i,~i=1,...,20$, are randomly generated from a uniform distribution on 0.05 to 0.3.
+```{r guess_slip_ind, cache=TRUE, echo=TRUE, tidy=TRUE}
+# Generate slip and guess (the values were generated by using "runif(20, 0.05, 0.3)" and fixed for repeatability)
+slip <- c(15, 16, 9, 14, 19, 12, 22, 16, 14, 26, 12, 18, 20, 13, 9, 29, 30, 24, 9, 27) * 0.01
+guess <- c(9, 15, 12, 20, 8, 10, 17, 25, 28, 15, 7, 27, 10, 5, 25, 13, 25, 17, 11, 16) * 0.01
+slip
+guess
+```
+
+We simulate the true attribute profiles $\boldsymbol{\alpha_j}$ of 500 respondents, then generate the probabilities of correct responses $\pi_{ij}$ and finally the sample responses $y_{ij}$ for all items $i$ and respondents $j$.
+```{r responses_ind, cache=TRUE, echo=TRUE, tidy=TRUE}
+
+J <- 500 # Number of respondents
+I <- 20 # Number of items
+K <- 5 # Number of attributes
+C <- nrow(alpha_patt) # Number of attribute profiles
+
+# Generate a respondent's true latent attribute profile
+ind <- sample(x = 1:C, size = J, replace = TRUE, prob = alpha_prob)
+A <- alpha_patt[ind, ]    # true attribute profiles
+
+# Calculate an indicator whether respondents have all attributes needed for each item 
+xi_ind <- matrix(0,J,I)
+for (j in 1:J){
+  for (i in 1:I){
+    xi_ind[j,i]<-prod(A[j,]^Q[i,])
+	}
+}
+
+# Generate probability correct and sample responses 
+prob_correct <- matrix(0,J,I)
+y <- matrix(0,J,I)
+for(j in 1:J){
+  for (i in 1:I){
+		prob_correct[j,i] <- ((1-slip[i])^xi_ind[j,i])*(guess[i]^(1-xi_ind[j,i]))
+		y[j,i] <- rbinom(1,1,prob_correct[j,i])		
+	}
+}
+```
+
+We then prepare data for **Stan** as follows:
+
+```{r data_list_ind, cache=TRUE, echo=TRUE, tidy=TRUE, comment=""}
+# The global attribute mastery indicator for respondents in latent class c
+xi <- matrix(0,I,C)
+for (i in 1:I){
+  for (c in 1:C){
+  	xi[i,c]<-prod(alpha_patt[c,]^Q[i,])	
+	}
+}
+
+dina_data_ind<-list(
+  I = I, J = J, K = K, C = C, y = y, alpha = alpha_patt, xi = xi
+)
+```
+
+The simulated dataset is fit with **Stan** by *dina_independent.stan*
+
+```{r stan_dina_ind, cache=TRUE, results='hide', warning=FALSE, tidy=TRUE, message=FALSE}
+# Specify initial values for the four chains
+stan_inits<-list(list(guess=runif(20, 0.1, 0.3),slip=runif(20, 0.1, 0.3)),list(guess=runif(20, 0.2, 0.4),slip=runif(20, 0.2, 0.4)),list(guess=runif(20, 0.3, 0.5),slip=runif(20, 0.3, 0.5)),list(guess=runif(20, 0.4, 0.6),slip=runif(20, 0.4, 0.6)))
+
+# Fit model to simulated data
+dina_independent <- stan(file = "dina_independent.stan", data = dina_data_ind, chains = 4, iter = 500, init = stan_inits)
+```
+
+We specify initial values for `slip` and `guess` parameters in each of four chains. Random values from uniform distributions between 0.1 and 0.3, between 0.2 and 0.4, between 0.3 and 0.5, between 0.4 and 0.6 are used for chain 1 through chain 4, respectively, so that each chain can be initiated at different places. We specify the initial values in order to avoid the situation where a large value close to 1 is used as a starting point for `slip` or `guess`. For example, if `guess` and `slip` are close to 1, we cannot learn whether respondents have the required attributes. Thus, a chain with such large initial value is stuck near that value and fails to converge.  
+
+A summary of the parameter posteriors generated by *dina_independent.stan* is as follows:
+```{r stan_dina_ind2, cache=TRUE, tidy=TRUE}
+# View table of parameter posteriors
+print(dina_independent, pars=c("eta","guess","slip","nu"))
+```
+
+
+The **Stan** model is evaluated in terms of its ability to recover the generating values of the parameters. The **R** code below prepares a plot in which the points indicate the difference between the posterior means and generating values for the parameters of main interest ($\eta_k, g_i, s_i$). This difference is referred to as discrepancy. The lines indicate the 95% posterior intervals for the difference. Ideally, (nearly) all the 95% posterior intervals would include zero.
+
+```{r sim_plot_indep, cache=TRUE, tidy=TRUE, fig.height=8, fig.cap="Discrepancies between estimated and generating parameters for the simulation. Points indicate the difference between the posterior means and generating values for a parameter, and horizontal lines indicate 95% posterior intervals for the difference. Most intervals contain 0, indicating that **Stan** successfully recovers the true parameters."}
+# Make vector of wanted parameter names
+wanted_pars <- c(paste0("eta[", 1:dina_data_ind$K, "]"),
+                 paste0("guess[", 1:dina_data_ind$I, "]"),
+                 paste0("slip[", 1:dina_data_ind$I, "]"))
+
+# Get estimated and generating values for wanted parameters
+generating_values = c(eta, guess, slip)
+sim_summary <- as.data.frame(summary(dina_independent)[[1]])
+estimated_values <- sim_summary[wanted_pars, c("mean", "2.5%", "97.5%")]
+
+# Assesmble a data frame to pass to ggplot()
+sim_df <- data.frame(parameter = factor(wanted_pars, rev(wanted_pars)),
+                     row.names = NULL)
+sim_df$middle <- estimated_values[,"mean"] - generating_values
+sim_df$lower <- estimated_values[,"2.5%"] - generating_values
+sim_df$upper <- estimated_values[,"97.5%"] - generating_values
+
+# Plot the discrepancy
+ggplot(sim_df) +
+  aes(x = parameter, y = middle, ymin = lower, ymax = upper) +
+  scale_x_discrete() +
+  labs(y = "Discrepancy", x = NULL) +
+  geom_abline(intercept = 0, slope = 0, color = "white") +
+  geom_linerange() +
+  geom_point(size = 2) +
+  theme(panel.grid = element_blank()) +
+  coord_flip()
+```
+
+Next, we evaluate the ability of the **Stan** model to predict respondents' attribute mastery. First, for each attribute, we calculate the mean of the predicted posterior probabilities of attribute mastery for the group of respondents who have mastered the corresponding attribute in their observed profiles (Group 1) and for the group of respondents who have not mastered the corresponding attribute in their observed profiles (Group 2), respectively. Ideally, Group 1 should have greater mean probabilities than Group 2 across the attributes. 
+
+```{r sim_class_comparison1, cache=TRUE, tidy=TRUE}
+# Make a table for mean predicted probabilities of individual attribute mastery 
+table_mean <- as.data.frame(matrix(0,K,2))
+rownames(table_mean) <- paste0("attribute ",1:K)
+colnames(table_mean) <- c("Group 1","Group 2")
+for (k in 1:K){
+  # Make vector of wanted parameter names
+  wanted_pars <- c(paste0("prob_resp_attr[", 1:dina_data_ind$J, ",", k, "]"))
+  # Get predicted posterior probabilities of each attribute mastery for all respondents
+  posterior_prob_attr <- sim_summary[wanted_pars, c("mean")]
+  dim(posterior_prob_attr)
+  # Calculate mean of the probabilities for respondents who have mastered the attributes and for those who do not
+  table_mean[k,"Group 1"] <- mean(posterior_prob_attr[A[,k]==1])
+  table_mean[k,"Group 2"] <- mean(posterior_prob_attr[A[,k]==0])
+}
+kable(table_mean, digits=2, caption="Table 1: Mean of predicted posterior probabilities of attribute mastery for the group of respondents who have mastered the corresponding attribute in their observed profiles (Group 1) and for the group of respondents who have not mastered the corresponding attribute in their observed profiles (Group 2)")
+```
+
+Table 1 shows that the group of respondents who have mastered the attributes (Group 1) has greater mean predicted probabilities of attribute mastery than the group of respondents who have not mastered (Group 2) across attributes. Also, the mean probabilities look reasonable as they are greater than 0.5 for Group 1 and less than 0.5 for Group 2. 
+
+We further verify the quality of predictions in terms of how accurately **Stan** classifies respondents into mastery and non-mastery. Respondents are classified as mastery if their predicted probabilities are greater than 0.5 and non-mastery if not. The **R** code below calculates how many respondents in Group 1 are actually classified as mastery (True positive rate or Sensitivity) and how many respondents in Group 2 are classified as non-mastery (True negative rate or Specificity). 
+
+```{r sim_class_comparison2, cache=TRUE, tidy=TRUE}
+classification_table <- as.data.frame(matrix(0,K,2))
+rownames(classification_table) <- paste0("attribute ",1:K)
+colnames(classification_table) <- c("Sensitivity","Specificity")
+for (k in 1:K){
+  # Make vector of wanted parameter names
+  wanted_pars <- c(paste0("prob_resp_attr[", 1:dina_data_ind$J, ",", k, "]"))
+  # Get predicted posterior probabilities of each attribute mastery for all respondents
+  posterior_prob_attr <- sim_summary[wanted_pars, c("mean")]
+  # Calculate "sensitivity" and "specificity"
+  classification_table[k,"Sensitivity"] <- sum(round(posterior_prob_attr[A[,k]==1]))/sum(A[,k]==1)
+  classification_table[k,"Specificity"] <- sum(1-round(posterior_prob_attr[A[,k]==0]))/sum(A[,k]==0) 
+}
+kable(classification_table, digits=2, caption="Table 2: Sensitivity and specificity")
+```
+
+Table 2 presents sensitivity and specificity for each attribute. Overall, both sensitivity and specificity are quite high (greater than 0.7) suggesting that **Stan** reasonably predicts attribute mastery. 
+
+In particular, attribute 2 shows the greatest classification accuracy among the attributes. This can be partly explained by the fact that, based on the Q-matrix, there are 3 items that measure only attribute 2 (item 9, 14, 16) while the other attributes have only 1 item that measure these attributes exclusively (item 15 for attribute 1; item 1 for attribute 3; item 8 for attribute 4; item 12 for attribute 5). Including items that measure multiple attributes, 12 items require attribute 2 whereas only 6 require attributes 1 and attribute 3, 9 items require attribute 4 and 7 require attribute 5. Thus, $\boldsymbol{y}_j$ appears to be particularly informative about attribute 2 compared with the other attributes. 
+
+We can also directly estimate the probabilities of each attribute profile without specifying the structure for $\nu_c$ by using *dina_nostructure.stan* described in [Section 1.4](#stan_nostructure).
+
+```{r stan_dina_ind3, cache=TRUE, results='hide', warning=FALSE, tidy=TRUE, message=FALSE}
+# Fit model to simulated data
+dina_independent_nostructure <- stan(file = "dina_nostructure.stan", data = dina_data_ind, chains = 4, iter = 500, init = stan_inits)
+```
+
+The results from *dina_nostructure.stan* can be summarized as follows:
+
+```{r stan_dina_ind4, cache=TRUE, tidy=TRUE}
+# View table of parameter posteriors
+print(dina_independent_nostructure, pars=c("guess","slip","nu"))
+```
+
+# Example application
+
+The example data are from @tatsuoka1984's fraction subtraction data. The original data set is comprised of responses to 20 fraction subtraction test items that measure 8 attributes: (1) Convert a whole number to a fraction, (2) Separate a whole number from a fraction, (3) Simplify before subtracting, (4) Find a common denominator, (5) Borrow from whole number part, (6) Column borrow to subtract the second numerator from the first, (7) Subtract numerators, and (8) Reduce answers to simplest form. 
+
+We use a subset of the data that includes 536 middle school students' responses to 15 of the items. The items are associated with only 5 attributes and the Q-matrix was defined in @de2009dina. The Q-matrix and response data are available in the **CDM** package.  
+
+```{r data_list_ind_fraction, cache=TRUE, echo=TRUE, tidy=TRUE, comment=""}
+Q <- data.fraction1$q.matrix
+y <- data.fraction1$data
+
+# Create possible attribute patterns
+alpha_patt <- expand.grid(c(0,1),c(0,1),c(0,1),c(0,1),c(0,1))
+colnames(alpha_patt) <- paste0("A", 1:5)
+alpha_patt
+
+# Assemble data list for Stan
+I=ncol(y)
+J=nrow(y)
+K=ncol(Q)
+C=nrow(alpha_patt)
+
+xi <- matrix(0,I,C)
+for (i in 1:I){
+  for (c in 1:C){
+    xi[i,c]<-prod(alpha_patt[c,]^Q[i,])	
+	}
+}
+
+dina_data_fraction<-list(
+  I = I, J = J, K = K, C = C, y = y, alpha = alpha_patt, xi = xi
+)
+
+```
+
+The data are now formatted into a list and fit with **Stan**. Here, we use the **Stan** code *dina_nostructure.stan* for the purpose of comparison with the maximum likelihood estimates from the **CDM** package later, since the independence model is not available in the package. 
+
+```{r stan_dina_ind_fraction, cache=TRUE, results='hide', warning=FALSE, tidy=TRUE, message=FALSE}
+# Specify initial values for the four chains
+stan_inits<-list(list(guess=runif(15, 0.1, 0.3),slip=runif(15, 0.1, 0.3)),list(guess=runif(15, 0.2, 0.4),slip=runif(15, 0.2, 0.4)),list(guess=runif(15, 0.3, 0.5),slip=runif(15, 0.3, 0.5)),list(guess=runif(15, 0.4, 0.6),slip=runif(15, 0.4, 0.6)))
+
+# Run Stan model
+dina_fraction <- stan(file = "dina_nostructure.stan", data = dina_data_fraction, chains = 4, iter = 500, init = stan_inits)
+```
+
+A summary of the parameter posteriors is as follows:
+
+```{r stan_dina_ind5, cache=TRUE, tidy=TRUE}
+# View table of parameter posteriors
+print(dina_fraction, pars=c("guess","slip","nu"))
+```
+
+We can compare the **Stan** estimates with maximum likelihood estimates obtained by the **CDM** package. The **R** code below calculates ML point estimates by using the `din()` function of the **CDM** package and prepares a scatter plot of the posterior means versus the ML estimates for $g_i, s_i$ and $\nu_c$ ($i=1,...,15, ~ c=1,...,32).$
+
+```{r get_mle_cdm, tidy=TRUE, cache=TRUE, warning=FALSE, message=FALSE, results='hide'}
+# Fit the DINA model
+result_dina_cdm <- din(y, Q, rule="DINA")
+```
+
+```{r get_mle_cdm2, tidy=TRUE, cache=TRUE, warning=FALSE, message=FALSE}
+# Extract the 32 attribute profile patterns
+attr_prof_mle <- rownames(result_dina_cdm$attribute.patt)
+# Sort the estimated probabilities of attribute profiles (latent class) by the attribute profile pattern
+class_prob_mle <- result_dina_cdm$attribute.patt[order(attr_prof_mle),]
+
+# Get MLEs of guess, slip and probabilities of attribute profiles (nu)
+mle_pars <- as.vector(rbind(as.matrix(result_dina_cdm$guess[1]),as.matrix(result_dina_cdm$slip[1]),as.matrix(class_prob_mle$class.prob)))
+```
+
+```{r plot_ex, tidy=TRUE, cache=TRUE, warning=FALSE, message=FALSE, fig.height=8, fig.cap="Scatter plot of the **Stan** estimates vs. ML estimates from the **CDM** package for the subset of fraction subtraction data. Most points lie near the 45-degree line, indicating that the **Stan** estimates are similar to the ML estimates. The `guess` estimate of Item 5 differs between Stan (0.18) and CDM estimate (0.27). The reason could be that the Stan estimate has more shrunk towards the prior mean of 0.16 due to the imprecision of the ML estimate for the item; it has the largest standard error (0.04) for `guess` among all items"}
+
+# Create a vector of the 32 attribute profile patterns used for Stan
+attr_prof_stan <- do.call(paste0,alpha_patt[1:5])
+# Assign ID for each attribute profile (In the Stan estimates, nu[1] indicates the estimated probability of having attribute profile (0,0,0,0,0))
+attr_prof_stan <- cbind(attr_prof_stan,1:32)
+# Sort the assigned ID by the attribute profile pattern
+attr_prof_stan <- attr_prof_stan[order(attr_prof_stan[,1]),-1]
+
+# Make vector of wanted parameter names
+wanted_pars <- c(paste0("guess[", 1:dina_data_fraction$I, "]"),
+                 paste0("slip[", 1:dina_data_fraction$I, "]"),
+                 paste0("nu[", attr_prof_stan, "]"))
+
+# Get posterior means
+ex_summary <- as.data.frame(summary(dina_fraction)[[1]])
+posterior_means <- ex_summary[wanted_pars, c("mean")]
+
+# Create a data frame that combines posterior means and mle, and generate a scatter plot with 45-degree line
+estimates <- data.frame(post.means = posterior_means, mle = mle_pars)
+estimates$pars <- c(rep("guess",dina_data_fraction$I),rep("slip",dina_data_fraction$I),rep("nu",2^K))
+ggplot(data=estimates, aes(x=mle, y=post.means, shape=pars)) + geom_point()  + geom_abline(intercept = 0, slope = 1, colour="gray") + labs(x="MLE", y = "Posterior means") + scale_shape_discrete(name  ="Parameters")
+```
+
+# References
+
+<!-- This comment causes section to be numbered -->
