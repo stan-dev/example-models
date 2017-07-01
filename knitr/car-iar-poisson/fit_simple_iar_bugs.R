@@ -1,7 +1,7 @@
 library(R2OpenBUGS);
 library(rstan)  
 
-source("carlin_data.R");
+source("scotland_data.R");
 
 iter = 100000;
 burn =  90000;

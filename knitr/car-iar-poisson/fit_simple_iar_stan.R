@@ -2,7 +2,7 @@ library(rstan)
 options(mc.cores = parallel::detectCores())  
 
 source("mungeCARdata4stan.R")  
-source("carlin_data.R")
+source("scotland_data.R")
 
 iter = 10000;
 mfile = "simple_iar.stan";
@@ -20,20 +20,20 @@ capture.output(print(fit_stan, digits=3, probs=c(0.025, 0.975)),
                file=ofile);
 
 # estimate posterior co-variance for different parameters
-#  neighbors:  phi[24]: 27,30,31,44,47,48,55,56,   
+#  neighbors:  phi[24]: 27,30,31,44,47,48,55,56,
 #              phi[23]: 9,29,34,36,37,39,
 #              phi[6]:  3, 8,
 #              phi[8]:  6
 
-flist = extract(car_stanfit);
+stanfit = extract(fit_stan);
 # cov neighbors
-cov(flist$phi[,6],flist$phi[,8]);
-cov(flist$phi[,6],flist$phi[,3]);
-cov(flist$phi[,10],flist$phi[,22]);
+cov(stanfit$phi[,6],stanfit$phi[,8]);
+cov(stanfit$phi[,6],stanfit$phi[,3]);
+cov(stanfit$phi[,10],stanfit$phi[,22]);
 # cov non-neighbors
-cov(flist$phi[,6],flist$phi[,54]);
-cov(flist$phi[,8],flist$phi[,54]);
-cov(flist$phi[,2],flist$phi[,55]);
-cov(flist$phi[,1],flist$phi[,55]);
-cov(flist$phi[,2],flist$phi[,50]);
+cov(stanfit$phi[,6],stanfit$phi[,54]);
+cov(stanfit$phi[,8],stanfit$phi[,54]);
+cov(stanfit$phi[,2],stanfit$phi[,55]);
+cov(stanfit$phi[,1],stanfit$phi[,55]);
+cov(stanfit$phi[,2],stanfit$phi[,50]);
 
