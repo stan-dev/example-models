@@ -81,6 +81,13 @@ describe the spatial proximity of regions $n_i$ and $n_j$
 
 The construction of the spatial proximity matrix $B$ determines the class of CAR model structure.
 
+In the case where $B$ is a positive definite matrix, then the CAR model structure is a fully generative model.
+However evaluation of the joint distribution requires computing the covariance matrix described by
+$[D_{\tau}(I - \alpha B)]^{-1}$, which is computationally expensive.
+See the Stan case study 
+[Exact sparse CAR models in Stan](http://mc-stan.org/documentation/case-studies/mbjoseph-CARStan.html),
+for further discussion of CAR models.
+
 ### Intrinsic Auto-Regressive (IAR) Models
 
 The model is an Intrinsic Auto-Regressive (IAR) model when:
@@ -225,7 +232,7 @@ the pairwise differences ${\phi}_i - {\phi}_j$ as:
 ```
 phi[node1] - phi[node2]
 ```
-_indexing-fu plus vectorization - is that cool or what?!!_
+_indexing-fu plus vectorization!_
 
 The log probability density of $\phi$ is:
 $$-{\frac{1}{2}} \left( \sum_{i \sim j} {({\phi}_i - {\phi}_j)}^2 \right) + \mbox{const}$$
@@ -270,8 +277,8 @@ The Stan program is in the file
 [simple_iar.stan](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/simple_iar.stan).
 It consists of just the statements discussed in the preceding section:
 
-```{r print-stan-iar, comment='', echo = FALSE}
-cat(readLines('simple_iar.stan'), sep = '\n')
+```{r print-stan-iar, comment='' }
+writeLines(readLines('simple_iar.stan'))
 ```
 
 The data comes from the Scotland lip cancer dataset originally presented by Clayton and Kaldor 1987,
@@ -315,8 +322,8 @@ which is in the file
 [simple_iar.txt](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/simple_iar.txt).
 We use the R [R2OpenBugs](https://cran.r-project.org/web/packages/R2OpenBugs) package to this model via OpenBUGS,
 which requires that we wrap the BUGS model in a function statement for R:
-```{r print-bugs-iar, comment='', echo = FALSE}
-cat(readLines('simple_iar.txt'), sep = '\n')
+```{r print-bugs-iar, comment='' }
+writeLines(readLines('simple_iar.txt'))
 ```
 
 The following description of the [`car.normal`](https://www.mrc-bsu.cam.ac.uk/wp-content/uploads/geobugs12manual.pdf)
@@ -472,19 +479,37 @@ thus models with include both an IAR spatial effects component and an intercept 
 Adding the constraint that $\phi$ must sum to zero centers it, allowing the model to
 fit both the fixed-effect intercept term as well as $\phi$ and $\theta$.
 
-To control the amount of variability allocated to the components $\phi$ and $\theta$,
-Banerjee et al. propose a pair of gamma hyperpriors for the scale parameters, which are specified
-as precision parameters ${\tau}_{\phi}$ and ${\tau}_{\theta}$, see discussion of
-"CAR models and their difficulties", section 5.4.
-We follow this parameterization when implementing this model in Stan.
+The convolution of the random effects components $\phi$ and $\theta$ is difficult to fit
+without strong constraints on one of the two components,
+as either component can account for most or all of the individual-level variance.
+Without any hyperpriors on $\phi$ and $\theta$ the sampler will be forced to explore
+many extreme posterior probability distributions; the sampler will go very slowly or
+fail to fit the data altogether.
+The example model used to fit the Scotland lip cancer dataset in
+Banerjee Carlin and Gelfand 2003 uses gamma hyperpriors on the
+precision parameters ${\tau}_{\phi}$ and ${\tau}_{\theta}$,
+see discussion of "CAR models and their difficulties", section 5.4.
+The precision of $\phi$, `tau_phi` is given a hyperprior of gamma(1, 1)
+while the precision of $\theta$ is given a hyperprior of gamma(3.2761, 1.81).
+This is intended to make a "fair" prior which places equal emphasis on
+both spatial and non-spatial variance, based on the formula from
+Bernardinelli et al. (1995):
+
+$$ \textit{sd} ({\theta}_i) = \frac{1}{\sqrt{\tau}_{\phi}} \approx \frac{1}{0.7 \sqrt{ \bar m {\tau}_{\theta}}} \approx \textit{sd}({\phi}_i) $$
+
+We use these same hyperpriors when implementing this model in Stan, which allows the model to fit the data.
+However, the assumptions underlying the use of this choice of hyperpriors and the actual values used for
+the gamma hyperprior on `tau_theta` are specific to this dataset and would need to be re-evaluated for other
+situations.  
+
 
 ### A Stan Implementation of the BYM Model
 
 A Stan model which implements the BYM model for univariate data plus offset is in the file
 [bym_predictor_plus_offset.stan](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/bym_predictor_plus_offset.stan).
 
-```{r print-stan-bym, comment='', echo = FALSE}
-cat(readLines('bym_predictor_plus_offset.stan'), sep = '\n')
+```{r print-stan-bym, comment='' }
+writeLines(readLines('bym_predictor_plus_offset.stan'))
 ```
 
 We have also included a BYM model for univariate data without and offset, in file:
@@ -577,7 +602,7 @@ We fit this model using only the Brooklyn census tracts, so that all areal units
 The dataset contains 709 census tracts in Brooklyn (omitting unpopulated areas, such as parks and cemeteries).
 We assemble the Brooklyn data and fit the a Poisson GLM model via the R script:
 [fit_brooklyn.R](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/fit_brooklyn.R)
-```{r fit-brooklyn, comment = NA, message = FALSE, warning = FALSE}
+```{r fit-brooklyn, comment = NA, message = FALSE, warning = FALSE }
 library(rstan);
 options(mc.cores = parallel::detectCores());
 library(maptools);   
@@ -612,7 +637,7 @@ We use the Stan R package [RStanArm](http://mc-stan.org/users/interfaces/rstanar
 to compare these results to a Poisson regression without the spatial and ordinary random effects components.
 The function `rstanarm::stan_glm` takes the same arguments as the R `glm` function and
 fits the corresponding regression model in Stan.
-```{r rstan-brooklyn-poisson-glm-fit, comment = NA, message = FALSE, warning = FALSE}
+```{r rstan-brooklyn-poisson-glm-fit, comment = NA, message = FALSE, warning = FALSE }
 library(rstanarm);
 source("nyc_ped_subset.data.R");
 y = events_all_2001[all_tractIDs %in% bklyn_tractIDs];
@@ -630,7 +655,7 @@ and the generated quantity "mu" which recovers
 the number of events based on the data and the samples.
 (Note that some Brooklyn census tracts are not in the study,
 these are parks, cemeteries, and otherwise unpopulated areas.)
-```{r setup-plot-data, comment = NA, message = FALSE }
+```{r setup-plot-data, comment = NA, message = FALSE  }
 library(gpclib);
 library(maptools);  
 library(spdep);
@@ -651,22 +676,22 @@ pdata = left_join(bkfort, df1, by=c("id" = "bklyn_tractIDs"))
 ```
 
 The following plot shows the raw number of events for pedestrian injuries in Brooklyn.
-```{r plot-events }
+```{r plot-events  }
 ggplot() + geom_polygon(data=pdata, aes(x=long, y=lat, group=group, fill=bklyn_events)) +  coord_map() + coord_fixed() + scale_fill_gradientn(limits=c(0, 30), colors=blues9, oob=scales::squish, guide=guide_legend(title="actual injuries per tract")) + theme(axis.text.x=element_blank(), axis.text.y=element_blank(), axis.title.x=element_blank(), axis.title.y=element_blank()) + ggtitle("Events")
 ```
 
 The following plot shows the rate-adjusted population for each census tract, i.e., the exposure-adjusted injury rate.
-```{r plot-population }
+```{r plot-population  }
 ggplot() + geom_polygon(data=pdata, aes(x=long, y=lat, group=group, fill=bklyn_pop)) + coord_map() + coord_fixed()  + scale_fill_gradientn(limits=c(0, 30), colors=blues9, oob=scales::squish, guide=guide_legend(title="rate-adjusted exposure")) + theme(axis.text.x=element_blank(), axis.text.y=element_blank(), axis.title.x=element_blank(), axis.title.y=element_blank()) + ggtitle("Rate-adjusted population")
 ```
 
 The following plot shows BYM model spatially smoothed fitted values.
-```{r plot-bym }
+```{r plot-bym  }
 ggplot() + geom_polygon(data=pdata, aes(x=long, y=lat, group=group, fill=brooklyn_means)) + coord_map() + coord_fixed()  + scale_fill_gradientn(limits=c(0, 30), colors=blues9, oob=scales::squish, guide=guide_legend(title="BYM fitted injuries per tract")) + theme(axis.text.x=element_blank(), axis.text.y=element_blank(), axis.title.x=element_blank(), axis.title.y=element_blank()) + ggtitle("BYM fit - spatial smoothing")
 ```
 
 The following plot shows RStanArm poisson regression fitted values.
-```{r plot-poisson }
+```{r plot-poisson  }
 poisson_plot = ggplot() + geom_polygon(data=pdata, aes(x=long, y=lat, group=group, fill=bk_glmfit_vals)) + coord_map() + coord_fixed()  + scale_fill_gradientn(limits=c(0, 30), colors=blues9, oob=scales::squish, guide=guide_legend(title="poisson fitted injuries per tract")) + theme(axis.text.x=element_blank(), axis.text.y=element_blank(), axis.title.x=element_blank(), axis.title.y=element_blank()) + ggtitle("Pois-GLM fit - no smoothing")
 poisson_plot
 ```
@@ -683,14 +708,14 @@ function which provides efficient computation of the sum of squares.
 
 The improper nature of the IAR component means that it can only be used as a prior, not a likelihood.
 In order to make the IAR component identifiable, we use a sum-to-zero constraint.
-An important factor in getting these models to fit quickly is using the right priors on
-both the fixed effects and the random effects components.
+The convolution of a spatial random effects component together with an ordinary random effects component
+used in the BYM model is extremely difficult for the MCMC sampler to fit without placing hyperpriors
+on the scale of each component.
 If no priors are specified, Stan's defaults prior are too diffuse to allow the model to fit easily.
-
 
 ### Acknowledgements
 
-Many thanks to Daniel Simpson, Rob Trangucci, Imad Ali, Andrew Gelman, and Bob Carpenter for all their help and encouragement.
+Many thanks to Imad Ali, Michael Betancourt, Bob Carpenter, Andrew Gelman, Daniel Simpson, and Rob Trangucci for all their help and encouragement.
 
 
 ### References
