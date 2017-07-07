@@ -71,12 +71,11 @@ generate_data <- function(datagen_model, datagen_data,
 #-----------------------------------------------------------------------
 get_bugs_fit_quantiles <- function(draw, param_names, target_model, target_data,
                            num_chains=4, num_iters=2000) {
-
-  inits <- function () {
-         list(beta0 = rnorm(1,0,1),
+  inits <- function () { list(
+         beta0 = rnorm(1,0,1),
          beta1 = rnorm(1,0,1),
-         tau_theta = exp(rnorm(1,0,1)),
-         tau_phi = exp(rnorm(1,0,1)),
+         tau_theta = rgamma(1, 3.2761, scale=1.81),
+         tau_phi = rgamma(1, 1.0, scale=1.0),
          theta = rnorm(56,0,1),
          phi = rep(0,56))};
 
@@ -89,6 +88,7 @@ get_bugs_fit_quantiles <- function(draw, param_names, target_model, target_data,
        digits=7,
        OpenBUGS.pgm=pathOpenBugs,
        useWINE=TRUE,
+       debug=TRUE,
        DIC=FALSE,
        WINE="/usr/local/bin/wine",
        bugs.seed=1);
@@ -113,7 +113,7 @@ get_bugs_fit_quantiles <- function(draw, param_names, target_model, target_data,
 
 
 DEBUG = TRUE;
-num_replicates = 10;
+num_replicates = 3;
 
 # compile models
 datagen_model = stan_model("sim_bym_data.stan", model_name="sim_bym_model");

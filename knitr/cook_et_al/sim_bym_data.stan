@@ -44,7 +44,7 @@ generated quantities {
   theta = theta_std * sigma_theta;         // non-centered parameterization
 
   for (i in 1:N) {
-    x[i] = normal_rng(0,1);
+    x[i] = normal_rng(0, 1);
     y[i] = poisson_log_rng(log_E[i] + beta0 + beta1 * x[i] + phi[i] + theta[i]);
   }
 }
