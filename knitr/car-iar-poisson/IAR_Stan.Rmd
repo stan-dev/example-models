@@ -2,7 +2,9 @@
 title: "Spatial Models in Stan: Intrinsic Auto-Regressive Models for Areal Data"
 author: "Mitzi Morris"
 output: 
-  html_document
+  html_document:
+    toc: true
+    toc_depth: 2
 ---
 
 <style type="text/css">
@@ -15,9 +17,9 @@ neighboring regions exhibit higher correlation than observations between
 distant regions,  this correlation can be accounted for using the class
 of spatial models called "CAR" models (Conditional Auto-Regressive)
 introduced by Besag (Besag 1974).
-Intrinsic Auto-Regressive (IAR) models are a subclass of CAR models.
+Intrinsic Conditional Auto-Regressive (ICAR) models are a subclass of CAR models.
 The Besag York Mollié (BYM) model is a lognormal Poisson model which
-includes both an IAR component for spatial smoothing and an ordinary
+includes both an ICAR component for spatial smoothing and an ordinary
 random-effects component for non-spatial heterogeneity.
 This case study covers how to efficiently code these models in Stan.
 
@@ -25,7 +27,7 @@ All models and data files are available in the Stan example-models GitHub repo f
 [car-iar-poisson](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson).
 All commands should be run from the directory `stan-dev/example-models/knitr/car-iar-poisson`.
 
-## Formulations of CAR and IAR models
+## About conditional conditional autoregresive models
 
 Given a set of observations taken at $n$ different areal units
 of a region with a number of dimensions $D$
@@ -88,9 +90,9 @@ See the Stan case study
 [Exact sparse CAR models in Stan](http://mc-stan.org/documentation/case-studies/mbjoseph-CARStan.html),
 for further discussion of CAR models.
 
-### Intrinsic Auto-Regressive (IAR) Models
+### Intrinsic Conditional Auto-Regressive (ICAR) models
 
-The model is an Intrinsic Auto-Regressive (IAR) model when:
+An Intrinsic Conditional Auto-Regressive (ICAR) model is a CAR model where:
 
 - $\alpha = 1$
 - $D$ is an $n \times n$ diagonal matrix where $d_{i,i}$ = the number of neighbors for region $n_i$
@@ -116,13 +118,13 @@ which rewrites to the _pairwise difference_ formulation:
 
 $$ p(\phi | \tau) \propto \frac{1}{{\tau}^\frac{n}{2}} \exp \left\{ {- \frac{1}{2\tau}} \sum_{i \sim j}{({\phi}_i - {\phi}_j)}^2 \right\} $$
 
-The above conditions for the IAR model produce an improper distribution
+The above conditions for the ICAR model produce an improper distribution
 because setting $\alpha = 1$ creates a singular matrix $(D - W)$, see Besag and Kooperberg 1995.
 Furthermore, the joint distribution is non-identifiable;
 adding any constant to all of the elements of $\phi$ leaves the joint distribution unchanged.
 Adding the constraint $\sum_{i} {\phi}_i = 0$ resolves this problem.
 
-While this IAR model is non-generating in that it cannot be used as a model for the data,
+While this ICAR model is non-generating in that it cannot be used as a model for the data,
 it can be used as a prior as part of a hierarchical model, which is the role it plays in
 the BYM model.
 
@@ -172,16 +174,16 @@ When both expressions are over $i \sim j$, we combine, rearrange, and reduce.
 We check our work by a simple example using 4 regions $\{a, b, c, d\}$
 where $a$ is adjacent to $b$, $b$ is adjacent to $c$, and $c$ is adjacent to $d$.
 The diagonal matrix $D$
-$\begin{vmatrix}\ 1\ 0\ 0\ 0\ \\
+$$\begin{pmatrix}\ 1\ 0\ 0\ 0\ \\
 \ 0\ 2\ 0\ 0\ \\
 \ 0\ 0\ 2\ 0\ \\
-\ 0\ 0\ 0\ 1\ \end{vmatrix}$
+\ 0\ 0\ 0\ 1\ \end{pmatrix}$$
 contributes terms $a^2, b^2, b^2, c^2, c^2, d^2$.
 The adjacency matrix $W$
-$\begin{vmatrix}\ 0\ 1\ 0\ 0\ \\
+$$\begin{pmatrix}\ 0\ 1\ 0\ 0\ \\
 \ 1\ 0\ 1\ 0\ \\
 \ 0\ 1\ 0\ 1\ \\
-\ 0\ 0\ 1\ 0\  \end{vmatrix}$
+\ 0\ 0\ 1\ 0\  \end{pmatrix}$$
 contributes terms $ab, ba, bc, cb, cd, dc$.
 We group the terms in $D - W$ as follows:
 $(a^2 - 2ab + b^2), (b^2 - 2bc + c^2), (c^2 - 2cd + d^2)$
@@ -194,7 +196,10 @@ Therefore, the specification of the pairwise difference form includes the constr
 on the indices $i$ and $j$ for the summation that $i < j$,
 as is done in Besag and Kooperberg 1995.
 
-### Efficient Representation and Computation of the IAR Component
+## Adding an ICAR component to a Stan model
+
+In this section we provide an efficient implementation of a simple ICAR component in Stan.
+To check our work, we compute a spatial prior on a small dataset.
 
 The encoding of adjacency as entries of either $0$ or $1$ in an $N \times N$ adjacency matrix
 is equivalent to an undirected graph with set of $N$ nodes and a set of edges,
@@ -265,11 +270,11 @@ model {
   target += -0.5 * dot_self(phi[node1] - phi[node2]);
 }
 ```
-### Model Validation: an IAR Prior for the Counties of Scotland
+### Model Validation: an ICAR Prior for the Counties of Scotland
 
 To check our work,
 we build a simple Stan model which takes in the neighborhood structure of
-the counties of Scotland and use it to compute the spatial IAR prior.
+the counties of Scotland and use it to compute the spatial ICAR prior.
 We then compare our results against those obtained by running
 an equivalent BUGS model which calls the WinBUGS/GeoBUGS function `car.normal`.
 
@@ -309,7 +314,7 @@ compiles and runs the model on the Scotland data.
 To check that this model recovers the spatial relationships, we expect to see positive covariance between adjacent regions and low or negative covariance between non-adjacent regions.
 Furthermore, the covariance between adjacent regions which have a small number of neighbors
 should be more positive than the covariance between regions which have many neighbors,
-per the conditional formulation of the IAR.
+per the conditional formulation of the ICAR.
 
 In the Scotland dataset, regions with few neighbors are regions 6 and 8:
 region 8 has exactly one neighbor, region 6, and region 6 has neighbors $\{3,  8\}$.
@@ -432,39 +437,35 @@ other neighbors; and close to zero for non-adjacent regions.
 [1] 0.1146452 (stan)
 [1] 0.1117422 (bugs)
 ```
-From this we conclude that the Stan model correctly implements the IAR model as specified above.
+From this we conclude that the Stan model correctly implements the ICAR model as specified above.
 
-## Multi-level Poisson GLMs: the Besag York Mollié (BYM) Model
+## Example: disease mapping
 
 Adding a CAR spatially structured error term to a multi-level GLM
 provides spatial smoothing of the resulting estimates.
-For count data, e.g. incidents of disease or accidents,
-Poisson CAR models are available via R, BUGS, and JAGS
+The lognormal Poisson model proposed in Besag York Mollié 1991
+is used for count data in biostatistics and epidemiology.
+It includes both an ICAR component for spatial smoothing and an
+ordinary random-effects component for non-spatial heterogeneity.
+
+Implementations of this model are available via R, BUGS, and JAGS
 as well as INLA (Integrated Nested Laplace Approximation)
 which is a fast alternative to MCMC,
 (INLA trades speed and scalability for accuracy,
 per the "no free lunch" principle).
-
-The lognormal Poisson model proposed in Besag York Mollié 1991
-is used for count data in biostatistics and epidemiology.
-It includes both an IAR component for spatial smoothing and an
-ordinary random-effects component for non-spatial heterogeneity.
 Banerjee Carlin and Gelfand 2003, section 5.4, presents the details of
 this model and its difficulties, together with a WinBUGS implementation
 which they use to fit the Scottish lip cancer dataset from Clayton and Kaldor 1987.
-Using the notation of Banerjee et al., the Besag York Mollié model is:
 
+Using the notation of Banerjee et al., the Besag York Mollié model is:
 $$
 Y_i \, \vert \, \psi_i \sim Poisson ( E_i \, e^{\psi_i}),
 $$
-
 for $i \in 1:N$, where 
-
 $$
 \psi = x \beta + \theta + \phi
 $$
-
-where
+and
 
 - $x$ is the matrix of explanatory spatial covariates such that $x_i$ is
 the vector of covariates for areal unit $i$.  The coefficients $\beta$ are
@@ -472,10 +473,10 @@ called "fixed effects."
 
 - $\theta$ is an ordinary random-effects components for non-spatial heterogeneity.
 
-- $\phi$ is an IAR spatial component.
+- $\phi$ is an ICAR spatial component.
 
-The pairwise difference formulation of the IAR spatial component $\phi$ is non-centered,
-thus models with include both an IAR spatial effects component and an intercept term are non-identifiable.
+The pairwise difference formulation of the ICAR spatial component $\phi$ is non-centered,
+thus models with include both an ICAR spatial effects component and an intercept term are non-identifiable.
 Adding the constraint that $\phi$ must sum to zero centers it, allowing the model to
 fit both the fixed-effect intercept term as well as $\phi$ and $\theta$.
 
@@ -502,7 +503,6 @@ However, the assumptions underlying the use of this choice of hyperpriors and th
 the gamma hyperprior on `tau_theta` are specific to this dataset and would need to be re-evaluated for other
 situations.  
 
-
 ### A Stan Implementation of the BYM Model
 
 A Stan model which implements the BYM model for univariate data plus offset is in the file
@@ -527,8 +527,7 @@ and precision parameters `tau_theta` and `tau_phi` (following Banerjee et al).
 - we use the non-centered parameterization for both the ordinary and spatial random effects.
 - in the model block we put priors on all parameters excepting `phi_std_raw`.
 
-
-#### Fitting the Model to the Scotland Lip Cancer Dataset
+### Fitting the Model to the Scotland Lip Cancer Dataset
 
 To test this model with real data, we ran it on the version of the Scotland Lip Cancer dataset in file
 [scotland_data.R](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/scotland_data.R),
@@ -562,9 +561,9 @@ print(scot_stanfit,
       probs=c(0.025, 0.5, 0.975));
 ```
 
-## From 56 Counties in Scotland to 709 Census Tracts in Brooklyn
+### From 56 Counties in Scotland to 709 Census Tracts in Brooklyn
 
-To demonstrate the scalability of using Stan to compute a spatial IAR component,
+To demonstrate the scalability of using Stan to compute a spatial ICAR component,
 we analyze the Brooklyn subset of the dataset from
 [Small-area spatiotemporal analysis of pedestrian and bicyclist injuries in New York City](https://www.ncbi.nlm.nih.gov/pubmed/25643104)
 which was compiled from all reported traffic accidents involving a car and either a pedestrian or bicyclist
@@ -706,8 +705,8 @@ The pairwise difference for adjacent areal units can be expressed as a single st
 using the Stan's multiple indexing feature and the math library's `dot-self`
 function which provides efficient computation of the sum of squares.
 
-The improper nature of the IAR component means that it can only be used as a prior, not a likelihood.
-In order to make the IAR component identifiable, we use a sum-to-zero constraint.
+The improper nature of the ICAR component means that it can only be used as a prior, not a likelihood.
+In order to make the ICAR component identifiable, we use a sum-to-zero constraint.
 The convolution of a spatial random effects component together with an ordinary random effects component
 used in the BYM model is extremely difficult for the MCMC sampler to fit without placing hyperpriors
 on the scale of each component.
