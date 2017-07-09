@@ -35,33 +35,21 @@ functions {
   }
 
   /**
-   * Return log probability of Zero-inflated Poisson Binomial Mixture
+   * Return log probability of Poisson Binomial Mixture
    *
    * @param y          Count
-   * @param max_y_site Max. number of counts on the site
-   * @param N          Population size
-   * @param oemga      Inclusion probability
+   * @param n          Population size
    * @param log_lambda Log of Poisson mean
    * @param p          Detection probability
    *
    * @return Log probability
    */
-  real zipbin_lpmf(int[] y, int max_y_site,
-                   int n, real omega, real log_lambda, real p) {
+  real poisbin_lpmf(int[] y, int n, real log_lambda, real p) {
 
-    if (max_y_site) {
-      if (max(y) > n)
-        return negative_infinity();
-      return bernoulli_lpmf(1 | omega)
-        + poisson_log_lpmf(n | log_lambda)
-        + binomial_lpmf(y | n, p);
-    } else {
-      return log_sum_exp(bernoulli_lpmf(0 | omega),
-                         bernoulli_lpmf(1 | omega)
-                         + poisson_log_lpmf(n | log_lambda)
-                         + binomial_lpmf(y | n, p));
-    }
-    return negative_infinity();
+    if (max(y) > n)
+      return negative_infinity();
+    return poisson_log_lpmf(n | log_lambda)
+          + binomial_lpmf(y | n, p);
   }
 }
 
@@ -150,8 +138,7 @@ generated quantities {
         vector[K + 1] lp;
 
         for (n in 0:K)
-          lp[n + 1] = zipbin_lpmf(y[i, 1:T, k] | max_y_site[i],
-                                    n, omega, alpha_lam[k], p[k]);
+          lp[n + 1] = poisbin_lpmf(y[i, 1:T, k] | n, alpha_lam[k], p[k]);
         N[i, k] = categorical_rng(softmax(lp)) - 1;
       }
 
