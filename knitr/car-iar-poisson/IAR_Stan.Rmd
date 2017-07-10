@@ -1,9 +1,15 @@
 ---
 title: "Spatial Models in Stan: Intrinsic Auto-Regressive Models for Areal Data"
 author: "Mitzi Morris"
-output: 
-  html_document
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
 ---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(cache=TRUE)
+```
 
 <style type="text/css">
 .table { width: 40%; }
@@ -15,9 +21,9 @@ neighboring regions exhibit higher correlation than observations between
 distant regions,  this correlation can be accounted for using the class
 of spatial models called "CAR" models (Conditional Auto-Regressive)
 introduced by Besag (Besag 1974).
-Intrinsic Auto-Regressive (IAR) models are a subclass of CAR models.
+Intrinsic Conditional Auto-Regressive (ICAR) models are a subclass of CAR models.
 The Besag York Mollié (BYM) model is a lognormal Poisson model which
-includes both an IAR component for spatial smoothing and an ordinary
+includes both an ICAR component for spatial smoothing and an ordinary
 random-effects component for non-spatial heterogeneity.
 This case study covers how to efficiently code these models in Stan.
 
@@ -25,7 +31,7 @@ All models and data files are available in the Stan example-models GitHub repo f
 [car-iar-poisson](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson).
 All commands should be run from the directory `stan-dev/example-models/knitr/car-iar-poisson`.
 
-## Formulations of CAR and IAR models
+## About conditional conditional autoregresive models
 
 Given a set of observations taken at $n$ different areal units
 of a region with a number of dimensions $D$
@@ -84,13 +90,13 @@ The construction of the spatial proximity matrix $B$ determines the class of CAR
 In the case where $B$ is a positive definite matrix, then the CAR model structure is a fully generative model.
 However evaluation of the joint distribution requires computing the covariance matrix described by
 $[D_{\tau}(I - \alpha B)]^{-1}$, which is computationally expensive.
-See the Stan case study 
+See the Stan case study
 [Exact sparse CAR models in Stan](http://mc-stan.org/documentation/case-studies/mbjoseph-CARStan.html),
 for further discussion of CAR models.
 
-### Intrinsic Auto-Regressive (IAR) Models
+### Intrinsic Conditional Auto-Regressive (ICAR) models
 
-The model is an Intrinsic Auto-Regressive (IAR) model when:
+An Intrinsic Conditional Auto-Regressive (ICAR) model is a CAR model where:
 
 - $\alpha = 1$
 - $D$ is an $n \times n$ diagonal matrix where $d_{i,i}$ = the number of neighbors for region $n_i$
@@ -108,7 +114,7 @@ which has a set of neighbors $j \neq i$ whose cardinality is $d_{i,i}$,
 is normally distributed with a mean equal to the average of its neighbors.
 Its variance decreases as the number of neighbors increases.
 
-The joint distribution simplifies to: 
+The joint distribution simplifies to:
 
 $$\phi \sim N(0, [\tau \, (D - W)]^{-1}).$$
 
@@ -116,13 +122,13 @@ which rewrites to the _pairwise difference_ formulation:
 
 $$ p(\phi | \tau) \propto \frac{1}{{\tau}^\frac{n}{2}} \exp \left\{ {- \frac{1}{2\tau}} \sum_{i \sim j}{({\phi}_i - {\phi}_j)}^2 \right\} $$
 
-The above conditions for the IAR model produce an improper distribution
+The above conditions for the ICAR model produce an improper distribution
 because setting $\alpha = 1$ creates a singular matrix $(D - W)$, see Besag and Kooperberg 1995.
 Furthermore, the joint distribution is non-identifiable;
 adding any constant to all of the elements of $\phi$ leaves the joint distribution unchanged.
 Adding the constraint $\sum_{i} {\phi}_i = 0$ resolves this problem.
 
-While this IAR model is non-generating in that it cannot be used as a model for the data,
+While this ICAR model is non-generating in that it cannot be used as a model for the data,
 it can be used as a prior as part of a hierarchical model, which is the role it plays in
 the BYM model.
 
@@ -163,8 +169,8 @@ Since $D$ is the diagonal matrix where $D_{i,i}$ is the number of neighbors and
 the off-diagonal entries have value $0$.
 The expression $\sum_{i,j} {\phi}_i\,{\phi}_j D_{i,j}$ rewrites to terms ${{\phi}_i}^2$ where the number of each ${\phi_i}$ terms is given by $D_{i,i}$.
 For each pair of adjacent regions $\{i,j\}$ and $\{j,i\}$, one ${\phi}^2$ term each is contributed, so we can rewrite this in terms of $i \sim j$.
-Since $W$ is the adjacency matrix where $w_{ii} = 0, w_{ij} = 1$ if $i$ is a neighbor of $j$, and $w_{ij}=0$ otherwise, 
-the expression $\sum_{i,j} {\phi}_i\,{\phi}_j W_{i,j}$ rewrite to terms 
+Since $W$ is the adjacency matrix where $w_{ii} = 0, w_{ij} = 1$ if $i$ is a neighbor of $j$, and $w_{ij}=0$ otherwise,
+the expression $\sum_{i,j} {\phi}_i\,{\phi}_j W_{i,j}$ rewrite to terms
 $2 \, {\phi}_i {\phi}_j$, since there are two entries in $W$
 for each pair of adjacent regions.
 When both expressions are over $i \sim j$, we combine, rearrange, and reduce.
@@ -172,16 +178,16 @@ When both expressions are over $i \sim j$, we combine, rearrange, and reduce.
 We check our work by a simple example using 4 regions $\{a, b, c, d\}$
 where $a$ is adjacent to $b$, $b$ is adjacent to $c$, and $c$ is adjacent to $d$.
 The diagonal matrix $D$
-$\begin{vmatrix}\ 1\ 0\ 0\ 0\ \\
+$$\begin{pmatrix}\ 1\ 0\ 0\ 0\ \\
 \ 0\ 2\ 0\ 0\ \\
 \ 0\ 0\ 2\ 0\ \\
-\ 0\ 0\ 0\ 1\ \end{vmatrix}$
+\ 0\ 0\ 0\ 1\ \end{pmatrix}$$
 contributes terms $a^2, b^2, b^2, c^2, c^2, d^2$.
 The adjacency matrix $W$
-$\begin{vmatrix}\ 0\ 1\ 0\ 0\ \\
+$$\begin{pmatrix}\ 0\ 1\ 0\ 0\ \\
 \ 1\ 0\ 1\ 0\ \\
 \ 0\ 1\ 0\ 1\ \\
-\ 0\ 0\ 1\ 0\  \end{vmatrix}$
+\ 0\ 0\ 1\ 0\  \end{pmatrix}$$
 contributes terms $ab, ba, bc, cb, cd, dc$.
 We group the terms in $D - W$ as follows:
 $(a^2 - 2ab + b^2), (b^2 - 2bc + c^2), (c^2 - 2cd + d^2)$
@@ -194,7 +200,10 @@ Therefore, the specification of the pairwise difference form includes the constr
 on the indices $i$ and $j$ for the summation that $i < j$,
 as is done in Besag and Kooperberg 1995.
 
-### Efficient Representation and Computation of the IAR Component
+## Adding an ICAR component to a Stan model
+
+In this section we provide an efficient implementation of a simple ICAR component in Stan.
+To check our work, we compute a spatial prior on a small dataset.
 
 The encoding of adjacency as entries of either $0$ or $1$ in an $N \times N$ adjacency matrix
 is equivalent to an undirected graph with set of $N$ nodes and a set of edges,
@@ -245,9 +254,9 @@ In the Stan program, we do this as follows:
 
 - in the parameter block we declare parameter vector `phi_std_raw` with length `N - 1`
 - in the transformed parameters block we declare the vector `phi` with length `N`
-and ensure that it sums to zero 
+and ensure that it sums to zero
 by defining the N-th element as the negation of the sum of the elements `1 : (N − 1)`.
-- the model block we use the `dot_self` function 
+- the model block we use the `dot_self` function
 which returns the dot product of a vector with itself
 to compute the sum of the squared pairwise differences.
 
@@ -265,11 +274,11 @@ model {
   target += -0.5 * dot_self(phi[node1] - phi[node2]);
 }
 ```
-### Model Validation: an IAR Prior for the Counties of Scotland
+### Model Validation: an ICAR Prior for the Counties of Scotland
 
 To check our work,
 we build a simple Stan model which takes in the neighborhood structure of
-the counties of Scotland and use it to compute the spatial IAR prior.
+the counties of Scotland and use it to compute the spatial ICAR prior.
 We then compare our results against those obtained by running
 an equivalent BUGS model which calls the WinBUGS/GeoBUGS function `car.normal`.
 
@@ -298,7 +307,7 @@ of the population employed in agriculture, fishing, or forestry (AFF)
 - `num`: a list of the number of neighbors for each region
 
 Elements `adj` and `num` describe the neighborhood structure of the counties in Scotland.
-We have written a helper function 
+We have written a helper function
 [mungeCARdata4stan.R](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/mungeCARdata4stan.R)
 which takes inputs: `adj` and `num` as described above and returns a list containing
 the input data objects `N`, `N_edges`, `node1`, and `node2` as specified by the Stan model.
@@ -309,7 +318,7 @@ compiles and runs the model on the Scotland data.
 To check that this model recovers the spatial relationships, we expect to see positive covariance between adjacent regions and low or negative covariance between non-adjacent regions.
 Furthermore, the covariance between adjacent regions which have a small number of neighbors
 should be more positive than the covariance between regions which have many neighbors,
-per the conditional formulation of the IAR.
+per the conditional formulation of the ICAR.
 
 In the Scotland dataset, regions with few neighbors are regions 6 and 8:
 region 8 has exactly one neighbor, region 6, and region 6 has neighbors $\{3,  8\}$.
@@ -432,39 +441,35 @@ other neighbors; and close to zero for non-adjacent regions.
 [1] 0.1146452 (stan)
 [1] 0.1117422 (bugs)
 ```
-From this we conclude that the Stan model correctly implements the IAR model as specified above.
+From this we conclude that the Stan model correctly implements the ICAR model as specified above.
 
-## Multi-level Poisson GLMs: the Besag York Mollié (BYM) Model
+## Example: disease mapping
 
 Adding a CAR spatially structured error term to a multi-level GLM
 provides spatial smoothing of the resulting estimates.
-For count data, e.g. incidents of disease or accidents,
-Poisson CAR models are available via R, BUGS, and JAGS
+The lognormal Poisson model proposed in Besag York Mollié 1991
+is used for count data in biostatistics and epidemiology.
+It includes both an ICAR component for spatial smoothing and an
+ordinary random-effects component for non-spatial heterogeneity.
+
+Implementations of this model are available via R, BUGS, and JAGS
 as well as INLA (Integrated Nested Laplace Approximation)
 which is a fast alternative to MCMC,
 (INLA trades speed and scalability for accuracy,
 per the "no free lunch" principle).
-
-The lognormal Poisson model proposed in Besag York Mollié 1991
-is used for count data in biostatistics and epidemiology.
-It includes both an IAR component for spatial smoothing and an
-ordinary random-effects component for non-spatial heterogeneity.
 Banerjee Carlin and Gelfand 2003, section 5.4, presents the details of
 this model and its difficulties, together with a WinBUGS implementation
 which they use to fit the Scottish lip cancer dataset from Clayton and Kaldor 1987.
-Using the notation of Banerjee et al., the Besag York Mollié model is:
 
+Using the notation of Banerjee et al., the Besag York Mollié model is:
 $$
 Y_i \, \vert \, \psi_i \sim Poisson ( E_i \, e^{\psi_i}),
 $$
-
-for $i \in 1:N$, where 
-
+for $i \in 1:N$, where
 $$
 \psi = x \beta + \theta + \phi
 $$
-
-where
+and
 
 - $x$ is the matrix of explanatory spatial covariates such that $x_i$ is
 the vector of covariates for areal unit $i$.  The coefficients $\beta$ are
@@ -472,10 +477,10 @@ called "fixed effects."
 
 - $\theta$ is an ordinary random-effects components for non-spatial heterogeneity.
 
-- $\phi$ is an IAR spatial component.
+- $\phi$ is an ICAR spatial component.
 
-The pairwise difference formulation of the IAR spatial component $\phi$ is non-centered,
-thus models with include both an IAR spatial effects component and an intercept term are non-identifiable.
+The pairwise difference formulation of the ICAR spatial component $\phi$ is non-centered,
+thus models with include both an ICAR spatial effects component and an intercept term are non-identifiable.
 Adding the constraint that $\phi$ must sum to zero centers it, allowing the model to
 fit both the fixed-effect intercept term as well as $\phi$ and $\theta$.
 
@@ -502,7 +507,6 @@ However, the assumptions underlying the use of this choice of hyperpriors and th
 the gamma hyperprior on `tau_theta` are specific to this dataset and would need to be re-evaluated for other
 situations.  
 
-
 ### A Stan Implementation of the BYM Model
 
 A Stan model which implements the BYM model for univariate data plus offset is in the file
@@ -527,8 +531,7 @@ and precision parameters `tau_theta` and `tau_phi` (following Banerjee et al).
 - we use the non-centered parameterization for both the ordinary and spatial random effects.
 - in the model block we put priors on all parameters excepting `phi_std_raw`.
 
-
-#### Fitting the Model to the Scotland Lip Cancer Dataset
+### Fitting the Model to the Scotland Lip Cancer Dataset
 
 To test this model with real data, we ran it on the version of the Scotland Lip Cancer dataset in file
 [scotland_data.R](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/scotland_data.R),
@@ -562,9 +565,9 @@ print(scot_stanfit,
       probs=c(0.025, 0.5, 0.975));
 ```
 
-## From 56 Counties in Scotland to 709 Census Tracts in Brooklyn
+### From 56 Counties in Scotland to 709 Census Tracts in Brooklyn
 
-To demonstrate the scalability of using Stan to compute a spatial IAR component,
+To demonstrate the scalability of using Stan to compute a spatial ICAR component,
 we analyze the Brooklyn subset of the dataset from
 [Small-area spatiotemporal analysis of pedestrian and bicyclist injuries in New York City](https://www.ncbi.nlm.nih.gov/pubmed/25643104)
 which was compiled from all reported traffic accidents involving a car and either a pedestrian or bicyclist
@@ -660,8 +663,8 @@ library(gpclib);
 library(maptools);  
 library(spdep);
 gpclibPermit()
-library(dplyr) 
-library(ggplot2) 
+library(dplyr)
+library(ggplot2)
 
 # prepare dfs for ggplot2
 mu_names = paste("mu[", c(1:709), "]")
@@ -696,7 +699,132 @@ poisson_plot = ggplot() + geom_polygon(data=pdata, aes(x=long, y=lat, group=grou
 poisson_plot
 ```
 
-### Discussion
+## A better parameterization of the Besag, York, and Mollié model
+
+Although the previous section shows that Stan can comfortably fit disease mapping models,
+there are some difficulties with the standard parameterization of the BYM model.
+In particular, it's quite challenging to set sensible priors on the precisions of the
+structured and unstructured random effects. While the recommendations  of Bernardinelli et al. (1995)
+are ok, it's better to re-state the model in an equivalent way that removes the problem.
+To some extent, this is a Bayesian version of Gelman's famous "Folk Theorem":
+if it's hard to set priors, then you model is probably wrong!
+
+So how do we do this? The first place to look is the original BYM paper, in which
+the unstructured random effect is added to the plain ICAR model to account
+for over-dispersion that isn't modelled by the spatial term.  (A note: adding any
+  random effect will induce over-dispersion in the data generating model)  
+  This means that there are two model components that are, at least partially
+  doing the same thing, which is why it's difficult to set priors.  You need to
+  ensure that the total over-dispersion (which is a non-linear function of
+    the two precision parameters) is controlled.  If the log-mean is given a $N(0,\sigma^2)$
+    prior, a quick calculation shows that the *a priori* mean-variance ratio for $Y$ is $$
+\frac{\operatorname{Var}(Y)}{\mathbb{E}(Y)} = 1 + \mathrm{e}^{\frac{\sigma^2}{2}}\left(\mathrm{e}^{\frac{\sigma^2}{2}} - 1\right),
+    $$ which means the over-dispersion is entirely controlled by the variance of the
+    random effect.
+
+This suggests that we want one overall parameter to control the variance of the
+random effect.  This can be achieved by re-writing the random effect as $$
+\theta + \phi = \sigma (\sqrt{1-\rho}\theta^* + \sqrt{\rho}\phi^* ),
+$$
+where
+
+* $\sigma\geq 0$ is the *overall* standard deviation
+
+* $\rho \in [0,1]$ models how much of the variance comes from the spatially structured effect
+and how much comes from the spatially unstructured effect
+
+* $\theta^* \sim N(0,I)$ is the unstructured random effect with fixed standard deviation $1$
+
+* $\phi^* $ is the ICAR model scaled so $\operatorname{Var}(\phi_i) \approx 1$
+
+In order for $\sigma$ to legitimately be the standard deviation of the random effect, it is
+**critical** that, for each $i$, $\operatorname{Var}(\theta_i) \approx \operatorname{Var}(\phi_i) \approx 1$.  This **is not automatic** for ICAR models, where every component of $\theta$ will have a
+different variance.  Riebler et al. (2016) recommend scaling the model so the geometric
+mean of these variances is 1.  For both the Scotland and Brooklyn examples, the
+geometric mean of the variances is about $0.5$, so multiplying the precision matrix  
+by $0.5$ will scale the model.  This scaling factor is difficult to compute efficiently,
+but there is an implementation of it in the **INLA** packages (the functions is *inla.scale.model*).
+
+
+With this re-parameterization, it is now easy to set priors!  In particular, we recommend
+- A standard prior on the standard deviation such as a half-normal, a half-t or an exponential
+- A beta(1/2,1/2) prior on $\rho$.  Riebler et al. (2016) offer a more sophisticated prior
+on $\rho$ that accounts for the fact that the two random effects are different "sizes", but
+that is not straightforward to implement in Stan at the moment.
+
+For more information about this re-parameterization, see Riebler et al. (2016),
+Dean et al. (2001), and Wakefield (2007).
+
+The Stan code for this model can be found at [bym2_predictor_plus_offset.stan](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/bym2_predictor_plus_offset.stan)
+
+```{r print-stan-bym2, comment='' }
+writeLines(readLines('bym2_predictor_plus_offset.stan'))
+```
+
+To test this model with real data, we ran it on the version of the Scotland Lip Cancer dataset in file
+[scotland_data.R](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/scotland_data.R),
+described in the previous section.
+The R script
+[fit_scotland.R](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/fit_scotland_bym2.R)
+fits the model to the data.  This code includes details on how to compute the scaling factor using the *INLA* library.
+
+```{r fit-scotland-bym2, comment = NA, message = FALSE, warning = FALSE}
+library(rstan)   
+options(mc.cores = parallel::detectCores())  
+
+source("mungeCARdata4stan.R")  
+source("scotland_data.R")
+y = data$y;
+x = 0.1 * data$x;
+E = data$E;
+
+
+
+nbs = mungeCARdata4stan(data$adj, data$num);
+N = nbs$N;
+node1 = nbs$node1;
+node2 = nbs$node2;
+N_edges = nbs$N_edges;
+
+#Calculate the scaling of the model. Requires the INLA package.
+#For convenience, this code isn't run.
+if(FALSE) {
+  library(INLA)
+  #Build the adjacency matrix
+  adj.matrix = sparseMatrix(i=nbs$node1,j=nbs$node2,x=1,symmetric=TRUE)
+  #The ICAR precision matrix (note! This is singular)
+  Q=  Diagonal(nbs$N, rowSums(adj.matrix)) - adj.matrix
+
+  #Add a small jitter to the diagonal for numerical stability (optional but recommended)
+  Q_pert = Q + Diagonal(nbs$N) * max(diag(Q)) * sqrt(.Machine$double.eps)
+
+
+# Compute the diagonal elements of the covariance matrix subject to the
+# constraint that the entries of the ICAR sum to zero.
+#See the function help for further details.
+Q_inv = inla.qinv(Q_pert, constr=list(A = matrix(1,1,nbs$N),e=0))
+
+#Compute the geometric mean of the variances, which are on the diagonal of Q.inv
+scaling_factor = exp(mean(log(diag(Q_inv))))
+
+} else{
+  scaling_factor= 0.4853175 # Not a magic number! Calculated as above
+}
+
+scot_stanfit = stan("bym2_predictor_plus_offset.stan",
+         data=list(N,N_edges,node1,node2,y,x,E,scaling_factor),
+         iter=10000);
+
+print(scot_stanfit,
+      pars=c("lp__", "beta0", "beta1", "rho", "sigma", "mu[5]"),
+      probs=c(0.025, 0.5, 0.975));
+
+
+```
+
+
+
+## Discussion
 
 The Stan BYM model developed in this case study allows for analysis of relatively large datasets.
 By encoding adjacency as an array of edges in an undirected graph instead of as
@@ -706,24 +834,26 @@ The pairwise difference for adjacent areal units can be expressed as a single st
 using the Stan's multiple indexing feature and the math library's `dot-self`
 function which provides efficient computation of the sum of squares.
 
-The improper nature of the IAR component means that it can only be used as a prior, not a likelihood.
-In order to make the IAR component identifiable, we use a sum-to-zero constraint.
+The improper nature of the ICAR component means that it can only be used as a prior, not a likelihood.
+In order to make the ICAR component identifiable, we use a sum-to-zero constraint.
 The convolution of a spatial random effects component together with an ordinary random effects component
 used in the BYM model is extremely difficult for the MCMC sampler to fit without placing hyperpriors
 on the scale of each component.
 If no priors are specified, Stan's defaults prior are too diffuse to allow the model to fit easily.
 
-### Acknowledgements
+## Acknowledgements
 
 Many thanks to Imad Ali, Michael Betancourt, Bob Carpenter, Andrew Gelman, Daniel Simpson, and Rob Trangucci for all their help and encouragement.
 
 
-### References
+## References
 
 
-#### Literature
+### Literature
 
 * Banerjee, Sudipto, Alan E. Gelfand, and Bradley P. Carlin. "Hierarchical modeling and analysis for spatial data." (2003).
+
+* Bernardinelli, L., Clayton, D. and Montomoli, C. (1995). Bayesian estimates of disease maps: How important are priors? Statistics in Medicine 14 2411–2431.
 
 * Besag, Julian. "Spatial interaction and the statistical analysis of lattice systems." Journal of the Royal Statistical Society. Series B (Methodological) (1974): 192-236.
 
@@ -731,7 +861,14 @@ Many thanks to Imad Ali, Michael Betancourt, Bob Carpenter, Andrew Gelman, Danie
 
 * Besag, J., J. York, and A. Mollie. "Bayesian image restoration with two applications in spatial statistics (with discussion) Ann Inst Stat Math. 1991; 43: 1–59. doi: 10.1007." BF00116466.[Cross Ref].
 
+* Dean, C. B., Ugarte, M. D. and Militino, A. F. (2001). Detecting interaction between random region and fixed age effects in disease mapping. Biometrics 57 197–202.
+
 * Haran, Murali. "Gaussian random field models for spatial data." Handbook of Markov Chain Monte Carlo (2011): 449-478.
+
+* Andrea Riebler, Sigrunn H Sørbye, Daniel Simpson, and Håvard Rue. "An intuitive Bayesian spatial model for disease mapping that accounts for scaling". Statistical Methods in Medical Research,
+Vol 25, Issue 4, pp. 1145 - 1165, 2016.
+
+* Wakefield, J. (2007). Disease mapping and spatial regression with count data. Biostatistics 8 158–183.
 
 #### R Packages
 
