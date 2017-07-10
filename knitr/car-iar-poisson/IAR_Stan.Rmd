@@ -1,11 +1,15 @@
 ---
 title: "Spatial Models in Stan: Intrinsic Auto-Regressive Models for Areal Data"
 author: "Mitzi Morris"
-output: 
+output:
   html_document:
     toc: true
     toc_depth: 2
 ---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(cache=TRUE)
+```
 
 <style type="text/css">
 .table { width: 40%; }
@@ -86,7 +90,7 @@ The construction of the spatial proximity matrix $B$ determines the class of CAR
 In the case where $B$ is a positive definite matrix, then the CAR model structure is a fully generative model.
 However evaluation of the joint distribution requires computing the covariance matrix described by
 $[D_{\tau}(I - \alpha B)]^{-1}$, which is computationally expensive.
-See the Stan case study 
+See the Stan case study
 [Exact sparse CAR models in Stan](http://mc-stan.org/documentation/case-studies/mbjoseph-CARStan.html),
 for further discussion of CAR models.
 
@@ -110,7 +114,7 @@ which has a set of neighbors $j \neq i$ whose cardinality is $d_{i,i}$,
 is normally distributed with a mean equal to the average of its neighbors.
 Its variance decreases as the number of neighbors increases.
 
-The joint distribution simplifies to: 
+The joint distribution simplifies to:
 
 $$\phi \sim N(0, [\tau \, (D - W)]^{-1}).$$
 
@@ -165,8 +169,8 @@ Since $D$ is the diagonal matrix where $D_{i,i}$ is the number of neighbors and
 the off-diagonal entries have value $0$.
 The expression $\sum_{i,j} {\phi}_i\,{\phi}_j D_{i,j}$ rewrites to terms ${{\phi}_i}^2$ where the number of each ${\phi_i}$ terms is given by $D_{i,i}$.
 For each pair of adjacent regions $\{i,j\}$ and $\{j,i\}$, one ${\phi}^2$ term each is contributed, so we can rewrite this in terms of $i \sim j$.
-Since $W$ is the adjacency matrix where $w_{ii} = 0, w_{ij} = 1$ if $i$ is a neighbor of $j$, and $w_{ij}=0$ otherwise, 
-the expression $\sum_{i,j} {\phi}_i\,{\phi}_j W_{i,j}$ rewrite to terms 
+Since $W$ is the adjacency matrix where $w_{ii} = 0, w_{ij} = 1$ if $i$ is a neighbor of $j$, and $w_{ij}=0$ otherwise,
+the expression $\sum_{i,j} {\phi}_i\,{\phi}_j W_{i,j}$ rewrite to terms
 $2 \, {\phi}_i {\phi}_j$, since there are two entries in $W$
 for each pair of adjacent regions.
 When both expressions are over $i \sim j$, we combine, rearrange, and reduce.
@@ -250,9 +254,9 @@ In the Stan program, we do this as follows:
 
 - in the parameter block we declare parameter vector `phi_std_raw` with length `N - 1`
 - in the transformed parameters block we declare the vector `phi` with length `N`
-and ensure that it sums to zero 
+and ensure that it sums to zero
 by defining the N-th element as the negation of the sum of the elements `1 : (N − 1)`.
-- the model block we use the `dot_self` function 
+- the model block we use the `dot_self` function
 which returns the dot product of a vector with itself
 to compute the sum of the squared pairwise differences.
 
@@ -303,7 +307,7 @@ of the population employed in agriculture, fishing, or forestry (AFF)
 - `num`: a list of the number of neighbors for each region
 
 Elements `adj` and `num` describe the neighborhood structure of the counties in Scotland.
-We have written a helper function 
+We have written a helper function
 [mungeCARdata4stan.R](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/mungeCARdata4stan.R)
 which takes inputs: `adj` and `num` as described above and returns a list containing
 the input data objects `N`, `N_edges`, `node1`, and `node2` as specified by the Stan model.
@@ -461,7 +465,7 @@ Using the notation of Banerjee et al., the Besag York Mollié model is:
 $$
 Y_i \, \vert \, \psi_i \sim Poisson ( E_i \, e^{\psi_i}),
 $$
-for $i \in 1:N$, where 
+for $i \in 1:N$, where
 $$
 \psi = x \beta + \theta + \phi
 $$
@@ -659,8 +663,8 @@ library(gpclib);
 library(maptools);  
 library(spdep);
 gpclibPermit()
-library(dplyr) 
-library(ggplot2) 
+library(dplyr)
+library(ggplot2)
 
 # prepare dfs for ggplot2
 mu_names = paste("mu[", c(1:709), "]")
@@ -695,7 +699,132 @@ poisson_plot = ggplot() + geom_polygon(data=pdata, aes(x=long, y=lat, group=grou
 poisson_plot
 ```
 
-### Discussion
+## A better parameterization of the Besag, York, and Mollié model
+
+Although the previous section shows that Stan can comfortably fit disease mapping models,
+there are some difficulties with the standard parameterization of the BYM model.
+In particular, it's quite challenging to set sensible priors on the precisions of the
+structured and unstructured random effects. While the recommendations  of Bernardinelli et al. (1995)
+are ok, it's better to re-state the model in an equivalent way that removes the problem.
+To some extent, this is a Bayesian version of Gelman's famous "Folk Theorem":
+if it's hard to set priors, then you model is probably wrong!
+
+So how do we do this? The first place to look is the original BYM paper, in which
+the unstructured random effect is added to the plain ICAR model to account
+for over-dispersion that isn't modelled by the spatial term.  (A note: adding any
+  random effect will induce over-dispersion in the data generating model)  
+  This means that there are two model components that are, at least partially
+  doing the same thing, which is why it's difficult to set priors.  You need to
+  ensure that the total over-dispersion (which is a non-linear function of
+    the two precision parameters) is controlled.  If the log-mean is given a $N(0,\sigma^2)$
+    prior, a quick calculation shows that the *a priori* mean-variance ratio for $Y$ is $$
+\frac{\operatorname{Var}(Y)}{\mathbb{E}(Y)} = 1 + \mathrm{e}^{\frac{\sigma^2}{2}}\left(\mathrm{e}^{\frac{\sigma^2}{2}} - 1\right),
+    $$ which means the over-dispersion is entirely controlled by the variance of the
+    random effect.
+
+This suggests that we want one overall parameter to control the variance of the
+random effect.  This can be achieved by re-writing the random effect as $$
+\theta + \phi = \sigma (\sqrt{1-\rho}\theta^* + \sqrt{\rho}\phi^* ),
+$$
+where
+
+* $\sigma\geq 0$ is the *overall* standard deviation
+
+* $\rho \in [0,1]$ models how much of the variance comes from the spatially structured effect
+and how much comes from the spatially unstructured effect
+
+* $\theta^* \sim N(0,I)$ is the unstructured random effect with fixed standard deviation $1$
+
+* $\phi^* $ is the ICAR model scaled so $\operatorname{Var}(\phi_i) \approx 1$
+
+In order for $\sigma$ to legitimately be the standard deviation of the random effect, it is
+**critical** that, for each $i$, $\operatorname{Var}(\theta_i) \approx \operatorname{Var}(\phi_i) \approx 1$.  This **is not automatic** for ICAR models, where every component of $\theta$ will have a
+different variance.  Riebler et al. (2016) recommend scaling the model so the geometric
+mean of these variances is 1.  For both the Scotland and Brooklyn examples, the
+geometric mean of the variances is about $0.5$, so multiplying the precision matrix  
+by $0.5$ will scale the model.  This scaling factor is difficult to compute efficiently,
+but there is an implementation of it in the **INLA** packages (the functions is *inla.scale.model*).
+
+
+With this re-parameterization, it is now easy to set priors!  In particular, we recommend
+- A standard prior on the standard deviation such as a half-normal, a half-t or an exponential
+- A beta(1/2,1/2) prior on $\rho$.  Riebler et al. (2016) offer a more sophisticated prior
+on $\rho$ that accounts for the fact that the two random effects are different "sizes", but
+that is not straightforward to implement in Stan at the moment.
+
+For more information about this re-parameterization, see Riebler et al. (2016),
+Dean et al. (2001), and Wakefield (2007).
+
+The Stan code for this model can be found at [bym2_predictor_plus_offset.stan](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/bym2_predictor_plus_offset.stan)
+
+```{r print-stan-bym2, comment='' }
+writeLines(readLines('bym2_predictor_plus_offset.stan'))
+```
+
+To test this model with real data, we ran it on the version of the Scotland Lip Cancer dataset in file
+[scotland_data.R](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/scotland_data.R),
+described in the previous section.
+The R script
+[fit_scotland.R](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/fit_scotland_bym2.R)
+fits the model to the data.  This code includes details on how to compute the scaling factor using the *INLA* library.
+
+```{r fit-scotland-bym2, comment = NA, message = FALSE, warning = FALSE}
+library(rstan)   
+options(mc.cores = parallel::detectCores())  
+
+source("mungeCARdata4stan.R")  
+source("scotland_data.R")
+y = data$y;
+x = 0.1 * data$x;
+E = data$E;
+
+
+
+nbs = mungeCARdata4stan(data$adj, data$num);
+N = nbs$N;
+node1 = nbs$node1;
+node2 = nbs$node2;
+N_edges = nbs$N_edges;
+
+#Calculate the scaling of the model. Requires the INLA package.
+#For convenience, this code isn't run.
+if(FALSE) {
+  library(INLA)
+  #Build the adjacency matrix
+  adj.matrix = sparseMatrix(i=nbs$node1,j=nbs$node2,x=1,symmetric=TRUE)
+  #The ICAR precision matrix (note! This is singular)
+  Q=  Diagonal(nbs$N, rowSums(adj.matrix)) - adj.matrix
+
+  #Add a small jitter to the diagonal for numerical stability (optional but recommended)
+  Q_pert = Q + Diagonal(nbs$N) * max(diag(Q)) * sqrt(.Machine$double.eps)
+
+
+# Compute the diagonal elements of the covariance matrix subject to the
+# constraint that the entries of the ICAR sum to zero.
+#See the function help for further details.
+Q_inv = inla.qinv(Q_pert, constr=list(A = matrix(1,1,nbs$N),e=0))
+
+#Compute the geometric mean of the variances, which are on the diagonal of Q.inv
+scaling_factor = exp(mean(log(diag(Q_inv))))
+
+} else{
+  scaling_factor= 0.4853175 # Not a magic number! Calculated as above
+}
+
+scot_stanfit = stan("bym2_predictor_plus_offset.stan",
+         data=list(N,N_edges,node1,node2,y,x,E,scaling_factor),
+         iter=10000);
+
+print(scot_stanfit,
+      pars=c("lp__", "beta0", "beta1", "rho", "sigma", "mu[5]"),
+      probs=c(0.025, 0.5, 0.975));
+
+
+```
+
+
+
+## Discussion
 
 The Stan BYM model developed in this case study allows for analysis of relatively large datasets.
 By encoding adjacency as an array of edges in an undirected graph instead of as
@@ -712,17 +841,19 @@ used in the BYM model is extremely difficult for the MCMC sampler to fit without
 on the scale of each component.
 If no priors are specified, Stan's defaults prior are too diffuse to allow the model to fit easily.
 
-### Acknowledgements
+## Acknowledgements
 
 Many thanks to Imad Ali, Michael Betancourt, Bob Carpenter, Andrew Gelman, Daniel Simpson, and Rob Trangucci for all their help and encouragement.
 
 
-### References
+## References
 
 
-#### Literature
+### Literature
 
 * Banerjee, Sudipto, Alan E. Gelfand, and Bradley P. Carlin. "Hierarchical modeling and analysis for spatial data." (2003).
+
+* Bernardinelli, L., Clayton, D. and Montomoli, C. (1995). Bayesian estimates of disease maps: How important are priors? Statistics in Medicine 14 2411–2431.
 
 * Besag, Julian. "Spatial interaction and the statistical analysis of lattice systems." Journal of the Royal Statistical Society. Series B (Methodological) (1974): 192-236.
 
@@ -730,7 +861,14 @@ Many thanks to Imad Ali, Michael Betancourt, Bob Carpenter, Andrew Gelman, Danie
 
 * Besag, J., J. York, and A. Mollie. "Bayesian image restoration with two applications in spatial statistics (with discussion) Ann Inst Stat Math. 1991; 43: 1–59. doi: 10.1007." BF00116466.[Cross Ref].
 
+* Dean, C. B., Ugarte, M. D. and Militino, A. F. (2001). Detecting interaction between random region and fixed age effects in disease mapping. Biometrics 57 197–202.
+
 * Haran, Murali. "Gaussian random field models for spatial data." Handbook of Markov Chain Monte Carlo (2011): 449-478.
+
+* Andrea Riebler, Sigrunn H Sørbye, Daniel Simpson, and Håvard Rue. "An intuitive Bayesian spatial model for disease mapping that accounts for scaling". Statistical Methods in Medical Research,
+Vol 25, Issue 4, pp. 1145 - 1165, 2016.
+
+* Wakefield, J. (2007). Disease mapping and spatial regression with count data. Biostatistics 8 158–183.
 
 #### R Packages
 
