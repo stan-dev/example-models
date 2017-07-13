@@ -44,5 +44,4 @@ model {
 }
 generated quantities {
   vector[N] mu = exp(log_E + beta0 + beta1 * x + phi + theta);
-  real psi = sd(phi) / (sd(theta) + sd(phi));  // proportion spatial variation
 }

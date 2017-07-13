@@ -8,7 +8,6 @@ data {
   vector[N] x;                    // predictor
   vector<lower=0>[N] E;           // exposure
 
-
   real<lower=0> scaling_factor; //the scaling factor to make the ICAR variances approxiamtely one
 }
 transformed data {
@@ -18,8 +17,8 @@ parameters {
   real beta0;                // intercept
   real beta1;                // slope
 
-  real<lower=0> sigma;   // precision of heterogeneous effects
-  real<lower=0,upper=1> rho;     // precision of spatial effects
+  real<lower=0> sigma;        // overall standard deviation
+  real<lower=0, upper=1> rho; // proportion unstructured vs. spatially structured variance
 
   vector[N] theta_std;       // standardized heterogeneous effects
   vector[N - 1] phi_std_raw; // raw, standardized spatial effects
@@ -27,21 +26,19 @@ parameters {
 transformed parameters {
 
   vector[N] phi;
-  vector[N] random;
+  vector[N] bym2_re;
 
 
   phi[1:(N - 1)] = phi_std_raw;
   phi[N] = -sum(phi_std_raw);
 
-
-
   // non-centered parameterisation
-  // NB: the scaling scales the spatial effect so the variance is approxiamtely 1
+  // NB: scaling_factor scales the spatial effect so the variance is approxiamtely 1
   // This is NOT a magic number, and comes as data
-  random =  sigma *(sqrt(rho)*theta_std + sqrt(1-rho)*scaling_factor*phi);
+  bym2_re =  sigma * (sqrt(rho) * theta_std + sqrt(1-rho) * scaling_factor * phi);
 }
 model {
-  y ~ poisson_log(log_E + beta0 + beta1 * x + random);
+  y ~ poisson_log(log_E + beta0 + beta1 * x + bym2_re);
 
   target += -0.5 * dot_self(phi[node1] - phi[node2]);
 
@@ -52,6 +49,5 @@ model {
   rho ~ beta(0.5,0.5);
 }
 generated quantities {
-  vector[N] mu = exp(log_E + beta0 + beta1 * x +random);
-  //real psi = sd(phi) / (sd(theta) + sd(phi));  // proportion spatial variation
+  vector[N] mu = exp(log_E + beta0 + beta1 * x + bym2_re);
 }
