@@ -167,11 +167,15 @@ transformed parameters {
   // non-centered parameterisation
   // NB: the scaling scales the spatial effect so the variance is approxiamtely 1
   // This is NOT a magic number, and comes as data
-  random =  sigma *(sqrt(1-rho)*theta_std + sqrt(rho)*scaling_factor*phi);
+  // NOTE: THE SCALING FACTOR SCALES THE PRECISION MATRIX, SO I'M DIVIDING BY
+  // ITS SQUARE ROOT HERE!! (Formerlly a subtle bug!)
+  random =  sigma *(sqrt(1-rho)*theta_std + sqrt(rho/scaling_factor)*phi);
 }
 model {
   y ~ poisson_log(log_E + beta0 + beta1 * x + random);
 
+
+  // This is the prior for phi! (up to proportionality)
   target += -0.5 * dot_self(phi[node1] - phi[node2]);
 
   beta0 ~ normal(0.0, 5.0);
@@ -233,11 +237,10 @@ scaling_factor = exp(mean(log(diag(Q_inv))))
   scaling_factor= 0.4853175 # Not a magic number! Calculated as above
 }
 
-scot_stanfit = stan(&quot;bym2_predictor_plus_offset.stan&quot;,
+stan_time=system.time(scot_stanfit &lt;- stan(&quot;bym2_predictor_plus_offset.stan&quot;,
          data=list(N,N_edges,node1,node2,y,x,E,scaling_factor),
-         iter=10000);</code></pre>
-<pre><code>warning: unknown warning option '-Wnomacro-redefined'; did you mean '-Wmacro-redefined'? [-Wunknown-warning-option]
-In file included from file42a92d7e82a0.cpp:8:
+         iter=10000),gcFirst = TRUE)[3];</code></pre>
+<pre><code>In file included from filea81634a4749.cpp:8:
 In file included from /Library/Frameworks/R.framework/Versions/3.4/Resources/library/StanHeaders/include/src/stan/model/model_header.hpp:4:
 In file included from /Library/Frameworks/R.framework/Versions/3.4/Resources/library/StanHeaders/include/stan/math.hpp:4:
 In file included from /Library/Frameworks/R.framework/Versions/3.4/Resources/library/StanHeaders/include/stan/math/rev/mat.hpp:4:
@@ -252,7 +255,7 @@ In file included from /Library/Frameworks/R.framework/Versions/3.4/Resources/lib
 &lt;command line&gt;:6:9: note: previous definition is here
 #define BOOST_NO_CXX11_RVALUE_REFERENCES 1
         ^
-2 warnings generated.</code></pre>
+1 warning generated.</code></pre>
 <pre class="r"><code># INLA code</code></pre>
 <pre class="r"><code>library(INLA)
 # Set up the data
@@ -268,19 +271,24 @@ adj.matrix = adj.matrix + Diagonal(nrow(adj.matrix))
 # Set prior so that the mixing parameter 
 # (rho in the Stan call, phi in INLA) has a beta(1/2,1/2) prior
 # NB: INLA needs a prior on logit(phi)
-priors =  list(phi = list(prior=&quot;logitbeta&quot;,params=c(0.5,0.5))) 
+# NB: INLA needs a prior for log(precision)
+priors =  list(phi = list(prior=&quot;logitbeta&quot;,params=c(0.5,0.5)),
+               prec = list(prior=&quot;logtgaussian&quot;,params=c(0,1/25))
+               ) 
 
   #Uniform on logit
 #priors = list(phi = list(prior=&quot;expression:return(x - 2*(exp(x)+1))&quot;)) 
 
 inla_formula &lt;- y ~ 1+ x+ f(region, model = &quot;bym2&quot;,graph=adj.matrix,hyper=priors,constr = TRUE)
 
-inla_bym2 &lt;- inla(inla_formula, family = &quot;poisson&quot;, E=E, 
+inla_time= system.time(
+  inla_bym2 &lt;- inla(inla_formula, family = &quot;poisson&quot;, E=E, 
                   data = inla_data,
                    control.fixed = list(prec = 1/25,prec.intercept=1/25),
                   control.predictor = list(compute=TRUE), 
-                  control.inla = list(strategy=&quot;laplace&quot;,fast=FALSE)
-                  )</code></pre>
+          #        control.inla = list(strategy=&quot;laplace&quot;,fast=FALSE)
+                  ),gcFirst = TRUE
+)[3]</code></pre>
 </div>
 <div id="results" class="section level1">
 <h1>Results</h1>
@@ -320,41 +328,41 @@ knitr::kable(table_joint,digits = 2)</code></pre>
 <td>1</td>
 <td align="left">log_precision</td>
 <td align="left">Stan</td>
-<td align="right">-0.68</td>
-<td align="right">0.40</td>
-<td align="right">-1.42</td>
-<td align="right">-0.70</td>
-<td align="right">0.14</td>
+<td align="right">1.34</td>
+<td align="right">0.34</td>
+<td align="right">0.68</td>
+<td align="right">1.34</td>
+<td align="right">2.00</td>
 </tr>
 <tr class="even">
 <td>6</td>
 <td align="left">log_precision</td>
 <td align="left">INLA</td>
-<td align="right">1.48</td>
-<td align="right">0.32</td>
-<td align="right">0.85</td>
-<td align="right">1.48</td>
-<td align="right">2.11</td>
+<td align="right">1.36</td>
+<td align="right">0.33</td>
+<td align="right">0.70</td>
+<td align="right">1.36</td>
+<td align="right">2.01</td>
 </tr>
 <tr class="odd">
 <td>2</td>
 <td align="left">logit_rho</td>
 <td align="left">Stan</td>
-<td align="right">5.07</td>
+<td align="right">3.07</td>
 <td align="right">2.24</td>
-<td align="right">1.97</td>
-<td align="right">4.63</td>
-<td align="right">10.67</td>
+<td align="right">-0.06</td>
+<td align="right">2.64</td>
+<td align="right">8.66</td>
 </tr>
 <tr class="even">
 <td>7</td>
 <td align="left">logit_rho</td>
 <td align="left">INLA</td>
-<td align="right">2.52</td>
-<td align="right">1.54</td>
-<td align="right">-0.11</td>
-<td align="right">2.37</td>
-<td align="right">5.85</td>
+<td align="right">2.58</td>
+<td align="right">1.57</td>
+<td align="right">-0.10</td>
+<td align="right">2.44</td>
+<td align="right">5.98</td>
 </tr>
 <tr class="odd">
 <td>3</td>
@@ -362,7 +370,7 @@ knitr::kable(table_joint,digits = 2)</code></pre>
 <td align="left">Stan</td>
 <td align="right">-0.22</td>
 <td align="right">0.13</td>
-<td align="right">-0.48</td>
+<td align="right">-0.47</td>
 <td align="right">-0.22</td>
 <td align="right">0.03</td>
 </tr>
@@ -370,11 +378,11 @@ knitr::kable(table_joint,digits = 2)</code></pre>
 <td>8</td>
 <td align="left">beta0</td>
 <td align="left">INLA</td>
-<td align="right">-0.23</td>
-<td align="right">0.12</td>
+<td align="right">-0.22</td>
+<td align="right">0.13</td>
 <td align="right">-0.47</td>
-<td align="right">-0.23</td>
-<td align="right">0.01</td>
+<td align="right">-0.22</td>
+<td align="right">0.03</td>
 </tr>
 <tr class="odd">
 <td>4</td>
@@ -382,42 +390,50 @@ knitr::kable(table_joint,digits = 2)</code></pre>
 <td align="left">Stan</td>
 <td align="right">0.37</td>
 <td align="right">0.13</td>
-<td align="right">0.11</td>
-<td align="right">0.38</td>
+<td align="right">0.10</td>
+<td align="right">0.37</td>
 <td align="right">0.63</td>
 </tr>
 <tr class="even">
 <td>9</td>
 <td align="left">beta1</td>
 <td align="left">INLA</td>
-<td align="right">0.38</td>
+<td align="right">0.37</td>
 <td align="right">0.13</td>
-<td align="right">0.12</td>
-<td align="right">0.38</td>
+<td align="right">0.11</td>
+<td align="right">0.37</td>
 <td align="right">0.63</td>
 </tr>
 <tr class="odd">
 <td>5</td>
 <td align="left">mu[5]</td>
 <td align="left">Stan</td>
-<td align="right">13.78</td>
-<td align="right">3.09</td>
-<td align="right">8.58</td>
-<td align="right">13.49</td>
-<td align="right">20.57</td>
+<td align="right">13.80</td>
+<td align="right">3.05</td>
+<td align="right">8.60</td>
+<td align="right">13.53</td>
+<td align="right">20.49</td>
 </tr>
 <tr class="even">
 <td>10</td>
 <td align="left">mu[5]</td>
 <td align="left">INLA</td>
-<td align="right">13.66</td>
-<td align="right">3.00</td>
-<td align="right">8.57</td>
-<td align="right">13.40</td>
-<td align="right">20.27</td>
+<td align="right">14.01</td>
+<td align="right">3.09</td>
+<td align="right">8.72</td>
+<td align="right">13.74</td>
+<td align="right">20.80</td>
 </tr>
 </tbody>
 </table>
+</div>
+<div id="some-concluding-notes" class="section level1">
+<h1>Some concluding notes</h1>
+<ul>
+<li><p>There are some small differences between the Stan output and the INLA output. For every parameter except for <span class="math inline">\(\operatorname{logit}(\rho)\)</span>, this reduces as you increase the MCMC chain length.</p></li>
+<li><p>The bias in <span class="math inline">\(logit(\rho)\)</span> is real but negligible on the <span class="math inline">\(\rho\)</span> scale, as you can see from the indifference the other parameters have to this.</p></li>
+<li><p>For this model, Stan took 49.163 seconds, while INLA took around 2.208 seconds.</p></li>
+</ul>
 </div>
 
 

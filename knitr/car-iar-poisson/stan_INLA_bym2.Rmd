@@ -64,9 +64,9 @@ scaling_factor = exp(mean(log(diag(Q_inv))))
   scaling_factor= 0.4853175 # Not a magic number! Calculated as above
 }
 
-scot_stanfit = stan("bym2_predictor_plus_offset.stan",
+stan_time=system.time(scot_stanfit <- stan("bym2_predictor_plus_offset.stan",
          data=list(N,N_edges,node1,node2,y,x,E,scaling_factor),
-         iter=10000);
+         iter=10000),gcFirst = TRUE)[3];
 
 
 
@@ -89,19 +89,24 @@ adj.matrix = adj.matrix + Diagonal(nrow(adj.matrix))
 # Set prior so that the mixing parameter 
 # (rho in the Stan call, phi in INLA) has a beta(1/2,1/2) prior
 # NB: INLA needs a prior on logit(phi)
-priors =  list(phi = list(prior="logitbeta",params=c(0.5,0.5))) 
+# NB: INLA needs a prior for log(precision)
+priors =  list(phi = list(prior="logitbeta",params=c(0.5,0.5)),
+               prec = list(prior="logtgaussian",params=c(0,1/25))
+               ) 
 
   #Uniform on logit
 #priors = list(phi = list(prior="expression:return(x - 2*(exp(x)+1))")) 
 
 inla_formula <- y ~ 1+ x+ f(region, model = "bym2",graph=adj.matrix,hyper=priors,constr = TRUE)
 
-inla_bym2 <- inla(inla_formula, family = "poisson", E=E, 
+inla_time= system.time(
+  inla_bym2 <- inla(inla_formula, family = "poisson", E=E, 
                   data = inla_data,
                    control.fixed = list(prec = 1/25,prec.intercept=1/25),
                   control.predictor = list(compute=TRUE), 
-                  control.inla = list(strategy="laplace",fast=FALSE)
-                  )
+          #        control.inla = list(strategy="laplace",fast=FALSE)
+                  ),gcFirst = TRUE
+)[3]
 
 
 
@@ -132,4 +137,10 @@ knitr::kable(table_joint,digits = 2)
 
 ```
 
+# Some concluding notes
 
+* There are some small differences between the Stan output and the INLA output.  For every parameter except for $\operatorname{logit}(\rho)$, this reduces as you increase the MCMC chain length.
+
+* The bias in $logit(\rho)$ is real but negligible on the $\rho$ scale, as you can see from the indifference the other parameters have to this.
+
+* For this model, Stan took  `r stan_time` seconds, while INLA took around `r inla_time` seconds.

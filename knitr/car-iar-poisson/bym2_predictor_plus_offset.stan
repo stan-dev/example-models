@@ -38,11 +38,15 @@ transformed parameters {
   // non-centered parameterisation
   // NB: the scaling scales the spatial effect so the variance is approxiamtely 1
   // This is NOT a magic number, and comes as data
-  random =  sigma *(sqrt(1-rho)*theta_std + sqrt(rho)*scaling_factor*phi);
+  // NOTE: THE SCALING FACTOR SCALES THE PRECISION MATRIX, SO I'M DIVIDING BY
+  // ITS SQUARE ROOT HERE!! (Formerlly a subtle bug!)
+  random =  sigma *(sqrt(1-rho)*theta_std + sqrt(rho/scaling_factor)*phi);
 }
 model {
   y ~ poisson_log(log_E + beta0 + beta1 * x + random);
 
+
+  // This is the prior for phi! (up to proportionality)
   target += -0.5 * dot_self(phi[node1] - phi[node2]);
 
   beta0 ~ normal(0.0, 5.0);
