@@ -35,19 +35,24 @@ transformed parameters {
   // non-centered parameterisation
   // NB: scaling_factor scales the spatial effect so the variance is approxiamtely 1
   // This is NOT a magic number, and comes as data
-  bym2_re =  sigma * (sqrt(rho) * theta_std + sqrt(1-rho) * scaling_factor * phi);
+  // NOTE: THE SCALING FACTOR SCALES THE PRECISION MATRIX, SO I'M DIVIDING BY
+  // ITS SQUARE ROOT HERE!!
+  bym2_re =  sigma *(sqrt(1-rho)*theta_std + sqrt(rho/scaling_factor)*phi);
 }
 model {
   y ~ poisson_log(log_E + beta0 + beta1 * x + bym2_re);
 
+  // This is the prior for phi! (up to proportionality)
   target += -0.5 * dot_self(phi[node1] - phi[node2]);
 
-  beta0 ~ normal(0, 5);
-  beta1 ~ normal(0, 5);
-  theta_std ~ normal(0, 1);
+  beta0 ~ normal(0.0, 5.0);
+  beta1 ~ normal(0.0, 5.0);
+  theta_std ~ normal(0.0, 1.0);
   sigma ~ normal(0,5);
   rho ~ beta(0.5,0.5);
 }
 generated quantities {
   vector[N] mu = exp(log_E + beta0 + beta1 * x + bym2_re);
+  real log_precision = -2.0*log(sigma);
+  real logit_rho = log(rho/(1.0-rho));
 }
