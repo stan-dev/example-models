@@ -297,12 +297,12 @@ file named "Lipsbrad.odc", which is an OpenBUGS data format file containing a Wi
 data, and inits.
 We've edited the data into file
 [scotland_data.R](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/scotland_data.R).
-It defined a list `data` with the following elements:
+It defines a list named `data` with the following fields:
 
 - `y`: the observed lip cancer case counts on a per-county basis
 - `x`: an area-specific continuous covariate that represents the proportion
 of the population employed in agriculture, fishing, or forestry (AFF)
-- `E`: the an expected number of cases, used as an offset,
+- `E`: the expected number of cases, used as an offset,
 - `adj`: a list of region ids for adjacent regions
 - `num`: a list of the number of neighbors for each region
 
@@ -315,9 +315,8 @@ the input data objects `N`, `N_edges`, `node1`, and `node2` as specified by the 
 The script
 [fit_simple_iar_stan.R](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/fit_simple_iar_stan.R)
 compiles and runs the model on the Scotland data.
-To check that this model recovers the spatial relationships, check the covariance between pairs of adjacent regions
-and pairs of non-adjacent regions and 
-compare the Stan results to those obtained by fitting the same data to the equivalent BUGS model.
+To check that this model recovers the spatial relationships,
+we compare the Stan results to those obtained by fitting the same data to the equivalent BUGS model 
 which is in the file
 [simple_iar.txt](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/simple_iar.txt).
 We use the R [R2OpenBugs](https://cran.r-project.org/web/packages/R2OpenBugs) package to this model via OpenBUGS,
@@ -325,7 +324,6 @@ which requires that we wrap the BUGS model in a function statement for R:
 ```{r print-bugs-iar }
 writeLines(readLines('simple_iar.txt'))
 ```
-
 The following description of the [`car.normal`](https://www.mrc-bsu.cam.ac.uk/wp-content/uploads/geobugs12manual.pdf)
 function and arguments is taken from the GeoBUGS manual:
 <div class="quote-container">
@@ -350,10 +348,9 @@ The script
 compiles and runs the model on the Scotland data.
 
 We run both models for 10,000 iterations and compare results for the first 10 entries in `phi`.
-We use RStan to print the posterior summary statistics.  The column `se\_mean` reports the Monte Carlo standard error,
-which reflects the uncertainty from the simulation.
-As both simulations are within se\_mean of one another, we conclude that they have
-both converged to the same posterior distribution.
+We use RStan to print the posterior summary statistics for the fit object returned by ROpenBugs.
+The RStan output column "se\_mean" reports the Monte Carlo standard error, which reflects the uncertainty from the simulation.
+As both simulations are within se\_mean of one another, we conclude that they have both converged to the same posterior distribution.
 
 ```
                  mean   se_mean  sd    2.5%   97.5% n_eff Rhat
@@ -494,10 +491,11 @@ Bernardinelli et al. (1995):
 
 $$ \textit{sd} ({\theta}_i) = \frac{1}{\sqrt{\tau}_{\phi}} \approx \frac{1}{0.7 \sqrt{ \bar m {\tau}_{\theta}}} \approx \textit{sd}({\phi}_i) $$
 
-We use these same hyperpriors when implementing this model in Stan, which allows the model to fit the data.
+We use these same hyperpriors for the precision of the random effects when implementing this model in Stan.
+These particular values allows the model to fit the Scotland data.
 However, the assumptions underlying the use of this choice of hyperpriors and the actual values used for
-the gamma hyperprior on `tau_theta` are specific to this dataset and would need to be re-evaluated for other
-situations.  
+the gamma hyperprior on `tau_theta` depend on $\bar m$, which is the average number of neighbors across all regions in the dataset,
+which means that they are dependent on the dataset being analyzed and must be reevaluated for each new dataset accordingly.
 
 ### A Stan Implementation of the BYM Model
 
@@ -507,9 +505,6 @@ A Stan model which implements the BYM model for univariate data plus offset is i
 ```{r print-stan-bym }
 writeLines(readLines('bym_predictor_plus_offset.stan'))
 ```
-
-We have also included a BYM model for univariate data without and offset, in file:
-[bym_predictor_only.stan](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/bym_predictor_only.stan).
 
 This model builds on the model in file `simple_iar.stan`:
 
@@ -597,8 +592,10 @@ geometric mean of the variances is about $0.5$, so multiplying the precision mat
 by $0.5$ will scale the model.  This scaling factor is difficult to compute efficiently,
 but there is an implementation of it in the **INLA** packages (the functions is *inla.scale.model*).
 
-With this re-parameterization, it is now easy to set priors!  In particular, we recommend
-- A standard prior on the standard deviation such as a half-normal, a half-t or an exponential
+With this re-parameterization, it is now easy to set priors!  In particular, we recommend:
+
+- A standard prior on the standard deviation such as a half-normal, a half-t or an exponential.
+
 - A beta(1/2,1/2) prior on $\rho$.  Riebler et al. (2016) offer a more sophisticated prior
 on $\rho$ that accounts for the fact that the two random effects are different "sizes", but
 that is not straightforward to implement in Stan at the moment.
