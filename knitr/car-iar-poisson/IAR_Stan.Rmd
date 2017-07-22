@@ -544,10 +544,76 @@ node2 = nbs$node2;
 N_edges = nbs$N_edges;
 
 bym_scot_stanfit = stan("bym_predictor_plus_offset.stan", data=list(N,N_edges,node1,node2,y,x,E), iter=10000);
-print(bym_scot_stanfit, pars=c("lp__", "beta0", "beta1", "sigma_phi", "tau_phi", "sigma_theta", "tau_theta", "mu[5]"), probs=c(0.025, 0.5, 0.975));
+print(bym_scot_stanfit, pars=c("lp__", "beta0", "beta1", "sigma_phi", "tau_phi", "sigma_theta", "tau_theta", "mu[5]", "phi[5]", "theta[5]"), probs=c(0.025, 0.5, 0.975));
 ```
 
-## A better parameterization of the Besag, York, and Mollié model
+The priors on all parameters match the priors on the corresponding WinBUGS model in the file
+"Lipsbrad.odc".  To check this model, we use OpenBUGS and R package R2OpenBugs to fit the WinBUGS version.
+We have edited the WinBUGS program so that the variable names match the names used in the Stan model,
+also we have changed the parameterization of the heterogenous random effects component `theta` to
+the non-centered parameterization.
+Our version of the WinBUGS model is in file
+[bym_bugs_carlin.txt](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/bym_bugs_carlin.txt).
+The R script
+[fit_scotland_bugs.R](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/fit_scotland_bugs.R)
+uses OpenBUGS to fit this model.
+
+```{r fit-scotland-bugs, echo = FALSE, results = FALSE }
+library(R2OpenBUGS);
+library(rstan)  
+
+mfile = "bym_bugs_carlin.txt";
+
+iter = 100000;
+burn =  90000;
+nchain = 4;
+thin = 2;
+
+pathOpenBugs = "/Users/mitzi/.wine/drive_c/Program\ Files/OpenBUGS/OpenBUGS323/OpenBUGS.exe";
+
+source("scotland_data.R");
+data$x = 0.1 * data$x;
+inits <- function () {
+         list(beta0 = rnorm(1,0,1),
+         beta1 = rnorm(1,0,1),
+         tau_theta = exp(rnorm(1,0,1)),
+         tau_phi = exp(rnorm(1,0,1)),
+         theta = rnorm(56,0,1),
+         phi = rep(0,56))};
+ 
+params2save = c("beta0", "beta1", "sigma_phi", "sigma_theta",
+  "tau_phi", "tau_theta", "mu", "phi", "theta");
+ 
+fit_bugs <- bugs(data, inits, params2save,
+      n.iter=iter,
+      n.chains=nchain,
+      n.burnin=burn,
+      n.thin=thin,
+      model.file=mfile,
+      digits=7,
+      OpenBUGS.pgm=pathOpenBugs,
+      useWINE=TRUE,
+      DIC=FALSE,
+      WINE="/usr/local/bin/wine",
+      bugs.seed=1);
+
+sims = rstan::monitor(fit_bugs$sims.array,
+      probs=c(0.025, 0.975), warmup=0, print=TRUE);
+```
+      
+```{r print-fit-scotland-bugs }
+options(digits=2);
+sims[c("beta0","beta1","sigma_phi","tau_phi","sigma_theta","tau_theta","mu[5]","phi[5]","theta[5]"),];
+```
+
+WinBUGS and Stan produce compatible estimates of the parameters and quantities of interest for this model
+when run on the Scotland dataset.
+For this model, the fit is achieved by careful choice of the hyperpriors,
+in particular, the choice of the gamma hyperprior on `tau_theta`
+which depends on $\bar m$, the average number of neighbors across all regions in the dataset.
+These values may not work so well for data with a different spatial structure.
+
+## BYM2: improving the parameterization of the Besag, York, and Mollié model
 
 Although the previous section shows that Stan can comfortably fit disease mapping models,
 there are some difficulties with the standard parameterization of the BYM model.
@@ -587,7 +653,8 @@ In order for $\sigma$ to legitimately be the standard deviation of the random ef
 **critical** that, for each $i$, $\operatorname{Var}(\theta_i) \approx \operatorname{Var}(\phi_i) \approx 1$.
 This **is not automatic** for ICAR models, where every component of $\theta$ will have a
 different variance.  Riebler et al. (2016) recommend scaling the model so the geometric
-mean of these variances is 1.  For both the Scotland and Brooklyn examples, the
+mean of these variances is 1.  For the two datasets in this case study, (Scotland lip cancer,
+previous section, Brooklyn traffic accidents, following section), the
 geometric mean of the variances is about $0.5$, so multiplying the precision matrix  
 by $0.5$ will scale the model.  This scaling factor is difficult to compute efficiently,
 but there is an implementation of it in the **INLA** packages (the functions is *inla.scale.model*).
@@ -661,11 +728,8 @@ if(DO_CALC) {
 }
 
 bym2_scot_stanfit = stan("bym2_predictor_plus_offset.stan", data=list(N,N_edges,node1,node2,y,x,E,scaling_factor), iter=10000);
-print(bym2_scot_stanfit, pars=c("lp__", "beta0", "beta1", "rho", "sigma", "mu[5]"), probs=c(0.025, 0.5, 0.975));
+print(bym2_scot_stanfit, pars=c("lp__", "beta0", "beta1", "sigma", "rho", "logit_rho", "mu[5]", "bym2_re[5]", "phi[5]", "theta[5]"), probs=c(0.025, 0.5, 0.975));
 ```
-
-Discuss interpretation of `rho` - how much variance is spatial variance.
-
 
 To see how this re-parameterization affects the fit, we reprint the results of fitting the Scotland data using the previous version of the BYM model,
 printing only the parameters and generated quantities shared by these two models:
@@ -674,7 +738,9 @@ printing only the parameters and generated quantities shared by these two models
 print(bym_scot_stanfit, pars=c("beta0", "beta1", "mu[5]"), probs=c(0.025, 0.5, 0.975));
 ```
 
-Show how to compute Carlin proportion of variance using samples.
+Discuss interpretation of `rho` - how much variance is spatial variance.
+
+
 
 ## Bigger data: from 56 counties in Scotland to 709 census tracts in Brooklyn
 
