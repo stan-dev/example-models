@@ -6,12 +6,8 @@ data {
 
   int<lower=0> y[N];              // count outcomes
   vector[N] x;                    // predictor
-  vector<lower=0>[N] E;           // exposure
 
   real<lower=0> scaling_factor; //the scaling factor to make the ICAR variances approxiamtely one
-}
-transformed data {
-  vector[N] log_E = log(E);
 }
 parameters {
   real beta0;                // intercept
@@ -36,20 +32,18 @@ transformed parameters {
   convolved_re =  sqrt(1 - rho) * theta + sqrt(rho / scaling_factor) * phi;
 }
 model {
-  y ~ poisson_log(log_E + beta0 + beta1 * x + convolved_re * sigma);
+  y ~ poisson_log(beta0 + beta1 * x + convolved_re * sigma);
 
-  // This is the prior for phi! (up to proportionality)
   target += -0.5 * dot_self(phi[node1] - phi[node2]);
 
-  beta0 ~ normal(0.0, 5.0);
-  beta1 ~ normal(0.0, 5.0);
-  theta ~ normal(0.0, 1.0);
-  sigma ~ normal(0,5);
+  beta0 ~ normal(0, 5);
+  beta1 ~ normal(0, 5);
+  theta ~ normal(0, 1);
+  sigma ~ normal(0, 5);
   rho ~ beta(0.5, 0.5);
 }
 generated quantities {
-  vector[N] mu = exp(log_E + beta0 + beta1 * x + convolved_re);
+  vector[N] mu = exp(beta0 + beta1 * x + convolved_re);
   real log_precision = -2.0 * log(sigma);
   real logit_rho = log(rho / (1.0 - rho));
 }
-

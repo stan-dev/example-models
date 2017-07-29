@@ -18,6 +18,6 @@ scot_stanfit = stan("bym_predictor_plus_offset.stan",
          iter=10000);
 
 print(scot_stanfit,
-      pars=c("lp__", "beta0", "beta1", "sigma_phi", "tau_phi", "sigma_theta", "tau_theta"),
-      probs=c(0.025, 0.5, 0.975));
+      pars=c("lp__", "beta0", "beta1", "sigma_phi", "tau_phi", "sigma_theta", "tau_theta","mu[5]","phi[5]","theta[5]"),
+      probs=c(0.025, 0.5, 0.975),digits=3);
 
