@@ -663,7 +663,7 @@ With this re-parameterization, it is now easy to set priors!  In particular, we 
 
 - A standard prior on the standard deviation such as a half-normal, a half-t or an exponential.
 
-- A beta(1/2,1/2) prior on $\rho$.  Riebler et al. (2016) offer a more sophisticated prior
+- A beta(1/2,1/2) prior on $\rho$. Riebler et al. (2016) offer a more sophisticated prior
 on $\rho$ that accounts for the fact that the two random effects are different "sizes", but
 that is not straightforward to implement in Stan at the moment.
 
@@ -728,7 +728,7 @@ if(DO_CALC) {
 }
 
 bym2_scot_stanfit = stan("bym2_predictor_plus_offset.stan", data=list(N,N_edges,node1,node2,y,x,E,scaling_factor), iter=10000);
-print(bym2_scot_stanfit, pars=c("lp__", "beta0", "beta1", "sigma", "rho", "logit_rho", "mu[5]", "bym2_re[5]", "phi[5]", "theta[5]"), probs=c(0.025, 0.5, 0.975));
+print(bym2_scot_stanfit, pars=c("lp__", "beta0", "beta1", "sigma", "rho", "logit_rho", "mu[5]", "convolved_re[5]", "phi[5]", "theta[5]"), probs=c(0.025, 0.5, 0.975));
 ```
 
 To see how this re-parameterization affects the fit, we reprint the results of fitting the Scotland data using the previous version of the BYM model,
@@ -738,8 +738,16 @@ printing only the parameters and generated quantities shared by these two models
 print(bym_scot_stanfit, pars=c("beta0", "beta1", "mu[5]"), probs=c(0.025, 0.5, 0.975));
 ```
 
-Discuss interpretation of `rho` - how much variance is spatial variance.
+As a further check, we compare the results of using Stan implementation of the BYM2 model to fit the Scotland lip cancer dataset with the results obtained by using INLA's implementation of the BYM2 model.  The script to run INLA using package R-INLA is in file
+[fit_scotland_inla_bym2.R](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/fit_inla_bym2.R).
+After fitting the model, we print the values for the fixed effects parameters, i.e., the slope and intercept terms `beta0` and `beta1`:
 
+```
+> inla_bym2$summary.fixed
+                  mean        sd 0.025quant   0.5quant 0.975quant       mode          kld
+(Intercept) -0.2215948 0.1265029 -0.4711830 -0.2215091 0.02705429 -0.2214959 1.472228e-08
+x            0.3706808 0.1320332  0.1054408  0.3725290 0.62566048  0.3762751 4.162445e-09
+```
 
 
 ## Bigger data: from 56 counties in Scotland to 709 census tracts in Brooklyn
@@ -849,8 +857,6 @@ pois_rstanarmfit = stan_glm(y~x,family="poisson",data=df, prior = normal(0,2.5),
 print(pois_rstanarmfit, digits=3, probs=c(0.025, 0.5, 0.975));
 ```
 
-Discuss `rho`.
-
 To round out the comparison of models, we fit two additional models:
 
 - a Poisson regression which has an ordinary random effects component, which would be appropriate for heterogeneous variance.
@@ -914,20 +920,20 @@ ggplot() + geom_polygon(data=df_long, aes(x=long, y=lat, group=group, fill=value
 
 ## Discussion
 
-The Stan BYM model developed in this case study allows for analysis of relatively large datasets.
-By encoding adjacency as an array of edges in an undirected graph instead of as
-a large square matrix, we can efficiently store the neighborhood structure for
-data over a large number of areal units.
+In this case study we have shown how to efficiently encode and compute the ICAR component.
+To can efficiently store the neighborhood structure, we encode
+the spatial adjacency matrix as an array of edges of an undirected graph instead
+of using a large square matrix.
 The pairwise difference for adjacent areal units can be expressed as a single statement
 using the Stan's multiple indexing feature and the math library's `dot-self`
 function which provides efficient computation of the sum of squares.
-
 The improper nature of the ICAR component means that it can only be used as a prior, not a likelihood.
 In order to make the ICAR component identifiable, we use a sum-to-zero constraint.
-The convolution of a spatial random effects component together with an ordinary random effects component
-used in the BYM model is extremely difficult for the MCMC sampler to fit without placing hyperpriors
-on the scale of each component.
-If no priors are specified, Stan's defaults prior are too diffuse to allow the model to fit easily.
+
+The BYM model is more properly a family of models which convolve both a spatial ICAR component and
+a heterogeneous random effects component.
+The convolution of these two components is extremely difficult for an MCMC sampler
+to fit without placing hyperpriors on the scale of each component.
 Here we follow Riebler et al 2016 in choosing to use a mixing parameter `rho` and a
 scaling factor which is derived from the structure of the neighborhood graph.
 The hyperpriors placed on these parameters are conceptually straightforward, and the
@@ -964,7 +970,7 @@ Many thanks to Imad Ali, Michael Betancourt, Bob Carpenter, Andrew Gelman, and R
 
 #### R Packages
 
-* Statistics: [RStan](http://mc-stan.org/users/interfaces/rstan.html), [RStanArm](http://mc-stan.org/users/interfaces/rstanarm.html), [R2OpenBugs](https://cran.r-project.org/web/packages/R2OpenBugs), OpenBUGS.
+* Statistics: [RStan](http://mc-stan.org/users/interfaces/rstan.html), [RStanArm](http://mc-stan.org/users/interfaces/rstanarm.html), [R2OpenBugs](https://cran.r-project.org/web/packages/R2OpenBugs), OpenBUGS, [R-INLA](http://www.r-inla.org).
 
 * Plots: [ggplot2](http://ggplot2.org), [dplyr](https://cran.r-project.org/web/packages/dplyr), [gridExtra](https://cran.r-project.org/web/packages/gridExtra)
 
