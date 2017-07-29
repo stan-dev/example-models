@@ -21,7 +21,7 @@ parameters {
 }
 transformed parameters {
   vector[N] phi;
-  vector[N] bym2_re;
+  vector[N] convolved_re;
 
   phi[1:(N - 1)] = phi_raw;
   phi[N] = -sum(phi_raw);
@@ -29,10 +29,10 @@ transformed parameters {
   // NB: scaling_factor scales the spatial effect so the variance is approxiamtely 1.
   // This is NOT a magic number, and comes as data.
   // Divide by sqrt of scaling factor to properly scale precision matrix phi.
-  bym2_re =  sqrt(1 - rho) * theta + sqrt(rho / scaling_factor) * phi;
+  convolved_re =  sqrt(1 - rho) * theta + sqrt(rho / scaling_factor) * phi;
 }
 model {
-  y ~ poisson_log(beta0 + beta1 * x + bym2_re * sigma);
+  y ~ poisson_log(beta0 + beta1 * x + convolved_re * sigma);
 
   target += -0.5 * dot_self(phi[node1] - phi[node2]);
 
@@ -43,7 +43,7 @@ model {
   rho ~ beta(0.5, 0.5);
 }
 generated quantities {
-  vector[N] mu = exp(beta0 + beta1 * x + bym2_re);
+  vector[N] mu = exp(beta0 + beta1 * x + convolved_re);
   real log_precision = -2.0 * log(sigma);
   real logit_rho = log(rho / (1.0 - rho));
 }
