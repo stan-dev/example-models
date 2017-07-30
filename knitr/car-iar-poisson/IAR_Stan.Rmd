@@ -930,20 +930,20 @@ function which provides efficient computation of the sum of squares.
 The improper nature of the ICAR component means that it can only be used as a prior, not a likelihood.
 In order to make the ICAR component identifiable, we use a sum-to-zero constraint.
 
-The BYM model is more properly a family of models which convolve both a spatial ICAR component and
-a heterogeneous random effects component.
-The convolution of these two components is extremely difficult for an MCMC sampler
-to fit without placing hyperpriors on the scale of each component.
+The BYM model convolves both a spatial ICAR component and a heterogeneous random effects component.
+There are many variants of this model which differ in the parameterization of these two components.
+This model is extremely difficult for an MCMC sampler to fit unless there are
+strong hyperpriors on the scale of each component.
 Here we follow Riebler et al 2016 in choosing to use a mixing parameter `rho` and a
-scaling factor which is derived from the structure of the neighborhood graph.
-The hyperpriors placed on these parameters are conceptually straightforward, and the
-resulting parameterization makes it possible to determine the amount of spatial structure
-present in the data.
+scaling factor which is derived from the structure of the neighborhood graph,
+in order to determine the amount of spatial structure present in the data.
 
 ## Acknowledgements
 
 Daniel Simpson contributed the section "A better parameterization of the Besag, York, and Mollié model".
 Many thanks to Imad Ali, Michael Betancourt, Bob Carpenter, Andrew Gelman, and Rob Trangucci for all their help and encouragement.
+
+Funded in part by the National Institute of Child Health and Human Development, grant number 1R01HD087460-01, Charles DiMaggio Principal Investigator.
 
 ## References
 
