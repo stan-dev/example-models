@@ -921,7 +921,7 @@ ggplot() + geom_polygon(data=df_long, aes(x=long, y=lat, group=group, fill=value
 ## Discussion
 
 In this case study we have shown how to efficiently encode and compute the ICAR component.
-To can efficiently store the neighborhood structure, we encode
+To efficiently store the neighborhood structure, we encode
 the spatial adjacency matrix as an array of edges of an undirected graph instead
 of using a large square matrix.
 The pairwise difference for adjacent areal units can be expressed as a single statement
