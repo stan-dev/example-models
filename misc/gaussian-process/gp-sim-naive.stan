@@ -6,10 +6,16 @@ data {
   real x[N];
 }
 transformed data {
-  matrix[N, N] K = cov_exp_quad(x, 1.0, 1.0);
+  matrix[N, N] K;
   vector[N] mu = rep_vector(0, N);
-  for (i in 1:N) 
-    K[i, i] = K[i, i] + 0.1;
+  for (i in 1:(N - 1)) {
+    K[i, i] = 1 + 0.1;
+    for (j in (i + 1):N) {
+      K[i, j] = exp(-0.5 * pow(x[i] - x[j],2));
+      K[j, i] = K[i, j];
+    }
+  }
+  K[N, N] = 1 + 0.1;
 }
 parameters {
   vector[N] y;

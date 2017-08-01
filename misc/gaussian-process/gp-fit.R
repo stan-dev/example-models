@@ -1,10 +1,10 @@
 
 # FIRST RUN SIMULATION to get a value to fit:
 # source("gp-sim.R");  # first run simulation 
+library(rstan)
+stan_dat <- read_rdump('gp-fit.data.R')
 
-y_samp <- fit_sim_ss$y[100,]
-
-fit_fit <- stan(file="gp-fit.stan", data=list(x=x,N=N,y=y_samp),
+fit_fit <- stan(file="gp-fit.stan", data=stan_dat,
                  iter=200, chains=3);
 
 fit_fit_ss <- extract(fit_fit, permuted=TRUE);

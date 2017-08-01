@@ -2,26 +2,20 @@
 // for squared exponential prior
 
 data {
-  int<lower=1> N1;
-  real x1[N1];
-  vector[N1] y1;
-  int<lower=1> N2;
-  real x2[N2];
+  int<lower=1> N;
+  real x[N];
+  int<lower=0> y[N];
 }
 transformed data {
   real delta = 1e-9;
-  int<lower=1> N = N1 + N2;
-  real x[N];
-  for (n in 1:N1) x[n] = x1[n];
-  for (n in 1:N2) x[N1 + n] = x2[n];
 }
 parameters {
-  real<lower=0> alpha;
   real<lower=0> rho;
-  real<lower=0> sigma;
+  real<lower=0> alpha;
+  real a;
   vector[N] eta;
 }
-transformed parameters {
+model {
   vector[N] f;
   {
     matrix[N, N] L_K;
@@ -34,19 +28,11 @@ transformed parameters {
     L_K = cholesky_decompose(K);
     f = L_K * eta;
   }
-}
-model {
   
-  
-  alpha ~ normal(0, 1);
   rho ~ gamma(4, 4);
-  sigma ~ normal(0, 1);
+  alpha ~ normal(0, 1);
   eta ~ normal(0, 1);
+  a ~ normal(0, 1);
 
-  y1 ~ normal(f[1:N1], sigma);
-}
-generated quantities {
-  vector[N2] y2;
-  for (n in 1:N2)
-    y2[n] = normal_rng(f[N1 + n], sigma);
+  y ~ poisson_log(a + f);
 }
