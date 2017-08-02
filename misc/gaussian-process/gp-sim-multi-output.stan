@@ -1,20 +1,20 @@
-// Fit a multi-output Gaussian process's hyperparameters
+// Fit a Gaussian process's hyperparameters
 // for squared exponential prior
 data {
   int<lower=1> N;
   int<lower=1> D;
   real x[N];
-  matrix[N, D] y;
 }
 transformed data {
   real delta = 1e-9;
+  real<lower=0> rho = 1.0;
+  vector<lower=0>[D] alpha = rep_vector(1.0, D);
+  real<lower=0> sigma = sqrt(0.1);
 }
 parameters {
-  real<lower=0> rho;
-  vector<lower=0>[D] alpha;
-  real<lower=0> sigma;
   cholesky_factor_corr[D] L_Omega;
   matrix[N, D] eta;
+  matrix[N, D] y;
 }
 model {
   matrix[N, D] f;
@@ -31,9 +31,6 @@ model {
         * diag_pre_multiply(alpha, L_Omega)';
   }
 
-  rho ~ gamma(4, 4);
-  alpha ~ normal(0, 1);
-  sigma ~ normal(0, 1);
   L_Omega ~ lkj_corr_cholesky(3);
   to_vector(eta) ~ normal(0, 1);
 

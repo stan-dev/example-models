@@ -7,7 +7,7 @@ data {
   vector[D] x[N];
 }
 transformed data {
-  matrix[N, N] K = cov_exp_quad(x, 1, 1);
+  matrix[N, N] K = cov_exp_quad(x, 1.0, 1.0);
   vector[N] mu = rep_vector(0, N);
   for (i in 1:N) 
     K[i, i] = K[i, i] + 0.1;

@@ -4,7 +4,7 @@
 data {
   int<lower=1> N;
   real x[N];
-  int<lower=0, upper=1> y[N];
+  int<lower=0, upper=1> z[N];
 }
 transformed data {
   real delta = 1e-9;
@@ -34,5 +34,5 @@ model {
   eta ~ normal(0, 1);
   a ~ normal(0, 1);
 
-  y ~ bernoulli_logit(a + f);
+  z ~ bernoulli_logit(a + f);
 }
