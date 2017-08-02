@@ -1,5 +1,5 @@
-// Fit a multi-output Gaussian process's hyperparameters
-// for squared exponential prior
+// Fit the hyperparameters of a multi-output Gaussian process 
+// with an exponentiated quadratic kernel and correlated outputs
 data {
   int<lower=1> N;
   int<lower=1> D;

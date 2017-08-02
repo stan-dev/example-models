@@ -1,5 +1,5 @@
-// Fit a Gaussian process's hyperparameters
-// for squared exponential prior
+// Fit the hyperparameters of a Gaussian process with an exponentiated
+// quadratic kernel and analytically predict out-of-sample observations
 functions{
     vector gp_pred_rng(real[] x2,
                        vector y1,

@@ -1,5 +1,5 @@
-// Fit a Gaussian process's hyperparameters
-// for squared exponential prior
+// Fit the hyperparameters of a Gaussian process with an 
+// exponentiated quadratic kernel
 
 data {
   int<lower=1> N;

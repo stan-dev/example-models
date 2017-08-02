@@ -1,5 +1,6 @@
-// Fit a Gaussian process's hyperparameters
-// for squared exponential prior
+// Fit the hyperparameters of a latent-variable Gaussian process with an
+// exponentiated quadratic kernel and a Bernoulli likelihood and predict
+// out-of-sample observations
 
 data {
   int<lower=1> N1;
@@ -12,8 +13,8 @@ transformed data {
   real delta = 1e-9;
   int<lower=1> N = N1 + N2;
   real x[N];
-  for (n in 1:N1) x[n] = x1[n];
-  for (n in 1:N2) x[N1 + n] = x2[n];
+  for (n1 in 1:N1) x[n1] = x1[n1];
+  for (n2 in 1:N2) x[N1 + n2] = x2[n2];
 }
 parameters {
   real<lower=0> alpha;
@@ -45,6 +46,6 @@ model {
 }
 generated quantities {
   int z2[N2];
-  for (n in 1:N2)
-    z2[n] = bernoulli_logit_rng(a + f[N1 + n]);
+  for (n2 in 1:N2)
+    z2[n2] = bernoulli_logit_rng(a + f[N1 + n2]);
 }

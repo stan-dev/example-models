@@ -1,5 +1,7 @@
-// Sample from Gaussian process
-// Fixed covar function: eta_sq=1, rho_sq=1, sigma_sq=0.1
+// Sample from a Gaussian process using Stan's built in exponentiated quadratic
+// covariance function and the Cholesky parameterization of a latent-variable
+// Gaussian process.  
+// Fixed kernel hyperparameters: rho=1, alpha=1, sigma=sqrt(0.1)
 
 data {
   int<lower=1> N;
@@ -10,9 +12,9 @@ transformed data {
   vector[N] mu = rep_vector(0, N);
   matrix[N, N] L;
   {
-    matrix[N, N] K = cov_exp_quad(x, 1, 1);
-    for (i in 1:N) 
-      K[i, i] = K[i, i] + 0.1;
+    matrix[N, N] K = cov_exp_quad(x, 1.0, 1.0);
+    for (n in 1:N) 
+      K[n, n] = K[n, n] + 0.1;
     L = cholesky_decompose(K);
   }
 }

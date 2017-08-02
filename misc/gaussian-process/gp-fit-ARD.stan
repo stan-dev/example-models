@@ -1,5 +1,5 @@
-// Fit a Gaussian process's hyperparameters
-// for squared exponential prior
+// Fit the hyperparameters of a latent-variable Gaussian process with an
+// ARD-parameterized exponentiated quadratic kernel and a Gaussian likelihood
 
 functions {
   matrix L_cov_exp_quad_ARD(vector[] x,

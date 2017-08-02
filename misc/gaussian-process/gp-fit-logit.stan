@@ -1,5 +1,5 @@
-// Fit a Gaussian process's hyperparameters
-// for squared exponential prior
+// Fit the hyperparameters of a latent-variable Gaussian process with an
+// exponentiated quadratic kernel and a Bernoulli likelihood
 
 data {
   int<lower=1> N;

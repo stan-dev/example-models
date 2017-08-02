@@ -1,5 +1,6 @@
-// Sample from Gaussian process
-// Fixed covar function: eta_sq=1, rho_sq=1, sigma_sq=0.1
+// Sample from Gaussian process with a manually-built covariance matrix K
+// parameterized with an exponentiated quadratic kernel.  
+// Fixed kernel hyperparameters: rho=1, alpha=1, sigma=sqrt(0.1)
 
 data {
   int<lower=1> N;

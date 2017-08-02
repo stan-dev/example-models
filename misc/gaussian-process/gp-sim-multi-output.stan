@@ -1,5 +1,6 @@
-// Fit a Gaussian process's hyperparameters
-// for squared exponential prior
+// Sample from a multi-output Gaussian process using Stan's built in
+// exponentiated quadratic covariance function.
+// Fixed kernel hyperparameters: rho=1, alpha=1, sigma=sqrt(0.1)
 data {
   int<lower=1> N;
   int<lower=1> D;
