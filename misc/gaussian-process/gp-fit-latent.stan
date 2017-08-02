@@ -29,7 +29,7 @@ model {
     f = L_K * eta;
   }
   
-  rho ~ gamma(4, 4);
+  rho ~ inv_gamma(5, 5);
   alpha ~ normal(0, 1);
   sigma ~ normal(0, 1);
   eta ~ normal(0, 1);

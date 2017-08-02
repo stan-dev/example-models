@@ -31,7 +31,7 @@ model {
         * diag_pre_multiply(alpha, L_Omega)';
   }
 
-  rho ~ gamma(4, 4);
+  rho ~ inv_gamma(5, 5);
   alpha ~ normal(0, 1);
   sigma ~ normal(0, 1);
   L_Omega ~ lkj_corr_cholesky(3);

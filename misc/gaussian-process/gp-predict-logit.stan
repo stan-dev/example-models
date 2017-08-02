@@ -38,7 +38,7 @@ transformed parameters {
 }
 model {
   alpha ~ normal(0, 1);
-  rho ~ gamma(4, 4);
+  rho ~ inv_gamma(5, 5);
   a ~ normal(0, 1);
   eta ~ normal(0, 1);
 
