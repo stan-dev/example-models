@@ -55,7 +55,8 @@ dump(c('x','N','D','y'), file = 'gp-fit-ARD.data.R')
 
 x <- x1
 D <- 3
-gp_mult_out <- stan(file = 'gp-sim-multi-output.stan', data = list(x = x, D = D, N = N), chains = 3, iter = 200, seed = 123, control = list(max_treedepth = 15))
+gp_mult_out <- stan(file = 'gp-sim-multi-output.stan', data = list(x = x, D = D, N = N),
+                    chains = 3, iter = 200, seed = 123, control = list(max_treedepth = 15))
 gp_mult_out_ss <- rstan::extract(gp_mult_out)
 y <- gp_mult_out_ss$y[200,,]
 Omega <- gp_mult_out_ss$Omega[200,,]
