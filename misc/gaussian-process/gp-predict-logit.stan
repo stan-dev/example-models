@@ -17,8 +17,8 @@ transformed data {
   for (n2 in 1:N2) x[N1 + n2] = x2[n2];
 }
 parameters {
-  real<lower=0> alpha;
   real<lower=0> rho;
+  real<lower=0> alpha;
   real a;
   vector[N] eta;
 }
@@ -37,8 +37,8 @@ transformed parameters {
   }
 }
 model {
-  alpha ~ normal(0, 1);
   rho ~ inv_gamma(5, 5);
+  alpha ~ normal(0, 1);
   a ~ normal(0, 1);
   eta ~ normal(0, 1);
 

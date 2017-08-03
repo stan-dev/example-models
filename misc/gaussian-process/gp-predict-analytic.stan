@@ -50,8 +50,8 @@ transformed data {
   real delta = 1e-9;
 }
 parameters {
-  real<lower=0> alpha;
   real<lower=0> rho;
+  real<lower=0> alpha;
   real<lower=0> sigma;
 }
 model {

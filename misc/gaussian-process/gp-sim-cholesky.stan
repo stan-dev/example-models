@@ -5,8 +5,7 @@
 
 data {
   int<lower=1> N;
-  int<lower=1> D;
-  vector[D] x[N];
+  real x[N];
 }
 transformed data {
   vector[N] mu = rep_vector(0, N);
@@ -19,12 +18,12 @@ transformed data {
   }
 }
 parameters {
-  vector[N] z;
+  vector[N] eta;
 }
 model {
-  z ~ normal(0, 1);
+  eta ~ normal(0, 1);
 }
 generated quantities {
   vector[N] y;
-  y = mu + L * z;
+  y = mu + L * eta;
 }
