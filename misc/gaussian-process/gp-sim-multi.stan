@@ -1,10 +1,11 @@
-// Sample from a Gaussian process using Stan's built in exponentiated quadratic
-// covariance function.
+// Sample from multidimensional Gaussian process using Stan's built-in
+// exponentiated quadratic covariance matrix function.  
 // Fixed kernel hyperparameters: rho=1, alpha=1, sigma=sqrt(0.1)
 
 data {
   int<lower=1> N;
-  real x[N];
+  int<lower=1> D;
+  vector[D] x[N];
 }
 transformed data {
   matrix[N, N] K = cov_exp_quad(x, 1.0, 1.0);

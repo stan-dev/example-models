@@ -1,11 +1,11 @@
 // Fit the hyperparameters of a latent-variable Gaussian process with an
-// exponentiated quadratic kernel and a Gaussian likelihood and predict
+// exponentiated quadratic kernel and a Bernoulli likelihood and predict
 // out-of-sample observations
 
 data {
   int<lower=1> N1;
   real x1[N1];
-  vector[N1] y1;
+  int<lower=0, upper=1> z1[N1];
   int<lower=1> N2;
   real x2[N2];
 }
@@ -19,7 +19,7 @@ transformed data {
 parameters {
   real<lower=0> rho;
   real<lower=0> alpha;
-  real<lower=0> sigma;
+  real a;
   vector[N] eta;
 }
 transformed parameters {
@@ -39,13 +39,13 @@ transformed parameters {
 model {
   rho ~ inv_gamma(5, 5);
   alpha ~ normal(0, 1);
-  sigma ~ normal(0, 1);
+  a ~ normal(0, 1);
   eta ~ normal(0, 1);
 
-  y1 ~ normal(f[1:N1], sigma);
+  z1 ~ bernoulli_logit(a + f[1:N1]);
 }
 generated quantities {
-  vector[N2] y2;
+  int z2[N2];
   for (n2 in 1:N2)
-    y2[n2] = normal_rng(f[N1 + n2], sigma);
+    z2[n2] = bernoulli_logit_rng(a + f[N1 + n2]);
 }
