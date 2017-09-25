@@ -14,10 +14,10 @@ transformed parameters {
   vector[J] eta;
   vector[N] y_hat;
 
-  eta <- 0.1 * mu_eta + sigma_eta * et;
+  eta = 0.1 * mu_eta + sigma_eta * et;
 
   for (i in 1:N)
-    y_hat[i] <- eta[county[i]];
+    y_hat[i] = eta[county[i]];
 }
 model {
   et ~ normal (0, 1);

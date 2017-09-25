@@ -7,8 +7,8 @@ data {
 transformed data {
   vector[N] log_earn;        // log transformations
   vector[N] log_height;
-  log_earn   <- log(earn);
-  log_height <- log(height);
+  log_earn   = log(earn);
+  log_height = log(height);
 }
 parameters {
   vector[3] beta;

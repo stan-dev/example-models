@@ -18,7 +18,7 @@ transformed parameters {
   vector[N] y_hat;
 
   for (i in 1:N)
-    y_hat[i] <- a1[person[i]] + a2[person[i]] * time[i];
+    y_hat[i] = a1[person[i]] + a2[person[i]] * time[i];
 } 
 model {
   mu_a1 ~ normal(0, 1);

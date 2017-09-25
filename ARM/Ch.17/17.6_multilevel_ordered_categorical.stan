@@ -33,12 +33,12 @@ model {
 
   for (i in 1:N) {
     for (i_cut in 1:n_cut)
-      Q[i,i_cut] <- inv_logit((x[i] - C[player[i],i_cut])/s[player[i]]);
+      Q[i,i_cut] = inv_logit((x[i] - C[player[i],i_cut])/s[player[i]]);
 
-    P[i,1] <- 1 - Q[i,1];
-    P[i,n_cut+1] <- Q[i,n_cut];
+    P[i,1] = 1 - Q[i,1];
+    P[i,n_cut+1] = Q[i,n_cut];
     for (i_cut in 2:n_cut)
-      P[i,i_cut] <- Q[i,i_cut-1] - Q[i,i_cut];
+      P[i,i_cut] = Q[i,i_cut-1] - Q[i,i_cut];
   }
 
   for (i in 1:N)

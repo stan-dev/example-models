@@ -6,7 +6,7 @@ data {
 }
 transformed data {
   vector[N] inter;           // interaction
-  inter <- treatment .* pre_test;
+  inter = treatment .* pre_test;
 }
 parameters {
   vector[4] beta;

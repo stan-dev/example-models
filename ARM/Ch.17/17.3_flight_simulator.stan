@@ -27,7 +27,7 @@ model {
   delta ~ normal(0, sigma_delta);
 
   for (i in 1:N)
-    y_hat[i] <- mu + gamma[treatment[i]] + delta[airport[i]];
+    y_hat[i] = mu + gamma[treatment[i]] + delta[airport[i]];
 
   y ~ normal(y_hat, sigma);
 }

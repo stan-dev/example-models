@@ -24,13 +24,13 @@ transformed parameters {
   real mu_g2;
   vector[N] y_hat;
 
-  mu_g2 <- mean(g);
-  mu_d2 <- mean(d);
-  g_adj <- g - mu_g2;
-  d_adj <- d - mu_d2;
-  mu_adj <- mu + mu_g2 + mu_d2;
+  mu_g2 = mean(g);
+  mu_d2 = mean(d);
+  g_adj = g - mu_g2;
+  d_adj = d - mu_d2;
+  mu_adj = mu + mu_g2 + mu_d2;
   for (i in 1:N)
-    y_hat[i] <- mu + g[treatment[i]] + d[airport[i]];
+    y_hat[i] = mu + g[treatment[i]] + d[airport[i]];
 }
 model {
   sigma_y ~ uniform(0, 100);

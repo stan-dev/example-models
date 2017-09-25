@@ -16,6 +16,6 @@ model {
 }
 generated quantities {       // prediction
   real kid_score_pred;
-  kid_score_pred <- normal_rng(beta[1] + beta[2] * mom_hs_new
+  kid_score_pred = normal_rng(beta[1] + beta[2] * mom_hs_new
                                + beta[3] * mom_iq_new, sigma);
 }

@@ -13,7 +13,7 @@ parameters {
 model {
   vector[N] y_hat;
   for (i in 1:N)
-    y_hat[i] <- a[county[i]];
+    y_hat[i] = a[county[i]];
 
   mu_a ~ normal(0, 1);
   sigma_a ~ cauchy(0, 2.5);

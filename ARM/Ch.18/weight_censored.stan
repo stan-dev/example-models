@@ -13,17 +13,17 @@ transformed data {
   vector[N_cens] c_height_cens;
   int i;
   int j;
-  c_height <- height - mean(height);
-  i <- 1;
-  j <- 1;
+  c_height = height - mean(height);
+  i = 1;
+  j = 1;
   for (n in 1:N) {
     if (weight[n] == C) {
-      c_height_cens[i] <- c_height[n];
-      i <- i + 1;
+      c_height_cens[i] = c_height[n];
+      i = i + 1;
     } else {
-      weight_obs[j] <- weight[n];
-      c_height_obs[j] <- c_height[n];
-      j <- j + 1;
+      weight_obs[j] = weight[n];
+      c_height_obs[j] = c_height[n];
+      j = j + 1;
     }
   }
 }

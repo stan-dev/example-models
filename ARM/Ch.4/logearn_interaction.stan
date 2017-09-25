@@ -7,8 +7,8 @@ data {
 transformed data {
   vector[N] log_earn;        // log transformation
   vector[N] inter;           // interaction
-  log_earn <- log(earn);        
-  inter    <- height .* male;
+  log_earn = log(earn);        
+  inter    = height .* male;
 }
 parameters {
   vector[4] beta;

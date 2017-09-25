@@ -9,7 +9,7 @@ data {
 transformed data {
   vector[N] log_expo;
 
-  log_expo <- log(exposure2);
+  log_expo = log(exposure2);
 }
 parameters {
   vector[4] beta;

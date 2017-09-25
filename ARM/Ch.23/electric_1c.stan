@@ -25,14 +25,14 @@ transformed parameters {
   vector[N] y_hat;
 
   for (i in 1:N) {
-    y_hat[i] <- a[pair[i]] + b[grade[i]] * treatment[i] 
+    y_hat[i] = a[pair[i]] + b[grade[i]] * treatment[i] 
                  + c[grade[i]] * pre_test[i];
-    sigma_y_hat[i] <- sigma_y[grade[i]];
+    sigma_y_hat[i] = sigma_y[grade[i]];
   }
 
   for (i in 1:n_pair) {
-    sigma_a_hat[i] <- sigma_a[grade_pair[i]];
-    mu_a_hat[i] <- 40 * mu_a[grade_pair[i]];
+    sigma_a_hat[i] = sigma_a[grade_pair[i]];
+    mu_a_hat[i] = 40 * mu_a[grade_pair[i]];
   }
 }
 model {

@@ -31,7 +31,7 @@ parameters {
 transformed parameters {
   vector[N] y_hat;
   for (i in 1:N)
-    y_hat[i] <- a1[eth[i]] + a2[eth[i]] * x[i] + b1[age[i]] 
+    y_hat[i] = a1[eth[i]] + a2[eth[i]] * x[i] + b1[age[i]] 
                 + b2[age[i]] * x[i] + c[eth[i],age[i]] 
                 + d[eth[i],age[i]] * x[i];
 } 

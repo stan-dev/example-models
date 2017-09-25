@@ -57,12 +57,12 @@ model {
   b_v_prev ~ normal(0, 100);
 
   for (j in 1:n_state)
-    b_state_hat[j] <- b_region[region[j]] + b_v_prev * v_prev[j];
+    b_state_hat[j] = b_region[region[j]] + b_v_prev * v_prev[j];
 
   b_hat ~ normal(b_state_hat, sigma_state);
 
   for (i in 1:N)
-    p[i] <- fmax(0, fmin(1, inv_logit(b_0 + b_female*female[i] 
+    p[i] = fmax(0, fmin(1, inv_logit(b_0 + b_female*female[i] 
       + b_black*black[i] + b_female_black*female[i]*black[i] +
       b_age[age[i]] + b_edu[edu[i]] + b_age_edu[age[i],edu[i]] +
       b_hat[state[i]])));

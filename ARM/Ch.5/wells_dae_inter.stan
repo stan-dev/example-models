@@ -9,9 +9,9 @@ transformed data {
   vector[N] dist100;         // rescaling
   vector[N] educ4;
   vector[N] inter;           // interaction
-  dist100 <- dist / 100.0;
-  educ4   <- educ / 4.0;
-  inter   <- dist100 .* arsenic;
+  dist100 = dist / 100.0;
+  educ4   = educ / 4.0;
+  inter   = dist100 .* arsenic;
 }
 parameters {
   vector[5] beta;
