@@ -18,7 +18,7 @@ parameters {
 model {
   vector[N] y_hat;
   for (i in 1:N)
-    y_hat[i] <- alpha[county[i]] + x[i] * beta[1] + u[i] * beta[2];
+    y_hat[i] = alpha[county[i]] + x[i] * beta[1] + u[i] * beta[2];
 
   alpha ~ normal(mu_alpha, sigma_alpha);
   beta ~ normal(mu_beta, sigma_beta);

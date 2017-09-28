@@ -12,10 +12,10 @@ transformed data {
   vector[N] site4; 
   vector[N] site5; 
   for (i in 1:N) {
-    site2[i] <- site[i] == 2;
-    site3[i] <- site[i] == 3;
-    site4[i] <- site[i] == 4;
-    site5[i] <- site[i] == 5;
+    site2[i] = site[i] == 2;
+    site3[i] = site[i] == 3;
+    site4[i] = site[i] == 4;
+    site5[i] = site[i] == 5;
   }
 }
 parameters {

@@ -20,10 +20,10 @@ transformed parameters {
   vector[N] y_hat;
 
   for (i in 1:N)
-    y_hat[i] <- a[village[i]] + beta[1] * enroll97[i] + beta[2] * work97[i]
+    y_hat[i] = a[village[i]] + beta[1] * enroll97[i] + beta[2] * work97[i]
                   + beta[3] * poor[i] + beta[4] * male[i] + beta[5] * age97[i];
   for (j in 1:J)
-    a_hat[j] <- g_0 + g_1 * program[j];
+    a_hat[j] = g_0 + g_1 * program[j];
 }
 model {
   sigma_a ~ uniform(0, 100);

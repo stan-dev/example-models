@@ -9,8 +9,8 @@ data {
 transformed data {
   real<lower=0> sigma_y;
   real<lower=0> sigma_a;
-  sigma_y <- 0.7;
-  sigma_a <- 0.4;
+  sigma_y = 0.7;
+  sigma_a = 0.4;
 }
 parameters {
   real a[J];

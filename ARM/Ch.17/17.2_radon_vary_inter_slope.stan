@@ -23,7 +23,7 @@ transformed parameters {
   vector[N] y_hat;
 
   for (i in 1:N)
-    y_hat[i] <- a[county[i]] + b[county[i]] * x[i];
+    y_hat[i] = a[county[i]] + b[county[i]] * x[i];
 }
 model {
   vector[N] a_hat;
@@ -40,8 +40,8 @@ model {
   g_b_0 ~ normal(0, 100);
   g_b_1 ~ normal(0, 100);
 
-  a_hat <- g_a_0 + g_a_1 * u;
-  b_hat <- g_b_0 + g_b_1 * u;
+  a_hat = g_a_0 + g_a_1 * u;
+  b_hat = g_b_0 + g_b_1 * u;
 
   y ~ normal(y_hat, sigma);
 }

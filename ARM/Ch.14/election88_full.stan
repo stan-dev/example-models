@@ -32,7 +32,7 @@ transformed parameters {
   vector[N] y_hat;
 
   for (i in 1:N)
-    y_hat[i] <- beta[1] + beta[2] * black[i] + beta[3] * female[i]
+    y_hat[i] = beta[1] + beta[2] * black[i] + beta[3] * female[i]
                 + beta[5] * female[i] * black[i] 
                 + beta[4] * v_prev_full[i] + a[age[i]] + b[edu[i]] 
                 + c[age_edu[i]] + d[state[i]] + e[region_full[i]];

@@ -24,7 +24,7 @@ generated quantities {
   real u_tilde;
   real a_tilde;
   real y_tilde;
-  u_tilde <- mean(u);
-  a_tilde <- normal_rng(g_0 + g_1 * u_tilde, sigma_a);
-  y_tilde <- normal_rng(a_tilde + b * 1, sigma_y);
+  u_tilde = mean(u);
+  a_tilde = normal_rng(g_0 + g_1 * u_tilde, sigma_a);
+  y_tilde = normal_rng(a_tilde + b * 1, sigma_y);
 }

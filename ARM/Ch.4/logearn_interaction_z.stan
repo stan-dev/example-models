@@ -8,9 +8,9 @@ transformed data {
   vector[N] log_earn;        // log transformation
   vector[N] z_height;        // standardization
   vector[N] inter;           // interaction
-  log_earn <- log(earn);
-  z_height <- (height - mean(height)) / sd(height);
-  inter    <- z_height .* male;
+  log_earn = log(earn);
+  z_height = (height - mean(height)) / sd(height);
+  inter    = z_height .* male;
 }
 parameters {
   vector[4] beta;

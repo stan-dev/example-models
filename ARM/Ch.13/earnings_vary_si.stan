@@ -7,7 +7,7 @@ data {
 transformed data {
   vector[N] log_earn;
 
-  log_earn <- log(earn);
+  log_earn = log(earn);
 }
 parameters {
   vector[4] a1;
@@ -22,7 +22,7 @@ transformed parameters {
   vector[N] y_hat;
 
   for (i in 1:N)
-    y_hat[i] <- a1[eth[i]] + a2[eth[i]] * height[i];
+    y_hat[i] = a1[eth[i]] + a2[eth[i]] * height[i];
 } 
 model {
   mu_a1 ~ normal(0, 1);

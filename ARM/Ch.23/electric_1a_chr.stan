@@ -22,11 +22,11 @@ transformed parameters {
   vector[N] y_hat;
 
   for (i in 1:n_pair)
-    a[i] <- 100 * mu_a[grade_pair[i]] + sigma_a[grade_pair[i]] * eta_a[i];
+    a[i] = 100 * mu_a[grade_pair[i]] + sigma_a[grade_pair[i]] * eta_a[i];
 
   for (i in 1:N) {
-    y_hat[i] <- a[pair[i]] + b[grade[i]] * treatment[i];
-    sigma_y_hat[i] <- sigma_y[grade[i]];
+    y_hat[i] = a[pair[i]] + b[grade[i]] * treatment[i];
+    sigma_y_hat[i] = sigma_y[grade[i]];
   }
 }
 model {

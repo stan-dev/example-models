@@ -8,8 +8,8 @@ data {
 transformed data {
   vector[N] log_weight;
   vector[N] log_canopy_volume;
-  log_weight        <- log(weight);
-  log_canopy_volume <- log(diam1 .* diam2 .* canopy_height);
+  log_weight        = log(weight);
+  log_canopy_volume = log(diam1 .* diam2 .* canopy_height);
 }
 parameters {
   vector[2] beta;

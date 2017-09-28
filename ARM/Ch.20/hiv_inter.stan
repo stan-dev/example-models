@@ -20,7 +20,7 @@ transformed parameters {
   vector[N] y_hat;
 
   for (i in 1:N)
-    y_hat[i] <- beta * time[i] * treatment[i] + a1[person[i]] 
+    y_hat[i] = beta * time[i] * treatment[i] + a1[person[i]] 
                 + a2[person[i]] * time[i];
 } 
 model {

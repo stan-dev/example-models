@@ -27,28 +27,28 @@ model {
   mu_b ~ normal(0, 100);
   rho ~ uniform(-1, 1);
 
-  Sigma_b[1,1] <- pow(sigma_a, 2);
-  Sigma_b[2,2] <- pow(sigma_b, 2);
-  Sigma_b[1,2] <- rho * sigma_a * sigma_b;
-  Sigma_b[2,1] <- Sigma_b[1,2];
+  Sigma_b[1,1] = pow(sigma_a, 2);
+  Sigma_b[2,2] = pow(sigma_b, 2);
+  Sigma_b[1,2] = rho * sigma_a * sigma_b;
+  Sigma_b[2,1] = Sigma_b[1,2];
 
   for (j in 1:J) {
-    B_hat[1,j] <- mu_a;
-    B_hat[2,j] <- mu_b;
-    B_hat_temp[1] <- mu_a;
-    B_hat_temp[2] <- mu_b;
+    B_hat[1,j] = mu_a;
+    B_hat[2,j] = mu_b;
+    B_hat_temp[1] = mu_a;
+    B_hat_temp[2] = mu_b;
     B_temp ~ multi_normal(B_hat_temp, Sigma_b);
-    B[1,j] <- B_temp[1];
-    B[2,j] <- B_temp[2];
+    B[1,j] = B_temp[1];
+    B[2,j] = B_temp[2];
   }
 
   for (j in 1:J) {
-    a[j] <- B[1,j];
-    b[j] <- B[2,j];
+    a[j] = B[1,j];
+    b[j] = B[2,j];
   }
 
   for (i in 1:N)
-    y_hat[i] <- a[county[i]] + b[county[i]] * x[i];
+    y_hat[i] = a[county[i]] + b[county[i]] * x[i];
 
   y ~ normal(y_hat, sigma);
 }

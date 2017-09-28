@@ -5,7 +5,7 @@ data {
   vector<lower=0, upper=1>[N] mom_hs;}
 transformed data {           // interaction
   vector[N] inter;
-  inter <- mom_hs .* mom_iq;
+  inter = mom_hs .* mom_iq;
 }
 parameters {
   vector[4] beta;

@@ -22,5 +22,5 @@ model {
 }  
 generated quantities {
   real y_tilde;
-  y_tilde <- normal_rng(a[26] + b * 1, sigma_y);
+  y_tilde = normal_rng(a[26] + b * 1, sigma_y);
 }
