@@ -5,7 +5,7 @@ data {
 }
 transformed data {           // log transformation
   vector[N] log_earn;        
-  log_earn <- log(earn);
+  log_earn = log(earn);
 }
 parameters {
   vector[2] beta;

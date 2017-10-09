@@ -7,8 +7,8 @@ data {
 transformed data {
   vector[N] dist100;         // rescaling
   vector[N] inter;           // interaction
-  dist100 <- dist / 100.0;
-  inter   <- dist100 .* arsenic;
+  dist100 = dist / 100.0;
+  inter   = dist100 .* arsenic;
 }
 parameters {
   vector[4] beta;

@@ -25,25 +25,25 @@ model {
   vector[2] yt_hat[N];
 
   //data level
-  Sigma_yt[1,1] <- pow(sigma_y,2);
-  Sigma_yt[2,2] <- pow(sigma_t,2);
-  Sigma_yt[1,2] <- rho_yt*sigma_y*sigma_t;  
-  Sigma_yt[2,1] <- Sigma_yt[1,2];
+  Sigma_yt[1,1] = pow(sigma_y,2);
+  Sigma_yt[2,2] = pow(sigma_t,2);
+  Sigma_yt[1,2] = rho_yt*sigma_y*sigma_t;  
+  Sigma_yt[2,1] = Sigma_yt[1,2];
    
   // group level
-  Sigma_ag[1,1] <- pow(sigma_a,2);
-  Sigma_ag[2,2] <- pow(sigma_g,2);
-  Sigma_ag[1,2] <- rho_ag*sigma_a*sigma_g;
-  Sigma_ag[2,1] <- Sigma_ag[1,2];  
+  Sigma_ag[1,1] = pow(sigma_a,2);
+  Sigma_ag[2,2] = pow(sigma_g,2);
+  Sigma_ag[1,2] = rho_ag*sigma_a*sigma_g;
+  Sigma_ag[2,1] = Sigma_ag[1,2];  
 
   for (j in 1:J) {
-    a[j] <- ag[j,1];
-    g[j] <- ag[j,2];
+    a[j] = ag[j,1];
+    g[j] = ag[j,2];
   }
 
   for (i in 1:N) {
-    yt_hat[i,2] <- g[siteset[i]] + d * z[i];
-    yt_hat[i,1] <- a[siteset[i]] + b * yt[i,2];
+    yt_hat[i,2] = g[siteset[i]] + d * z[i];
+    yt_hat[i,1] = a[siteset[i]] + b * yt[i,2];
   }
 
   //data level

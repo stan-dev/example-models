@@ -22,13 +22,13 @@ transformed parameters {
   vector[N] y_hat;
 
   for (j in 1:J)
-    a_hat[j] <- 100 * g_0 + 100 * g_1 * u[j];
-  e_a <- a - a_hat;
+    a_hat[j] = 100 * g_0 + 100 * g_1 * u[j];
+  e_a = a - a_hat;
 
   for (i in 1:N)
-    y_hat[i] <- a[county[i]] + x[i] * b * 100;
+    y_hat[i] = a[county[i]] + x[i] * b * 100;
 
-  e_y <- y - y_hat;
+  e_y = y - y_hat;
 }
 model {
   g_0 ~ normal(0, 1);

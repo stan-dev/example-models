@@ -8,8 +8,8 @@ data {
 transformed data {
   vector[N] dist100;         // rescaling
   vector[N] educ4;
-  dist100 <- dist / 100.0;
-  educ4   <- educ / 4.0;
+  dist100 = dist / 100.0;
+  educ4   = educ / 4.0;
 }
 parameters {
   vector[4] beta;

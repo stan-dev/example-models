@@ -8,9 +8,9 @@ transformed data {           // centered predictors
   vector[N] c_mom_hs;
   vector[N] c_mom_iq;
   vector[N] inter;
-  c_mom_hs <- mom_hs - mean(mom_hs);
-  c_mom_iq <- mom_iq - mean(mom_iq);  
-  inter    <- c_mom_hs .* c_mom_iq;
+  c_mom_hs = mom_hs - mean(mom_hs);
+  c_mom_iq = mom_iq - mean(mom_iq);  
+  inter    = c_mom_hs .* c_mom_iq;
 }
 parameters {
   vector[4] beta;

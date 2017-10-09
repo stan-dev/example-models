@@ -19,11 +19,11 @@ transformed parameters {
   vector[J] a2;
   vector[N] y_hat;
 
-  a1 <- mu_a1 + sigma_a1 * eta1;
-  a2 <- 0.1 * mu_a2 + sigma_a2 * eta2;
+  a1 = mu_a1 + sigma_a1 * eta1;
+  a2 = 0.1 * mu_a2 + sigma_a2 * eta2;
 
   for (i in 1:N)
-    y_hat[i] <- a1[person[i]] + a2[person[i]] * time[i];
+    y_hat[i] = a1[person[i]] + a2[person[i]] * time[i];
 } 
 model {
   mu_a1 ~ normal(0, 1);

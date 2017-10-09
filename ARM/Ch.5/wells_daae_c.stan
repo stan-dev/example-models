@@ -11,10 +11,10 @@ transformed data {
   vector[N] c_arsenic;
   vector[N] da_inter;
   vector[N] educ4;
-  c_dist100 <- (dist - mean(dist)) / 100.0;
-  c_arsenic <- arsenic - mean(arsenic);
-  da_inter  <- c_dist100 .* c_arsenic;
-  educ4     <- educ / 4.0;
+  c_dist100 = (dist - mean(dist)) / 100.0;
+  c_arsenic = arsenic - mean(arsenic);
+  da_inter  = c_dist100 .* c_arsenic;
+  educ4     = educ / 4.0;
 }
 parameters {
   vector[6] beta;

@@ -5,7 +5,7 @@ data {
 }
 transformed data {           // centering height
   vector[N] c_height;
-  c_height <- height - mean(height);
+  c_height = height - mean(height);
 }
 parameters {
   real a;

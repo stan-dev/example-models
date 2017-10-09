@@ -18,7 +18,7 @@ transformed parameters {
   vector[N] y_hat;
 
   for (i in 1:N)
-    y_hat[i] <- mu + gamma[group_id[i]] + delta[scenario_id[i]];
+    y_hat[i] = mu + gamma[group_id[i]] + delta[scenario_id[i]];
 }
 model {
   # mu ~ unif(-inf, +inf); # implicit

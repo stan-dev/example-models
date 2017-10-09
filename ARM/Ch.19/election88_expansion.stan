@@ -54,27 +54,27 @@ transformed parameters {
   real<lower=0> sigma_state;
   real<lower=0> sigma_region;
 
-  b_age <- xi_age * (b_age_raw - mean(b_age_raw));
-  b_edu <- xi_edu * (b_edu_raw - mean(b_edu_raw));
-  b_age_edu_adj <- b_age_edu - mean(b_age_edu);
-  b_region <- xi_state * b_region_raw;
-  b_state <- xi_state * (b_state_raw - mean(b_state_raw));
-  mu_adj <- beta[1] + mean(b_age) + mean(b_edu) + mean(b_age_edu) +
+  b_age = xi_age * (b_age_raw - mean(b_age_raw));
+  b_edu = xi_edu * (b_edu_raw - mean(b_edu_raw));
+  b_age_edu_adj = b_age_edu - mean(b_age_edu);
+  b_region = xi_state * b_region_raw;
+  b_state = xi_state * (b_state_raw - mean(b_state_raw));
+  mu_adj = beta[1] + mean(b_age) + mean(b_edu) + mean(b_age_edu) +
      mean(b_state);
 
-  sigma_age <- xi_age*sigma_age_raw;
-  sigma_edu <- xi_edu*sigma_edu_raw;
-  sigma_age_edu <- xi_age_edu*sigma_age_edu_raw;
-  sigma_state <- xi_state*sigma_state_raw;
-  sigma_region <- xi_state*sigma_region_raw;     # not "xi_region"
+  sigma_age = xi_age*sigma_age_raw;
+  sigma_edu = xi_edu*sigma_edu_raw;
+  sigma_age_edu = xi_age_edu*sigma_age_edu_raw;
+  sigma_state = xi_state*sigma_state_raw;
+  sigma_region = xi_state*sigma_region_raw;     # not "xi_region"
 
   for (i in 1:N)
-    Xbeta[i] <- beta[1] + beta[2]*female[i] + beta[3]*black[i] +
+    Xbeta[i] = beta[1] + beta[2]*female[i] + beta[3]*black[i] +
       beta[4]*female[i]*black[i] +
       b_age[age[i]] + b_edu[edu[i]] + b_age_edu[age_edu[i]] +
       b_state[state[i]];
   for (j in 1:n_state)
-    b_state_hat[j] <- b_region_raw[region[j]] + b_v_prev_raw*v_prev[j];
+    b_state_hat[j] = b_region_raw[region[j]] + b_v_prev_raw*v_prev[j];
 }
 model {
   mu ~ normal (0, 100);

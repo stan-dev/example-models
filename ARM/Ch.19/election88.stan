@@ -46,20 +46,20 @@ transformed parameters {
   vector[N] p_bound;
 
   for (i in 1:N)
-    Xbeta[i] <- beta[1] + beta[2]*female[i] + beta[3]*black[i] +
+    Xbeta[i] = beta[1] + beta[2]*female[i] + beta[3]*black[i] +
       beta[4]*female[i]*black[i] +
       b_age[age[i]] + b_edu[edu[i]] + b_age_edu[age_edu[i]] +
       b_state[state[i]];
 
-  mu_adj <- beta[1] + mean(b_age) + mean(b_edu) + mean(b_age_edu) +
+  mu_adj = beta[1] + mean(b_age) + mean(b_edu) + mean(b_age_edu) +
      mean(b_state);
-  b_age_adj <- b_age - mean(b_age);
-  b_edu_adj <- b_edu - mean(b_edu);
-  b_age_edu_adj <- b_age_edu - mean(b_age_edu);
-  b_region_adj <- b_region - mean(b_region);
+  b_age_adj = b_age - mean(b_age);
+  b_edu_adj = b_edu - mean(b_edu);
+  b_age_edu_adj = b_age_edu - mean(b_age_edu);
+  b_region_adj = b_region - mean(b_region);
 
   for (j in 1:n_state)
-    b_state_hat[j] <- b_region[region[j]] + 100 * b_v_prev * v_prev[j];
+    b_state_hat[j] = b_region[region[j]] + 100 * b_v_prev * v_prev[j];
 }
 model {  
   mu_age ~ normal(0, 1);

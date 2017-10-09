@@ -6,7 +6,7 @@ data {
 transformed data {           // log 10 transformation
   vector[N] log10_earn;      
   for (i in 1:N) {                       
-    log10_earn[i] <- log10(earn[i]);
+    log10_earn[i] = log10(earn[i]);
   }
 }
 parameters {
