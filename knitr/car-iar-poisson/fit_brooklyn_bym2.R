@@ -13,7 +13,21 @@ bklyn_tracts <- nyc_all_tracts.shp$GEOID10 %in% bklyn_tractIDs;
 bklyn_tracts.shp <- nyc_all_tracts.shp[bklyn_tracts,];
 bklyn_tracts.shp <- bklyn_tracts.shp[order(bklyn_tracts.shp$GEOID10),];
 nb_bk = poly2nb(bklyn_tracts.shp);
+
+coords<-coordinates(bklyn_tracts.shp);
+plot(nb_bk, coords, pch = ".", col = "red");
+
+components <- n.comp.nb(nb_bk)
+table(components$comp.id)
+
+
+
+
+
 nbs=nbdata4stan(nb_bk);
+
+
+
 N = nbs$N;
 node1 = nbs$node1;
 node2 = nbs$node2;

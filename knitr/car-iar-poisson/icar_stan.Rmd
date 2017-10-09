@@ -31,7 +31,7 @@ All models and data files are available in the Stan example-models GitHub repo f
 [car-iar-poisson](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson).
 All commands should be run from the directory `stan-dev/example-models/knitr/car-iar-poisson`.
 
-## About conditional conditional autoregressive models
+## About conditional autoregressive models
 
 Given a set of observations taken at $n$ different areal units
 of a region with a number of dimensions $D$

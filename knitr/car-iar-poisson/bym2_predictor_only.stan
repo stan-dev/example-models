@@ -43,7 +43,7 @@ model {
   rho ~ beta(0.5, 0.5);
 }
 generated quantities {
-  vector[N] mu = exp(beta0 + beta1 * x + convolved_re);
+  vector[N] mu = exp(beta0 + beta1 * x + convolved_re * sigma);
   real log_precision = -2.0 * log(sigma);
   real logit_rho = log(rho / (1.0 - rho));
 }
