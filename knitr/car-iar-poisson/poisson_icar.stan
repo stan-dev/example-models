@@ -19,10 +19,9 @@ transformed parameters {
   vector[N] phi;
   phi[1:(N - 1)] = phi_std_raw;
   phi[N] = -sum(phi_std_raw);
-  phi = phi * sigma_phi;    // non-centered parameterization
 }
 model {
-  y ~ poisson_log(beta0 + beta1 * x + phi);
+  y ~ poisson_log(beta0 + beta1 * x + phi * sigma_phi);
 
   target += -0.5 * dot_self(phi[node1] - phi[node2]);
 
@@ -31,5 +30,5 @@ model {
   tau_phi ~ gamma(1, 1);
 }
 generated quantities {
-  vector[N] mu = exp(beta0 + beta1 * x + phi);
+  vector[N] mu = exp(beta0 + beta1 * x + phi * sigma_phi);
 }
