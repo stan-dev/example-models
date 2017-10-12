@@ -121,7 +121,11 @@ $$\phi \sim N(0, [\tau \, (D - W)]^{-1}).$$
 
 which rewrites to the _pairwise difference_ formulation:
 
-$$ p(\phi | \tau) \propto \frac{1}{{\tau}^\frac{n}{2}} \exp \left\{ {- \frac{1}{2\tau}} \sum_{i \sim j}{({\phi}_i - {\phi}_j)}^2 \right\} $$
+$$ p(\phi | \tau) \propto {\tau}^{\frac{n - NC}{2}} \exp \left\{ {- \frac{\tau}{2}} \sum_{i \sim j}{({\phi}_i - {\phi}_j)}^2 \right\} $$
+
+where $NC$ is the number of components in the graph over all areal subregions defined by the spatial proximity matrix;
+$NC == 1$ when the areal graph is fully connected, i.e., every subregion can be reached from every other subregion
+via a sequence of neighbors.
 
 The above conditions for the ICAR model produce an improper distribution
 because setting $\alpha = 1$ creates a singular matrix $(D - W)$, see Besag and Kooperberg 1995.
@@ -857,27 +861,10 @@ pois_rstanarmfit = stan_glm(y~x,family="poisson",data=df, prior = normal(0,2.5),
 print(pois_rstanarmfit, digits=3, probs=c(0.025, 0.5, 0.975));
 ```
 
-To round out the comparison of models, we fit two additional models:
-
-- a Poisson regression which has an ordinary random effects component, which would be appropriate for heterogeneous variance.
-- a Poisson regression with an ICAR component
-
-```{r fit-more-models }
-# poisson + re
-pois_re_stanfit = stan("poisson_re.stan", data=list(N,y,x), iter=5000);
-# poisson + icar
-pois_icar_stanfit = stan("poisson_icar.stan", data=list(N,N_edges,node1,node2,y,x), iter=5000);
-```
-
 We use `maptools`, `ggplot2` and related packages to visualize the data and the fitted models.
 (Note that some Brooklyn census tracts are not in the study,
 these are parks, cemeteries, and otherwise unpopulated areas.)
-We compare the results of fitting four different models:
-
-- the Poisson regression
-- a Poisson regression which has an ordinary random effects component, which would be appropriate for heterogeneous variance.
-- a Poisson regression with an ICAR component
-- the BYM2 model
+We used ggplot2 to compare the Poisson regression to the BYM2 fit.
 
 ```{r plot-data }
 # use ggplot2 to visualize data and results
@@ -893,16 +880,10 @@ mu_names = paste("mu[", c(1:709), "]");
 
 pois_fit = pois_rstanarmfit$fitted.values;
 
-pois_re_mu_samples = as.data.frame(pois_re_stanfit, pars=mu_names);
-pois_re_fit = apply(pois_re_mu_samples, 2, mean);
-
-pois_icar_mu_samples = as.data.frame(pois_icar_stanfit, pars=mu_names);
-pois_icar_fit = apply(pois_icar_mu_samples, 2, mean);
-
 bym2_mu_samples = as.data.frame(bym2_bk_stanfit, pars=mu_names);
 bym2_fit = apply(bym2_mu_samples, 2, mean);
 
-df_model_fits = data.frame(id=bklyn_tractIDs, pois_fit, pois_re_fit, pois_icar_fit, bym2_fit);
+df_model_fits = data.frame(id=bklyn_tractIDs, pois_fit, bym2_fit);
 
 nyc_all_tracts.shp<-readShapePoly("nycTracts10/nycTracts10");
 bklyn_tracts <- nyc_all_tracts.shp$GEOID10 %in% bklyn_tractIDs;
@@ -911,12 +892,11 @@ bklyn_tracts.shp <- bklyn_tracts.shp[order(bklyn_tracts.shp$GEOID10),];
 df_brooklyn_shp = tidy(bklyn_tracts.shp, region="GEOID10");
 df_wide = left_join(df_brooklyn_shp, df_model_fits);
 df_long = melt(df_wide,id.vars=c("long","lat","order","hole","piece","group","id"),
-     measure.vars=c("pois_fit","pois_re_fit","pois_icar_fit","bym2_fit"),
+     measure.vars=c("pois_fit", "bym2_fit"),
      variable.name="model", variable.value="fitted_value");
 
-ggplot() + geom_polygon(data=df_long, aes(x=long, y=lat, group=group, fill=value)) + facet_wrap(~model) + coord_map() + coord_fixed() + scale_fill_gradientn(limits=c(0, 25), colors=blues9, oob=scales::squish, guide=guide_legend(title="ped injuries")) + theme(axis.text.x=element_blank(), axis.text.y=element_blank(), axis.title.x=element_blank(), axis.title.y=element_blank())
+ggplot() + geom_polygon(data=df_long, aes(x=long, y=lat, group=group, fill=value)) + facet_wrap(~model) + coord_map() + coord_fixed() + scale_fill_gradientn(limits=c(0, 50), colors=blues9, oob=scales::squish, guide=guide_legend(title="ped injuries")) + theme(axis.text.x=element_blank(), axis.text.y=element_blank(), axis.title.x=element_blank(), axis.title.y=element_blank())
 ```
-
 
 ## Discussion
 
