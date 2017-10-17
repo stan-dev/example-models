@@ -14,9 +14,9 @@ transformed data {
   vector[N] age65up;
 
   for (n in 1:N) {
-    age30_44[n] <- age_discrete[n] == 2;
-    age45_64[n] <- age_discrete[n] == 3;
-    age65up[n]  <- age_discrete[n] == 4;
+    age30_44[n] = age_discrete[n] == 2;
+    age45_64[n] = age_discrete[n] == 3;
+    age65up[n]  = age_discrete[n] == 4;
   }
 }
 parameters {

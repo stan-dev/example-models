@@ -17,13 +17,13 @@ transformed parameters {
   real mu_adj;
   vector[N] y_hat;
 
-  eta <- 100 * mu_eta + sigma_eta * et;
+  eta = 100 * mu_eta + sigma_eta * et;
 
-  mean_eta <- mean(eta);
-  mu_adj <- mean_eta;
-  eta_adj <- eta - mean_eta;
+  mean_eta = mean(eta);
+  mu_adj = mean_eta;
+  eta_adj = eta - mean_eta;
   for (i in 1:N)
-    y_hat[i] <- eta[county[i]];
+    y_hat[i] = eta[county[i]];
 }
 model {
   mu_eta ~ normal(0, 1);

@@ -7,7 +7,7 @@ data {
 transformed data {
   vector[N] inter;
 
-  inter <- party .* x;
+  inter = party .* x;
 }
 parameters {
   vector[4] beta;

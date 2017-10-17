@@ -9,7 +9,7 @@ data {
 transformed data {
   vector[N] log_expo;
 
-  log_expo <- log(exposure2);
+  log_expo = log(exposure2);
 }
 parameters {
   vector[4] beta;
@@ -19,7 +19,7 @@ parameters {
 transformed parameters {
   real<lower=0> sigma;
 
-  sigma <- 1.0 / sqrt(tau);
+  sigma = 1.0 / sqrt(tau);
 }
 model {
   tau ~ gamma(0.001, 0.001);

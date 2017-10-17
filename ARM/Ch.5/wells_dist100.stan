@@ -5,7 +5,7 @@ data {
 }
 transformed data {
   vector[N] dist100;         // rescaling
-  dist100 <- dist / 100.0;   
+  dist100 = dist / 100.0;   
 }
 parameters {
   vector[2] beta;

@@ -9,9 +9,9 @@ transformed data {
   vector[N] male;
   vector[N] height_male_inter;
 
-  log_earnings <- log(earnings);
-  male <- 2 - sex;
-  height_male_inter <- height .* male;
+  log_earnings = log(earnings);
+  male = 2 - sex;
+  height_male_inter = height .* male;
 }
 parameters {
   vector[4] beta;

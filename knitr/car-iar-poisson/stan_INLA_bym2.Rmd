@@ -1,0 +1,146 @@
+---
+title: "Stan and INLA for BYM2"
+author: "Daniel Simpson"
+date: "14/07/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Purpose of document
+
+The aim here is to make a matching INLA call to the BYM2 Stan model
+```{r print-stan-bym2, comment='' }
+writeLines(readLines('bym2_predictor_plus_offset.stan'))
+```
+This model is implemented in the BYM2 model in INLA. It's not necessary to do the scaling explicitly as this is done internally.  The main challenge here is making sure that the priors match, which should lead to matching postriors.
+
+# The Data
+
+We're going to use the Scottish lip cancer data again.
+
+```{r fit-scotland-bym2, comment = NA, message = FALSE, warning = FALSE,cache=FALSE}
+library(rstan)   
+options(mc.cores = parallel::detectCores())  
+
+source("mungeCARdata4stan.R")  
+source("scotland_data.R")
+y = data$y;
+x = 0.1 * data$x;
+E = data$E;
+
+
+
+nbs = mungeCARdata4stan(data$adj, data$num);
+N = nbs$N;
+node1 = nbs$node1;
+node2 = nbs$node2;
+N_edges = nbs$N_edges;
+
+#Calculate the scaling of the model. Requires the INLA package.
+#For convenience, this code isn't run.
+if(FALSE) {
+  library(INLA)
+  #Build the adjacency matrix
+  adj.matrix = sparseMatrix(i=nbs$node1,j=nbs$node2,x=1,symmetric=TRUE)
+  #The ICAR precision matrix (note! This is singular)
+  Q=  Diagonal(nbs$N, rowSums(adj.matrix)) - adj.matrix
+
+  #Add a small jitter to the diagonal for numerical stability (optional but recommended)
+  Q_pert = Q + Diagonal(nbs$N) * max(diag(Q)) * sqrt(.Machine$double.eps)
+
+
+# Compute the diagonal elements of the covariance matrix subject to the
+# constraint that the entries of the ICAR sum to zero.
+#See the function help for further details.
+Q_inv = inla.qinv(Q_pert, constr=list(A = matrix(1,1,nbs$N),e=0))
+
+#Compute the geometric mean of the variances, which are on the diagonal of Q.inv
+scaling_factor = exp(mean(log(diag(Q_inv))))
+
+} else{
+  scaling_factor= 0.4853175 # Not a magic number! Calculated as above
+}
+
+stan_time=system.time(scot_stanfit <- stan("bym2_predictor_plus_offset.stan",
+         data=list(N,N_edges,node1,node2,y,x,E,scaling_factor),
+         iter=10000),gcFirst = TRUE)[3];
+
+
+
+
+
+# INLA code
+
+```{r inla-model, message = FALSE, warning = FALSE}
+library(INLA)
+# Set up the data
+inla_data = list(
+  y=data$y, E=data$E, x= 0.1 * data$x, region=c(1:data$N)
+)
+
+# Get the adjacency matrix
+adj.matrix = sparseMatrix(i=nbs$node1,j=nbs$node2,x=1,symmetric=TRUE) 
+adj.matrix = adj.matrix + Diagonal(nrow(adj.matrix))
+
+
+# Set prior so that the mixing parameter 
+# (rho in the Stan call, phi in INLA) has a beta(1/2,1/2) prior
+# NB: INLA needs a prior on logit(phi)
+# NB: INLA needs a prior for log(precision)
+priors =  list(phi = list(prior="logitbeta",params=c(0.5,0.5)),
+               prec = list(prior="logtgaussian",params=c(0,1/25))
+               ) 
+
+  #Uniform on logit
+#priors = list(phi = list(prior="expression:return(x - 2*(exp(x)+1))")) 
+
+inla_formula <- y ~ 1+ x+ f(region, model = "bym2",graph=adj.matrix,hyper=priors,constr = TRUE)
+
+inla_time= system.time(
+  inla_bym2 <- inla(inla_formula, family = "poisson", E=E, 
+                  data = inla_data,
+                   control.fixed = list(prec = 1/25,prec.intercept=1/25),
+                  control.predictor = list(compute=TRUE), 
+          #        control.inla = list(strategy="laplace",fast=FALSE)
+                  ),gcFirst = TRUE
+)[3]
+
+
+
+
+```
+
+# Results
+
+```{r results, message = FALSE, warning = FALSE}
+library(gdata)
+table_stan=summary(scot_stanfit,pars=c("log_precision","logit_rho","beta0","beta1","mu[5]"),probs = c(0.025,0.5,0.975))$summary[,-c(2,7,8)]
+
+
+table_inla = as.matrix(inla_bym2$internal.summary.hyperpar[,-6])
+
+table_inla = rbind(table_inla,as.matrix(inla_bym2$summary.fixed[,-c(6,7)]))
+table_inla = rbind(table_inla, as.matrix(inla_data$E[5]*inla_bym2$summary.fitted.values[5,-6]))
+rownames(table_inla) <- c()
+rownames(table_stan) <- c()
+colnames(table_inla) <- colnames(table_stan)
+
+table_inla = cbind(data.frame(parameter=c("log_precision","logit_rho","beta0","beta1","mu[5]"),method=rep("INLA",5)),as.data.frame(table_inla))
+table_stan = cbind(data.frame(parameter=c("log_precision","logit_rho","beta0","beta1","mu[5]"),method=rep("Stan",5)),as.data.frame(table_stan))
+
+table_joint = gdata::interleave(table_stan,table_inla)
+  
+knitr::kable(table_joint,digits = 2)
+
+```
+
+# Some concluding notes
+
+* There are some small differences between the Stan output and the INLA output.  For every parameter except for $\operatorname{logit}(\rho)$, this reduces as you increase the MCMC chain length.
+
+* The bias in $logit(\rho)$ is real but negligible on the $\rho$ scale, as you can see from the indifference the other parameters have to this.
+
+* For this model, Stan took  `r stan_time` seconds, while INLA took around `r inla_time` seconds.

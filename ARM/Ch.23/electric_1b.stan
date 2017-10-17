@@ -17,7 +17,7 @@ transformed parameters {
   vector[N] y_hat;
 
   for (i in 1:N)
-    y_hat[i] <- a[pair[i]] + beta[1] * treatment[i] 
+    y_hat[i] = a[pair[i]] + beta[1] * treatment[i] 
                   + beta[2] * pre_test[i];
 }
 model {

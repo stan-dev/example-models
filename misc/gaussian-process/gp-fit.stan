@@ -1,39 +1,33 @@
-// Fit a Gaussian process's hyperparameters
-// for squared exponential prior
+// Fit the hyperparameters of a Gaussian process with an 
+// exponentiated quadratic kernel
 
 data {
   int<lower=1> N;
-  vector[N] x;
+  real x[N];
   vector[N] y;
 }
 transformed data {
-  vector[N] mu;
-  for (i in 1:N) 
-    mu[i] <- 0;
+  vector[N] mu = rep_vector(0, N);
 }
 parameters {
-  real<lower=0> eta_sq;
-  real<lower=0> rho_sq;
-  real<lower=0> sigma_sq;
+  real<lower=0> rho;
+  real<lower=0> alpha;
+  real<lower=0> sigma;
 }
 model {
-  matrix[N,N] Sigma;
-
-  // off-diagonal elements
-  for (i in 1:(N-1)) {
-    for (j in (i+1):N) {
-      Sigma[i,j] <- eta_sq * exp(-rho_sq * pow(x[i] - x[j],2));
-      Sigma[j,i] <- Sigma[i,j];
-    }
-  }
+  matrix[N, N] L_K;
+  matrix[N, N] K = cov_exp_quad(x, alpha, rho);
+  real sq_sigma = square(sigma);
 
   // diagonal elements
-  for (k in 1:N)
-    Sigma[k,k] <- eta_sq + sigma_sq; // + jitter
+  for (n in 1:N)
+    K[n, n] = K[n, n] + sq_sigma;
+  
+  L_K = cholesky_decompose(K);
+  
+  rho ~ inv_gamma(5, 5);
+  alpha ~ normal(0, 1);
+  sigma ~ normal(0, 1);
 
-  eta_sq ~ cauchy(0,5);
-  rho_sq ~ cauchy(0,5);
-  sigma_sq ~ cauchy(0,5);
-
-  y ~ multi_normal(mu,Sigma);
+  y ~ multi_normal_cholesky(mu, L_K);
 }

@@ -60,23 +60,23 @@ model {
   b_v_prev ~ normal(0, 100);
 
   for (j in 1:n_state)
-    b_state_hat[j] <- b_region[region[j]] + b_v_prev * v_prev[j];
+    b_state_hat[j] = b_region[region[j]] + b_v_prev * v_prev[j];
 
   b_state ~ normal(b_state_hat, sigma_state);
 
   for (i in 1:N) {
-    Xbeta[i] <- b_0 + b_female*female[i] 
+    Xbeta[i] = b_0 + b_female*female[i] 
       + b_black*black[i] + b_female_black*female[i]*black[i] +
       b_age[age[i]] + b_edu[edu[i]] + b_age_edu[age[i],edu[i]] +
       b_state[state[i]];
-    p[i] <- fmax(0, fmin(1, inv_logit(Xbeta[i])));
+    p[i] = fmax(0, fmin(1, inv_logit(Xbeta[i])));
   }
   
   y ~ bernoulli(p);
 
   for (i in 1:N) {
-    z_lo[i] <- 100 * (y[i] == 0);
-    z_hi[i] <- 100 * (y[i] == 1);
+    z_lo[i] = 100 * (y[i] == 0);
+    z_hi[i] = 100 * (y[i] == 1);
     z[i] ~ logistic(Xbeta[i],1) T[z_lo[i],z_hi[i]];  
   }
 

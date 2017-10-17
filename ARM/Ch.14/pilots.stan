@@ -19,7 +19,7 @@ transformed parameters {
   vector[N] y_hat;
 
   for (i in 1:N)
-    y_hat[i] <- a[group_id[i]] + b[scenario_id[i]];
+    y_hat[i] = a[group_id[i]] + b[scenario_id[i]];
 } 
 model {
   mu_a ~ normal(0, 1);

@@ -29,15 +29,15 @@ transformed parameters {
   real scale;
   real shift;
 
-  shift <- mean(a_raw);
-  scale <- sd(a_raw);
-  a <- (a_raw - shift) / scale;
-  b_hat_raw <- 100 * b_0_raw + d_raw * x;
-  b <- (b_raw - shift) / scale;
-  g <- g_raw * scale;
-  d <- d_raw * scale;
+  shift = mean(a_raw);
+  scale = sd(a_raw);
+  a = (a_raw - shift) / scale;
+  b_hat_raw = 100 * b_0_raw + d_raw * x;
+  b = (b_raw - shift) / scale;
+  g = g_raw * scale;
+  d = d_raw * scale;
   for (i in 1:N)
-    p[i] <- (g[k[i]]*(a[j[i]] - b[k[i]]));
+    p[i] = (g[k[i]]*(a[j[i]] - b[k[i]]));
 }
 model {
   mu_a_raw ~ normal(0, 1);

@@ -16,7 +16,7 @@ transformed parameters {
   vector[N] y_hat;
 
   for (i in 1:N)
-    y_hat[i] <- b[1] * black[i] + b[2] * female[i] + a[state[i]];
+    y_hat[i] = b[1] * black[i] + b[2] * female[i] + a[state[i]];
 } 
 model {
   mu_a ~ normal(0, 1);

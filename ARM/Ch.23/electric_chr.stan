@@ -16,10 +16,10 @@ transformed parameters {
   vector[N] y_hat;
   vector[n_pair] a;
 
-  a <- 100 * mu_a + sigma_a * eta;
+  a = 100 * mu_a + sigma_a * eta;
 
   for (i in 1:N)
-    y_hat[i] <- a[pair[i]] + beta * treatment[i];
+    y_hat[i] = a[pair[i]] + beta * treatment[i];
 }
 model {
   mu_a ~ normal(0, 1);

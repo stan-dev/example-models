@@ -8,7 +8,7 @@ data {
 transformed data {
   vector[N] inter;
 
-  inter <- u .* x;
+  inter = u .* x;
 }
 parameters {
   vector[85] a;
@@ -26,7 +26,7 @@ transformed parameters {
   vector[N] y_hat;
 
   for (i in 1:N)
-    y_hat[i] <- a[county[i]] + x[i] * b[county[i]] + beta[1] * u[i]     
+    y_hat[i] = a[county[i]] + x[i] * b[county[i]] + beta[1] * u[i]     
                 + beta[2] * inter[i];
 }
 model {

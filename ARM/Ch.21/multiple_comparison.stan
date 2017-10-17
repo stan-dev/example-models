@@ -15,5 +15,5 @@ model {
 generated quantities {
   vector[N] e_theta;
 
-  e_theta <- theta - mu_theta;
+  e_theta = theta - mu_theta;
 }
