@@ -1,4 +1,4 @@
-// http://www.mrc-bsu.cam.ac.uk/bugs/winbugs/Vol2.pdf
+// https://www.mrc-bsu.cam.ac.uk/wp-content/uploads/WinBUGS_Vol2.pdf
 // Page 2: Dugongs 
 // 
 //
