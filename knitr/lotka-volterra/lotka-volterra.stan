@@ -19,10 +19,10 @@ functions {
   }
 }
 data {
-  int<lower = 0> N;         // num measurements
+  int<lower = 0> N;         // number of measurement times
   real ts[N];               // measurement times > 0
-  real y0[2];               // initial measured population
-  real<lower = 0> y[N, 2];  // measured population at measurement times
+  real y0[2];               // initial measured populations
+  real<lower = 0> y[N, 2];  // measured populations
 }
 parameters {
   real<lower = 0> theta[4];  // theta = { alpha, beta, gamma, delta }
@@ -42,10 +42,10 @@ model {
   theta[{1, 3}] ~ normal(1, 0.5);
   theta[{2, 4}] ~ normal(0.05, 0.05);
 
-  z0[1] ~ lognormal(log(30), 5);
-  z0[2] ~ lognormal(log(5), 5);
+  z0[1] ~ lognormal(log(30), 1);
+  z0[2] ~ lognormal(log(5), 1);
 
-  // likelihood (lognormal)
+  // likelihood
   for (k in 1:2) {
     y0[k] ~ lognormal(log(z0[k]), sigma[k]);
     y[ , k] ~ lognormal(log(z[, k]), sigma[k]);

@@ -72,7 +72,7 @@ population_plot2 <-
 population_plot2
 ```
 
-This plot makes it clear that the spikes in the lynx population lag those in the hare population.  This is explained by the hare population growing when there are fewer lynxes and the lynx population growing when there are more hares;  at some point, the population tips and the lynxes reduce the hare population after which their own numbers are reduced.
+This plot makes it clear that the spikes in the lynx population lag those in the hare population.  In both populations, the periodicity appears to be somewhere in the neighborhood of ten to twelve years.
 
 Volterra (1926) plotted the temporal dynamics of predator and prey populations using an axis for each species and then plotting the temporal course as a line.  The result for the lynx and hare population is easily plotted from the original data frame.
 
@@ -87,10 +87,12 @@ population_plot1 <-
 population_plot1
 ```
 
-As can be seen from the diagram, the population dynamics orbit in a stable pattern in these 21 years.
+As can be seen from the diagram, the population dynamics orbit in a stable pattern.
 
 
 ## The Lotka-Volterra Equations
+
+The hare population intrinsically grows, but larger number of lynxes cause it to drop.  The lynx population intrinsically shrinks, but larger number of hares cause it to rise.  Together, these dynamics lead to a cycle of rising and falling populations.  With a low lynx population the hare population grows.  As the hare population grows, the lynx population grows.  Eventually the lynx population is such as to cut down on the hare population, and the lynx population itself drops.
 
 The Lotka-Volterra equations (Volterra 1926, 1927; Lotka 1925) use a pair of first-order differential equations to describe the population dynamics of a pair of species, one predator and one prey  Suppose that $u(t) \geq 0$ is the population size of the prey species at time $t$ and $v(t) \geq 0$ is the population size of the predator species.  Volterra modeled the temporal dynamics of the two species (i.e., population sizes over times) in terms of four parameters, $\alpha, \beta, \gamma, \delta > 0$, as
 $$
@@ -107,9 +109,15 @@ $$
 As usual in writing differential equations, $u(t)$ and $v(t)$ are rendered as $u$ and $v$ to simplify notation.
 
 
-## A noisy measurement model
+## Error model: measurement and unexplained variation
 
-The Lotka-Volterra model is deterministic.  Given the system parameters and the initial conditions, the population dynamics are fully determined.  In practice, we cannot measure the population directly.  Instead, we only have noisy measurements such as mark-recapture studies or proxies such as number of pelts retrieved. We will specify a statistical model that allows us to infer the parameters of the model and predict future population dynamics based on such noisy data.
+The Lotka-Volterra model is deterministic.  Given the system parameters and the initial conditions, the population dynamics are fully determined.  We will consider two sources of error.
+
+First, the theory is not expected to be that good in this case, so there will be resulting unexplained variation.  For example, the weather in a particular year is going to have an impact on the populations, but it is not taken into account, leading to variation that is not explained by the model.
+
+The second source of error is noisy measurements of the population.  We cannot measure the population directly, so instead make do with noisy measurements, such as the number of pelts collected.  These measurements may be supplemented with output of other measurements, such as mark-recapture data.
+
+We will specify a statistical model that allows us to infer the parameters of the model and predict future population dynamics based on noisy measurements and a model that does not explain all of the observed variation in the data.
 
 Like a simple linear regression, or non-linear GLM, the trick is to treat the underlying determinstic model as providing a value which is expected to have error from both measurement and unexplained variance due to the simplifications in the scientific model.  Consider the typical formulation of a linear regression,
 $$
@@ -122,19 +130,35 @@ $$
 In linear regression, the error term $\epsilon_n$ has an independent normal distiribution located at zero with scale $\sigma$,
 The deterministic part of the equation is $x \beta$;  that's the linear part.  The error term $\epsilon_n$ is then given a normal distribution located at zero with scale $\sigma$.
 
-The data $y_i$ consists of measurements of the predator and prey populations at times $t_i$.  The Lotka-Volterra equations will replace the determinsitic parts of the equations.
+The data $y_i$ consists of measurements of the prey $y_{i, 1}$ and predator $y_{i, 2}$ populations at times $t_i$.  The Lotka-Volterra equations will replace the determinsitic parts of the equations.
 
-Let $z_0$ to be the starting population at time $t = 0$.  The true population size at time $t = 0$ is unknown---we only have a measurement for it---so $z_0$ is a parameter of the model.  Next, let $z_1, \ldots, z_N$ be the solutions to the Lotka-Volterra equations at times $t_1, \ldots, t_N$ given initial conditions $z(t = 0) = z_0$.  These $z_1, \ldots, z_N$ are not parameters---they are solutions to a differential equation given $z_0$ and the parameters $\theta = (\alpha, \beta, \gamma, \delta)$.
+The true population sizes at time $t = 0$ is unknown---we only have a measurement $y0$ for it.  The true population initial population sizes at time $t = 0$ will be represented by a parameter $z0$, so that
 
-Putting this together, the $y_n$ are measurements of the underlying predicted population $z_n$.  Because they are positive, this has to be on the log scale, which has the convenient feature of making the noise term proportional to the size of the quantity being measured (rather than additive in the usual non-log case).
+$$
+z0_1 = u(t = 0)
+\ \ \ \mathrm{and} \ \ \
+z0_2 = v(t = 0).
+$$
+
+Next, let $z_1, \ldots, z_N$ be the solutions to the Lotka-Volterra equations at times $t_1, \ldots, t_N$ given initial conditions $z(t = 0) = z0$.  Each $z_n$ is a pair of prey and predator population sizes,
+$$
+z_{n, 1} = u(t_n)
+\ \ \ \mathrm{and} \ \ \
+z_{n, 2} = v(t_n)
+$$
+The $z_n$ are deterministic functions of $z0$ and the system parameters $\alpha, \beta, \gamma, \delta$, and ae thus not parameters of the model.
+
+The observed data is the form of measurements $y0$ of the initial population of prey and predators, and subsequent measurements $y_n$ at times $t_n$, where $y0$ and the $y_n$ consist of a pair of measured population sizes, for the prey and predator species.
+
+Putting this together, the $y_n$ (and $y0$) are measurements of the underlying predicted population $z_n$ ($z0$).  Because they are positive, the noise will be modeled on the log scale.  This has the convenient side effect of making the error multiplicative (i.e., proportional) rather than additive.
 $$
 \begin{eqnarray}
-\log y_n & = & \log z_n + \epsilon_n
+\log y_{n, k} & = & \log z_{n, k} + \epsilon_{n, k}
 \\[6pt]
-\epsilon_n & \sim & \mathrm{Normal}(0, \sigma)
+\epsilon_{n, k} & \sim & \mathrm{Normal}(0, \sigma_k)
 \end{eqnarray}
 $$
-where the $z_n$ are the solutions to the Lotka-Volterra equations at times $t_1, \ldots, t_N$ given initial population $z_0$.
+where the $z_n$ are the solutions to the Lotka-Volterra equations at times $t_1, \ldots, t_N$ given initial population $z0$.  The prey and predator populations have error scales $\sigma_1$ and $\sigma_2$.
 
 ## Weakly informative priors
 
@@ -144,23 +168,23 @@ For the parameters,
 
 $$
 \begin{eqnarray}
-\alpha, \beta & \sim & \mathrm{Normal}(0, 1)
+\alpha, \gamma & \sim & \mathrm{Normal}(1, 0.5)
 \\[6pt]
-\gamma, \delta & \sim & \mathrm{Normal}(0, 0.2)
+\beta, \delta & \sim & \mathrm{Normal}(0.05, 0.05)
 \end{eqnarray}
 $$
 
 The noise scale is proportional, so the following prior should be weakly informative,
 $$
-\sigma \sim \mathrm{Normal}(0, 0.5)
+\sigma \sim \mathrm{Lognormal}(0, 0.5)
 $$
 
 Then, for the initial population of predator and prey, the following priors are weakly informative
 $$
 \begin{eqnarray}
-z_{0,1} & \sim & \mathrm{Normal}(10, 10)
+z_{0,1} & \sim & \mathrm{Normal}(\log(30), 1)
 \\[6pt]
-z_{0, 2} & \sim & \mathrm{Normal}(50, 50)
+z_{0, 2} & \sim & \mathrm{Normal}(\log(5), 1)
 \end{eqnarray}
 $$
 
@@ -214,7 +238,7 @@ parameters {
 }
 ```
 
-The solutions to the Lotka-Volterra equations for a given initial state $z_0$ are coded up as transformed parameters.  This will allow them to be used in the model and inspected in the output.  It also makes it clear that they are all functions of the initial population and parameters (as well as the solution times).
+The solutions to the Lotka-Volterra equations for a given initial state $z0$ are coded up as transformed parameters.  This will allow them to be used in the model and inspected in the output.  It also makes it clear that they are all functions of the initial population and parameters (as well as the solution times).
 ```
   real z[N, 2]               // population for remaining years
     = integrate_ode_rk45(dz_dt, z0, 0, ts, theta,
@@ -256,66 +280,82 @@ y <- cbind(y[ , 2], y[ , 1]);
 lynx_hare_data <- list(N, ts, y0, y)
 ```
 
-Then, the model is translated to C++ and compiled.
+Next, the model is translated to C++ and compiled.
+
 ```{r results="hide"}
 model <- stan_model("lotka-volterra.stan")
 ```
 
-Then the compiled model is used for sampling.
+Finally, the compiled model and data are used for sampling.  Stan's default settings are sufficient for to fit this data set to this model.
+
 ```{r results="hide"}
 fit <- sampling(model, data = lynx_hare_data,
                 seed=123)
 ```
 
-Here, the step size (<code>stepsize</code>) and target acceptance rate (<code>adapt_delta</code>) are increased from their default values.  The first helps the sampler adapt more quickly and the second targets a lower step size so that more steps along the Hamiltonian trajectory are accepted.  Only 1000 iterations are required for adequate sample size here.  All of these things are only known after running the model more than once.  Initially, the sampler reported that the maximum tree depth was being hit so that it should be increased.  Instead, the initial stepsize was increased.  The refresh value is set to zero because nobody wants to see intermediate output in a report.
-
-Now the output can be displayed in tabular form.
+The output can be displayed in tabular form.
 
 ```{r}
-print(fit, probs=c(0.1, 0.5, 0.9))
+print(fit, probs=c(0.1, 0.5, 0.9), digits=3)
 ```
 
-The R-hat values are all near 1, which is consistent with convergence.  The effective sample sizes for each parameter is also reasonable.  Thus we have reason to trust this fit.
+The R-hat values are all near 1, which is consistent with convergence.  The effective sample size estimates for each parameter are sufficient for inference.  Thus we have reason to trust this fit.
+
+The expected values `z` are unlike the replicated draws `y_rep` in two ways.  First, their posterior has much lower variance and much narrower 80% intervals.  This is to be expected, as the `y_rep` additional takes into account measurement and unexplained variance, whereas `z` only takes into account parameter estimation uncertainty.  Second, the mean values of `z` are lower than the corresponding values of `y_rep`.  This is because `y_rep` is adding a lognormal error term, which has a positive expectation as it is constrained to be positive.
 
 
 #### Comparing the fitted model to data
 
-Howard (2009, Figure 2.10) provides the following approximate point estimates for the model parameters based on the data.
+Using a non-statistically motivated error term and optimization, Howard (2009, Figure 2.10) provides the following approximate point estimates for the model parameters based on the data.
 $$
 \hat{\alpha} = 0.55, \ \
-\hat{\beta} = 0.028, \\
+\hat{\beta} = 0.028, \ \
 \hat{\gamma} = 0.84, \ \
 \hat{\delta} = 0.026
 $$
-Howard then plugs in these point estimates and derives the most likely populations $z$ (including the initial population $z_0$).
+Our model produced the following point estimates based on the posterior mean, which minimizes expected squared error,
+$$
+\hat{\alpha} = 0.55, \ \
+\hat{\beta} = 0.028, \ \
+\hat{\gamma} = 0.80, \ \
+\hat{\delta} = 0.024
+$$
+and the posterior median, which minimizes expected absolute error,
+$$
+\hat{\alpha} = 0.54, \ \
+\hat{\beta} = 0.035, \ \
+\hat{\gamma} = 0.80, \ \
+\hat{\delta} = 0.030.
+$$
+The estimates are very similar to each other and to Howard's.
 
-Rather than plugging in point estimates to get point predictions, we will adjust for the two forms of uncertainty inherent in our model.  First, there is estimation uncertainty, which we characterize with the posterior density $p(\alpha, \beta, \gamma, \delta, z_0, \sigma \mid y)$.  The second form of uncertainty is the observation error and unexplained variation, which are both rolled into a single sampling distribution, $\log y_n \sim \mathsf{Normal}(\log z_n, \sigma)$.  As in the Stan implementation, $z_n$ is the solution to the differential equation conditioned on the parameters $\alpha, \beta, \gamma, \delta$ and initial state $z_0$.  Altogether, we will be simulating new $y$ values, which we write as $y^{\mathrm{sim}}$, according to the posterior predictive distribution,
+Howard then plugs in these point estimates and derives the most likely populations $z$ (including the initial population $z0$).  Rather than plugging in point estimates to get point predictions, we will adjust for the two forms of uncertainty inherent in our model.  First, there is estimation uncertainty, which we characterize with the posterior density $p(\alpha, \beta, \gamma, \delta, z_0, \sigma \mid y)$.  The second form of uncertainty is the observation error and unexplained variation, which are both rolled into a single sampling distribution, $\log y_n \sim \mathsf{Normal}(\log z_n, \sigma)$.  As in the Stan implementation, $z_n$ is the solution to the differential equation conditioned on the parameters $\alpha, \beta, \gamma, \delta$ and initial state $z_0$.  Altogether, we will be repulating new $y$ values, which we write as $y^{\mathrm{rep}}$, according to the posterior predictive distribution,
 
 $$
-p(y^{\mathrm{sim}} | y)
+p(y^{\mathrm{rep}} | y)
 \ = \
-\int p(y^{\mathrm{sim}} | \theta) \ p(\theta | y) \ \mathrm{d}\theta.
+\int p(y^{\mathrm{rep}} | \theta) \ p(\theta | y) \ \mathrm{d}\theta.
 $$
 where $\theta = (\alpha, \beta, \gamma, \delta, z_0, \sigma)$ is the vector of parameters for the model.  Then, we calculate the posterior mean, which is itself an expectation,
 $$
 \begin{eqnarray}
-\hat{y}^{\mathrm{sim}}
+\hat{y}^{\mathrm{rep}}
 & = &
-\mathbb{E}[y^{\mathrm{sim}} | y]
+\mathbb{E}[y^{\mathrm{rep}} | y]
 \\[8pt]
 & = &
-\int y^{\mathrm{sim}} \, p(y^{\mathrm{sim}} | y) \ \mathrm{d}y^{\mathrm{sim}}
+\int y^{\mathrm{rep}} \, p(y^{\mathrm{rep}} | y) \ \mathrm{d}y^{\mathrm{rep}}
 \\[8pt]
 & = &
-\int y^{\mathrm{sim}} \, p(y^{\mathrm{sim}} | \theta) \, p(\theta | y) \ \mathrm{d}y^{\mathrm{sim}} \ \mathrm{d}\theta
+\int y^{\mathrm{rep}} \, p(y^{\mathrm{rep}} | \theta) \, p(\theta | y) \ \mathrm{d}y^{\mathrm{rep}} \ \mathrm{d}\theta
 \\[8pt]
 & \approx &
-\frac{1}{M} \sum_{m=1}^M y^{\mathrm{sim}(m)}
+\frac{1}{M} \sum_{m=1}^M y^{\mathrm{rep}(m)}
 \end{eqnarray}
 $$
-As with other posterior expectations, the Bayesian point estimate is given by a simple average over simulated values, where $y^{\mathrm{sim}(m)}$ is just the result of simulating the value of $y^{\mathrm{sim}}$ according to the generative model based on parameter draw $\theta^{(m)}$.
+As with other posterior expectations, the Bayesian point estimate is given by a simple average over simulated values, where $y^{\mathrm{rep}(m)}$ is just the result of simulating the value of $y^{\mathrm{rep}}$ according to the generative model based on parameter draw $\theta^{(m)}$.
 
-The posterior predictive estimates of the dynamics is shown below, along with the raw data on number of pelts collected.
+The posterior predictive estimates of the dynamics are shown below, along with the raw data on number of pelts collected.
 
 ```{r}
 z0_draws <- extract(fit)$z0
@@ -369,11 +409,12 @@ population_plot2 <-
 	      colour = NA, fill = "black", alpha = 0.1) +
   geom_line() +
   geom_point() +
-  ylab("pelts (thousands)")
+  ylab("pelts (thousands)") +
+  ggtitle("Posterior predictive replications with 50% intervals\nvs. measured data")
 population_plot2
 ```
-In the lynx and hare data, the periodicity appears to be somewhere in the neighborhood of ten to twelve years.
 
+This posterior predictive check shows that the model fit is consistent with the data.
 
 
 #### How large are the populations?
@@ -388,6 +429,7 @@ This model could be combined with a mark-recapture model to get a better handle 
 
 2.  Write a Stan model to simulate data from this model.  First simulate parameters from the prior (or pick ones consistent with the priors).  Then simulate data from the parameters.  Finally, fit the model in Stan and compare the coverage as in the last plot in the case study.
 
+3.  Suppose that several of the measurements are missing.  Write a Stan program that uses only the observed measurements.  How robust is the fit to missing a few data points?
 
 ## References
 
