@@ -52,12 +52,12 @@ model {
   }
 }
 generated quantities {
-  real y0_sim[2];
-  real y_sim[N, 2];
+  real y0_rep[2];
+  real y_rep[N, 2];
 
   for (k in 1:2) {
-    y0_sim[k] = lognormal_rng(log(z0[k]), sigma[k]);
+    y0_rep[k] = lognormal_rng(log(z0[k]), sigma[k]);
     for (n in 1:N)
-      y_sim[n, k] = lognormal_rng(log(z[n, k]), sigma[k]);
+      y_rep[n, k] = lognormal_rng(log(z[n, k]), sigma[k]);
   }
 }

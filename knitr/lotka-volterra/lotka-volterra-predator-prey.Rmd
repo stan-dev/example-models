@@ -2,8 +2,8 @@
 title: "Estimating Lotka-Volterra Predator-Prey Dynamics with Stan"
 author: "Bob Carpenter"
 date: "October 16, 2017"
-output: 
-  html_document: 
+output:
+  html_document:
     theme: readable
 ---
 
@@ -12,6 +12,8 @@ knitr::opts_chunk$set(echo = TRUE)
 library(reshape)
 library(ggplot2)
 library(rstan)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores(logical = FALSE))
 ```
 
 <br />
@@ -34,7 +36,7 @@ This case study embeds the Lotka-Volterra model of predator-prey population dyna
 
 ## Lynxes and Hares, 1900-1920
 
-The Hudson Bay Company recorded the number of captured pelts of two species between 1900 and 1920, 
+The Hudson Bay Company recorded the number of captured pelts of two species between 1900 and 1920,
 
 * [hares](https://en.wikipedia.org/wiki/Snowshoe_hare), an hervivorous cousin of rabbits, and
 
@@ -90,7 +92,7 @@ As can be seen from the diagram, the population dynamics orbit in a stable patte
 
 ## The Lotka-Volterra Equations
 
-The Lotka-Volterra equations (Volterra 1926, 1927; Lotka 1925) use a pair of first-order differential equations to describe the population dynamics of a pair of species, one predator and one prey  Suppose that $u(t) \geq 0$ is the population size of the predator species at time $t$ and $v(t) \geq 0$ is the population size of prey.  Volterra modeled the temporal dynamics of the two species (i.e., population sizes over times) in terms of four parameters, $\alpha, \beta, \gamma, \delta > 0$, as
+The Lotka-Volterra equations (Volterra 1926, 1927; Lotka 1925) use a pair of first-order differential equations to describe the population dynamics of a pair of species, one predator and one prey  Suppose that $u(t) \geq 0$ is the population size of the prey species at time $t$ and $v(t) \geq 0$ is the population size of the predator species.  Volterra modeled the temporal dynamics of the two species (i.e., population sizes over times) in terms of four parameters, $\alpha, \beta, \gamma, \delta > 0$, as
 $$
 \begin{eqnarray}
 \frac{\mathrm{d}}{\mathrm{d}t} u
@@ -109,7 +111,7 @@ As usual in writing differential equations, $u(t)$ and $v(t)$ are rendered as $u
 
 The Lotka-Volterra model is deterministic.  Given the system parameters and the initial conditions, the population dynamics are fully determined.  In practice, we cannot measure the population directly.  Instead, we only have noisy measurements such as mark-recapture studies or proxies such as number of pelts retrieved. We will specify a statistical model that allows us to infer the parameters of the model and predict future population dynamics based on such noisy data.
 
-Like a simple linear regression, or non-linear GLM, the trick is to treat the underlying determinstic model as providing a value which is expected to have error from both measurement and unexplained variance due to the simplifications in the scientific model.  Consider the typical formulation of a linear regression,  
+Like a simple linear regression, or non-linear GLM, the trick is to treat the underlying determinstic model as providing a value which is expected to have error from both measurement and unexplained variance due to the simplifications in the scientific model.  Consider the typical formulation of a linear regression,
 $$
 \begin{eqnarray}
 y_n & = & x \beta + \epsilon_n
@@ -117,14 +119,14 @@ y_n & = & x \beta + \epsilon_n
 \epsilon_n & \sim & \mbox{Normal}(0, \sigma)
 \end{eqnarray}
 $$
-In linear regression, the error term $\epsilon_n$ has an independent normal distiribution located at zero with scale $\sigma$, 
+In linear regression, the error term $\epsilon_n$ has an independent normal distiribution located at zero with scale $\sigma$,
 The deterministic part of the equation is $x \beta$;  that's the linear part.  The error term $\epsilon_n$ is then given a normal distribution located at zero with scale $\sigma$.
 
-The data $y_i$ consists of measurements of the predator and prey populations at times $t_i$.  The Lotka-Volterra equations will replace the determinsitic parts of the equations.  
+The data $y_i$ consists of measurements of the predator and prey populations at times $t_i$.  The Lotka-Volterra equations will replace the determinsitic parts of the equations.
 
 Let $z_0$ to be the starting population at time $t = 0$.  The true population size at time $t = 0$ is unknown---we only have a measurement for it---so $z_0$ is a parameter of the model.  Next, let $z_1, \ldots, z_N$ be the solutions to the Lotka-Volterra equations at times $t_1, \ldots, t_N$ given initial conditions $z(t = 0) = z_0$.  These $z_1, \ldots, z_N$ are not parameters---they are solutions to a differential equation given $z_0$ and the parameters $\theta = (\alpha, \beta, \gamma, \delta)$.
 
-Putting this together, the $y_n$ are measurements of the underlying predicted population $z_n$.  Because they are positive, this has to be on the log scale, which has the convenient feature of making the noise term proportional to the size of the quantity being measured (rather than additive in the usual non-log case). 
+Putting this together, the $y_n$ are measurements of the underlying predicted population $z_n$.  Because they are positive, this has to be on the log scale, which has the convenient feature of making the noise term proportional to the size of the quantity being measured (rather than additive in the usual non-log case).
 $$
 \begin{eqnarray}
 \log y_n & = & \log z_n + \epsilon_n
@@ -132,11 +134,11 @@ $$
 \epsilon_n & \sim & \mathrm{Normal}(0, \sigma)
 \end{eqnarray}
 $$
-where the $z_n$ are the solutions to the Lotka-Volterra equations at times $t_1, \ldots, t_N$ given initial population $z_0$.  
+where the $z_n$ are the solutions to the Lotka-Volterra equations at times $t_1, \ldots, t_N$ given initial population $z_0$.
 
 ## Weakly informative priors
 
-The only remaining question is what to use for priors on the parameters.   In general, the Stan Development Team has been recommending at least weakly informative priors.  In practice, the parameter ranges for the Lotka-Volterra model leading to stable populations are well known.  
+The only remaining question is what to use for priors on the parameters.   In general, the Stan Development Team has been recommending at least weakly informative priors.  In practice, the parameter ranges for the Lotka-Volterra model leading to stable populations are well known.
 
 For the parameters,
 
@@ -166,8 +168,8 @@ $$
 
 #### Coding the system dynamics
 
-Whenver a system of differential equations is involved, the system equations must be coded as a Stan function.  In this case, the model is relatively simple as the state is only two dimensional and there are only four parameters.  Stan requires the system to be defined with exactly the signature defined here for the function <code>dz_dt()</code>.  The first argument is for time, which is not used here because the Lotka-Voltarra equations are not time-dependent.  The second argument is for the system state, and here it is coded as an array 
-$z = (u, v)$.  The third argument is for the parameters of the equation, of which the Lotka-Voltarra equations have four, which are coded as $\theta = (\alpha, \beta, \gamma, \delta)$.  The fourth and fifth argument are for data constants, but none areneeded here, so these arguments are unused.  
+Whenver a system of differential equations is involved, the system equations must be coded as a Stan function.  In this case, the model is relatively simple as the state is only two dimensional and there are only four parameters.  Stan requires the system to be defined with exactly the signature defined here for the function <code>dz_dt()</code>.  The first argument is for time, which is not used here because the Lotka-Voltarra equations are not time-dependent.  The second argument is for the system state, and here it is coded as an array
+$z = (u, v)$.  The third argument is for the parameters of the equation, of which the Lotka-Voltarra equations have four, which are coded as $\theta = (\alpha, \beta, \gamma, \delta)$.  The fourth and fifth argument are for data constants, but none areneeded here, so these arguments are unused.
 
 ```
   real[] dz_dt(real t,       // time (unused)
@@ -189,7 +191,7 @@ $z = (u, v)$.  The third argument is for the parameters of the equation, of whic
     return { du_dt, dv_dt };
   }
 ```
-After unpacking the variables from their containers, the derivatives of population with respect to time are defined just as in the mathematical specification.  The return value uses braces to construct the two-element array to return, which consists of the derivatives of the system components with respect to time, 
+After unpacking the variables from their containers, the derivatives of population with respect to time are defined just as in the mathematical specification.  The return value uses braces to construct the two-element array to return, which consists of the derivatives of the system components with respect to time,
 $$
 \frac{\mathrm{d}}{\mathrm{d}t} z
 \ = \ \frac{\mathrm{d}}{\mathrm{d}t} (u, v)
@@ -212,7 +214,7 @@ parameters {
 }
 ```
 
-The solutions to the Lotka-Volterra equations for a given initial state $z_0$ are coded up as transformed parameters.  This will allow them to be used in the model and inspected in the output.  It also makes it clear that they are all functions of the initial population and parameters (as well as the solution times).   
+The solutions to the Lotka-Volterra equations for a given initial state $z_0$ are coded up as transformed parameters.  This will allow them to be used in the model and inspected in the output.  It also makes it clear that they are all functions of the initial population and parameters (as well as the solution times).
 ```
   real z[N, 2]               // population for remaining years
     = integrate_ode_rk45(dz_dt, z0, 0, ts, theta,
@@ -220,9 +222,9 @@ The solutions to the Lotka-Volterra equations for a given initial state $z_0$ ar
                          1e-6, 1e-5, 1e3);  // rel tol, abs tol, max steps
 }
 ```
-The Runge-Kutta 4th/5th-order solver is specified here for efficiency (with suffix <code>_rk45</code>) because the equations are not stiff in the parameter ranges encountered for this data.  For further efficiency, the tolerances for the ODE solver are relatively loose for this example; usually tighter tolerances are required (smaller numbers).    
+The Runge-Kutta 4th/5th-order solver is specified here for efficiency (with suffix <code>_rk45</code>) because the equations are not stiff in the parameter ranges encountered for this data.  For further efficiency, the tolerances for the ODE solver are relatively loose for this example; usually tighter tolerances are required (smaller numbers).
 
-If the solver runs into stiffness (the symptom of which is very slow iterations that may appear to be hanging), it is best to switch to the backward-differentiation formula solver, called with <code>integrate_ode_bdf</code>. The Runge-Kutta solver is twice as fast as the BDF solver for this problem on this data.  
+If the solver runs into stiffness (the symptom of which is very slow iterations that may appear to be hanging), it is best to switch to the backward-differentiation formula solver, called with <code>integrate_ode_bdf</code>. The Runge-Kutta solver is twice as fast as the BDF solver for this problem on this data.
 
 With the solutions in hand, the only thing left are the prior and likelihood.  As with the other parts of the model, these directly follow the notation in the mathematical specification of the model.
 
@@ -248,22 +250,20 @@ First, the data is setup in a form suitabl for Stan.
 ```{r}
 N <- length(lynx_hare_df$Year) - 1
 ts <- 1:N
-y0 <- c(lynx_hare_df$Lynx[1], lynx_hare_df$Hare[1])
+y0 <- c(lynx_hare_df$Hare[1], lynx_hare_df$Lynx[1])
 y <- as.matrix(lynx_hare_df[2:(N + 1), 2:3])
+y <- cbind(y[ , 2], y[ , 1]);
 lynx_hare_data <- list(N, ts, y0, y)
 ```
 
 Then, the model is translated to C++ and compiled.
 ```{r results="hide"}
-model <- stan_model("lotka-volterra-4ln.stan")
+model <- stan_model("lotka-volterra.stan")
 ```
 
 Then the compiled model is used for sampling.
 ```{r results="hide"}
 fit <- sampling(model, data = lynx_hare_data,
-                chains = 4, iter = 1000,
-                control = list(stepsize = 5, adapt_delta = 0.95),
-                refresh = 0,
                 seed=123)
 ```
 
@@ -272,10 +272,122 @@ Here, the step size (<code>stepsize</code>) and target acceptance rate (<code>ad
 Now the output can be displayed in tabular form.
 
 ```{r}
-print(fit, probs=c(0.05, 0.5, 0.95), digits=2)
+print(fit, probs=c(0.1, 0.5, 0.9))
 ```
 
 The R-hat values are all near 1, which is consistent with convergence.  The effective sample sizes for each parameter is also reasonable.  Thus we have reason to trust this fit.
+
+
+#### Comparing the fitted model to data
+
+Howard (2009, Figure 2.10) provides the following approximate point estimates for the model parameters based on the data.
+$$
+\hat{\alpha} = 0.55, \ \
+\hat{\beta} = 0.028, \\
+\hat{\gamma} = 0.84, \ \
+\hat{\delta} = 0.026
+$$
+Howard then plugs in these point estimates and derives the most likely populations $z$ (including the initial population $z_0$).
+
+Rather than plugging in point estimates to get point predictions, we will adjust for the two forms of uncertainty inherent in our model.  First, there is estimation uncertainty, which we characterize with the posterior density $p(\alpha, \beta, \gamma, \delta, z_0, \sigma \mid y)$.  The second form of uncertainty is the observation error and unexplained variation, which are both rolled into a single sampling distribution, $\log y_n \sim \mathsf{Normal}(\log z_n, \sigma)$.  As in the Stan implementation, $z_n$ is the solution to the differential equation conditioned on the parameters $\alpha, \beta, \gamma, \delta$ and initial state $z_0$.  Altogether, we will be simulating new $y$ values, which we write as $y^{\mathrm{sim}}$, according to the posterior predictive distribution,
+
+$$
+p(y^{\mathrm{sim}} | y)
+\ = \
+\int p(y^{\mathrm{sim}} | \theta) \ p(\theta | y) \ \mathrm{d}\theta.
+$$
+where $\theta = (\alpha, \beta, \gamma, \delta, z_0, \sigma)$ is the vector of parameters for the model.  Then, we calculate the posterior mean, which is itself an expectation,
+$$
+\begin{eqnarray}
+\hat{y}^{\mathrm{sim}}
+& = &
+\mathbb{E}[y^{\mathrm{sim}} | y]
+\\[8pt]
+& = &
+\int y^{\mathrm{sim}} \, p(y^{\mathrm{sim}} | y) \ \mathrm{d}y^{\mathrm{sim}}
+\\[8pt]
+& = &
+\int y^{\mathrm{sim}} \, p(y^{\mathrm{sim}} | \theta) \, p(\theta | y) \ \mathrm{d}y^{\mathrm{sim}} \ \mathrm{d}\theta
+\\[8pt]
+& \approx &
+\frac{1}{M} \sum_{m=1}^M y^{\mathrm{sim}(m)}
+\end{eqnarray}
+$$
+As with other posterior expectations, the Bayesian point estimate is given by a simple average over simulated values, where $y^{\mathrm{sim}(m)}$ is just the result of simulating the value of $y^{\mathrm{sim}}$ according to the generative model based on parameter draw $\theta^{(m)}$.
+
+The posterior predictive estimates of the dynamics is shown below, along with the raw data on number of pelts collected.
+
+```{r}
+z0_draws <- extract(fit)$z0
+z_draws <- extract(fit)$z
+y0_rep_draws <- extract(fit)$y0_rep
+y_rep_draws <- extract(fit)$y_rep
+predicted_pelts <- matrix(NA, 21, 2)
+min_pelts <- matrix(NA, 21, 2)
+max_pelts <- matrix(NA, 21, 2)
+for (k in 1:2) {
+  predicted_pelts[1, k] <- mean(y0_rep_draws[ , k])
+  min_pelts[1, k] <- quantile(y0_rep_draws[ , k], 0.25)
+  max_pelts[1, k] <- quantile(y0_rep_draws[ , k], 0.75)
+  for (n in 2:21) {
+    predicted_pelts[n, k] <- mean(y_rep_draws[ , n - 1, k])
+    min_pelts[n, k] <- quantile(y_rep_draws[ , n - 1, k], 0.25)
+    max_pelts[n, k] <- quantile(y_rep_draws[ , n - 1, k], 0.75)
+  }
+}
+
+lynx_hare_melted_df <- melt(as.matrix(lynx_hare_df[, 2:3]))
+colnames(lynx_hare_melted_df) <- c("year", "species", "pelts")
+lynx_hare_melted_df$year <-
+  lynx_hare_melted_df$year +
+  rep(1899, length(lynx_hare_melted_df$year))
+
+Nmelt <- dim(lynx_hare_melted_df)[1]
+lynx_hare_observe_df <- lynx_hare_melted_df
+lynx_hare_observe_df$source <- rep("measurement", Nmelt)
+
+lynx_hare_predict_df <-
+  data.frame(year = rep(1900:1920, 2),
+             species = c(rep("Lynx", 21), rep("Hare", 21)),
+             pelts = c(predicted_pelts[, 2],
+                       predicted_pelts[, 1]),
+             min_pelts = c(min_pelts[, 2], min_pelts[, 1]),
+             max_pelts = c(max_pelts[, 2], max_pelts[, 1]),
+             source = rep("prediction", 42))
+
+lynx_hare_observe_df$min_pelts = lynx_hare_predict_df$min_pelts
+lynx_hare_observe_df$max_pelts = lynx_hare_predict_df$max_pelts
+
+lynx_hare_observe_predict_df <-
+  rbind(lynx_hare_observe_df, lynx_hare_predict_df)
+
+population_plot2 <-
+  ggplot(data = lynx_hare_observe_predict_df,
+         aes(x = year, y = pelts, color = source)) +
+  facet_wrap( ~ species, ncol = 1) +
+  geom_ribbon(aes(ymin = min_pelts, ymax = max_pelts),
+	      colour = NA, fill = "black", alpha = 0.1) +
+  geom_line() +
+  geom_point() +
+  ylab("pelts (thousands)")
+population_plot2
+```
+In the lynx and hare data, the periodicity appears to be somewhere in the neighborhood of ten to twelve years.
+
+
+
+#### How large are the populations?
+
+Going on the assumption that the number of pelts collected is proportional to the population, we only know how the relative sizes of the populations change, not their actual sizes.
+
+This model could be combined with a mark-recapture model to get a better handle on the actual population size.  Mark-recapture gives you an estimate of actual numbers and the Lotka-Volterra model would provide information on relative change in the predator and prey populations.
+
+## Exercises
+
+1.  Extend predictions another 50 years into the future and plot as in the last plot.  This can be done by extending the solution points in the transformed parameters, but is more efficiently done in the generated quantities block.
+
+2.  Write a Stan model to simulate data from this model.  First simulate parameters from the prior (or pick ones consistent with the priors).  Then simulate data from the parameters.  Finally, fit the model in Stan and compare the coverage as in the last plot in the case study.
+
 
 ## References
 
