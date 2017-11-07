@@ -32,15 +32,16 @@ Prey: *snowshoe hare*
 
 #### Abstract
 
-This case study embeds the Lotka-Volterra model of predator-prey population dynamics in a statistical model where the populations are only measured with uncertainty.  By coding the measurement error in Stan, the parameters of the population dynamics model may be inferred and predictions made for future populations.  The Lotka-Volterra model involves a system of differential equations for the populations, which may be solved with Stan's built-in numerical integrator.
+The Lotka-Volterra equations define parametric differential equations for the fluctuation of predator and prey populations.  To estimate the parameters of such a model, a model for measurement error and unexplained variation is layered on top of the deterministic dynamics.  The model is coded in Stan and fit to data on Canadian lynxes and snowshoe hares based on numbers of pelts collected in the early 20th century by the Hudson Bay Company.
+
 
 ## Lynxes and Hares, 1900-1920
 
 The Hudson Bay Company recorded the number of captured pelts of two species between 1900 and 1920,
 
-* [hares](https://en.wikipedia.org/wiki/Snowshoe_hare), an hervivorous cousin of rabbits, and
+* [snowshoe hares](https://en.wikipedia.org/wiki/Snowshoe_hare), an hervivorous cousin of rabbits, and
 
-* [lynxes](https://en.wikipedia.org/wiki/Canada_lynx), a feline predator whose diet consists almost exclusively of hares.
+* [Canadian lynxes](https://en.wikipedia.org/wiki/Canada_lynx), a feline predator whose diet consists almost exclusively of hares.
 
 The date provided here was converted to comma-separated value (CSV) format from (Howard 2009).
 
@@ -87,14 +88,30 @@ population_plot1 <-
 population_plot1
 ```
 
-As can be seen from the diagram, the population dynamics orbit in a stable pattern.
+As can be seen from the diagram, the population dynamics orbit in an apparently stable pattern.
 
 
 ## The Lotka-Volterra Equations
 
-The hare population intrinsically grows, but larger number of lynxes cause it to drop.  The lynx population intrinsically shrinks, but larger number of hares cause it to rise.  Together, these dynamics lead to a cycle of rising and falling populations.  With a low lynx population the hare population grows.  As the hare population grows, the lynx population grows.  Eventually the lynx population is such as to cut down on the hare population, and the lynx population itself drops.
+The Lotka-Volterra equations (Volterra 1926, 1927; Lotka 1925) are based on the assumptions that
 
-The Lotka-Volterra equations (Volterra 1926, 1927; Lotka 1925) use a pair of first-order differential equations to describe the population dynamics of a pair of species, one predator and one prey  Suppose that $u(t) \geq 0$ is the population size of the prey species at time $t$ and $v(t) \geq 0$ is the population size of the predator species.  Volterra modeled the temporal dynamics of the two species (i.e., population sizes over times) in terms of four parameters, $\alpha, \beta, \gamma, \delta > 0$, as
+* the predator population intrinsically shrinks,
+
+* the prey population intrinsically grows,
+
+* larger prey population leads to larger predator population, and
+
+* larger predator population leads to smaller prey populations.
+
+Together, these dynamics lead to a cycle of rising and falling populations.  With a low lynx population, the hare population grows.  As the hare population grows, it allows the lynx population to grow.  Eventually, the lynx population is large enough to start cutting down on the hare population.  That in turn puts downward pressure on the lynx population.  The cycle then resumes from where it started.
+
+The Lotka-Volterra equations (Volterra 1926, 1927; Lotka 1925) are a pair of first-order differential equations describing the population dynamics of a pair of species, one predator and one prey  Suppose that
+
+* $u(t) \geq 0$ is the population size of the prey species at time $t$, and
+
+* $v(t) \geq 0$ is the population size of the predator species.
+
+Volterra modeled the temporal dynamics of the two species (i.e., population sizes over times) in terms of four parameters, $\alpha, \beta, \gamma, \delta > 0$, as
 $$
 \begin{eqnarray}
 \frac{\mathrm{d}}{\mathrm{d}t} u
@@ -111,28 +128,32 @@ As usual in writing differential equations, $u(t)$ and $v(t)$ are rendered as $u
 
 ## Error model: measurement and unexplained variation
 
-The Lotka-Volterra model is deterministic.  Given the system parameters and the initial conditions, the population dynamics are fully determined.  We will consider two sources of error.
+The Lotka-Volterra model is deterministic.  Given the system parameters and the initial conditions, the population dynamics are fully determined.  We will specify a statistical model that allows us to infer the parameters of the model and predict future population dynamics based on noisy measurements and a model that does not explain all of the observed variation in the data.  We will consider two sources of error.
 
 First, the theory is not expected to be that good in this case, so there will be resulting unexplained variation.  For example, the weather in a particular year is going to have an impact on the populations, but it is not taken into account, leading to variation that is not explained by the model.
 
-The second source of error is noisy measurements of the population.  We cannot measure the population directly, so instead make do with noisy measurements, such as the number of pelts collected.  These measurements may be supplemented with output of other measurements, such as mark-recapture data.
+The second source of error is noisy measurements of the population.  We cannot measure the population directly, so instead make do with noisy measurements, such as the number of pelts collected.  In more elaborate models (beyond what we consider here), measurements of pelts collected could be supplemented with output of other measurements, such as mark-recapture studies.
 
-We will specify a statistical model that allows us to infer the parameters of the model and predict future population dynamics based on noisy measurements and a model that does not explain all of the observed variation in the data.
-
-Like a simple linear regression, or non-linear GLM, the trick is to treat the underlying determinstic model as providing a value which is expected to have error from both measurement and unexplained variance due to the simplifications in the scientific model.  Consider the typical formulation of a linear regression,
+#### A linear regression analogy
+Like a simple linear regression, or non-linear GLM, the trick is to treat the underlying determinstic model as providing a value which is expected to have error from both measurement and unexplained variance due to the simplifications in the scientific model.  Consider the typical formulation of a linear regression, where $y_n$ is the scalar outcome, $x_n$ is a row vector of predictors, $\beta$ is a coefficient vector parameter, and $\epsilon_n$ is a latent scalar parameter and $\sigma > 0$ is another parameter,
 $$
 \begin{eqnarray}
-y_n & = & x \beta + \epsilon_n
+y_n & = & x_n \beta + \epsilon_n
 \\[6pt]
 \epsilon_n & \sim & \mbox{Normal}(0, \sigma)
 \end{eqnarray}
 $$
-In linear regression, the error term $\epsilon_n$ has an independent normal distiribution located at zero with scale $\sigma$,
-The deterministic part of the equation is $x \beta$;  that's the linear part.  The error term $\epsilon_n$ is then given a normal distribution located at zero with scale $\sigma$.
+The deterministic part of the equation is the linear predictor $x \beta$.  The stochastic error term, $\epsilon_n$, gets a normal distribution located at zero with scale parameter $\sigma > 0$ (this error model ensures that the maximum likelihood value for $\beta$ is at the least squares solution).  We can alternatively write this model without the latent value $\epsilon_n$ as
+$$
+y_n \sim \mbox{Normal}(x_n \beta, \sigma).
+$$
+Here, $\epsilon_n = y_n - x_n \beta$ is implicit.
 
-The data $y_i$ consists of measurements of the prey $y_{i, 1}$ and predator $y_{i, 2}$ populations at times $t_i$.  The Lotka-Volterra equations will replace the determinsitic parts of the equations.
+#### Noise model for Lotka-Volterra dynamics
 
-The true population sizes at time $t = 0$ is unknown---we only have a measurement $y0$ for it.  The true population initial population sizes at time $t = 0$ will be represented by a parameter $z0$, so that
+The data $y_i$ consists of measurements of the prey $y_{i, 1}$ and predator $y_{i, 2}$ populations at times $t_i$.  The Lotka-Volterra equations will replace the determinsitic parts of the linear regression equations.
+
+The true population sizes at time $t = 0$ are unknown---we only have measurements $y0_1$ and $y0_2$ for it.  The true population initial population sizes at time $t = 0$ will be represented by a parameter $z0$, so that
 
 $$
 z0_1 = u(t = 0)
@@ -140,13 +161,13 @@ z0_1 = u(t = 0)
 z0_2 = v(t = 0).
 $$
 
-Next, let $z_1, \ldots, z_N$ be the solutions to the Lotka-Volterra equations at times $t_1, \ldots, t_N$ given initial conditions $z(t = 0) = z0$.  Each $z_n$ is a pair of prey and predator population sizes,
+Next, let $z_1, \ldots, z_N$ be the solutions to the Lotka-Volterra differential equations at times $t_1, \ldots, t_N$ given initial conditions $z(t = 0) = z0$.  Each $z_n$ is a pair of prey and predator population sizes at the specified times,
 $$
 z_{n, 1} = u(t_n)
 \ \ \ \mathrm{and} \ \ \
 z_{n, 2} = v(t_n)
 $$
-The $z_n$ are deterministic functions of $z0$ and the system parameters $\alpha, \beta, \gamma, \delta$, and ae thus not parameters of the model.
+The $z_n$ are deterministic functions of $z0$ and the system parameters $\alpha, \beta, \gamma, \delta$;  thus $z$ is not a parameter but a derived quantity.
 
 The observed data is the form of measurements $y0$ of the initial population of prey and predators, and subsequent measurements $y_n$ at times $t_n$, where $y0$ and the $y_n$ consist of a pair of measured population sizes, for the prey and predator species.
 
@@ -158,7 +179,8 @@ $$
 \epsilon_{n, k} & \sim & \mathrm{Normal}(0, \sigma_k)
 \end{eqnarray}
 $$
-where the $z_n$ are the solutions to the Lotka-Volterra equations at times $t_1, \ldots, t_N$ given initial population $z0$.  The prey and predator populations have error scales $\sigma_1$ and $\sigma_2$.
+where the $z_n$ are the solutions to the Lotka-Volterra equations at times $t_1, \ldots, t_N$ given initial population $z0$.  The prey and predator populations have error scales (on the log scale) of $\sigma_1$ and $\sigma_2$.
+
 
 ## Weakly informative priors
 
@@ -192,7 +214,7 @@ $$
 
 #### Coding the system dynamics
 
-Whenver a system of differential equations is involved, the system equations must be coded as a Stan function.  In this case, the model is relatively simple as the state is only two dimensional and there are only four parameters.  Stan requires the system to be defined with exactly the signature defined here for the function <code>dz_dt()</code>.  The first argument is for time, which is not used here because the Lotka-Voltarra equations are not time-dependent.  The second argument is for the system state, and here it is coded as an array
+Whenever a system of differential equations is involved, the system equations must be coded as a Stan function.  In this case, the model is relatively simple as the state is only two dimensional and there are only four parameters.  Stan requires the system to be defined with exactly the signature defined here for the function <code>dz_dt()</code>.  The first argument is for time, which is not used here because the Lotka-Voltarra equations are not time-dependent.  The second argument is for the system state, and here it is coded as an array
 $z = (u, v)$.  The third argument is for the parameters of the equation, of which the Lotka-Voltarra equations have four, which are coded as $\theta = (\alpha, \beta, \gamma, \delta)$.  The fourth and fifth argument are for data constants, but none areneeded here, so these arguments are unused.
 
 ```
@@ -240,13 +262,15 @@ parameters {
 
 The solutions to the Lotka-Volterra equations for a given initial state $z0$ are coded up as transformed parameters.  This will allow them to be used in the model and inspected in the output.  It also makes it clear that they are all functions of the initial population and parameters (as well as the solution times).
 ```
-  real z[N, 2]               // population for remaining years
+transformed parameters {
+  // population for remaining years
+  real z[N, 2]
     = integrate_ode_rk45(dz_dt, z0, 0, ts, theta,
-                         rep_array(0.0, 0), rep_array(0, 0), // no data
-                         1e-6, 1e-5, 1e3);  // rel tol, abs tol, max steps
+                         rep_array(0.0, 0), rep_array(0, 0),
+                         1e-6, 1e-5, 1e3);
 }
 ```
-The Runge-Kutta 4th/5th-order solver is specified here for efficiency (with suffix <code>_rk45</code>) because the equations are not stiff in the parameter ranges encountered for this data.  For further efficiency, the tolerances for the ODE solver are relatively loose for this example; usually tighter tolerances are required (smaller numbers).
+The Runge-Kutta 4th/5th-order solver is specified here for efficiency (with suffix <code>_rk45</code>) because the equations are not stiff in the parameter ranges encountered for this data.   The required real and integer data arguments in the second line are both given as size-zero arrays.  The last line provides relative and absolute tolerances, along with the maximum number of steps allowed in the solver.  For further efficiency, the tolerances for the differential equation solver are relatively loose for this example; usually tighter tolerances are required (smaller numbers).
 
 If the solver runs into stiffness (the symptom of which is very slow iterations that may appear to be hanging), it is best to switch to the backward-differentiation formula solver, called with <code>integrate_ode_bdf</code>. The Runge-Kutta solver is twice as fast as the BDF solver for this problem on this data.
 
@@ -270,13 +294,13 @@ model {
 
 ## Fitting the Hudson Bay Company lynx-hare data
 
-First, the data is setup in a form suitabl for Stan.
+First, the data is setup in a form suitable for Stan.
 ```{r}
-N <- length(lynx_hare_df$Year) - 1
-ts <- 1:N
-y0 <- c(lynx_hare_df$Hare[1], lynx_hare_df$Lynx[1])
-y <- as.matrix(lynx_hare_df[2:(N + 1), 2:3])
-y <- cbind(y[ , 2], y[ , 1]);
+N <- length(lynx_hare_df$Year) - 1                   # num observations after first
+ts <- 1:N                                            # observation times just years
+y0 <- c(lynx_hare_df$Hare[1], lynx_hare_df$Lynx[1])  # first observation
+y <- as.matrix(lynx_hare_df[2:(N + 1), 2:3])         # remaining observations
+y <- cbind(y[ , 2], y[ , 1]);                        # reverse order
 lynx_hare_data <- list(N, ts, y0, y)
 ```
 
@@ -286,14 +310,14 @@ Next, the model is translated to C++ and compiled.
 model <- stan_model("lotka-volterra.stan")
 ```
 
-Finally, the compiled model and data are used for sampling.  Stan's default settings are sufficient for to fit this data set to this model.
+Finally, the compiled model and data are used for sampling.  Stan's default settings are sufficient for this data set and model.
 
 ```{r results="hide"}
 fit <- sampling(model, data = lynx_hare_data,
                 seed=123)
 ```
 
-The output can be displayed in tabular form.
+The output can be displayed in tabular form, here limited to the median (0.5 quantile) and 80% interval (0.1 and 0.9 quantiles).
 
 ```{r}
 print(fit, probs=c(0.1, 0.5, 0.9), digits=3)
@@ -301,7 +325,7 @@ print(fit, probs=c(0.1, 0.5, 0.9), digits=3)
 
 The R-hat values are all near 1, which is consistent with convergence.  The effective sample size estimates for each parameter are sufficient for inference.  Thus we have reason to trust this fit.
 
-The expected values `z` are unlike the replicated draws `y_rep` in two ways.  First, their posterior has much lower variance and much narrower 80% intervals.  This is to be expected, as the `y_rep` additional takes into account measurement and unexplained variance, whereas `z` only takes into account parameter estimation uncertainty.  Second, the mean values of `z` are lower than the corresponding values of `y_rep`.  This is because `y_rep` is adding a lognormal error term, which has a positive expectation as it is constrained to be positive.
+The expected values `z` are unlike the replicated draws `y_rep` in two ways.  First, their posterior has much lower variance and much narrower 80% intervals.  This is to be expected, as the `y_rep` additional takes into account measurement and unexplained variance, whereas `z` only takes into account parameter estimation uncertainty.  Second, the mean values of `z` are lower than the corresponding values of `y_rep`.  This is because `y_rep` is adding a lognormal error term, which has a positive expectation as it is constrained to be positive;  this positivity is also a factor in the fits that are derived for `z`.
 
 
 #### Comparing the fitted model to data
@@ -414,14 +438,25 @@ population_plot2 <-
 population_plot2
 ```
 
-This posterior predictive check shows that the model fit is consistent with the data.
+This posterior predictive check shows that the model fit is consistent with the data, with around 50% of the data points falling within the 50% intervals.
 
 
-#### How large are the populations?
+## How large are the populations?
 
 Going on the assumption that the number of pelts collected is proportional to the population, we only know how the relative sizes of the populations change, not their actual sizes.
 
 This model could be combined with a mark-recapture model to get a better handle on the actual population size.  Mark-recapture gives you an estimate of actual numbers and the Lotka-Volterra model would provide information on relative change in the predator and prey populations.
+
+## Extensions to the model
+
+The Lotka-Volterra model is easily extended for realistic applications in several ways.
+
+1.  Predictors can be rolled into the system state to take into the dynamnics to account for things like the correlation of populations with the abundance of food.
+
+2.  The model may be extended beyond two species.  The dynamics for each species will reflect that it may stand in predator-prey relations to multiple other species.
+
+3.  Additional data for population observations may be included, such as adding a mark-recapture model for tag-release-recapture data of populations.
+
 
 ## Exercises
 
@@ -430,6 +465,11 @@ This model could be combined with a mark-recapture model to get a better handle 
 2.  Write a Stan model to simulate data from this model.  First simulate parameters from the prior (or pick ones consistent with the priors).  Then simulate data from the parameters.  Finally, fit the model in Stan and compare the coverage as in the last plot in the case study.
 
 3.  Suppose that several of the measurements are missing.  Write a Stan program that uses only the observed measurements.  How robust is the fit to missing a few data points?
+
+4.  Write a Stan model that predicts the population at finer-grained intervals than a year (such as every three months).  Can the model be formulated to only use the yearly data?  Do the smoother plots for predicted populations make sense?  Does this fit better or worse than the original model?
+
+4.  Replace the lognormal error with a simple normal error model.  What does this do to the `z` estimates and to the basic parameter estimates?  Which error model fits better?
+
 
 ## References
 
