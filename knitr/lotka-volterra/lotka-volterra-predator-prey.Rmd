@@ -1,5 +1,5 @@
 ---
-title: "Estimating Lotka-Volterra Predator-Prey Dynamics with Stan"
+title: "Lotka-Volterra Dynamics for Predator-Prey Populations"
 author: "Bob Carpenter"
 date: "October 16, 2017"
 output:
@@ -32,7 +32,7 @@ Prey: *snowshoe hare*
 
 #### Abstract
 
-The Lotka-Volterra equations define parametric differential equations for the fluctuation of predator and prey populations.  To estimate the parameters of such a model, a model for measurement error and unexplained variation is layered on top of the deterministic dynamics.  The model is coded in Stan and fit to data on Canadian lynxes and snowshoe hares based on numbers of pelts collected in the early 20th century by the Hudson Bay Company.
+Lotka and Volterra provided parameteric differential equations that characterize the dynamics of the populations of predator and prey species.   A statistical model to account for measurement error and unexplained variation uses the deterministic solutions to the Lotka-Volterra equations as expected population sizes.  Stan is used to encode the model and perform full Bayesian inference.  The model is fit to Canadian lynx and snowshoe hare populations between 1900 and 1920, based on the number of pelts collected annually by the Hudson Bay Company.  Posterior predictive checks for replicated data show the model fits this data well.  Full Bayesian inference may be used to estimate future (or past) populations.
 
 
 ## Lynxes and Hares, 1900-1920
