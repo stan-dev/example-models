@@ -9,7 +9,7 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-library(reshape)
+library(reshape2)
 library(ggplot2)
 library(rstan)
 rstan_options(auto_write = TRUE)
@@ -55,18 +55,14 @@ head(lynx_hare_df, n = 3)
 The number of pelts taken by the Hudson Bay Company is shown over time as follows (first, the data is melted using the reshape package, then plotted by species using ggplot).
 
 ```{r}
-lynx_hare_melted_df <- melt(as.matrix(lynx_hare_df[, 2:3]))
-colnames(lynx_hare_melted_df) <- c("year", "species", "pelts")
-lynx_hare_melted_df$year <-
-  lynx_hare_melted_df$year +
-  rep(1899, length(lynx_hare_melted_df$year))
+lynx_hare_melted_df <- melt(lynx_hare_df,id.vars = 'Year',variable.name = 'species',value.name = 'pelts')
 head(lynx_hare_melted_df, n=3)
 tail(lynx_hare_melted_df, n=3)
 ```
 ```{r}
 population_plot2 <-
   ggplot(data = lynx_hare_melted_df,
-         aes(x = year, y = pelts, color = species)) +
+         aes(x = Year, y = pelts, color = species)) +
   geom_line() +
   geom_point() +
   ylab("pelts (thousands)")
@@ -125,6 +121,7 @@ $$
 $$
 As usual in writing differential equations, $u(t)$ and $v(t)$ are rendered as $u$ and $v$ to simplify notation.
 
+[This](https://en.wikipedia.org/wiki/Lotka%E2%80%93Volterra_equations#Physical_meaning_of_the_equations) wiki page provide some explanations of the (ecological) meaning of the four parameters.
 
 ## Error model: measurement and unexplained variation
 
@@ -400,18 +397,12 @@ for (k in 1:2) {
   }
 }
 
-lynx_hare_melted_df <- melt(as.matrix(lynx_hare_df[, 2:3]))
-colnames(lynx_hare_melted_df) <- c("year", "species", "pelts")
-lynx_hare_melted_df$year <-
-  lynx_hare_melted_df$year +
-  rep(1899, length(lynx_hare_melted_df$year))
-
 Nmelt <- dim(lynx_hare_melted_df)[1]
 lynx_hare_observe_df <- lynx_hare_melted_df
 lynx_hare_observe_df$source <- rep("measurement", Nmelt)
 
 lynx_hare_predict_df <-
-  data.frame(year = rep(1900:1920, 2),
+  data.frame(Year = rep(1900:1920, 2),
              species = c(rep("Lynx", 21), rep("Hare", 21)),
              pelts = c(predicted_pelts[, 2],
                        predicted_pelts[, 1]),
@@ -419,15 +410,15 @@ lynx_hare_predict_df <-
              max_pelts = c(max_pelts[, 2], max_pelts[, 1]),
              source = rep("prediction", 42))
 
-lynx_hare_observe_df$min_pelts = lynx_hare_predict_df$min_pelts
-lynx_hare_observe_df$max_pelts = lynx_hare_predict_df$max_pelts
+lynx_hare_observe_df$min_pelts <- lynx_hare_predict_df$min_pelts
+lynx_hare_observe_df$max_pelts <- lynx_hare_predict_df$max_pelts
 
 lynx_hare_observe_predict_df <-
   rbind(lynx_hare_observe_df, lynx_hare_predict_df)
 
 population_plot2 <-
   ggplot(data = lynx_hare_observe_predict_df,
-         aes(x = year, y = pelts, color = source)) +
+         aes(x = Year, y = pelts, color = source)) +
   facet_wrap( ~ species, ncol = 1) +
   geom_ribbon(aes(ymin = min_pelts, ymax = max_pelts),
 	      colour = NA, fill = "black", alpha = 0.1) +
