@@ -7,66 +7,58 @@ data {
   int<lower=0> y[N];              // count outcomes
   vector<lower=0>[N] E;           // exposure
 
-  vector[N] scaling_factor; // the scaling factor to make the ICAR variances approxiamtely one
-  int<lower=0> N_singletons;
-  int<lower=1> singletons[N_singletons];
+  int<lower=0, upper=N> N_singletons;
+  int<lower=0, upper=N> N_components;
+  int<lower=1, upper=N> nodes_per_component[N_components];
+
+  vector[N_components] scales; // per-component scaling factor
+                               // makes the ICAR variances approx == 1
 }
 transformed data {
   vector[N] log_E = log(E);
-
   int N_connected = N - N_singletons;
-  vector<lower=0>[N_connected] scaling_factor_connected;
-  int sfc_idx = 1;
-  int node_map[N];
-  for (n in 1:N) {
-    node_map[n] = 0;
+  int N_con_comp = N_components - N_singletons;
+  vector<lower=0>[N_connected] scaling_factor;   // per-node scaling factor
+  int component_starts[N_components];
+  int component_ends[N_components];
+  int c_offset = 1;
+  // calculate component offsets, set up scaling factor
+  for (i in 1:N_components) {
+    component_starts[i] = c_offset;
+    c_offset = c_offset + nodes_per_component[i];
+    component_ends[i] = c_offset - 1;
   }
-  for (n in 1:N_singletons) {
-    int idx2 = singletons[n];
-    node_map[idx2] = n;
-  }
-  for (n in 1:N) {
-    if (node_map[n] == 0) {
-      scaling_factor_connected[sfc_idx] = scaling_factor[n];
-      sfc_idx = sfc_idx + 1;
+  for (i in 1:N_con_comp) {
+    for (j in component_starts[i]:component_ends[i]) {
+      scaling_factor[j] = scales[i];
     }
   }
 }
 parameters {
   real beta0;                // intercept
 
-  real<lower=0> sigma;        // overall standard deviation
+  real<lower=0> sigma;        // random effects scale
   real<lower=0, upper=1> rho; // proportion unstructured vs. spatially structured variance
 
   vector[N_connected] theta;       // heterogeneous effects
   vector[N_connected - 1] phi_raw; // raw spatial effects
-  vector[N_singletons] singletons_re; // random effects for areas with no neighbors
+  vector[N_singletons] singletons_re; // random effects for areas with no neighbours
 }
 transformed parameters {
   vector[N_connected] phi;
-  vector[N_connected] convolved_re;
   vector[N] re;
 
-  // need to sum-to-zero on a per-component basis.
-  phi[1:(N_connected - 1)] = phi_raw;
-  phi[N_connected] = -sum(phi_raw);
-  
-  // Divide by sqrt of scaling factor to properly scale precision matrix phi.
-  convolved_re =  sqrt(1 - rho) * theta + sqrt(rho * inv(scaling_factor_connected)) .* phi;
-  // construct RE component vector
-  // nodes with neighbors have convolved RE, islands have std normal
-  {
-    int idx = 1;
-    for (n in 1:N) {
-      if (node_map[n] == 0) {
-        re[n] = convolved_re[idx];
-        idx = idx + 1;
-      } else {
-        int idx2 = node_map[n];
-        re[n] = singletons_re[idx2];
-      }
-    }
+  // phi sum-to-zero by component
+  for (i in 1:N_con_comp) {
+    phi[component_starts[i]:(component_ends[i]-1)]
+      = phi_raw[component_starts[i]:(component_ends[i]-1)];
+    phi[component_ends[i]]
+      = -sum(phi_raw[component_starts[i]:(component_ends[i]-1)]);
   }
+
+  // Divide by sqrt of scaling factor to properly scale precision matrix phi.
+  re[1:N_connected] = sqrt(1 - rho) * theta + sqrt(rho * inv(scaling_factor)) .* phi;
+  re[(N_connected+1):N] = singletons_re;
 }
 model {
   y ~ poisson_log(log_E + beta0 + re * sigma);
@@ -82,13 +74,14 @@ model {
 }
 generated quantities {
   real log_precision = -2.0 * log(sigma);
-  real logit_rho = log(rho / (1.0 - rho));
+  real logit_rho = logit(rho);
   vector[N] eta = log_E + beta0 + re * sigma;
   vector[N] mu = exp(eta);
-  vector[N] log_lik;
   int y_rep[N];
+  vector[N] log_lik;  // log p(y_rep | y)
   if (max(eta) > 20) {
-    print("max eta too big: ", max(eta));
+    // avoid overflow in poisson_log_rng
+    print("max eta too big: ", max(eta));  
     for (n in 1:N) {
       y_rep[n] = -1;
       log_lik[n] = not_a_number();
