@@ -23,6 +23,9 @@ data {
   real ts[N];               // measurement times > 0
   real y0[2];               // initial measured population
   real<lower = 0> y[N, 2];  // measured population at measurement times
+
+  int<lower = 0> N_sim;     // number of simulation points
+  real ts_sim[N_sim];       // times at which to simulate
 }
 parameters {
   real<lower = 0> theta[4];  // theta = { alpha, beta, gamma, delta }
@@ -52,12 +55,16 @@ model {
   }
 }
 generated quantities {
+  real z_sim[N_sim, 2]
+    = integrate_ode_rk45(dz_dt, z0, 0, ts_sim, theta,
+                         rep_array(0.0, 0), rep_array(0, 0),
+                         1e-5, 1e-3, 5e2);
   real y0_sim[2];
-  real y_sim[N, 2];
+  real y_sim[N_sim, 2];
 
   for (k in 1:2) {
     y0_sim[k] = lognormal_rng(log(z0[k]), sigma[k]);
-    for (n in 1:N)
-      y_sim[n, k] = lognormal_rng(log(z[n, k]), sigma[k]);
+    for (n in 1:N_sim)
+      y_sim[n, k] = lognormal_rng(log(z_sim[n, k]), sigma[k]);
   }
 }
