@@ -236,7 +236,7 @@ Furthermore, the pairwise difference formulation doesn't use information about t
 only the edges, thus we don't even need to store the node set explicitly, we only need to store $N$.
 
 In Stan, we create two parallel integer arrays `node1` and `node2` which store edge information, together with integer values
-`N`, the number of nodes, and `N\_edges`, the number of edges.
+`N`, the number of nodes, and `N_edges`, the number of edges.
 These two arrays are (implicitly) indexed by the ordinal value of node $i$ in the graph,
 thus we don't need to store the list of node ids.
 These are declared in the data block of a Stan program as follows:
@@ -265,10 +265,10 @@ As noted above,  $\phi$ is non-centered;
 adding any constant to all of the elements of $\phi$ leaves the distribution unchanged.
 Therefore we must add the constraint $\sum_{i} {\phi}_i = 0$.
 This can be implemented as a hard  sum-to-zero constraint
-by declaring an parameter vector of length `N - 1` with a corresponding
-transformed parameter vector of length `N` whose N-th is negation of the sum of the parameter vector.
+by declaring an parameter vector of length $N - 1$ with a corresponding
+transformed parameter vector of length $N$ whose n-th element is negation of the sum of the parameter vector.
 Another option is to set up a soft sum-to-zero constraint using a prior
-on ${\phi} which tightly constrains the mean of ${\phi}$ to be within some epsilon of zero.
+on ${\phi}$ which tightly constrains the mean of ${\phi}$ to be within some epsilon of zero.
 Having explored both options, we found that Stan's HMC sampler runs faster
 on models which have a soft sum-to-zero constraint.
 
@@ -653,7 +653,7 @@ To test this model with real data, we ran it on the version of the Scotland Lip 
 described in the previous section.
 The R script
 [fit_scotland.R](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/fit_scotland_bym2.R)
-fits the model to the data.  This code includes details on how to compute the scaling factor using the *INLA* library.
+fits the model to the data.  This code includes details on how to compute the scaling factor using the INLA library.
 
 ```{r fit-scotland-bym2 }
 library(rstan)   
