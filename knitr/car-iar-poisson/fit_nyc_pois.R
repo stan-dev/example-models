@@ -4,7 +4,7 @@ library(rgdal)
 library(rstan);
 options(mc.cores = 3);
 
-load("nyc_subset_2001.data.R");
+load("nyc_subset.data.R");
 
 nyc_shp<-readOGR("nycTracts10", layer="nycTracts10");
 geoids <- nyc_shp$GEOID10 %in% nyc_tractIDs;
