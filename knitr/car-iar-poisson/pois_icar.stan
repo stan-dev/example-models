@@ -13,6 +13,7 @@ transformed data {
 parameters {
   real beta0;             // intercept
   real<lower=0> sigma;    // overall standard deviation
+  vector[N] phi;         // spatial effects
 }
 model {
   y ~ poisson_log(log_E + beta0 + phi * sigma);
