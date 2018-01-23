@@ -1,3 +1,4 @@
+// use for Scotland dataset
 data {
   int<lower=0> N;
   int<lower=0> N_edges;
@@ -8,7 +9,7 @@ data {
   vector[N] x;                    // predictor
   vector<lower=0>[N] E;           // exposure
 
-  real<lower=0> scaling_factor; //the scaling factor to make the ICAR variances approxiamtely one
+  real<lower=0> scaling_factor; // scales the variance of the spatial effects
 }
 transformed data {
   vector[N] log_E = log(E);
@@ -20,19 +21,12 @@ parameters {
   real<lower=0> sigma;        // overall standard deviation
   real<lower=0, upper=1> rho; // proportion unstructured vs. spatially structured variance
 
-  vector[N] theta;       // heterogeneous effects
-  vector[N - 1] phi_raw; // raw spatial effects
+  vector[N] theta;           // heterogeneous effects
+  vector[N] phi;             // spatial effects
 }
 transformed parameters {
-  vector[N] phi;
   vector[N] convolved_re;
-
-  phi[1:(N - 1)] = phi_raw;
-  phi[N] = -sum(phi_raw);
-
-  // NB: scaling_factor scales the spatial effect so the variance is approxiamtely 1.
-  // This is NOT a magic number, and comes as data.
-  // Divide by sqrt of scaling factor to properly scale precision matrix phi.
+  // variance of each component should be approximately equal to 1
   convolved_re =  sqrt(1 - rho) * theta + sqrt(rho / scaling_factor) * phi;
 }
 model {
@@ -40,6 +34,8 @@ model {
 
   // This is the prior for phi! (up to proportionality)
   target += -0.5 * dot_self(phi[node1] - phi[node2]);
+  // soft sum-to-zero constraint on phi)
+  sum(phi) ~ normal(0, 0.001 * N);  // equivalent to mean(phi) ~ normal(0,0.001)
 
   beta0 ~ normal(0.0, 5.0);
   beta1 ~ normal(0.0, 5.0);
@@ -48,8 +44,9 @@ model {
   rho ~ beta(0.5, 0.5);
 }
 generated quantities {
-  vector[N] mu = exp(log_E + beta0 + beta1 * x + convolved_re * sigma);
   real log_precision = -2.0 * log(sigma);
   real logit_rho = log(rho / (1.0 - rho));
+  vector[N] eta = log_E + beta0 + beta1 * x + convolved_re * sigma;
+  vector[N] mu = exp(eta);
 }
 

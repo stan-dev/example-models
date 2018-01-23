@@ -6,6 +6,8 @@ data {
 
   int<lower=0> y[N];              // count outcomes
   vector<lower=0>[N] E;           // exposure
+  //  int<lower=1> K;                 // num covariates
+  //  matrix[N, K] x;                 // design matrix
 
   int<lower=0, upper=N> N_singletons;
   int<lower=0, upper=N> N_components;
@@ -36,6 +38,7 @@ transformed data {
 }
 parameters {
   real beta0;                // intercept
+  //  vector[K] betas;       // covariates
 
   real<lower=0> sigma;        // random effects scale
   real<lower=0, upper=1> rho; // proportion unstructured vs. spatially structured variance
@@ -62,11 +65,13 @@ transformed parameters {
 }
 model {
   y ~ poisson_log(log_E + beta0 + re * sigma);
+  //  y ~ poisson_log(log_E + beta0 + x * betas + convolved_re * sigma);  // co-variates
 
   // This is the prior for phi! (up to proportionality)
   target += -0.5 * dot_self(phi[node1] - phi[node2]);
 
   beta0 ~ normal(0.0, 2.5);
+  //  betas ~ normal(0.0, 2.5);
   theta ~ normal(0.0, 1.0);
   sigma ~ normal(0,5);
   rho ~ beta(0.5, 0.5);
@@ -75,21 +80,8 @@ model {
 generated quantities {
   real log_precision = -2.0 * log(sigma);
   real logit_rho = logit(rho);
+
+  //  vector[N] eta = log_E + beta0 + x * betas + convolved_re * sigma; // co-variates
   vector[N] eta = log_E + beta0 + re * sigma;
   vector[N] mu = exp(eta);
-  int y_rep[N];
-  vector[N] log_lik;  // log p(y_rep | y)
-  if (max(eta) > 20) {
-    // avoid overflow in poisson_log_rng
-    print("max eta too big: ", max(eta));  
-    for (n in 1:N) {
-      y_rep[n] = -1;
-      log_lik[n] = not_a_number();
-    }
-  } else {
-      for (n in 1:N) {
-        y_rep[n] = poisson_log_rng(eta[n]);
-        log_lik[n] = poisson_log_lpmf(y[n] | eta[n]);
-      }
-  }
 }
