@@ -5,13 +5,10 @@ data {
   int<lower=1, upper=N> node2[N_edges];  // and node1[i] < node2[i]
 }
 parameters {
-  vector[N-1] phi_raw_std;
-}
-transformed parameters {
   vector[N] phi;
-  phi[1:(N - 1)] = phi_raw_std;
-  phi[N] = -sum(phi_raw_std);
 }
 model {
   target += -0.5 * dot_self(phi[node1] - phi[node2]);
+  // soft sum-to-zero constraint on phi)
+  sum(phi) ~ normal(0, 0.01 * N);  // equivalent to mean(phi) ~ normal(0,0.01)
 }
