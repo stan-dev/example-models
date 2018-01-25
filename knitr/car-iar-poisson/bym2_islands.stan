@@ -44,20 +44,11 @@ parameters {
   real<lower=0, upper=1> rho; // proportion unstructured vs. spatially structured variance
 
   vector[N_connected] theta;       // heterogeneous effects
-  vector[N_connected - 1] phi_raw; // raw spatial effects
+  vector[N_connected] phi;         // raw spatial effects
   vector[N_singletons] singletons_re; // random effects for areas with no neighbours
 }
 transformed parameters {
-  vector[N_connected] phi;
   vector[N] re;
-
-  // phi sum-to-zero by component
-  for (i in 1:N_con_comp) {
-    phi[component_starts[i]:(component_ends[i]-1)]
-      = phi_raw[component_starts[i]:(component_ends[i]-1)];
-    phi[component_ends[i]]
-      = -sum(phi_raw[component_starts[i]:(component_ends[i]-1)]);
-  }
 
   // Divide by sqrt of scaling factor to properly scale precision matrix phi.
   re[1:N_connected] = sqrt(1 - rho) * theta + sqrt(rho * inv(scaling_factor)) .* phi;
@@ -76,6 +67,11 @@ model {
   sigma ~ normal(0,5);
   rho ~ beta(0.5, 0.5);
   singletons_re ~ normal(0.0, 1.0);
+
+ for (i in 1:N_components) {
+   sum(phi[component_starts[i]:(component_ends[i])]) ~ normal(0, 0.001 * nodes_per_component[i]);
+ }
+
 }
 generated quantities {
   real log_precision = -2.0 * log(sigma);
