@@ -258,9 +258,9 @@ $$
 
 The $z_n$ are random variables, but they are deterministic functions of other random variables: the initial system state $z^{\mathrm init}$ and the system parameters $\alpha, \beta, \gamma, \delta$.
 
-The observed data is the form of measurements $y^{\rm init}$ of the initial population of prey and predators, and subsequent measurements $y_n$ at times $t_n$, where $y0$ and the $y_n$ consist of a pair of measured population sizes, for the prey and predator species.
+The observed data is the form of measurements $y^{\rm init}$ of the initial population of prey and predators, and subsequent measurements $y_n$ at times $t_n$, where $y^{\mathrm init}$ and the $y_n$ consist of a pair of measured population sizes, for the prey and predator species.
 
-Putting this all together, the $y_n$ (and $y^{\rm init}$) are measurements of the underlying predicted population $z_n$ ($z^{\mathrm init}$).  
+Putting this all together, the measurements $y^{\rm init}$ and $y_n$ are of an underlying latent population sizes $z^{\mathrm init}$ and $z_n$.  
 
 ## Multiplicate error and the lognormal distribution
 
@@ -276,7 +276,7 @@ $$
 
 where the $z_n$ are the solutions to the Lotka-Volterra equations at times $t_1, \ldots, t_N$ given initial population $z^{\mathrm init}$.  The prey and predator populations have error scales (on the log scale) of $\sigma_1$ and $\sigma_2$.
 
-This formulation of log-scale measurements with additive errors, leads to multiplicative errors when transformed back to the natural values by the exponential function,
+With log-transformed measurements with additive errors, transforming back to the natural scale leads to multiplicative errors,
 
 $$
 \begin{array}{rcl}
@@ -286,16 +286,23 @@ y_{n, k} & = & \exp(\log z_{n, k} + \epsilon_{n, k})
 \end{array}
 $$
 
-with $\exp(\epsilon_{n,k})$ being constrained to be positive, so that the product is positive.
+with $\exp(\epsilon_{n,k})$ being constrained to be positive, so that the product is positive.  In other words, rather than the measurement being plus or minus some value, it's plus or minus some percentage of the total.
 
+This transform and error multiplicative error model are so common that they are jointly known as the lognormal distribution, so that we can simplify the above notation as we did with linear regression and write
 
+$$
+y_{n, k} \sim \mathsf{LogNormal}(z_{n, k}, \sigma_n).
+$$
+if $\log y_{n, k} \sim \mathsf{Normal}(z_{n, k}, \sigma_n)$.
 
 
 # Weakly informative priors
 
-The only remaining question is what to use for priors on the parameters.   In general, the Stan Development Team has been recommending at least weakly informative priors.  In practice, the parameter ranges for the Lotka-Volterra model leading to stable populations are well known.
+The only remaining part of the model to formulate is what we know about the parameters.  In general, we^[The Stan Development Team, in a Wiki on  [prior choice recommendations](https://github.com/stan-dev/stan/wiki/Prior-Choice-Recommendations).] recommend at least weakly informative priors on parameters.   In practice, weakly informative priors inform the scale of the answer, but not the exact value.  That means that in order to formulate such priors, we need to know the rough scale on which to expect an answer.  Because this model is well understood and widely used, as is the basic behavior of predator and prey species such as lynxes and hares, the parameter ranges for the Lotka-Volterra model leading to stable and realistic population oscillations are well known.
 
-For the parameters,
+## Priors for system parameters
+
+For the parameters, recall that $\alpha$ and $\gamma$ are multipliers of $u$ and $-v$ respectively in the state equations, whereas $\beta$ and $\delta$ are multipliers of the product $u \, v$.  Combined with the fact that the scale of $u$ and $v$ are roughly 10 as the data has been encoded, leads to a prior scaling of the former parameters by the same factor.  
 
 $$
 \begin{eqnarray}
@@ -305,11 +312,23 @@ $$
 \end{eqnarray}
 $$
 
-The noise scale is proportional, so the following prior should be weakly informative,
+## Prior for noise scale
+
+The noise scale is proportional, so the following prior should be weakly informative,^[A lognormal prior on $\sigma$ is not consistent with zero values of $\sigma$, but we do not expect zero values of $\sigma$ here as we do not expect this model to be particularly accurate as formulated.]
 
 $$
-\sigma \sim \mathrm{Lognormal}(0, 0.5)
+\sigma \sim \mathrm{LogNormal}(0, 1)
 $$
+
+```{r echo=FALSE, fig.margin=TRUE, fig.cap = "Plot of lognormal(0, 0.5) prior.  This prior density is not consistent with a value of zero, as the density approaches zero very rapidly as the value approaches zero.  It is consistent with values only slightly larger than zero."}
+ggplot(data.frame(x = c(0, 6)), aes(x = x)) +
+  stat_function(fun = function(x) dlnorm(x, meanlog = 0, sdlog = 0.5)) +
+  scale_y_continuous(name = "prior density") +
+  scale_x_continuous(name = expression(sigma)) +
+  ggtheme_tufte()
+```
+
+The 95% interval will be roughly 1/e and e.  
 
 Then, for the initial population of predator and prey, the following priors are weakly informative
 
@@ -364,7 +383,7 @@ The data and parameters are coded following their specifications.
 data {
   int<lower = 0> N;         // num measurements
   real ts[N];               // measurement times > 0
-  real y0[2];               // initial measured population
+  real y_init[2];           // initial measured population
   real<lower = 0> y[N, 2];  // measured population at measurement times
 }
 parameters {
@@ -402,7 +421,7 @@ model {
   z_init[2] ~ normal(50, 50);
 
   // likelihood
-  y0 ~ lognormal(log(z_init), sigma);
+  y_init ~ lognormal(log(z_init), sigma);
   for (k in 1:2)
     y[ , k] ~ lognormal(log(z[, k]), sigma[k]);
 }
@@ -415,10 +434,10 @@ First, the data is setup in a form suitable for Stan.
 ```{r}
 N <- length(lynx_hare_df$Year) - 1                   # num observations after first
 ts <- 1:N                                            # observation times just years
-y0 <- c(lynx_hare_df$Hare[1], lynx_hare_df$Lynx[1])  # first observation
+y_init <- c(lynx_hare_df$Hare[1], lynx_hare_df$Lynx[1])  # first observation
 y <- as.matrix(lynx_hare_df[2:(N + 1), 2:3])         # remaining observations
 y <- cbind(y[ , 2], y[ , 1]);                        # reverse order
-lynx_hare_data <- list(N, ts, y0, y)
+lynx_hare_data <- list(N, ts, y_init, y)
 ```
 
 Next, the model is translated to C++ and compiled.
@@ -455,27 +474,29 @@ $$
 \hat{\delta} = 0.026
 $$
 
-Our model produced the following point estimates based on the posterior mean, which minimizes expected squared error,
-
-$$
-\hat{\alpha} = 0.55, \ \
-\hat{\beta} = 0.028, \ \
-\hat{\gamma} = 0.80, \ \
-\hat{\delta} = 0.024
-$$
-
-and the posterior median, which minimizes expected absolute error,
+Our model produced the following point estimates based on the posterior mean,^[The posterior mean minimizes expected squared error, whereas posterior medians minimize expected absolute error.  Here, the estimates are the same to within MCMC standard error.]
 
 $$
 \hat{\alpha} = 0.54, \ \
-\hat{\beta} = 0.035, \ \
+\hat{\beta} = 0.028, \ \
 \hat{\gamma} = 0.80, \ \
-\hat{\delta} = 0.030.
+\hat{\delta} = 0.024,
 $$
 
-The estimates are very similar to each other and to Howard's.
+which are quite close to Howard's estimates. 
 
-Howard then plugs in these point estimates and derives the most likely populations $z$ (including the initial population $z^{\mathrm init}$).  Rather than plugging in point estimates to get point predictions, we will adjust for the two forms of uncertainty inherent in our model.  First, there is estimation uncertainty, which we characterize with the posterior density $p(\alpha, \beta, \gamma, \delta, z^{\mathrm init}, \sigma \mid y)$.  The second form of uncertainty is the observation error and unexplained variation, which are both rolled into a single sampling distribution, $\log y_n \sim \mathsf{Normal}(\log z_n, \sigma)$.  As in the Stan implementation, $z_n$ is the solution to the differential equation conditioned on the parameters $\alpha, \beta, \gamma, \delta$ and initial state $z^{\mathrm init}$.  Altogether, we will be repulating new $y$ values, which we write as $y^{\mathrm{rep}}$, according to the posterior predictive distribution,
+## Inference for population sizes
+
+One inference we would like to make from our data is the size of the lynx and hare populations over time.  Howard (2009)
+plugs in optimization-derived point estimates to derive population predictions.  
+
+Rather than plugging in point estimates to get point predictions, we will follow the fully Bayesian approach of adjusting for uncertainty.  This uncertainty takes two forms in inference.  First, there is estimation uncertainty, which is fully characterized by the joint posterior density $p(\alpha, \beta, \gamma, \delta, z^{\mathrm init}, \sigma \mid y)$.  In well-behaved models in which the data is broadly consistent with the prior and likelihood, estimation uncertainty is reduced by larger samples; as more data is available, the posterior will concentrate  
+
+The second form of uncertainty is the observation error and unexplained variation, which are both rolled into a single sampling distribution, $\log y_n \sim \mathsf{Normal}(\log z_n, \sigma)$.  As in the Stan implementation, $z_n = (u_n, v_n)$ is the solution to the differential equation conditioned on the parameters $\theta = (\alpha, \beta, \gamma, \delta, \sigma)$ and initial state $z^{\mathrm init}$.  
+
+## Posterior predictive checks
+
+We use posterior predictive checks to evaluate how well our model fits the data on which it is trained.  The basic idea is to take the posterior for the fitted model and use it to predict what the data should've looked like.  That is, we will be replicating new $y$ values that parallel the actual observations $y$.  Becuase they are replicated values, we write them as as $y^{\mathrm{rep}}$.  The distribution of these replicated values is given by the posterior predictive distribution, 
 
 $$
 p(y^{\mathrm{rep}} | y)
@@ -483,23 +504,12 @@ p(y^{\mathrm{rep}} | y)
 \int p(y^{\mathrm{rep}} | \theta) \ p(\theta | y) \ \mathrm{d}\theta.
 $$
 
-where $\theta = (\alpha, \beta, \gamma, \delta, z^{\mathrm init}, \sigma)$ is the vector of parameters for the model.  Then, we calculate the posterior mean, which is itself an expectation,
+where $\theta = (\alpha, \beta, \gamma, \delta, z^{\mathrm init}, \sigma)$ is the vector of parameters for the model.  Our two forms of uncertainty are represented in the two terms in the integral.  The first is the sampling distribution for the replications, $p(y^{\mathrm rep} | \theta)$, which is the distribution of observations $y^{\mathrm rep}$ given parameters $\theta$.  This term encapsulates the unexplained variance and measurement error. The second term is the posterior $p(\theta | y)$, which encapsulates our uncertainty in our parameter estimates $\theta$ given the observations $y$.  What the integral is telling us is that we're calculating a weighted average of the sampling distribution, with weights given the posterior.  In statistical terms, we are calculating an expectation of a function of the parameters, $f(\theta) = p(y^{\mathrm rep} | \theta)$, over  the posterior $p(\theta | y)$, which can be written concisely as a conditional expectation,
 
 $$
-\begin{eqnarray}
-\hat{y}^{\mathrm{rep}}
-& = &
-\mathbb{E}[y^{\mathrm{rep}} | y]
-\\[8pt]
-& = &
-\int y^{\mathrm{rep}} \, p(y^{\mathrm{rep}} | y) \ \mathrm{d}y^{\mathrm{rep}}
-\\[8pt]
-& = &
-\int y^{\mathrm{rep}} \, p(y^{\mathrm{rep}} | \theta) \, p(\theta | y) \ \mathrm{d}y^{\mathrm{rep}} \ \mathrm{d}\theta
-\\[8pt]
-& \approx &
-\frac{1}{M} \sum_{m=1}^M y^{\mathrm{rep}(m)}
-\end{eqnarray}
+p(y^{\mathrm{rep}} | y)
+\ = \
+\mathbb{E}\!\left[ p(y^{\mathrm{rep}} | \theta) \ \big| \ y \right].
 $$
 
 As with other posterior expectations, the Bayesian point estimate is given by a simple average over simulated values, where $y^{\mathrm{rep}(m)}$ is just the result of simulating the value of $y^{\mathrm{rep}}$ according to the generative model based on parameter draw $\theta^{(m)}$.
@@ -509,15 +519,15 @@ The posterior predictive estimates of the dynamics are shown below, along with t
 ```{r echo=FALSE}
 z_init_draws <- extract(fit)$z_init
 z_draws <- extract(fit)$z
-y0_rep_draws <- extract(fit)$y0_rep
+y_init_rep_draws <- extract(fit)$y_init_rep
 y_rep_draws <- extract(fit)$y_rep
 predicted_pelts <- matrix(NA, 21, 2)
 min_pelts <- matrix(NA, 21, 2)
 max_pelts <- matrix(NA, 21, 2)
 for (k in 1:2) {
-  predicted_pelts[1, k] <- mean(y0_rep_draws[ , k])
-  min_pelts[1, k] <- quantile(y0_rep_draws[ , k], 0.25)
-  max_pelts[1, k] <- quantile(y0_rep_draws[ , k], 0.75)
+  predicted_pelts[1, k] <- mean(y_init_rep_draws[ , k])
+  min_pelts[1, k] <- quantile(y_init_rep_draws[ , k], 0.25)
+  max_pelts[1, k] <- quantile(y_init_rep_draws[ , k], 0.75)
   for (n in 2:21) {
     predicted_pelts[n, k] <- mean(y_rep_draws[ , n - 1, k])
     min_pelts[n, k] <- quantile(y_rep_draws[ , n - 1, k], 0.25)
