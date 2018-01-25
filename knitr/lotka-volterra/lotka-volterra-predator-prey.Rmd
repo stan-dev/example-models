@@ -67,11 +67,11 @@ printf <- function(msg = "%5.3f", ...) {
 
 ## Abstract
 
-Lotka and Volterra provided parameteric differential equations that characterize the dynamics of the populations of predator and prey species.   A statistical model to account for measurement error and unexplained variation uses the deterministic solutions to the Lotka-Volterra equations as expected population sizes.  Stan is used to encode the model and perform full Bayesian inference.  The model is fit to Canadian lynx^[Canadian lynx
+Lotka and Volterra provided parameteric differential equations that characterize the dynamics of the populations of predator and prey species.   A statistical model to account for measurement error and unexplained variation uses the deterministic solutions to the Lotka-Volterra equations as expected population sizes.  Stan is used to encode the model and perform full Bayesian inference.  The model is fit to Canadian lynx^[*Predator*: Canadian lynx
 ![Canadian lynx](Canadian_lynx_by_Keith_Williams.jpg)
 <span style="font-size:70%; float:right">&copy; 2009, Keith Williams, CC-BY 2.0</span>
-] and snowshoe hare^[Snowshoe hare
-![Snowshoe hare](Snowshoe_Hare,_Shirleys_Bay.jpg)
+] and snowshoe hare^[*Prey*: snowshoe hare
+![snowshoe hare](Snowshoe_Hare,_Shirleys_Bay.jpg)
 <span style="font-size:70%; float:right">&copy; 2013, D. Gordon E. Robertson, CC-BY SA 3.0</span>
 ] populations between 1900 and 1920, based on the number of pelts collected annually by the Hudson Bay Company.  Posterior predictive checks for replicated data show the model fits this data well.  Full Bayesian inference may be used to estimate future (or past) populations.
 
@@ -80,28 +80,24 @@ Lotka and Volterra provided parameteric differential equations that characterize
 
 > The rise and fall in numbers of snowshoe hares and Canada lynx was observed more than two hundred years ago by trappers working for Hudson’s Bay Company, which was once heavily involved in the fur trade. In the early 20th century, records of the number of lynx and hare pelts traded by Hudson’s Bay were analyzed by biologist Charles Gordon Hewitt.  *(Kara Rogers, 2011, Encyclopedia Brittanica Blog)*
 
-Hudson's Bay Company recorded the number of captured pelts of two species between 1900 and 1920,
+The species of interest are
 
 * [snowshoe hares](https://en.wikipedia.org/wiki/Snowshoe_hare), an hervivorous cousin of rabbits, and
-* [Canadian lynxes](https://en.wikipedia.org/wiki/Canada_lynx), a feline predator whose diet consists almost exclusively of snowshoe hares.
+* [Canadian lynxes](https://en.wikipedia.org/wiki/Canada_lynx), a feline predator whose diet consists largely of snowshoe hares.
 
-
-Hewitt's data derives from pelts collected by the Hudson's Bay Company, the largest fur trapper in Canada, between the years of 1821 and 1914.^[Graph from (Hewitt 1921) showing hare, lynx, and wolverine fluctuations based on pelts captured by the Hudson's Bay Company.
+Hewitt (1921) provides plots of the number of from pelts collected by the Hudson's Bay Company, the largest fur trapper in Canada, between the years of 1821 and 1914.^[Graph from (Hewitt 1921) showing hare, lynx, and wolverine fluctuations based on pelts captured by the Hudson's Bay Company.
 <br /> &nbsp; <br />
 ![](hewitt-hare-lynx-wolverine.png)
 <span style="float:right; font-size: 70%">&copy; Scribner's Sons 1921</span>
 ]
 Hewitt's discussion is also fascinating as to the nature of plagues, lynx migrations, and other factors affecting the populations other than their relative sizes, and factors affecting measurement such as starving lynx being easier to capture.  The models we consider here for illustrative purposes will not consider any of these factors, though they could be extended to do so through the usual strategy of the inclusion of covariates.  Hewitt also discusses many other species;  hares and lynxes occupy only a small part of a single chapter.
 
-
-We use the data provided by Howard (2009).
+Howard (2009) provides numerical data for the number of pelts collected by the Hudson's Bay Company in the years 1900-1920, which we have included in comma-separated value (CSV) form in the case study.
 
 ```{r}
 lynx_hare_df <-
   read.csv("hudson-bay-lynx-hare.csv", comment.char="#")
 ```
-
-
 
 ```{r echo=FALSE, fig.cap = "First and last rows of the long form data."}
 lynx_hare_melted_df <- melt(as.matrix(lynx_hare_df[, 2:3]))
@@ -182,17 +178,48 @@ $$
 As usual in writing differential equations, $u(t)$ and $v(t)$ are rendered as $u$ and $v$ to simplify notation.
 
 
-# Error model: measurement and unexplained variation
+## Positivitity constraint and extinction
 
-The Lotka-Volterra model is deterministic.  Given the system parameters and the initial conditions, the population dynamics are fully determined.  We will specify a statistical model that allows us to infer the parameters of the model and predict future population dynamics based on noisy measurements and a model that does not explain all of the observed variation in the data.  We will consider two sources of error.
+As population measures, the values of $u(t)$ and $v(t)$ should be non-negative.  Nothing in the differential equations here explicitly enforces positivity.  Nevertheless, as long as the initial populations are non-negative, i.e., $u(0) \geq 0$ and $v(0) \geq 0$, the values $u(t)$ and $v(t)$ for other times $t$ must also be positive.  This result is easy to see from the form of the differential equations, which take the change in each population to be a factor of the population size itself.  
 
-First, the theory is not expected to be that good in this case, so there will be resulting unexplained variation.  For example, the weather in a particular year is going to have an impact on the populations, but it is not taken into account, leading to variation that is not explained by the model.
+## Behavior in the limit
 
-The second source of error is noisy measurements of the population.  We cannot measure the population directly, so instead make do with noisy measurements, such as the number of pelts collected.  In more elaborate models (beyond what we consider here), measurements of pelts collected could be supplemented with output of other measurements, such as mark-recapture studies.
+One way to understand systems of equations is to consider their limiting behavior.  Here, there are four possible limiting behaviors
+
+1. If both populations begin at size zero, they remain that way.
+
+2. If only the prey population begins at zero, the predator population decays toward an asymptote at zero.
+
+3. If only the predator population begins at zero, the prey population grows without bound.
+
+4. If neither population is initially zero, the population sizes will oscillate in a fixed pattern indefinitely.
+
+In the oscillating cases, the populations may be arbitrarily close to zero, but they will never get to zero.  
+
+The fact that we can have very small fractional population size estimates is unrealistic in multiple ways.  First and most obviously, animals don't come in fractions.  But perhaps more importantly, random events such as accidents can drive a very small population extinct.
+
+
+# Measurement Error and Unexplained Variation
+
+The Lotka-Volterra model is deterministic.  Given the system parameters and the initial conditions, the solutions to the equations are fully determined.  Population measurements are not so well behaved that they exactly follow the model.  As we saw from the plots, the measurements do roughly follow the model for various ranges of parameters, but there is residual error that cannot be explained by the model.
+
+There are factors that impact predator and prey population size other than the current population size.  There are variable environmental effects, such as annual weather, which will vary from season to season and year to year and affect population sizes.  Infectious diseases occasionally spread through a population, reducing its size (Hewitt 1921).  There are also more long-term environmental factors such as carrying capacity.^[Carrying capacity is roughly the maximum population that an environment can sustain.  It is often modeled in the system dynamics as an asymptote on population size.]  In addition to factors that affect population which are not modeled, there is typically noise in the measurements.  
+
+In this particular case, we cannot even measure the population directly.  Instead, pelts are used as a proxy for population sizes.^[It would be possible to combine population models such as these with mark-recapture population models.]  Hewitt (1921) further noted that animals are easier to trap when food is scarce, making the population measurements dependent on the population size.  Even the exact number of pelts taken is likely to be only approximate, as they were collected in a range of locations over an entire season.  Here, the number is only recorded to the closest 100.^[Rounding can be treated explicitly by allowing the true value to be a parameter;  for instance if rounding is to the closest 100, the parameter can be modeled as uniform over $\pm 50$ of the true measured value or even greater if the measurement on which the rounding was based may be in error.]
+
+# Solving the inverse problem
+
+For a given legal value of the model parameters and initial state,  the Lotka-Volterra model predicts population dynamics into the future (and into the past).  But given noisy data about population dynamics, how do we solve the inverse problem, that of inferring the values of model parameters consistent with the data?  The general approach in Bayesian statistics is somewhat counterintuitive, as it involves formulating the forward model then using general principles to solve the inverse problem.   Specifically, it requires specifying what we know about the parameters before seeing the data, and what we expect the data to look like given parameter values.  Mathematically, this is done through a prior $p(\theta)$ over the sequence of parameters $\theta$ that encapsulates our knowledge of the parameters before seeing the data along with a sampling distribution $p(y|\theta)$ that characterizes the distribution of observable data $y$ given parameters $\theta$.^[The sampling distribution is called a likelihood function when considered as a function of parameters $\theta$ for fixed data $y$.] 
+
+Bayes's rule gives us a general solution to the inverse problem in the form of a posterior probability function $p(\theta | y)$.^[The derivation of Bayes's rule for parameters $\theta$ and observed data $y$ is $$ \begin{array}{rcl} p(\theta | y) & = & \displaystyle \frac{p(\theta, y)}{p(y)} \\[8pt] & = & \displaystyle \frac{p(y | \theta) \, p(\theta)}{p(y)} \\[8pt] & = & \displaystyle \frac{p(y | \theta) \, p(\theta)}{\int p(y | \theta) \, p(\theta) \, \mathrm{d}\theta} \\[8pt] & \propto & p(y | \theta) \, p(\theta). \end{array} $$]
+
+
+
+# Noise model for Lotka-Volterra dynamics
 
 ## A linear regression analogy
 
-Like a simple linear regression, or non-linear GLM, the trick is to treat the underlying determinstic model as providing a value which is expected to have error from both measurement and unexplained variance due to the simplifications in the scientific model.  Consider the typical formulation of a linear regression, where $y_n$ is the scalar outcome, $x_n$ is a row vector of predictors, $\beta$ is a coefficient vector parameter, and $\epsilon_n$ is a latent scalar parameter and $\sigma > 0$ is another parameter,
+Like a simple linear regression, or non-linear generalized linear model, the trick is to treat the underlying determinstic model as providing a value which is expected to have error from both measurement and unexplained variance due to the simplifications in the scientific model.  Consider the typical formulation of a linear regression, where $y_n$ is an observable scalar outcome, $x_n$ is a row vector of unmodeled predictors, $\beta$ is a coefficient vector parameter, and $\sigma > 0$ is the error scale, 
 
 $$
 \begin{eqnarray}
@@ -201,27 +228,27 @@ y_n & = & x_n \beta + \epsilon_n
 \epsilon_n & \sim & \mbox{Normal}(0, \sigma)
 \end{eqnarray}
 $$
-The deterministic part of the equation is the linear predictor $x \beta$.  The stochastic error term, $\epsilon_n$, gets a normal distribution located at zero with scale parameter $\sigma > 0$ (this error model ensures that the maximum likelihood value for $\beta$ is at the least squares solution).  We can alternatively write this model without the latent value $\epsilon_n$ as
+
+The deterministic part of the equation is the linear predictor $x \beta$.  The stochastic error term, $\epsilon_n$, gets a normal distribution located at zero with scale parameter $\sigma > 0$ (this error model ensures that the maximum likelihood value for $\beta$ is at the least squares solution).  We typically formulate this model without the latent error variable $\epsilon_n$ as follows,^[The latent error variable may be defined as  $\epsilon_n = y_n - x_n \beta$.]
 
 $$
 y_n \sim \mbox{Normal}(x_n \beta, \sigma).
 $$
 
-Here, $\epsilon_n = y_n - x_n \beta$ is implicit.
 
-### Noise model for Lotka-Volterra dynamics
+## Lotka-Volterra error model
 
 The data $y_i$ consists of measurements of the prey $y_{i, 1}$ and predator $y_{i, 2}$ populations at times $t_i$.  The Lotka-Volterra equations will replace the determinsitic parts of the linear regression equations.
 
-The true population sizes at time $t = 0$ are unknown---we only have measurements $y0_1$ and $y0_2$ for it.  The true population initial population sizes at time $t = 0$ will be represented by a parameter $z0$, so that
+The true population sizes at time $t = 0$ are unknown---we only have measurements $y^{\rm init}_1$ and $y^{\rm init}_2$ for it.  The true initial population sizes at time $t = 0$ will be represented by a parameter $z^{\mathrm init}$, so that
 
 $$
-z0_1 = u(t = 0)
+z^{\mathrm init}_1 = u(t = 0)
 \ \ \ \mathrm{and} \ \ \
-z0_2 = v(t = 0).
+z^{\mathrm init}_2 = v(t = 0).
 $$
 
-Next, let $z_1, \ldots, z_N$ be the solutions to the Lotka-Volterra differential equations at times $t_1, \ldots, t_N$ given initial conditions $z(t = 0) = z0$.  Each $z_n$ is a pair of prey and predator population sizes at the specified times,
+Next, let $z_1, \ldots, z_N$ be the solutions to the Lotka-Volterra differential equations at times $t_1, \ldots, t_N$ given initial conditions $z(t = 0) = z^{\mathrm init}$ and parameters $\theta = (\alpha, \beta, \gamma, \delta)$.  Each $z_n$ is a pair of prey and predator population sizes at the specified times,
 
 $$
 z_{n, 1} = u(t_n)
@@ -229,11 +256,15 @@ z_{n, 1} = u(t_n)
 z_{n, 2} = v(t_n)
 $$
 
-The $z_n$ are deterministic functions of $z0$ and the system parameters $\alpha, \beta, \gamma, \delta$;  thus $z$ is not a parameter but a derived quantity.
+The $z_n$ are random variables, but they are deterministic functions of other random variables: the initial system state $z^{\mathrm init}$ and the system parameters $\alpha, \beta, \gamma, \delta$.
 
-The observed data is the form of measurements $y0$ of the initial population of prey and predators, and subsequent measurements $y_n$ at times $t_n$, where $y0$ and the $y_n$ consist of a pair of measured population sizes, for the prey and predator species.
+The observed data is the form of measurements $y^{\rm init}$ of the initial population of prey and predators, and subsequent measurements $y_n$ at times $t_n$, where $y0$ and the $y_n$ consist of a pair of measured population sizes, for the prey and predator species.
 
-Putting this together, the $y_n$ (and $y0$) are measurements of the underlying predicted population $z_n$ ($z0$).  Because they are positive, the noise will be modeled on the log scale.  This has the convenient side effect of making the error multiplicative (i.e., proportional) rather than additive.
+Putting this all together, the $y_n$ (and $y^{\rm init}$) are measurements of the underlying predicted population $z_n$ ($z^{\mathrm init}$).  
+
+## Multiplicate error and the lognormal distribution
+
+It is natural for positive-only parameters to log transform them so that they are no longer constrained to be positive.  The simplest assumption we can make here is to take the error to be additive on the log scale, just as in a linear regression.
 
 $$
 \begin{eqnarray}
@@ -243,7 +274,21 @@ $$
 \end{eqnarray}
 $$
 
-where the $z_n$ are the solutions to the Lotka-Volterra equations at times $t_1, \ldots, t_N$ given initial population $z0$.  The prey and predator populations have error scales (on the log scale) of $\sigma_1$ and $\sigma_2$.
+where the $z_n$ are the solutions to the Lotka-Volterra equations at times $t_1, \ldots, t_N$ given initial population $z^{\mathrm init}$.  The prey and predator populations have error scales (on the log scale) of $\sigma_1$ and $\sigma_2$.
+
+This formulation of log-scale measurements with additive errors, leads to multiplicative errors when transformed back to the natural values by the exponential function,
+
+$$
+\begin{array}{rcl}
+y_{n, k} & = & \exp(\log z_{n, k} + \epsilon_{n, k})
+\\[4pt]
+         & = & z_{n, k} \, \exp(\epsilon_{n,k})
+\end{array}
+$$
+
+with $\exp(\epsilon_{n,k})$ being constrained to be positive, so that the product is positive.
+
+
 
 
 # Weakly informative priors
@@ -324,18 +369,18 @@ data {
 }
 parameters {
   real<lower = 0> theta[4];  // theta = { alpha, beta, gamma, delta }
-  real<lower = 0> z0[2];     // initial population
+  real<lower = 0> z_init[2];     // initial population
   real<lower = 0> sigma[2];  // measurement errors
 }
 ```
 
-The solutions to the Lotka-Volterra equations for a given initial state $z0$ are coded up as transformed parameters.  This will allow them to be used in the model and inspected in the output.  It also makes it clear that they are all functions of the initial population and parameters (as well as the solution times).
+The solutions to the Lotka-Volterra equations for a given initial state $z^{\mathrm init}$ are coded up as transformed parameters.  This will allow them to be used in the model and inspected in the output.  It also makes it clear that they are all functions of the initial population and parameters (as well as the solution times).
 
 ```
 transformed parameters {
   // population for remaining years
   real z[N, 2]
-    = integrate_ode_rk45(dz_dt, z0, 0, ts, theta,
+    = integrate_ode_rk45(dz_dt, z_init, 0, ts, theta,
                          rep_array(0.0, 0), rep_array(0, 0),
                          1e-6, 1e-5, 1e3);
 }
@@ -353,11 +398,11 @@ model {
   sigma ~ normal(0, 0.5);
   theta[1:2] ~ normal(0, 1);
   theta[3:4] ~ normal(0, 0.2);
-  z0[1] ~ normal(10, 10);
-  z0[2] ~ normal(50, 50);
+  z_init[1] ~ normal(10, 10);
+  z_init[2] ~ normal(50, 50);
 
   // likelihood
-  y0 ~ lognormal(log(z0), sigma);
+  y0 ~ lognormal(log(z_init), sigma);
   for (k in 1:2)
     y[ , k] ~ lognormal(log(z[, k]), sigma[k]);
 }
@@ -430,7 +475,7 @@ $$
 
 The estimates are very similar to each other and to Howard's.
 
-Howard then plugs in these point estimates and derives the most likely populations $z$ (including the initial population $z0$).  Rather than plugging in point estimates to get point predictions, we will adjust for the two forms of uncertainty inherent in our model.  First, there is estimation uncertainty, which we characterize with the posterior density $p(\alpha, \beta, \gamma, \delta, z_0, \sigma \mid y)$.  The second form of uncertainty is the observation error and unexplained variation, which are both rolled into a single sampling distribution, $\log y_n \sim \mathsf{Normal}(\log z_n, \sigma)$.  As in the Stan implementation, $z_n$ is the solution to the differential equation conditioned on the parameters $\alpha, \beta, \gamma, \delta$ and initial state $z_0$.  Altogether, we will be repulating new $y$ values, which we write as $y^{\mathrm{rep}}$, according to the posterior predictive distribution,
+Howard then plugs in these point estimates and derives the most likely populations $z$ (including the initial population $z^{\mathrm init}$).  Rather than plugging in point estimates to get point predictions, we will adjust for the two forms of uncertainty inherent in our model.  First, there is estimation uncertainty, which we characterize with the posterior density $p(\alpha, \beta, \gamma, \delta, z^{\mathrm init}, \sigma \mid y)$.  The second form of uncertainty is the observation error and unexplained variation, which are both rolled into a single sampling distribution, $\log y_n \sim \mathsf{Normal}(\log z_n, \sigma)$.  As in the Stan implementation, $z_n$ is the solution to the differential equation conditioned on the parameters $\alpha, \beta, \gamma, \delta$ and initial state $z^{\mathrm init}$.  Altogether, we will be repulating new $y$ values, which we write as $y^{\mathrm{rep}}$, according to the posterior predictive distribution,
 
 $$
 p(y^{\mathrm{rep}} | y)
@@ -438,7 +483,7 @@ p(y^{\mathrm{rep}} | y)
 \int p(y^{\mathrm{rep}} | \theta) \ p(\theta | y) \ \mathrm{d}\theta.
 $$
 
-where $\theta = (\alpha, \beta, \gamma, \delta, z_0, \sigma)$ is the vector of parameters for the model.  Then, we calculate the posterior mean, which is itself an expectation,
+where $\theta = (\alpha, \beta, \gamma, \delta, z^{\mathrm init}, \sigma)$ is the vector of parameters for the model.  Then, we calculate the posterior mean, which is itself an expectation,
 
 $$
 \begin{eqnarray}
@@ -461,8 +506,8 @@ As with other posterior expectations, the Bayesian point estimate is given by a 
 
 The posterior predictive estimates of the dynamics are shown below, along with the raw data on number of pelts collected.
 
-```{r}
-z0_draws <- extract(fit)$z0
+```{r echo=FALSE}
+z_init_draws <- extract(fit)$z_init
 z_draws <- extract(fit)$z
 y0_rep_draws <- extract(fit)$y0_rep
 y_rep_draws <- extract(fit)$y_rep
@@ -580,7 +625,7 @@ sessionInfo()
 
 <br />
 
-##< Appendix: Licenses
+## Appendix: Licenses
 
-* Code &copy; 2017, Columbia University, licensed under BSD-3.
-* Text &copy; 2017, Bob Carpenter, licensed under CC-BY-NC 4.0.
+* <span style="font-size:85%">Code &copy; 2017--2018, Columbia University, licensed under BSD-3.</span>
+* <span style="font-size:85%">Text &copy; 2017--2018, Bob Carpenter, licensed under CC-BY-NC 4.0.</span>
