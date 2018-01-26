@@ -26,25 +26,22 @@ data {
 }
 parameters {
   real<lower = 0> theta[4];  // theta = { alpha, beta, gamma, delta }
-  real<lower = 0> z_init[2];     // initial population
+  real<lower = 0> z_init[2]; // initial population
   real<lower = 0> sigma[2];  // measurement errors
 }
 transformed parameters {
-  // population for remaining years
   real z[N, 2]
     = integrate_ode_rk45(dz_dt, z_init, 0, ts, theta,
                          rep_array(0.0, 0), rep_array(0, 0),
                          1e-5, 1e-3, 5e2);
 }
 model {
-  // priors
-  theta[{1, 3}] ~ normal(1, 0.5); // 95% (
+  theta[{1, 3}] ~ normal(1, 0.5);
   theta[{2, 4}] ~ normal(0.05, 0.05);
 
-  z_init ~ lognormal(25, 1);
-  sigma ~ lognormal(0.5, 1);  // 95% (0.07, 3.5)
+  z_init ~ lognormal(10, 1);
+  sigma ~ lognormal(-1, 1);
 
-  // likelihood
   for (k in 1:2) {
     y_init[k] ~ lognormal(log(z_init[k]), sigma[k]);
     y[ , k] ~ lognormal(log(z[, k]), sigma[k]);

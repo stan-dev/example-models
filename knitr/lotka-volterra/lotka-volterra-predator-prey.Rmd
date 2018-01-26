@@ -10,17 +10,26 @@ output:
 ---
 
 ```{r setup, include=FALSE, echo=FALSE}
-library(tufte)
-library(reshape)
+options(htmltools.dir.version = FALSE)
+options(digits = 2)
+
 library(ggplot2)
+
+library(gridExtra)
+
+library(knitr)
+knitr::opts_chunk$set(cache = TRUE)
+knitr::opts_chunk$set(tidy = FALSE, cache.extra = packageVersion('tufte'))
+knitr::opts_chunk$set(comment = "")
+
+library(reshape)
+
 library(rstan)
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores(logical = FALSE))
-knitr::opts_chunk$set(tidy = FALSE, cache.extra = packageVersion('tufte'))
-knitr::opts_chunk$set(cache = TRUE)
-knitr::opts_chunk$set(comment = '>')
-options(htmltools.dir.version = FALSE)
-options(digits = 2)
+
+library(tufte)
+
 ggtheme_tufte <- function(base_size = 12, base_family = "") {
   theme(plot.background =
           element_rect(fill = "#fffff8",
@@ -46,8 +55,9 @@ ggtheme_tufte <- function(base_size = 12, base_family = "") {
         axis.title.y = element_text(family = "Palatino", size = 20,
                                     margin = margin(t = 0, r = 15, b = 0, l = 0)),
         strip.background = element_rect(fill = "#fffff8",
-                                        colour = "black",
+                                        colour = "#fffff8",
                                         linetype = "solid"),
+        strip.text = element_text(family = "Palatino", size = 16),
         legend.text = element_text(family = "Palatino", size = 16),
         legend.title = element_text(family = "Palatino", size = 16),
         legend.background = element_rect(fill = "#fffff8",
@@ -85,7 +95,7 @@ The species of interest are
 * [snowshoe hares](https://en.wikipedia.org/wiki/Snowshoe_hare), an hervivorous cousin of rabbits, and
 * [Canadian lynxes](https://en.wikipedia.org/wiki/Canada_lynx), a feline predator whose diet consists largely of snowshoe hares.
 
-Hewitt (1921) provides plots of the number of from pelts collected by the Hudson's Bay Company, the largest fur trapper in Canada, between the years of 1821 and 1914.^[Graph from (Hewitt 1921) showing hare, lynx, and wolverine fluctuations based on pelts captured by the Hudson's Bay Company.
+Hewitt (1921) provides plots of the number of from pelts collected by the Hudson's Bay Company, the largest fur trapper in Canada, between the years of 1821 and 1914.^[Graph from (Hewitt 1921) showing the numbers of pelts captured by the Hudson's Bay Company.  The fluctuations are irregular and the linear growth in rabbits after 1830 is suspicious.
 <br /> &nbsp; <br />
 ![](hewitt-hare-lynx-wolverine.png)
 <span style="float:right; font-size: 70%">&copy; Scribner's Sons 1921</span>
@@ -119,6 +129,8 @@ knitr::kable(lynx_hare_melted_df[c(1:2, 21:22, 41:42), ],
 population_plot2 <-
   ggplot(data = lynx_hare_melted_df,
          aes(x = year, y = pelts, color = species)) +
+  geom_vline(xintercept = 1900, color = "grey") +
+  geom_hline(yintercept = 0, color = "grey") +
   geom_line(size = 0.75) +
   geom_point(size = 1.5) +
   ylab("pelts (thousands)") +
@@ -130,6 +142,8 @@ population_plot2
 population_plot1 <-
   ggplot(data = lynx_hare_df,
          aes(x = Lynx, y = Hare, color = Year)) +
+  geom_vline(xintercept = 0, color = "grey") +
+  geom_hline(yintercept = 0, color = "grey") +
   geom_path(size = 0.75) +
   geom_point(size = 1.5) +
   xlab("lynx pelts (thousands)") +
@@ -151,7 +165,7 @@ The Lotka-Volterra equations (Volterra 1926, 1927; Lotka 1925) are based on the 
 
 Together, these dynamics lead to a cycle of rising and falling populations.  With a low lynx population, the hare population grows.  As the hare population grows, it allows the lynx population to grow.  Eventually, the lynx population is large enough to start cutting down on the hare population.  That in turn puts downward pressure on the lynx population.  The cycle then resumes from where it started.
 
-The Lotka-Volterra equations (Volterra 1926, 1927; Lotka 1925) are a pair of first-order differential equations describing the population dynamics of a pair of species, one predator and one prey.^[Solutions to the Lotka-Volterra equations time plotted as predator vs. prey populations;  the temporal trajectory of populations forms a stable orbit when plotted in two dimensions (Volterra 1926). 
+The Lotka-Volterra equations (Volterra 1926, 1927; Lotka 1925) are a pair of first-order, ordinary differential equations (ODEs) describing the population dynamics of a pair of species, one predator and one prey.^[Solutions to the Lotka-Volterra equations time plotted as predator vs. prey populations;  the temporal trajectory of populations forms a stable orbit when plotted in two dimensions (Volterra 1926). 
 <br /> &nbsp; <br />
 ![](volterra-1926-cyclic.jpg)
 <span style="float:right; font-size:60%">&copy; 1926, Nature Publishing Group</a>
@@ -187,16 +201,12 @@ As population measures, the values of $u(t)$ and $v(t)$ should be non-negative. 
 One way to understand systems of equations is to consider their limiting behavior.  Here, there are four possible limiting behaviors
 
 1. If both populations begin at size zero, they remain that way.
-
-2. If only the prey population begins at zero, the predator population decays toward an asymptote at zero.
-
 3. If only the predator population begins at zero, the prey population grows without bound.
-
 4. If neither population is initially zero, the population sizes will oscillate in a fixed pattern indefinitely.
 
-In the oscillating cases, the populations may be arbitrarily close to zero, but they will never get to zero.  
+In the oscillating cases, the population sizes may come arbitrarily close to zero, but they will never quite die out because of the form of the equations.
 
-The fact that we can have very small fractional population size estimates is unrealistic in multiple ways.  First and most obviously, animals don't come in fractions.  But perhaps more importantly, random events such as accidents can drive a very small population extinct.
+The fact that we can have very small fractional population size estimates is unrealistic in multiple ways.  Most obviously, animal populations are natural numbers, not fractional;  this is usually a tolerable abstraction.^[To solve this problem, the populations could be drawn as Poisson or negative binomial using the continuous expected counts.  With counts in the thousands, a normal approximation is more than adequate and more convenient computationally.]   More importantly from a biological point of view, random events such as accidents can drive a very small population extinct.
 
 
 # Measurement Error and Unexplained Variation
@@ -253,14 +263,14 @@ Next, let $z_1, \ldots, z_N$ be the solutions to the Lotka-Volterra differential
 $$
 z_{n, 1} = u(t_n)
 \ \ \ \mathrm{and} \ \ \
-z_{n, 2} = v(t_n)
+z_{n, 2} = v(t_n).
 $$
 
-The $z_n$ are random variables, but they are deterministic functions of other random variables: the initial system state $z^{\mathrm init}$ and the system parameters $\alpha, \beta, \gamma, \delta$.
+The $z_n$ are random variables, but they are deterministic functions of the random variables for the initial state $z^{\mathrm init}$ and system parameters $\alpha, \beta, \gamma, \delta$.
 
 The observed data is the form of measurements $y^{\rm init}$ of the initial population of prey and predators, and subsequent measurements $y_n$ at times $t_n$, where $y^{\mathrm init}$ and the $y_n$ consist of a pair of measured population sizes, for the prey and predator species.
 
-Putting this all together, the measurements $y^{\rm init}$ and $y_n$ are of an underlying latent population sizes $z^{\mathrm init}$ and $z_n$.  
+Putting this all together, the measurements $y^{\rm init}$ and $y_n$ are of a underlying latent population sizes of predator and prey $z^{\mathrm init} = u(0), v(0)$ and $z_n = u(t_n), v(t_n)$.  
 
 ## Multiplicate error and the lognormal distribution
 
@@ -275,6 +285,37 @@ $$
 $$
 
 where the $z_n$ are the solutions to the Lotka-Volterra equations at times $t_1, \ldots, t_N$ given initial population $z^{\mathrm init}$.  The prey and predator populations have error scales (on the log scale) of $\sigma_1$ and $\sigma_2$.
+
+```{r echo=FALSE, fig.margin=TRUE, fig.cap="The top figure shows the density of a standard normal variate, i.e., location (mean) 0 and scale (standard deviation) 1. The bottom figure the corresponding standard lognormal variate, i.e., log location 0 and log scale 1.  The central 99.5% interval is shown in both cases with a dashed vertical line indicating the median and dotted lines the boundaries of the central 95% interval.  The skew in the lognormal plot is due to the exponentiation---the range (2, 3) in the standard normal plot, containing only 2% of the total probability mass, maps to (7, 20) in the lognormal plot.  If the horizontal and vertical axes were drawn to the same scale, the areas under the two curves would be the same."}
+lb = -3
+ub = 3
+plot1 <- ggplot(data.frame(x = c(lb, ub)), aes(x = x)) +
+  geom_vline(xintercept = 0, color = "grey") +
+  geom_hline(yintercept = 0, color = "grey") +
+  stat_function(fun = function(x) dnorm(x, mean = 0, sd = 1)) +
+  scale_y_continuous(name = expression(p(log~~y[n]))) +
+  scale_x_continuous(name = expression(log~~y[n])) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_vline(xintercept = -2, linetype = "dotted") +
+  geom_vline(xintercept = 2, linetype = "dotted") +
+  ggtheme_tufte()  +
+  theme(axis.text.y = element_blank())
+#
+plot2 <- ggplot(data.frame(x = c(exp(lb), exp(ub))), aes(x = x)) +
+  geom_vline(xintercept = 0, color = "grey") +
+  geom_hline(yintercept = 0, color = "grey") +
+  stat_function(fun = function(x) dlnorm(x, meanlog = 0, sdlog = 1)) +
+  scale_y_continuous(name = expression(p(y[n]))) +
+  scale_x_continuous(breaks = c(0, 1, 5, 10, 20), name = expression(y[n])) +
+  geom_vline(xintercept = 1, linetype = "dashed") +
+  geom_vline(xintercept = exp(-2), linetype = "dotted") +
+  geom_vline(xintercept = exp(2), linetype = "dotted") +
+  ggtheme_tufte() +
+  theme(axis.text.y = element_blank())
+grid.arrange(plot1, plot2, nrow=2, ncol=1)
+```
+
+
 
 With log-transformed measurements with additive errors, transforming back to the natural scale leads to multiplicative errors,
 
@@ -293,7 +334,10 @@ This transform and error multiplicative error model are so common that they are 
 $$
 y_{n, k} \sim \mathsf{LogNormal}(z_{n, k}, \sigma_n).
 $$
-if $\log y_{n, k} \sim \mathsf{Normal}(z_{n, k}, \sigma_n)$.
+if 
+$$
+\log y_{n, k} \sim \mathsf{Normal}(z_{n, k}, \sigma_n).
+$$
 
 
 # Weakly informative priors
@@ -317,29 +361,41 @@ $$
 The noise scale is proportional, so the following prior should be weakly informative, as a value smaller than 0.1 or larger than 1 would be unexpected. Because values are positive, this prior adopts the lognormal distribution.^[A lognormal prior on $\sigma$ is not consistent with zero values of $\sigma$, but we do not expect zero values of $\sigma$ here as we do not expect this model to be particularly accurate as formulated.]  Another reasonable prior choice would be a broad half normal.^[An interval prior with hard boundaries is not recommended as it may bias results if the data is compatible with results near the boundary.]
 
 $$
-\sigma \sim \mathrm{LogNormal}(\log(0.5), 1)
+\sigma \sim \mathrm{LogNormal}(-1, 1)
 $$
 
-```{r echo=FALSE, fig.margin=TRUE, fig.cap = "Plot of lognormal(log(0.5), 0.5) prior.  This prior density is not consistent with a value of zero, as the density approaches zero very rapidly as the value approaches zero.  It is consistent with values only slightly larger than zero."}
-ggplot(data.frame(x = c(0, 6)), aes(x = x)) +
-  stat_function(fun = function(x) dlnorm(x, meanlog = log(0.5), sdlog = 1)) +
+```{r echo=FALSE, fig.margin=TRUE, fig.cap = "Plot of lognormal(-1, 1) prior.  The median, 0.4, is highlighted with a dashed line and the central 95% interval, (0.05, 2.7), with dotted lines.  This prior density is not consistent with values of sigma approaching zero."}
+loc = -1
+scale = 1
+ggplot(data.frame(x = c(0, 4)), aes(x = x)) +
+  geom_vline(xintercept = 0, color = "grey") +
+  geom_hline(yintercept = 0, color = "grey") +
+  stat_function(fun = function(x) dlnorm(x, meanlog = loc, sdlog = scale)) +
+  geom_vline(xintercept = exp(loc), linetype = "dashed", color="darkgrey") +
+  geom_vline(xintercept = exp(loc - 2 * scale), linetype = "dotted", color="darkgrey") +
+  geom_vline(xintercept = exp(loc + 2 * scale), linetype = "dotted", color="darkgrey") +
   scale_y_continuous(name = expression(p(sigma))) +
   scale_x_continuous(name = expression(sigma)) +
   ggtheme_tufte() +
   theme(axis.text.y = element_blank())
 ```
 
-The 95% interval will be roughly 1/e and e.  
-
-Then, for the initial population of predator and prey, the following priors are weakly informative.
+For the initial population of predator and prey, the following priors are weakly informative.
 
 $$
-z^{\mathrm init}_1, \ z^{\mathrm init}_2 \ \sim \ \mathsf{LogNormal}(\log(25), 1)
+z^{\mathrm init}_1, \ z^{\mathrm init}_2 \ \sim \ \mathsf{LogNormal}(\log(10), 1)
 $$
 
-```{r echo=FALSE, fig.margin=TRUE, fig.cap = "Plot of lognormal(log(10), 1) prior.  This prior suffices for both predator and prey sizes."}
+```{r echo=FALSE, fig.margin=TRUE, fig.cap = "Plot of lognormal(log(10), 1) prior.  The median, 2.3, is highlighted with a dashed line and the 95% interval, (1.4, 75), withdotted lines. This prior suffices for both predator and prey sizes."}
+loc = log(10)
+scale = 1
 ggplot(data.frame(x = c(0, 150)), aes(x = x)) +
-  stat_function(fun = function(x) dlnorm(x, meanlog = log(25), sdlog = 1))+
+  geom_vline(xintercept = 0, color = "grey") +
+  geom_hline(yintercept = 0, color = "grey") +
+  stat_function(fun = function(x) dlnorm(x, meanlog = log(10), sdlog = 1)) +
+  geom_vline(xintercept = exp(loc), linetype = "dashed", color="darkgrey") +
+  geom_vline(xintercept = exp(loc - 2 * scale), linetype = "dotted", color="darkgrey") +
+  geom_vline(xintercept = exp(loc + 2 * scale), linetype = "dotted", color="darkgrey") +
   scale_y_continuous(name = expression(p(z^init), )) +
   scale_x_continuous(name = expression(z^init)) +
   ggtheme_tufte() +
@@ -388,23 +444,22 @@ The data and parameters are coded following their specifications.
 
 ```
 data {
-  int<lower = 0> N;         // num measurements
-  real ts[N];               // measurement times > 0
-  real y_init[2];           // initial measured population
-  real<lower = 0> y[N, 2];  // measured population at measurement times
+  int<lower = 0> N;           // num measurements
+  real ts[N];                 // measurement times > 0
+  real y_init[2];             // initial measured population
+  real<lower = 0> y[N, 2];    // measured population at measurement times
 }
 parameters {
-  real<lower = 0> theta[4];  // theta = { alpha, beta, gamma, delta }
-  real<lower = 0> z_init[2];     // initial population
-  real<lower = 0> sigma[2];  // measurement errors
+  real<lower = 0> theta[4];   // theta = { alpha, beta, gamma, delta }
+  real<lower = 0> z_init[2];  // initial population
+  real<lower = 0> sigma[2];   // error scale
 }
 ```
 
-The solutions to the Lotka-Volterra equations for a given initial state $z^{\mathrm init}$ are coded up as transformed parameters.  This will allow them to be used in the model and inspected in the output.  It also makes it clear that they are all functions of the initial population and parameters (as well as the solution times).
+The solutions to the Lotka-Volterra equations for a given initial state $z^{\mathrm init}$ are coded up as transformed parameters.  This will allow them to be used in the model and inspected in the output.  It also makes it clear that they are all functions of the initial population and parameters (as well as the solution times).^[Stan provides two solvers, a Runge-Kutta 4th/5th-order solver (`_rk45`) and a backwards-differentiation formula solver (`_bdf`) for stiff systems.  The RK45 solver is twice as fast as the BDF solver for this data.   The symptom of stiffness is slow iterations that may appear to be hanging if a large number of iterations is permitted.  If the solver runs into stiffness and more careful initialization or prior choice does not mitigate the problem, the BDF solver may be used to adjust for the ill-conditioned Jacobians at the cost of increased computation time.]
 
 ```
 transformed parameters {
-  // population for remaining years
   real z[N, 2]
     = integrate_ode_rk45(dz_dt, z_init, 0, ts, theta,
                          rep_array(0.0, 0), rep_array(0, 0),
@@ -412,38 +467,34 @@ transformed parameters {
 }
 ```
 
-The Runge-Kutta 4th/5th-order solver is specified here for efficiency (with suffix <code>_rk45</code>) because the equations are not stiff in the parameter ranges encountered for this data.   The required real and integer data arguments in the second line are both given as size-zero arrays.  The last line provides relative and absolute tolerances, along with the maximum number of steps allowed in the solver.  For further efficiency, the tolerances for the differential equation solver are relatively loose for this example; usually tighter tolerances are required (smaller numbers).
-
-If the solver runs into stiffness (the symptom of which is very slow iterations that may appear to be hanging), it is best to switch to the backward-differentiation formula solver, called with <code>integrate_ode_bdf</code>. The Runge-Kutta solver is twice as fast as the BDF solver for this problem on this data.
+The required real and integer data arguments in the second line are both given as constant size-zero arrays.  The last line provides relative and absolute tolerances, along with the maximum number of steps allowed in the solver before rejecting.^[Rejections behave like zero density points from which no progress may be made;  in C++, the behavior is to throw an exception, which is caught and displayed as an error message by the interfaces.]  For further efficiency, the tolerances for the differential equation solver are relatively loose for this example; usually tighter tolerances are required (smaller numbers).
 
 With the solutions in hand, the only thing left are the prior and likelihood.  As with the other parts of the model, these directly follow the notation in the mathematical specification of the model.
 
 ```
 model {
-  // priors
   sigma ~ normal(0, 0.5);
   theta[1:2] ~ normal(0, 1);
   theta[3:4] ~ normal(0, 0.2);
   z_init[1] ~ normal(10, 10);
   z_init[2] ~ normal(50, 50);
 
-  // likelihood
   y_init ~ lognormal(log(z_init), sigma);
   for (k in 1:2)
     y[ , k] ~ lognormal(log(z[, k]), sigma[k]);
 }
 ```
 
-## Fitting the Hudson Bay Company lynx-hare data
+## Fitting the Hudson's Bay Company data
 
 First, the data is setup in a form suitable for Stan.
 
 ```{r}
-N <- length(lynx_hare_df$Year) - 1                   # num observations after first
-ts <- 1:N                                            # observation times just years
-y_init <- c(lynx_hare_df$Hare[1], lynx_hare_df$Lynx[1])  # first observation
-y <- as.matrix(lynx_hare_df[2:(N + 1), 2:3])         # remaining observations
-y <- cbind(y[ , 2], y[ , 1]);                        # reverse order
+N <- length(lynx_hare_df$Year) - 1
+ts <- 1:N
+y_init <- c(lynx_hare_df$Hare[1], lynx_hare_df$Lynx[1])
+y <- as.matrix(lynx_hare_df[2:(N + 1), 2:3])
+y <- cbind(y[ , 2], y[ , 1]); # hare, lynx order
 lynx_hare_data <- list(N, ts, y_init, y)
 ```
 
@@ -453,23 +504,20 @@ Next, the model is translated to C++ and compiled.
 model <- stan_model("lotka-volterra.stan")
 ```
 
-Finally, the compiled model and data are used for sampling.  Stan's default settings are sufficient for this data set and model.
+Finally, the compiled model and data are used for sampling.^[The independent steps of compiling the Stan model and running it are highlighted here.  These two steps may be composed into a single call as `stan("lotka_volterra.stan", data = lynx_hare_dat, seed = 123)`.  Calling `rstan_options(auto_write = TRUE)` configures `stan_model()` and `stan()` to reuse a compiled model if it hasn't changed.]  Stan's default settings are sufficient for this data set and model.
 
 ```{r results="hide"}
-fit <- sampling(model, data = lynx_hare_data,
-                seed=123)
+fit <- sampling(model, data = lynx_hare_data, seed = 123)
 ```
 
-The output can be displayed in tabular form, here limited to the median (0.5 quantile) and 80% interval (0.1 and 0.9 quantiles), and restricted to the main quantities of interest
+The output can be displayed in tabular form, here limited to the median (0.5 quantile) and 80% interval (0.1 and 0.9 quantiles), and restricted to the parameters of interest.
 
 ```{r}
 print(fit, pars=c("theta", "sigma", "z_init"), 
       probs=c(0.1, 0.5, 0.9), digits = 3)
 ```
 
-The R-hat values are all near 1, which is consistent with convergence.  The effective sample size estimates for each parameter are sufficient for inference.  Thus we have reason to trust this fit.
-
-The expected values `z` are unlike the replicated draws `y_rep` in two ways.  First, their posterior has much lower variance and much narrower 80% intervals.  This is to be expected, as the `y_rep` additional takes into account measurement and unexplained variance, whereas `z` only takes into account parameter estimation uncertainty.  Second, the mean values of `z` are lower than the corresponding values of `y_rep`.  This is because `y_rep` is adding a lognormal error term, which has a positive expectation as it is constrained to be positive;  this positivity is also a factor in the fits that are derived for `z`.
+There were no divergent transitions^[Divergences occur when Stan's Hamiltonian solver diverges from the Hamiltonian because of numerical problems in the gradient-based approximation of the log density.] reported and R-hat values are all near 1, which is consistent with convergence.  The effective sample size estimates for each parameter are sufficient for inference.^[With effective sample sizes of roughly one thousand, standard errors are roughly one thirtieth the size of posterior standard deviations.]  Thus we have reason to trust that Stan has produced an adequate approximation of the posterior.
 
 
 ## Comparing the fitted model to data
@@ -485,13 +533,34 @@ $$
 Our model produced the following point estimates based on the posterior mean,^[The posterior mean minimizes expected squared error, whereas posterior medians minimize expected absolute error.  Here, the mean and median are the same to within MCMC standard error.]
 
 $$
-\hat{\alpha} = 0.54, \ \
-\hat{\beta} = 0.028, \ \
-\hat{\gamma} = 0.80, \ \
-\hat{\delta} = 0.024,
+\hat{\alpha} = 0.57, \ \
+\hat{\beta} = 0.029, \ \
+\hat{\gamma} = 0.76, \ \
+\hat{\delta} = 0.022,
 $$
 
-which are quite close to Howard's estimates. 
+which are quite close to Howard's estimates.^[Discrepancies are to be expected in that we are finding a posterior mean wheras Howard is finding a posterior mode.  We do not suspect the priors have a strong influence here, but this could be checked by varying them and comparing results, i.e., performing a sensitivity analysis.] The posterior intervals are quite large in fact. The posterior intervals may be interpreted probabilistically,
+
+$$
+\begin{array}{ccc}
+\mbox{Pr}[0.48 \leq \alpha \leq 0.66] & = & 0.8
+\\[4pt]
+\mbox{Pr}[0.23 \leq \beta \leq 0.35] & = & 0.8
+\\[4pt]
+\mbox{Pr}[0.65 \leq \delta \leq 0.88] & = & 0.8
+\\[4pt]
+\mbox{Pr}[0.018 \leq \gamma \leq 0.027] & = & 0.8
+\end{array}
+$$
+
+Error scales for both populations have the same posterior mean estimate,
+
+$$
+\hat{\sigma}_1 \ = \ \hat{\sigma}_2 \ = \ 0.25.
+$$
+
+and both have the same posterior 80% interval, (0.20, 0.31).^[This suggests they may be completely pooled and modeled using a single parameter.]
+
 
 ## Inference for population sizes
 
@@ -514,17 +583,7 @@ $$
 
 where $\theta = (\alpha, \beta, \gamma, \delta, z^{\mathrm init}, \sigma)$ is the vector of parameters for the model.  Our two forms of uncertainty are represented in the two terms in the integral.  The first is the sampling distribution for the replications, $p(y^{\mathrm rep} | \theta)$, which is the distribution of observations $y^{\mathrm rep}$ given parameters $\theta$.  This term encapsulates the unexplained variance and measurement error. The second term is the posterior $p(\theta | y)$, which encapsulates our uncertainty in our parameter estimates $\theta$ given the observations $y$.  What the integral is telling us is that we're calculating a weighted average of the sampling distribution, with weights given the posterior.  In statistical terms, we are calculating an expectation of a function of the parameters, $f(\theta) = p(y^{\mathrm rep} | \theta)$, over  the posterior $p(\theta | y)$, which can be written concisely as a conditional expectation,
 
-$$
-p(y^{\mathrm{rep}} | y)
-\ = \
-\mathbb{E}\!\left[ p(y^{\mathrm{rep}} | \theta) \ \big| \ y \right].
-$$
-
-As with other posterior expectations, the Bayesian point estimate is given by a simple average over simulated values, where $y^{\mathrm{rep}(m)}$ is just the result of simulating the value of $y^{\mathrm{rep}}$ according to the generative model based on parameter draw $\theta^{(m)}$.
-
-The posterior predictive estimates of the dynamics are shown below, along with the raw data on number of pelts collected.
-
-```{r echo=FALSE, fig.margin = TRUE, fig.cap = "Posterior means plotted with 50% posterior intervals along with the measured data."}
+```{r echo=FALSE, fig.margin = TRUE, fig.cap = "Posterior predictive checks, including posterior means and 50% intervals along with the measured data.  If the model is well calibrated, as this one appears to be, 50% of the points are expected to fall in their 50% intervals."}
 z_init_draws <- extract(fit)$z_init
 z_draws <- extract(fit)$z
 y_init_rep_draws <- extract(fit)$y_init_rep
@@ -571,17 +630,28 @@ lynx_hare_observe_predict_df <-
 population_plot2 <-
   ggplot(data = lynx_hare_observe_predict_df,
          aes(x = year, y = pelts, color = source)) +
+  geom_vline(xintercept = 1900, color = "grey") +
+  geom_hline(yintercept = 0, color = "grey") +
   facet_wrap( ~ species, ncol = 1) +
   geom_ribbon(aes(ymin = min_pelts, ymax = max_pelts),
 	      colour = NA, fill = "black", alpha = 0.1) +
   geom_line() +
   geom_point() +
   ylab("pelts (thousands)") +
-  ggtheme_tufte()
+  ggtheme_tufte() +
+  theme(legend.position="bottom")
+
 population_plot2
 ```
 
-This posterior predictive check shows that the model fit is consistent with the data, with around 50% of the data points falling within the 50% intervals.
+
+$$
+p(y^{\mathrm{rep}} | y)
+\ = \
+\mathbb{E}\!\left[ p(y^{\mathrm{rep}} | \theta) \ \big| \ y \right].
+$$
+
+As with other posterior expectations, the Bayesian point estimate is given by a simple average over simulated values, where $y^{\mathrm{rep}(m)}$ is just the result of simulating the value of $y^{\mathrm{rep}}$ according to the generative model based on parameter draw $\theta^{(m)}$.
 
 
 # How large are the populations?
@@ -590,45 +660,79 @@ Going on the assumption that the number of pelts collected is proportional to th
 
 This model could be combined with a mark-recapture model to get a better handle on the actual population size.  Mark-recapture gives you an estimate of actual numbers and the Lotka-Volterra model would provide information on relative change in the predator and prey populations.
 
+## Predicted population cycles
+
+```{r echo=FALSE, fig.margin=TRUE, fig.cap="Plot of expected population orbit for one hundred draws from the posterior.  Each draw represents a different orbit.  If the solutions were requesed at more fine grained intervals than yearly, the results would appear smooth."}
+ss <- extract(fit)
+df <- data.frame(list(lynx = ss$z[1, 1:12 , 1], hare = ss$z[1, 1:12, 2], draw = 1))
+for (m in 2:100) {
+  df <- rbind(df, data.frame(list(lynx = ss$z[m, 1:12 , 1], hare = ss$z[m, 1:12, 2], draw = m)))
+}  
+plot <- ggplot(df) +
+  geom_vline(xintercept = 0, color = "grey") +
+  geom_hline(yintercept = 0, color = "grey") +
+  geom_path(aes(x = lynx, y = hare, colour = draw), size = 0.75, alpha = 0.2) +
+#  geom_point(size = 1.25) +
+  xlab("lynx pelts (thousands)") +
+  ylab("hare pelts (thousands)") +
+  ggtheme_tufte() +
+  theme(legend.position="none")
+plot
+```
+In the same way as Volterra (1926) plotted the cycles of predator and prey populations, we can select draws from the posterior and plot them. The variation here is due to posterior uncertainty in the value of the system parameters $\alpha, \beta, \gamma, \delta$ and the initial population $z^{\mathrm init}$.
+
+## Predicted measurements
+
+```{r echo=FALSE, fig.margin=TRUE, fig.cap="Plot of expected pelt collections for one hundred draws from the posterior.  Each draw represents a different orbit (as shown in the previous figure) multiplied (not added) by an error term.   Even if the solutions were requesed at more fine grained intervals than yearly, the results would not appear smooth due to the error term.  Some of the extreme draws are typical when large values have high error on the multiplicative scale."}
+ss <- extract(fit)
+df <- data.frame(list(lynx = ss$y_rep[1, 1:12 , 1], hare = ss$y_rep[1, 1:12, 2], draw = 1))
+for (m in 2:100) {
+  df <- rbind(df, data.frame(list(lynx = ss$y_rep[m, 1:12 , 1], hare = ss$y_rep[m, 1:12, 2], draw = m)))
+}  
+plot <- ggplot(df) +
+  geom_vline(xintercept = 0, color = "grey") +
+  geom_hline(yintercept = 0, color = "grey") +
+  geom_path(aes(x = lynx, y = hare, colour = draw), size = 0.75, alpha = 0.2) +
+  xlab("lynx pelts (thousands)") +
+  ylab("hare pelts (thousands)") +
+  ggtheme_tufte() +
+  theme(legend.position="none")
+plot
+```
+
+In addition to the estimation uncertainty discussed in the previous section, there is also the general error due to measurement error, model misspecification, etc.  In order to simulate the number of pelts that are reported collected (which may itself have error relative to the actual number of pelts), we must additionally consider the general error term.  That is already rolled into the variables $y^{\mathrm rep}$, so we plot those here.
+
+
+
 # Extensions
 
 The Lotka-Volterra model is easily extended for realistic applications in several ways.
 
 1.  Predictors can be rolled into the system state to take into the dynamnics to account for things like the correlation of populations with the abundance of food.
-
-2.  The model may be extended beyond two species.  The dynamics for each species will reflect that it may stand in predator-prey relations to multiple other species.
-
-3.  Additional data for population observations may be included, such as adding a mark-recapture model for tag-release-recapture data of populations.
+1.  The model may be extended beyond two species.  The dynamics for each species will reflect that it may stand in predator-prey relations to multiple other species.
+1.  Additional data for population observations may be included, such as adding a mark-recapture model for tag-release-recapture data of populations.
 
 
 # Exercises
 
-1.  Extend predictions another 50 years into the future and plot as in the last plot.  This can be done by extending the solution points in the transformed parameters, but is more efficiently done in the generated quantities block.
+I ran out of steam before turning this case study into a self-contained tutorial on Bayesian modeling.  So I leave the next steps to you.
 
-2.  Write a Stan model to simulate data from this model.  First simulate parameters from the prior (or pick ones consistent with the priors).  Then simulate data from the parameters.  Finally, fit the model in Stan and compare the coverage as in the last plot in the case study.
-
-3.  Suppose that several of the measurements are missing.  Write a Stan program that uses only the observed measurements.  How robust is the fit to missing a few data points?
-
-4.  Write a Stan model that predicts the population at finer-grained intervals than a year (such as every three months).  Can the model be formulated to only use the yearly data?  Do the smoother plots for predicted populations make sense?  Does this fit better or worse than the original model?
-
-4.  Replace the lognormal error with a simple normal error model.  What does this do to the `z` estimates and to the basic parameter estimates?  Which error model fits better?
+1.  *Forecasting and backcasting*.  Extend predictions another 50 years into the future and plot as in the last plot.  This can be done by extending the solution points in the transformed parameters, but is more efficiently done in the generated quantities block.  Next, extend the predictions 50 years into the past.^[Hint: the initial time will have to be changed in the call to `ode_integrate`.]
+1.  *Model calibration*.  Write a Stan model to simulate data from this model.  First simulate parameters from the prior (or pick ones consistent with the priors).  Then simulate data from the parameters.  Finally, fit the model in Stan and compare the coverage as in the last plot in the case study.^[In general, this technique was extended and converted to a statistical test by Cook, Gelman and Rubin (2006).  As extra credit, apply this test to validate the model.].
+1.  *Missing data*.  Suppose that several of the measurements are missing.  Write a Stan program that uses only the observed measurements.  How robust is the fit to missing a few data points?
+1.  *Error model.* Replace the lognormal error with a simple normal error model.  What does this do to the `z` estimates and to the basic parameter estimates?  Which error model fits better?
+1.  *Prior choice*.  Perform a sensitivity analysis on the prior choices made for this model.  When the prior means or scales are varied, how much does the posterior vary?  Does the model become easier or harder to fit (in terms of effective sample size per unit time or divergent transitions) with different prior choices?  What does this imply about the number of digits with which we report results and thus the effective sample sizes necessary for most inferences?
 
 
 # References
 
+* Cook, S. R., Gelman, A., & Rubin, D. B. (2006)  Validation of software for Bayesian models using posterior quantiles. *Journal of Computational and Graphical Statistics*, 15(3), 675--692.
 * Hewitt, C. G. (1921) [*The Conservation of the Wild Life of Canada*](https://books.google.com/books?id=8hVDAAAAIAAJ). Charles Scribner's Sons.
-
 * Howard, P. (2009). [Modeling Basics](http://www.math.tamu.edu/~phoward/m442/modbasics.pdf). Lecture Notes for Math 442, Texas A&M University.
-
 * Lotka, A. J. (1925). *Principles of physical biology*. Baltimore: Waverly.
-
 * Rogers, K. (2011) [The rise and fall of the Canada lynx and snowshoe hare]( http://blogs.britannica.com/2011/06/rise-fall-canada-lynx-snowshoe-hare/). *Encyclopedia Brittanica Blog*.
-
 * Volterra, V. (1926). Fluctuations in the abundance of a species considered mathematically. *Nature*, 118(2972), 558-560.
-
 * Volterra, V. (1927). *Variazioni e fluttuazioni del numero d'individui in specie animali conviventi*. C. Ferrari.
-
-
 
 
 
@@ -636,7 +740,69 @@ The Lotka-Volterra model is easily extended for realistic applications in severa
 
 ## Appendix
 
-  **full Stan model here**
+Here is the complete Stan program for solving the inverse problem for the Lotka-Volterra model, including posterior predictive checks. 
+
+```
+functions {
+  real[] dz_dt(real t,       // time
+               real[] z,     // system state {prey, predator}
+               real[] theta, // parameters
+               real[] x_r,   // unused data
+               int[] x_i) {
+    real u = z[1];
+    real v = z[2];
+
+    real alpha = theta[1];
+    real beta = theta[2];
+    real gamma = theta[3];
+    real delta = theta[4];
+
+    real du_dt = (alpha - beta * v) * u;
+    real dv_dt = (-gamma + delta * u) * v;
+
+    return { du_dt, dv_dt };
+  }
+}
+data {
+  int<lower = 0> N;         // number of measurement times
+  real ts[N];               // measurement times > 0
+  real y_init[2];           // initial measured populations
+  real<lower = 0> y[N, 2];  // measured populations
+}
+parameters {
+  real<lower = 0> theta[4];  // theta = { alpha, beta, gamma, delta }
+  real<lower = 0> z_init[2]; // initial population
+  real<lower = 0> sigma[2];  // measurement errors
+}
+transformed parameters {
+  real z[N, 2]
+    = integrate_ode_rk45(dz_dt, z_init, 0, ts, theta,
+                         rep_array(0.0, 0), rep_array(0, 0),
+                         1e-5, 1e-3, 5e2);
+}
+model {
+  theta[{1, 3}] ~ normal(1, 0.5);
+  theta[{2, 4}] ~ normal(0.05, 0.05);
+
+  z_init ~ lognormal(10, 1);
+  sigma ~ lognormal(-1, 1);
+
+  for (k in 1:2) {
+    y_init[k] ~ lognormal(log(z_init[k]), sigma[k]);
+    y[ , k] ~ lognormal(log(z[, k]), sigma[k]);
+  }
+}
+generated quantities {
+  real y_init_rep[2];
+  real y_rep[N, 2];
+
+  for (k in 1:2) {
+    y_init_rep[k] = lognormal_rng(log(z_init[k]), sigma[k]);
+    for (n in 1:N)
+      y_rep[n, k] = lognormal_rng(log(z[n, k]), sigma[k]);
+  }
+}
+```
 
 
 ## Appendix: Session information
@@ -645,7 +811,6 @@ The Lotka-Volterra model is easily extended for realistic applications in severa
 sessionInfo()
 ```
 
-<br />
 
 ## Appendix: Licenses
 
