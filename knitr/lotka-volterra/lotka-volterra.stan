@@ -21,7 +21,7 @@ functions {
 data {
   int<lower = 0> N;         // number of measurement times
   real ts[N];               // measurement times > 0
-  real y_init[2];               // initial measured populations
+  real y_init[2];           // initial measured populations
   real<lower = 0> y[N, 2];  // measured populations
 }
 parameters {
@@ -38,12 +38,11 @@ transformed parameters {
 }
 model {
   // priors
-  sigma ~ lognormal(0, 1);
-  theta[{1, 3}] ~ normal(1, 0.5);
+  theta[{1, 3}] ~ normal(1, 0.5); // 95% (
   theta[{2, 4}] ~ normal(0.05, 0.05);
 
-  z_init[1] ~ lognormal(log(30), 1);
-  z_init[2] ~ lognormal(log(5), 1);
+  z_init ~ lognormal(25, 1);
+  sigma ~ lognormal(0.5, 1);  // 95% (0.07, 3.5)
 
   // likelihood
   for (k in 1:2) {

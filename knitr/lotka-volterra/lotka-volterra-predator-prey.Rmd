@@ -314,31 +314,38 @@ $$
 
 ## Prior for noise scale
 
-The noise scale is proportional, so the following prior should be weakly informative,^[A lognormal prior on $\sigma$ is not consistent with zero values of $\sigma$, but we do not expect zero values of $\sigma$ here as we do not expect this model to be particularly accurate as formulated.]
+The noise scale is proportional, so the following prior should be weakly informative, as a value smaller than 0.1 or larger than 1 would be unexpected. Because values are positive, this prior adopts the lognormal distribution.^[A lognormal prior on $\sigma$ is not consistent with zero values of $\sigma$, but we do not expect zero values of $\sigma$ here as we do not expect this model to be particularly accurate as formulated.]  Another reasonable prior choice would be a broad half normal.^[An interval prior with hard boundaries is not recommended as it may bias results if the data is compatible with results near the boundary.]
 
 $$
-\sigma \sim \mathrm{LogNormal}(0, 1)
+\sigma \sim \mathrm{LogNormal}(\log(0.5), 1)
 $$
 
-```{r echo=FALSE, fig.margin=TRUE, fig.cap = "Plot of lognormal(0, 0.5) prior.  This prior density is not consistent with a value of zero, as the density approaches zero very rapidly as the value approaches zero.  It is consistent with values only slightly larger than zero."}
+```{r echo=FALSE, fig.margin=TRUE, fig.cap = "Plot of lognormal(log(0.5), 0.5) prior.  This prior density is not consistent with a value of zero, as the density approaches zero very rapidly as the value approaches zero.  It is consistent with values only slightly larger than zero."}
 ggplot(data.frame(x = c(0, 6)), aes(x = x)) +
-  stat_function(fun = function(x) dlnorm(x, meanlog = 0, sdlog = 0.5)) +
-  scale_y_continuous(name = "prior density") +
+  stat_function(fun = function(x) dlnorm(x, meanlog = log(0.5), sdlog = 1)) +
+  scale_y_continuous(name = expression(p(sigma))) +
   scale_x_continuous(name = expression(sigma)) +
-  ggtheme_tufte()
+  ggtheme_tufte() +
+  theme(axis.text.y = element_blank())
 ```
 
 The 95% interval will be roughly 1/e and e.  
 
-Then, for the initial population of predator and prey, the following priors are weakly informative
+Then, for the initial population of predator and prey, the following priors are weakly informative.
 
 $$
-\begin{eqnarray}
-z_{0,1} & \sim & \mathrm{Normal}(\log(30), 1)
-\\[6pt]
-z_{0, 2} & \sim & \mathrm{Normal}(\log(5), 1)
-\end{eqnarray}
+z^{\mathrm init}_1, \ z^{\mathrm init}_2 \ \sim \ \mathsf{LogNormal}(\log(25), 1)
 $$
+
+```{r echo=FALSE, fig.margin=TRUE, fig.cap = "Plot of lognormal(log(10), 1) prior.  This prior suffices for both predator and prey sizes."}
+ggplot(data.frame(x = c(0, 150)), aes(x = x)) +
+  stat_function(fun = function(x) dlnorm(x, meanlog = log(25), sdlog = 1))+
+  scale_y_continuous(name = expression(p(z^init), )) +
+  scale_x_continuous(name = expression(z^init)) +
+  ggtheme_tufte() +
+  theme(axis.text.y = element_blank())
+```
+
 
 # Stan Code
 
@@ -453,10 +460,11 @@ fit <- sampling(model, data = lynx_hare_data,
                 seed=123)
 ```
 
-The output can be displayed in tabular form, here limited to the median (0.5 quantile) and 80% interval (0.1 and 0.9 quantiles).
+The output can be displayed in tabular form, here limited to the median (0.5 quantile) and 80% interval (0.1 and 0.9 quantiles), and restricted to the main quantities of interest
 
 ```{r}
-print(fit, probs=c(0.1, 0.5, 0.9), digits=3)
+print(fit, pars=c("theta", "sigma", "z_init"), 
+      probs=c(0.1, 0.5, 0.9), digits = 3)
 ```
 
 The R-hat values are all near 1, which is consistent with convergence.  The effective sample size estimates for each parameter are sufficient for inference.  Thus we have reason to trust this fit.
@@ -468,13 +476,13 @@ The expected values `z` are unlike the replicated draws `y_rep` in two ways.  Fi
 
 Using a non-statistically motivated error term and optimization, Howard (2009, Figure 2.10) provides the following approximate point estimates for the model parameters based on the data.
 $$
-\hat{\alpha} = 0.55, \ \
-\hat{\beta} = 0.028, \ \
-\hat{\gamma} = 0.84, \ \
-\hat{\delta} = 0.026
+\alpha^* = 0.55, \ \
+\beta^* = 0.028, \ \
+\gamma^* = 0.84, \ \
+\delta^* = 0.026
 $$
 
-Our model produced the following point estimates based on the posterior mean,^[The posterior mean minimizes expected squared error, whereas posterior medians minimize expected absolute error.  Here, the estimates are the same to within MCMC standard error.]
+Our model produced the following point estimates based on the posterior mean,^[The posterior mean minimizes expected squared error, whereas posterior medians minimize expected absolute error.  Here, the mean and median are the same to within MCMC standard error.]
 
 $$
 \hat{\alpha} = 0.54, \ \
@@ -516,7 +524,7 @@ As with other posterior expectations, the Bayesian point estimate is given by a 
 
 The posterior predictive estimates of the dynamics are shown below, along with the raw data on number of pelts collected.
 
-```{r echo=FALSE}
+```{r echo=FALSE, fig.margin = TRUE, fig.cap = "Posterior means plotted with 50% posterior intervals along with the measured data."}
 z_init_draws <- extract(fit)$z_init
 z_draws <- extract(fit)$z
 y_init_rep_draws <- extract(fit)$y_init_rep
@@ -569,7 +577,6 @@ population_plot2 <-
   geom_line() +
   geom_point() +
   ylab("pelts (thousands)") +
-  ggtitle("Posterior predictive replications with 50% intervals\nvs. measured data") +
   ggtheme_tufte()
 population_plot2
 ```
@@ -626,6 +633,11 @@ The Lotka-Volterra model is easily extended for realistic applications in severa
 
 
 <br />
+
+## Appendix
+
+  **full Stan model here**
+
 
 ## Appendix: Session information
 
