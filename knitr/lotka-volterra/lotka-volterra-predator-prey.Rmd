@@ -3,7 +3,11 @@ title: "Predator-Prey Population Dynamics: <br /><small>the Lotka-Volterra model
 author: "Bob Carpenter"
 date: "October 16, 2017"
 output:
-  tufte::tufte_html: default
+  tufte::tufte_html:
+    toc: true
+    toc_depth: 1
+    highlight: pygments
+    number_sections: false
   html_document:
       includes:
           in_header: stan-rmd.sty
@@ -18,7 +22,7 @@ library(ggplot2)
 library(gridExtra)
 
 library(knitr)
-knitr::opts_chunk$set(cache = TRUE)
+knitr::opts_chunk$set(cache = FALSE)
 knitr::opts_chunk$set(tidy = FALSE, cache.extra = packageVersion('tufte'))
 knitr::opts_chunk$set(comment = "")
 
@@ -42,7 +46,8 @@ ggtheme_tufte <- function(base_size = 12, base_family = "") {
                        colour = "#fffff8",
                        size = 0.5,
                        linetype = "solid"),
-        panel.grid.major = element_blank(),
+        panel.grid.major = element_line(colour = "white", size = 1, linetype="dashed"),
+          # blank(),
         panel.grid.minor = element_blank(),
         legend.box.background =
           element_rect(fill = "#fffff8",
@@ -52,14 +57,15 @@ ggtheme_tufte <- function(base_size = 12, base_family = "") {
         axis.text = element_text(family = "Palatino", size = 16),
         axis.title.x = element_text(family = "Palatino", size = 20,
                                     margin = margin(t = 15, r = 0, b = 0, l = 0)),
-        axis.title.y = element_text(family = "Palatino", size = 20,
+        axis.title.y = element_text(family = "Palatino", size = 18,
                                     margin = margin(t = 0, r = 15, b = 0, l = 0)),
         strip.background = element_rect(fill = "#fffff8",
                                         colour = "#fffff8",
                                         linetype = "solid"),
         strip.text = element_text(family = "Palatino", size = 16),
         legend.text = element_text(family = "Palatino", size = 16),
-        legend.title = element_text(family = "Palatino", size = 16),
+        legend.title = element_text(family = "Palatino", size = 16,
+                                    margin = margin(b = 5)),
         legend.background = element_rect(fill = "#fffff8",
                                         colour = "#fffff8",
                                         linetype = "solid"),
@@ -68,6 +74,7 @@ ggtheme_tufte <- function(base_size = 12, base_family = "") {
                                         linetype = "solid")
   )
 }
+
 printf <- function(msg = "%5.3f", ...) {
   cat(sprintf(msg, ...))
 }
@@ -75,34 +82,33 @@ printf <- function(msg = "%5.3f", ...) {
 
 
 
-## Abstract
+## Abstract {-}
 
-Lotka and Volterra provided parameteric differential equations that characterize the dynamics of the populations of predator and prey species.   A statistical model to account for measurement error and unexplained variation uses the deterministic solutions to the Lotka-Volterra equations as expected population sizes.  Stan is used to encode the model and perform full Bayesian inference.  The model is fit to Canadian lynx^[*Predator*: Canadian lynx
+Lotka and Volterra formulated parameteric differential equations that characterize the oscillating populations of predator and prey species.   A statistical model to account for measurement error and unexplained variation uses the deterministic solutions to the Lotka-Volterra equations as expected population sizes.  Stan is used to encode the model and perform full Bayesian inference to solve the inverse problem of inferring parameters from noisy data.  The model is fit to Canadian lynx^[*Predator*: Canadian lynx
 ![Canadian lynx](Canadian_lynx_by_Keith_Williams.jpg)
 <span style="font-size:70%; float:right">&copy; 2009, Keith Williams, CC-BY 2.0</span>
 ] and snowshoe hare^[*Prey*: snowshoe hare
 ![snowshoe hare](Snowshoe_Hare,_Shirleys_Bay.jpg)
 <span style="font-size:70%; float:right">&copy; 2013, D. Gordon E. Robertson, CC-BY SA 3.0</span>
-] populations between 1900 and 1920, based on the number of pelts collected annually by the Hudson Bay Company.  Posterior predictive checks for replicated data show the model fits this data well.  Full Bayesian inference may be used to estimate future (or past) populations.
+] populations between 1900 and 1920, based on the number of pelts collected annually by the Hudson's Bay Company.  Posterior predictive checks for replicated data show the model fits this data well.  Full Bayesian inference may be used to estimate future (or past) populations.
 
 
-# Lynxes and Hares in Canada
+# Data: Lynx and Hare Pelts in Canada
 
 > The rise and fall in numbers of snowshoe hares and Canada lynx was observed more than two hundred years ago by trappers working for Hudson’s Bay Company, which was once heavily involved in the fur trade. In the early 20th century, records of the number of lynx and hare pelts traded by Hudson’s Bay were analyzed by biologist Charles Gordon Hewitt.  *(Kara Rogers, 2011, Encyclopedia Brittanica Blog)*
 
-The species of interest are
+The species of interest in this case study are
 
 * [snowshoe hares](https://en.wikipedia.org/wiki/Snowshoe_hare), an hervivorous cousin of rabbits, and
 * [Canadian lynxes](https://en.wikipedia.org/wiki/Canada_lynx), a feline predator whose diet consists largely of snowshoe hares.
 
-Hewitt (1921) provides plots of the number of from pelts collected by the Hudson's Bay Company, the largest fur trapper in Canada, between the years of 1821 and 1914.^[Graph from (Hewitt 1921) showing the numbers of pelts captured by the Hudson's Bay Company.  The fluctuations are irregular and the linear growth in rabbits after 1830 is suspicious.
-<br /> &nbsp; <br />
+Hewitt (1921) provides plots of the number of from pelts collected by the Hudson's Bay Company, the largest fur trapper in Canada, between the years of 1821 and 1914.^[Graph from (Hewitt 1921) showing the numbers of pelts captured by the Hudson's Bay Company.  The fluctuations are irregular and the linear growth in rabbits after 1830 appears to be an artifact of interpolation.
 ![](hewitt-hare-lynx-wolverine.png)
 <span style="float:right; font-size: 70%">&copy; Scribner's Sons 1921</span>
 ]
-Hewitt's discussion is also fascinating as to the nature of plagues, lynx migrations, and other factors affecting the populations other than their relative sizes, and factors affecting measurement such as starving lynx being easier to capture.  The models we consider here for illustrative purposes will not consider any of these factors, though they could be extended to do so through the usual strategy of the inclusion of covariates.  Hewitt also discusses many other species;  hares and lynxes occupy only a small part of a single chapter.
+Hewitt's discussion is also enlightening about other natural factors affecting the population sizes, such as plagues, migrations, and weather-related events.  Hewitt even discusses measurement confounders such as the fact that lynx are easier to trap when they are weak and hungry.  The models we consider here for illustrative purposes will not consider any of these factors, though they could be extended to do so through the usual strategy of the inclusion of covariates.  Hewitt also discusses many other species;  hares and lynxes occupy only a small part of a single chapter.
 
-Howard (2009) provides numerical data for the number of pelts collected by the Hudson's Bay Company in the years 1900-1920, which we have included in comma-separated value (CSV) form in the case study.
+Howard (2009) provides numerical data for the number of pelts collected by the Hudson's Bay Company in the years 1900-1920, which we have included in comma-separated value (CSV) form in the source repository with the case study.
 
 ```{r}
 lynx_hare_df <-
@@ -120,31 +126,29 @@ knitr::kable(lynx_hare_melted_df[c(1:2, 21:22, 41:42), ],
              col.names = c('year', 'species', 'pelts in thousands'),
              align = c('r', 'c', 'r'),
              caption = "Example rows (with their indexes) from the long-form data frame
-                        for number of pelts taken by the Hudson Bay Company
+                        for number of pelts taken by the Hudson's Bay Company
                         in the years 1900 to 1920 (in thousands)."  
   ) 
 ```
 
-```{r echo=FALSE, fig.margin = TRUE, fig.cap="Plot of the lynx and hare populations over time."}
-population_plot2 <-
-  ggplot(data = lynx_hare_melted_df,
-         aes(x = year, y = pelts, color = species)) +
-  geom_vline(xintercept = 1900, color = "grey") +
-  geom_hline(yintercept = 0, color = "grey") +
-  geom_line(size = 0.75) +
-  geom_point(size = 1.5) +
-  ylab("pelts (thousands)") +
-  ggtheme_tufte()
-population_plot2
+```{r echo=FALSE, fig.margin = TRUE, fig.cap="Plot of the number of lynx and hare pelts (in thousands) collected by the Hudson's Bay Company between 1900 and 1920."}
+ggplot(data = lynx_hare_melted_df,
+       aes(x = year, y = pelts, color = species)) +
+geom_vline(xintercept = 1900, color = "grey") +
+geom_hline(yintercept = 0, color = "grey") +
+geom_line(size = 0.75) +
+geom_point(size = 1.5) +
+ylab("pelts (thousands)") +
+ggtheme_tufte()
 ```
 
-```{r echo=FALSE, fig.margin=TRUE, fig.cap="Plot of lynx pelts versus hare pelts over time.  The ups and downs of the individual plots over times is more revealing as a joint plot.  Volterra noticed the spiral pattern was stable and could be modeled with a pair of simple differential equations."}
+```{r echo=FALSE, fig.margin=TRUE, fig.cap="Plot of the number of pelts collected for lynx versus hares evolving from 1900 to 1920.  This allows the population dynamics to be viewed in a way similar to that of the dynamics of a spring in phase space (position, momentum)."}
 population_plot1 <-
   ggplot(data = lynx_hare_df,
          aes(x = Lynx, y = Hare, color = Year)) +
   geom_vline(xintercept = 0, color = "grey") +
   geom_hline(yintercept = 0, color = "grey") +
-  geom_path(size = 0.75) +
+  geom_path(arrow = arrow(angle = 15, length = unit(0.15, "inches"))) + 
   geom_point(size = 1.5) +
   xlab("lynx pelts (thousands)") +
   ylab("hare pelts (thousands)") +
@@ -152,20 +156,22 @@ population_plot1 <-
 population_plot1
 ```
 
-The plot makes it clear that the spikes in the lynx population lag those in the hare population.  When the populations are plotted against one another over time, the population dynamics orbit in an apparently stable pattern.  Volterra (1926) noticed this pattern and realized that it could be modeled with a stable pair of differential equations.
+The plot makes it clear that the spikes in the lynx population lag those in the hare population.  When the populations are plotted against one another over time, the population dynamics orbit in an apparently stable pattern.  Volterra (1926) recognized that these population oscillations could be modeled with a pair of differential equations similar to that used to describe springs.
 
-# The Lotka-Volterra Equations
+# Mechanistic Model: The Lotka-Volterra Equations
 
 The Lotka-Volterra equations (Volterra 1926, 1927; Lotka 1925) are based on the assumptions that
 
 * the predator population intrinsically shrinks,
 * the prey population intrinsically grows,
-* larger prey population leads to larger predator population, and
-* larger predator population leads to smaller prey populations.
+* a larger prey population leads to a larger predator population, and
+* a larger predator population leads to a smaller prey population.
+
+More specifically, the rate of growth of the prey population is proportional to the size of the prey population, leading to exponential growth if unchecked.  The prey population shrinks at a rate proportional to the size of the product of the prey and predator populations.  For the predator species, these rates are reversed.  The predator population shrinks at a rate proportional to its size, and grows at a rate proportional to the product of its size and the prey population's size.
 
 Together, these dynamics lead to a cycle of rising and falling populations.  With a low lynx population, the hare population grows.  As the hare population grows, it allows the lynx population to grow.  Eventually, the lynx population is large enough to start cutting down on the hare population.  That in turn puts downward pressure on the lynx population.  The cycle then resumes from where it started.
 
-The Lotka-Volterra equations (Volterra 1926, 1927; Lotka 1925) are a pair of first-order, ordinary differential equations (ODEs) describing the population dynamics of a pair of species, one predator and one prey.^[Solutions to the Lotka-Volterra equations time plotted as predator vs. prey populations;  the temporal trajectory of populations forms a stable orbit when plotted in two dimensions (Volterra 1926). 
+The Lotka-Volterra equations (Volterra 1926, 1927; Lotka 1925) are a pair of first-order, ordinary differential equations (ODEs) describing the population dynamics of a pair of species, one predator and one prey.^[Solutions to the Lotka-Volterra equations fore predator and prey population sizes.  The temporal trajectory of populations forms a stable orbit when plotted in two dimensions (Volterra 1926). 
 <br /> &nbsp; <br />
 ![](volterra-1926-cyclic.jpg)
 <span style="float:right; font-size:60%">&copy; 1926, Nature Publishing Group</a>
@@ -189,98 +195,100 @@ $$
 \end{eqnarray}
 $$
 
-As usual in writing differential equations, $u(t)$ and $v(t)$ are rendered as $u$ and $v$ to simplify notation.
-
+As usual in writing differential equations, $u(t)$ and $v(t)$ are rendered as $u$ and $v$ to simplify notation.  The factor $\alpha$ is the growth rate of the prey population, whereas $\beta$ is the rate of shrinkage relative to the product of the population sizes.  The factor $\gamma$ is the shrinkage rate of the predator population and $\delta$ is the growth rate of the predator population as a factor of the product of the population sizes.
 
 ## Positivitity constraint and extinction
 
-As population measures, the values of $u(t)$ and $v(t)$ should be non-negative.  Nothing in the differential equations here explicitly enforces positivity.  Nevertheless, as long as the initial populations are non-negative, i.e., $u(0) \geq 0$ and $v(0) \geq 0$, the values $u(t)$ and $v(t)$ for other times $t$ must also be positive.  This result is easy to see from the form of the differential equations, which take the change in each population to be a factor of the population size itself.  
+As measures of population sizes, the values of $u(t)$ and $v(t)$ should be non-negative.^[As in much of ecology, undead are frowned upon.]  Nothing in the differential equations here explicitly enforces positivity.  Nevertheless, as long as the initial populations are non-negative, i.e., $u(0) \geq 0$ and $v(0) \geq 0$, the values $u(t)$ and $v(t)$ for other times $t$ must also be positive.  This is because the rate of change in each population is a factor of the population size itself.
+
+A population following the Lotka-Volterra dynamics will never become extinct.^[The dodo (right), in 1682, before the population became extinct.  ![](hen-dodo.jpg) <br /> <span style="float:right; font-size:60%">1682, Sir Thomas Herbert, public domain.</span>]  Nevertheless, $z_{n,k}$, the size of population $k$ at time $t_n$, may become arbitrarily small.   In reality, random events such as accidents can cause extinction events as can not so random events such as extensive hunting.  Therefore, the Lotka-Volterra model should not be expected to adequately model small population dynamics.
+
 
 ## Behavior in the limit
 
-One way to understand systems of equations is to consider their limiting behavior.  Here, there are four possible limiting behaviors
+One way to understand systems of equations is to consider their limiting behavior.  In this case, there are four behaviors, falling in two broad classes.
 
-1. If both populations begin at size zero, they remain that way.
-3. If only the predator population begins at zero, the prey population grows without bound.
-4. If neither population is initially zero, the population sizes will oscillate in a fixed pattern indefinitely.
+1. If neither population is initially zero, the populations will oscillate in a fixed pattern indefinitely, never dying out.
+2. If both population sizes are initially zero, the population sizes will remain zero.
+3. If only the predator population size begins at zero, it will remain at size zero and the prey population size grows without bound.
+4. If only the prey population size beings at zero, it will remain at size zero while the predator population size shrinks toward zero without ever reaching it.
 
-In the oscillating cases, the population sizes may come arbitrarily close to zero, but they will never quite die out because of the form of the equations.
+As noted above, in the oscillating case, the population sizes may come arbitrarily close to zero, but they will never quite reach zero because of the form of the equations.  Very small fractional population size estimates are unrealistic in multiple ways.  Most obviously, animal populations are natural numbers, not fractional;  this is usually a tolerable abstraction.^[To solve this problem, the populations could be drawn as Poisson or negative binomial using the continuous expected counts.  With counts in the thousands, a normal approximation is more than adequate and more convenient computationally.]   More importantly from a biological point of view, random events such as accidents can drive a very small population extinct.
 
-The fact that we can have very small fractional population size estimates is unrealistic in multiple ways.  Most obviously, animal populations are natural numbers, not fractional;  this is usually a tolerable abstraction.^[To solve this problem, the populations could be drawn as Poisson or negative binomial using the continuous expected counts.  With counts in the thousands, a normal approximation is more than adequate and more convenient computationally.]   More importantly from a biological point of view, random events such as accidents can drive a very small population extinct.
+# Statistical Model: Prior Knowledge and Unexplained Variation
 
+## Solving the inverse problem
 
-# Measurement Error and Unexplained Variation
+For a given legal value of the model parameters and initial state,  the Lotka-Volterra model predicts population dynamics into the future (and into the past).  But given noisy data about population dynamics, how do we solve the inverse problem, that of inferring the values of model parameters consistent with the data?  The general approach in Bayesian statistics is somewhat counterintuitive, as it involves formulating the forward model then using general principles to solve the inverse problem.   Specifically, it requires specifying what we know about the parameters before seeing the data, and what we expect the data to look like given parameter values.  Mathematically, a prior density $p(\theta)$ over the sequence of parameters $\theta$ encapsulates our knowledge of the parameters before seeing the data.  A sampling probability function $p(y | \theta)$ characterizes the distribution of observable data $y$ given parameters $\theta$.^[The sampling distribution is called a likelihood function when considered as a function of parameters $\theta$ for fixed data $y$.] 
 
-The Lotka-Volterra model is deterministic.  Given the system parameters and the initial conditions, the solutions to the equations are fully determined.  Population measurements are not so well behaved that they exactly follow the model.  As we saw from the plots, the measurements do roughly follow the model for various ranges of parameters, but there is residual error that cannot be explained by the model.
+Bayes's rule gives us a general solution to the inverse problem in the form of a posterior probability function $p(\theta | y)$.^[Bayes's rule for parameters $\theta$ and observed data $y$ is $$ \begin{array}{rcl} p(\theta | y) & = & \displaystyle \frac{p(\theta, y)}{p(y)} \\[8pt] & = & \displaystyle \frac{p(y | \theta) \, p(\theta)}{p(y)} \\[8pt] & = & \displaystyle \frac{p(y | \theta) \, p(\theta)}{\int p(y | \theta) \, p(\theta) \, \mathrm{d}\theta} \\[8pt] & \propto & p(y | \theta) \, p(\theta). \end{array} $$]
+
+## Measurement Error and Unexplained Variation
+
+The Lotka-Volterra model is deterministic.  Given the system parameters and the initial conditions, the solutions to the equations are fully determined.  Population measurements are not so well behaved that they exactly follow the model; there is residual, unexplained variation.
 
 There are factors that impact predator and prey population size other than the current population size.  There are variable environmental effects, such as annual weather, which will vary from season to season and year to year and affect population sizes.  Infectious diseases occasionally spread through a population, reducing its size (Hewitt 1921).  There are also more long-term environmental factors such as carrying capacity.^[Carrying capacity is roughly the maximum population that an environment can sustain.  It is often modeled in the system dynamics as an asymptote on population size.]  In addition to factors that affect population which are not modeled, there is typically noise in the measurements.  
 
-In this particular case, we cannot even measure the population directly.  Instead, pelts are used as a proxy for population sizes.^[It would be possible to combine population models such as these with mark-recapture population models.]  Hewitt (1921) further noted that animals are easier to trap when food is scarce, making the population measurements dependent on the population size.  Even the exact number of pelts taken is likely to be only approximate, as they were collected in a range of locations over an entire season.  Here, the number is only recorded to the closest 100.^[Rounding can be treated explicitly by allowing the true value to be a parameter;  for instance if rounding is to the closest 100, the parameter can be modeled as uniform over $\pm 50$ of the true measured value or even greater if the measurement on which the rounding was based may be in error.]
-
-# Solving the inverse problem
-
-For a given legal value of the model parameters and initial state,  the Lotka-Volterra model predicts population dynamics into the future (and into the past).  But given noisy data about population dynamics, how do we solve the inverse problem, that of inferring the values of model parameters consistent with the data?  The general approach in Bayesian statistics is somewhat counterintuitive, as it involves formulating the forward model then using general principles to solve the inverse problem.   Specifically, it requires specifying what we know about the parameters before seeing the data, and what we expect the data to look like given parameter values.  Mathematically, this is done through a prior $p(\theta)$ over the sequence of parameters $\theta$ that encapsulates our knowledge of the parameters before seeing the data along with a sampling distribution $p(y|\theta)$ that characterizes the distribution of observable data $y$ given parameters $\theta$.^[The sampling distribution is called a likelihood function when considered as a function of parameters $\theta$ for fixed data $y$.] 
-
-Bayes's rule gives us a general solution to the inverse problem in the form of a posterior probability function $p(\theta | y)$.^[The derivation of Bayes's rule for parameters $\theta$ and observed data $y$ is $$ \begin{array}{rcl} p(\theta | y) & = & \displaystyle \frac{p(\theta, y)}{p(y)} \\[8pt] & = & \displaystyle \frac{p(y | \theta) \, p(\theta)}{p(y)} \\[8pt] & = & \displaystyle \frac{p(y | \theta) \, p(\theta)}{\int p(y | \theta) \, p(\theta) \, \mathrm{d}\theta} \\[8pt] & \propto & p(y | \theta) \, p(\theta). \end{array} $$]
-
-
-
-# Noise model for Lotka-Volterra dynamics
+In this particular case, we cannot even measure the population directly.  Instead, pelts are used as a proxy for population sizes.^[It would be possible to combine population models such as these with mark-recapture population models.]  Hewitt (1921) further noted that animals are easier to trap when food is scarce, making the population measurements dependent on the population size.  Even the exact number of pelts taken is likely to be only approximate, as they were collected in a range of locations over an entire season.  Here, the number of pelts is rounded to the closest 100.^[Rounding can be treated explicitly by allowing the true value to be a parameter;  for instance if rounding is to the closest 100, the parameter can be modeled as uniform over $\pm 50$ of the true measured value or even greater if the measurement on which the rounding was based may be in error.]
 
 ## A linear regression analogy
 
-Like a simple linear regression, or non-linear generalized linear model, the trick is to treat the underlying determinstic model as providing a value which is expected to have error from both measurement and unexplained variance due to the simplifications in the scientific model.  Consider the typical formulation of a linear regression, where $y_n$ is an observable scalar outcome, $x_n$ is a row vector of unmodeled predictors, $\beta$ is a coefficient vector parameter, and $\sigma > 0$ is the error scale, 
+Like a simple linear regression, or non-linear generalized linear model, we will proceed by treating the underlying determinstic model as providing an expected population value around which there will be variation due to both measurement error and simplifications in the scientific model.  Consider the typical formulation of a linear regression, where $y_n$ is an observable scalar outcome, $x_n$ is a row vector of unmodeled predictors, $\beta$ is a coefficient vector parameter, and $\sigma > 0$ is the error scale, 
 
 $$
 \begin{eqnarray}
 y_n & = & x_n \beta + \epsilon_n
 \\[6pt]
-\epsilon_n & \sim & \mbox{Normal}(0, \sigma)
+\epsilon_n & \sim & \mathsf{Normal}(0, \sigma)
 \end{eqnarray}
 $$
 
-The deterministic part of the equation is the linear predictor $x \beta$.  The stochastic error term, $\epsilon_n$, gets a normal distribution located at zero with scale parameter $\sigma > 0$ (this error model ensures that the maximum likelihood value for $\beta$ is at the least squares solution).  We typically formulate this model without the latent error variable $\epsilon_n$ as follows,^[The latent error variable may be defined as  $\epsilon_n = y_n - x_n \beta$.]
+The deterministic part of the equation is the linear predictor $x \beta$.  The stochastic error term, $\epsilon_n$, gets a normal distribution located at zero with scale parameter $\sigma > 0$ (this error model ensures that the maximum likelihood value for $\beta$ is at the least squares solution).  We typically formulate this model without the latent error variable $\epsilon_n$ as follows,^[The latent error variable may be defined in terms of $x$, $y$, and $\beta$ as $$\epsilon_n = y_n - x_n \beta$$.]
 
 $$
-y_n \sim \mbox{Normal}(x_n \beta, \sigma).
+y_n \sim \mathsf{Normal}(x_n \beta, \sigma).
 $$
 
 
 ## Lotka-Volterra error model
 
-The data $y_i$ consists of measurements of the prey $y_{i, 1}$ and predator $y_{i, 2}$ populations at times $t_i$.  The Lotka-Volterra equations will replace the determinsitic parts of the linear regression equations.
+The data $y_n$ consists of measurements of the prey $y_{n, 1}$ and predator $y_{n, 2}$ populations at times $t_n$.  The Lotka-Volterra equations will play the role of the linear predictor in the regression example, and we will introduce an error term to compensate.
 
-The true population sizes at time $t = 0$ are unknown---we only have measurements $y^{\rm init}_1$ and $y^{\rm init}_2$ for it.  The true initial population sizes at time $t = 0$ will be represented by a parameter $z^{\mathrm init}$, so that
+The true population sizes at time $t = 0$ are unknown---we only have measurements $y^{\rm init}_1$ and $y^{\rm init}_2$ of them.  The true initial population sizes at time $t = 0$ will be represented by a parameter $z^{\mathrm init}$, so that
 
 $$
-z^{\mathrm init}_1 = u(t = 0)
-\ \ \ \mathrm{and} \ \ \
-z^{\mathrm init}_2 = v(t = 0).
+\begin{array}{rcl}
+z^{\mathrm init}_1 & = & u(t = 0)
+\\[4pt]
+z^{\mathrm init}_2 & = & v(t = 0).
+\end{array}
 $$
 
 Next, let $z_1, \ldots, z_N$ be the solutions to the Lotka-Volterra differential equations at times $t_1, \ldots, t_N$ given initial conditions $z(t = 0) = z^{\mathrm init}$ and parameters $\theta = (\alpha, \beta, \gamma, \delta)$.  Each $z_n$ is a pair of prey and predator population sizes at the specified times,
 
 $$
-z_{n, 1} = u(t_n)
-\ \ \ \mathrm{and} \ \ \
-z_{n, 2} = v(t_n).
+\begin{array}{rcl}
+z_{n, 1} & = & u(t_n)
+\\[4pt]
+z_{n, 2} & = &  v(t_n).
+\end{array}
 $$
 
 The $z_n$ are random variables, but they are deterministic functions of the random variables for the initial state $z^{\mathrm init}$ and system parameters $\alpha, \beta, \gamma, \delta$.
 
-The observed data is the form of measurements $y^{\rm init}$ of the initial population of prey and predators, and subsequent measurements $y_n$ at times $t_n$, where $y^{\mathrm init}$ and the $y_n$ consist of a pair of measured population sizes, for the prey and predator species.
+The observed data is in the form of measurements $y^{\rm init}$ of the initial population of prey and predators, and subsequent measurements $y_n$ of the populations at times $t_n$, where $y^{\mathrm init}$ and the $y_n$ consist of a pair of measured population sizes, for the prey and predator species.
 
 Putting this all together, the measurements $y^{\rm init}$ and $y_n$ are of a underlying latent population sizes of predator and prey $z^{\mathrm init} = u(0), v(0)$ and $z_n = u(t_n), v(t_n)$.  
 
 ## Multiplicate error and the lognormal distribution
 
-It is natural for positive-only parameters to log transform them so that they are no longer constrained to be positive.  The simplest assumption we can make here is to take the error to be additive on the log scale, just as in a linear regression.
+It is common for positive-only parameters to log transform them so that they are no longer constrained to be positive.  On the log scale, we can then take the error to be unconstrained and additive, just as in linear regression.
 
 $$
 \begin{eqnarray}
 \log y_{n, k} & = & \log z_{n, k} + \epsilon_{n, k}
 \\[6pt]
-\epsilon_{n, k} & \sim & \mathrm{Normal}(0, \sigma_k)
+\epsilon_{n, k} & \sim & \mathsf{Normal}(0, \sigma_k)
 \end{eqnarray}
 $$
 
@@ -329,40 +337,43 @@ $$
 
 with $\exp(\epsilon_{n,k})$ being constrained to be positive, so that the product is positive.  In other words, rather than the measurement being plus or minus some value, it's plus or minus some percentage of the total.
 
-This transform and error multiplicative error model are so common that they are jointly known as the lognormal distribution, so that we can simplify the above notation as we did with linear regression and write
+This transform and its associated fractional error is so common that they are jointly known as the lognormal distribution, so that we can simplify the above notation as we did with linear regression and write
 
 $$
 y_{n, k} \sim \mathsf{LogNormal}(z_{n, k}, \sigma_n).
 $$
-if 
+whenever 
 $$
 \log y_{n, k} \sim \mathsf{Normal}(z_{n, k}, \sigma_n).
 $$
 
 
-# Weakly informative priors
+## Weakly informative priors
 
-The only remaining part of the model to formulate is what we know about the parameters.  In general, we^[The Stan Development Team, in a Wiki on  [prior choice recommendations](https://github.com/stan-dev/stan/wiki/Prior-Choice-Recommendations).] recommend at least weakly informative priors on parameters.   In practice, weakly informative priors inform the scale of the answer, but not the exact value.  That means that in order to formulate such priors, we need to know the rough scale on which to expect an answer.  Because this model is well understood and widely used, as is the basic behavior of predator and prey species such as lynxes and hares, the parameter ranges for the Lotka-Volterra model leading to stable and realistic population oscillations are well known.
+The only remaining part of the model to formulate is what we know about the parameters.  In general, we recommend at least weakly informative priors on parameters.^[The Stan Development Team, in a Wiki on  [prior choice recommendations](https://github.com/stan-dev/stan/wiki/Prior-Choice-Recommendations).]   In practice, weakly informative priors inform the scale of the answer, but have only a small effect on the exact value.  In order to formulate such priors, we need to know the rough scale on which to expect an answer.  Because this model is well understood and widely used, as is the basic behavior of predator and prey species such as lynxes and hares, the parameter ranges for the Lotka-Volterra model leading to stable and realistic population oscillations are well known.
 
 ## Priors for system parameters
 
-For the parameters, recall that $\alpha$ and $\gamma$ are multipliers of $u$ and $-v$ respectively in the state equations, whereas $\beta$ and $\delta$ are multipliers of the product $u \, v$.  Combined with the fact that the scale of $u$ and $v$ are roughly 10 as the data has been encoded, leads to a prior scaling of the former parameters by the same factor.  
+For the parameters, recall that $\alpha$ and $\gamma$ are multipliers of $u$ and $-v$ respectively in the state equations, whereas $\beta$ and $\delta$ are multipliers of the product $u \, v$.  Combined with the fact that the scale of $u$ and $v$ are roughly 10 as the data has been encoded, we can put the priors on the same scale as follows, 
 
 $$
 \begin{eqnarray}
-\alpha, \gamma & \sim & \mathrm{Normal}(1, 0.5)
+\alpha, \gamma & \sim & \mathsf{Normal}(1, 0.5)
 \\[6pt]
-\beta, \delta & \sim & \mathrm{Normal}(0.05, 0.05)
+\beta, \delta & \sim & \mathsf{Normal}(0.05, 0.05)
 \end{eqnarray}
 $$
 
 ## Prior for noise scale
 
-The noise scale is proportional, so the following prior should be weakly informative, as a value smaller than 0.1 or larger than 1 would be unexpected. Because values are positive, this prior adopts the lognormal distribution.^[A lognormal prior on $\sigma$ is not consistent with zero values of $\sigma$, but we do not expect zero values of $\sigma$ here as we do not expect this model to be particularly accurate as formulated.]  Another reasonable prior choice would be a broad half normal.^[An interval prior with hard boundaries is not recommended as it may bias results if the data is compatible with results near the boundary.]
+The noise scale is proportional, so the following prior should be weakly informative, as a value smaller than 0.1 or larger than 1 would be unexpected. Because values are positive, this prior adopts the lognormal distribution.^[A lognormal prior on $\sigma$ is not consistent with zero values of $\sigma$, but we do not expect zero values of $\sigma$ here as we do not expect this model to be particularly accurate as formulated.] 
 
 $$
-\sigma \sim \mathrm{LogNormal}(-1, 1)
+\sigma \sim \mathsf{LogNormal}(-1, 1)
 $$
+
+Another reasonable prior choice would be a broad half normal.^[An interval prior with hard boundaries is not recommended as it may bias results if the data is compatible with results near the boundary.]
+
 
 ```{r echo=FALSE, fig.margin=TRUE, fig.cap = "Plot of lognormal(-1, 1) prior.  The median, 0.4, is highlighted with a dashed line and the central 95% interval, (0.05, 2.7), with dotted lines.  This prior density is not consistent with values of sigma approaching zero."}
 loc = -1
@@ -386,7 +397,7 @@ $$
 z^{\mathrm init}_1, \ z^{\mathrm init}_2 \ \sim \ \mathsf{LogNormal}(\log(10), 1)
 $$
 
-```{r echo=FALSE, fig.margin=TRUE, fig.cap = "Plot of lognormal(log(10), 1) prior.  The median, 2.3, is highlighted with a dashed line and the 95% interval, (1.4, 75), withdotted lines. This prior suffices for both predator and prey sizes."}
+```{r echo=FALSE, fig.margin=TRUE, fig.cap = "Plot of lognormal(log(10), 1) prior.  The median, 2.3, is highlighted with a dashed line and the 95% interval, (1.4, 75), withdotted lines. This prior suffices for both predator and prey population sizes."}
 loc = log(10)
 scale = 1
 ggplot(data.frame(x = c(0, 150)), aes(x = x)) +
@@ -403,20 +414,16 @@ ggplot(data.frame(x = c(0, 150)), aes(x = x)) +
 ```
 
 
-# Stan Code
-
+# Coding the Model: Stan Program
 
 ## Coding the system dynamics
 
-Whenever a system of differential equations is involved, the system equations must be coded as a Stan function.  In this case, the model is relatively simple as the state is only two dimensional and there are only four parameters.  Stan requires the system to be defined with exactly the signature defined here for the function <code>dz_dt()</code>.  The first argument is for time, which is not used here because the Lotka-Voltarra equations are not time-dependent.  The second argument is for the system state, and here it is coded as an array
-$z = (u, v)$.  The third argument is for the parameters of the equation, of which the Lotka-Voltarra equations have four, which are coded as $\theta = (\alpha, \beta, \gamma, \delta)$.  The fourth and fifth argument are for data constants, but none areneeded here, so these arguments are unused.
+Whenever a system of differential equations is involved, the system equations must be coded as a Stan function.  In this case, the model is relatively simple as the state is only two dimensional and there are only four parameters.  Stan requires the system to be defined with exactly the signature defined here for the function <code>dz_dt()</code>, even if not all of them are used.  The first argument is for time, which is not used here because the Lotka-Voltarra equations are not time-dependent.  The second argument is for the system state, and here it is coded as an array
+$z = (u, v)$.  The third argument is for the parameters of the equation, of which the Lotka-Voltarra equations have four, which are coded as $\theta = (\alpha, \beta, \gamma, \delta)$.  The fourth and fifth argument are for data constants, but none are needed here, so these arguments are unused.
 
 ```
-  real[] dz_dt(real t,       // time (unused)
-               real[] z,     // system state
-               real[] theta, // parameters
-               real[] x_r,   // data (unused)
-               int[] x_i) {
+  real[] dz_dt(real t, real[] z, real[] theta,
+               real[] x_r, int[] x_i) {
     real u = z[1];
     real v = z[2];
 
@@ -456,7 +463,7 @@ parameters {
 }
 ```
 
-The solutions to the Lotka-Volterra equations for a given initial state $z^{\mathrm init}$ are coded up as transformed parameters.  This will allow them to be used in the model and inspected in the output.  It also makes it clear that they are all functions of the initial population and parameters (as well as the solution times).^[Stan provides two solvers, a Runge-Kutta 4th/5th-order solver (`_rk45`) and a backwards-differentiation formula solver (`_bdf`) for stiff systems.  The RK45 solver is twice as fast as the BDF solver for this data.   The symptom of stiffness is slow iterations that may appear to be hanging if a large number of iterations is permitted.  If the solver runs into stiffness and more careful initialization or prior choice does not mitigate the problem, the BDF solver may be used to adjust for the ill-conditioned Jacobians at the cost of increased computation time.]
+The solutions to the Lotka-Volterra equations for a given initial state $z^{\mathrm init}$ are defined as transformed parameters.  This will allow them to be used in the model and inspected in the output (as we do in later graphs).  It also makes it clear that they are all functions of the initial population and parameters (as well as the solution times).^[Stan provides two solvers, a Runge-Kutta 4th/5th-order solver (`_rk45`) and a backwards-differentiation formula solver (`_bdf`) for stiff systems.  The RK45 solver is twice as fast as the BDF solver for this data.   The symptom of stiffness is slow iterations that may appear to be hanging if a large number of iterations is permitted.  If the solver runs into stiffness and more careful initialization or prior choice does not mitigate the problem, the BDF solver may be used to adjust for the ill-conditioned Jacobians at the cost of increased computation time.]
 
 ```
 transformed parameters {
@@ -473,17 +480,30 @@ With the solutions in hand, the only thing left are the prior and likelihood.  A
 
 ```
 model {
-  sigma ~ normal(0, 0.5);
-  theta[1:2] ~ normal(0, 1);
-  theta[3:4] ~ normal(0, 0.2);
-  z_init[1] ~ normal(10, 10);
-  z_init[2] ~ normal(50, 50);
+  theta[{1, 3}] ~ normal(1, 0.5);
+  theta[{2, 4}] ~ normal(0.05, 0.05);
 
-  y_init ~ lognormal(log(z_init), sigma);
-  for (k in 1:2)
+  z_init ~ lognormal(log(10), 1);
+  sigma ~ lognormal(-1, 1);
+
+  for (k in 1:2) {
+    y_init[k] ~ lognormal(log(z_init[k]), sigma[k]);
     y[ , k] ~ lognormal(log(z[, k]), sigma[k]);
+  }
 }
 ```
+
+The multiple indexing `theta[{1, 3}]` indicates that both `theta[1]` and `theta[3]` get the prior `normal(1, 0.5)`;  it is both more efficient and more compact to represent them this way.  The second sampling statement involving `y[ , k]` is vectorized and amounts to the same thing as an additional loop,
+
+```
+for (n in 1:N)
+  y[n, k] ~ lognormal(log(z[n, k]), sigma[k])
+```
+
+As with the prior, the vectorized form used in the actual model block is much more efficient.  The `y_init` sampling statement could be pulled out of the loop, but there is not much efficiency gain as there are only two elements, so it is left in this form for clarity.
+
+
+# Solving the Inverse Problem: Bayesian Inference in Stan
 
 ## Fitting the Hudson's Bay Company data
 
@@ -522,7 +542,7 @@ There were no divergent transitions^[Divergences occur when Stan's Hamiltonian s
 
 ## Comparing the fitted model to data
 
-Using a non-statistically motivated error term and optimization, Howard (2009, Figure 2.10) provides the following approximate point estimates for the model parameters based on the data.
+Using a non-statistically motivated error term and optimization, Howard (2009, Figure 2.10) provides the following point estimates for the model parameters based on the data.
 $$
 \alpha^* = 0.55, \ \
 \beta^* = 0.028, \ \
@@ -533,25 +553,26 @@ $$
 Our model produced the following point estimates based on the posterior mean,^[The posterior mean minimizes expected squared error, whereas posterior medians minimize expected absolute error.  Here, the mean and median are the same to within MCMC standard error.]
 
 $$
-\hat{\alpha} = 0.57, \ \
-\hat{\beta} = 0.029, \ \
-\hat{\gamma} = 0.76, \ \
-\hat{\delta} = 0.022,
+\hat{\alpha} = 0.55, \ \
+\hat{\beta} = 0.028, \ \
+\hat{\gamma} = 0.80, \ \
+\hat{\delta} = 0.024,
 $$
 
-which are quite close to Howard's estimates.^[Discrepancies are to be expected in that we are finding a posterior mean wheras Howard is finding a posterior mode.  We do not suspect the priors have a strong influence here, but this could be checked by varying them and comparing results, i.e., performing a sensitivity analysis.] The posterior intervals are quite large in fact. The posterior intervals may be interpreted probabilistically,
+which are very close to Howard's estimates.^[Discrepancies are to be expected in that we are finding a posterior mean wheras Howard is finding a posterior mode.  We do not suspect the priors have a strong influence here, but this could be checked by varying them and comparing results, i.e., performing a sensitivity analysis.] The posterior intervals, which are quite wide here, may be interpreted probabilistically,
 
 $$
 \begin{array}{ccc}
-\mbox{Pr}[0.48 \leq \alpha \leq 0.66] & = & 0.8
+\mbox{Pr}[0.47 \leq \alpha \leq 0.63] & = & 0.8
 \\[4pt]
-\mbox{Pr}[0.23 \leq \beta \leq 0.35] & = & 0.8
+\mbox{Pr}[0.23 \leq \beta \leq 0.33] & = & 0.8
 \\[4pt]
-\mbox{Pr}[0.65 \leq \delta \leq 0.88] & = & 0.8
+\mbox{Pr}[0.69 \leq \delta \leq 0.91] & = & 0.8
 \\[4pt]
-\mbox{Pr}[0.018 \leq \gamma \leq 0.027] & = & 0.8
+\mbox{Pr}[0.020 \leq \gamma \leq 0.029] & = & 0.8
 \end{array}
 $$
+The effect of these estimates is plotted later with simulated population orbits.
 
 Error scales for both populations have the same posterior mean estimate,
 
@@ -567,13 +588,15 @@ and both have the same posterior 80% interval, (0.20, 0.31).^[This suggests they
 One inference we would like to make from our data is the size of the lynx and hare populations over time.  Howard (2009)
 plugs in optimization-derived point estimates to derive population predictions.  
 
-Rather than plugging in point estimates to get point predictions, we will follow the fully Bayesian approach of adjusting for uncertainty.  This uncertainty takes two forms in inference.  First, there is estimation uncertainty, which is fully characterized by the joint posterior density $p(\alpha, \beta, \gamma, \delta, z^{\mathrm init}, \sigma \mid y)$.  In well-behaved models in which the data is broadly consistent with the prior and likelihood, estimation uncertainty is reduced by larger samples; as more data is available, the posterior will concentrate  
+Rather than plugging in point estimates to get point predictions, we will follow the fully Bayesian approach of adjusting for uncertainty.  This uncertainty takes two forms in inference.  First, there is estimation uncertainty, which is fully characterized by the joint posterior density $p(\alpha, \beta, \gamma, \delta, z^{\mathrm init}, \sigma \mid y)$.^[In well-behaved models in which the data is broadly consistent with the prior and likelihood, estimation uncertainty is reduced by larger samples; as more data is available, the posterior will concentrate.]
 
-The second form of uncertainty is the observation error and unexplained variation, which are both rolled into a single sampling distribution, $\log y_n \sim \mathsf{Normal}(\log z_n, \sigma)$.  As in the Stan implementation, $z_n = (u_n, v_n)$ is the solution to the differential equation conditioned on the parameters $\theta = (\alpha, \beta, \gamma, \delta, \sigma)$ and initial state $z^{\mathrm init}$.  
+The second form of uncertainty stems from measurement error and unexplained variation, which are both rolled into a single sampling distribution, $\log y_n \sim \mathsf{Normal}(\log z_n, \sigma)$.  As in the Stan implementation, $z_n = (u_n, v_n)$ is the solution to the differential equation conditioned on the parameters $\theta = (\alpha, \beta, \gamma, \delta, \sigma)$ and initial state $z^{\mathrm init}$.  
 
 ## Posterior predictive checks
 
-We use posterior predictive checks to evaluate how well our model fits the data on which it is trained.  The basic idea is to take the posterior for the fitted model and use it to predict what the data should've looked like.  That is, we will be replicating new $y$ values that parallel the actual observations $y$.  Becuase they are replicated values, we write them as as $y^{\mathrm{rep}}$.  The distribution of these replicated values is given by the posterior predictive distribution, 
+We use posterior predictive checks to evaluate how well our model fits the data from which it was estimated.^[This is "testing on the training data" in machine learning parlance, and while we would not trust it for final evaluation, it is an easy way to spot inconsistencies in the implementation of misspecification in the model.]
+
+The basic idea is to take the posterior for the fitted model and use it to predict what the data should've looked like.  That is, we will be replicating new $y$ values that parallel the actual observations $y$.  Becuase they are replicated values, we write them as as $y^{\mathrm{rep}}$.  The distribution of these replicated values is given by the posterior predictive distribution, 
 
 $$
 p(y^{\mathrm{rep}} | y)
@@ -648,21 +671,32 @@ population_plot2
 $$
 p(y^{\mathrm{rep}} | y)
 \ = \
-\mathbb{E}\!\left[ p(y^{\mathrm{rep}} | \theta) \ \big| \ y \right].
+\mathbb{E}\!\left[ \, p(y^{\mathrm{rep}} | \theta) \ \, \big| \ \, y \, \right].
 $$
 
-As with other posterior expectations, the Bayesian point estimate is given by a simple average over simulated values, where $y^{\mathrm{rep}(m)}$ is just the result of simulating the value of $y^{\mathrm{rep}}$ according to the generative model based on parameter draw $\theta^{(m)}$.
+As with other posterior expectations, the Bayesian point estimate is based on the posterior mean, which is estimated by the avearage of simulated draws from the posterior and reported in the `mean` column of Stan output.  In mathematical terms, it is another expectation,
+
+$$
+\begin{array}{rcl}
+\hat{\theta} & = & \displaystyle \mathbb{E}[\theta \mid y] 
+\\[8pt]
+& = & \displaystyle \int \theta \, p(\theta | y) \, \mathrm{d}\theta
+\\[8pt]
+& \approx & \displaystyle \frac{1}{M} \sum_{m=1}^M \theta^{(m)}
+\end{array}
+$$
+where $\theta^{(m)}$ is the $m$-th Markov chain Monte Carlo draw of $\theta$ from the posterior.^[The matrix of $\theta^{(m)}$ values (parameter by draw) is what is returned by the `extract()` function in Stan.]
 
 
-# How large are the populations?
 
-Going on the assumption that the number of pelts collected is proportional to the population, we only know how the relative sizes of the populations change, not their actual sizes.
+# Conclusion: What are the Population Dynamics?
 
-This model could be combined with a mark-recapture model to get a better handle on the actual population size.  Mark-recapture gives you an estimate of actual numbers and the Lotka-Volterra model would provide information on relative change in the predator and prey populations.
+Even with the strong assumption that the number of pelts collected is proportional to the population, we only know how the relative sizes of the populations change, not their actual sizes.
+
 
 ## Predicted population cycles
 
-```{r echo=FALSE, fig.margin=TRUE, fig.cap="Plot of expected population orbit for one hundred draws from the posterior.  Each draw represents a different orbit.  If the solutions were requesed at more fine grained intervals than yearly, the results would appear smooth."}
+```{r echo=FALSE, fig.margin=TRUE, fig.cap="Plot of expected population orbit for one hundred draws from the posterior.  Each draw represents a different orbit determined by the differential equation system parameters.  Together they provide a sketch of posterior uncertainty for the *expected* population dynamics. If the solutions were requesed at more fine grained intervals than yearly, the results would appear smooth."}
 ss <- extract(fit)
 df <- data.frame(list(lynx = ss$z[1, 1:12 , 1], hare = ss$z[1, 1:12, 2], draw = 1))
 for (m in 2:100) {
@@ -683,7 +717,7 @@ In the same way as Volterra (1926) plotted the cycles of predator and prey popul
 
 ## Predicted measurements
 
-```{r echo=FALSE, fig.margin=TRUE, fig.cap="Plot of expected pelt collections for one hundred draws from the posterior.  Each draw represents a different orbit (as shown in the previous figure) multiplied (not added) by an error term.   Even if the solutions were requesed at more fine grained intervals than yearly, the results would not appear smooth due to the error term.  Some of the extreme draws are typical when large values have high error on the multiplicative scale."}
+```{r echo=FALSE, fig.margin=TRUE, fig.cap="Plot of expected pelt collection orbits for one hundred draws of system parameters from the posterior.  Even if plotted at more fine-grained time intervals, error would remove any apparent smoothness.  Extreme draws as seen here are typical when large values have high error on the multiplicative scale."}
 ss <- extract(fit)
 df <- data.frame(list(lynx = ss$y_rep[1, 1:12 , 1], hare = ss$y_rep[1, 1:12, 2], draw = 1))
 for (m in 2:100) {
@@ -704,27 +738,26 @@ In addition to the estimation uncertainty discussed in the previous section, the
 
 
 
-# Extensions
-
-The Lotka-Volterra model is easily extended for realistic applications in several ways.
-
-1.  Predictors can be rolled into the system state to take into the dynamnics to account for things like the correlation of populations with the abundance of food.
-1.  The model may be extended beyond two species.  The dynamics for each species will reflect that it may stand in predator-prey relations to multiple other species.
-1.  Additional data for population observations may be included, such as adding a mark-recapture model for tag-release-recapture data of populations.
 
 
-# Exercises
+## Exercises & Next Steps
 
-I ran out of steam before turning this case study into a self-contained tutorial on Bayesian modeling.  So I leave the next steps to you.
+The Lotka-Volterra model is easily extended for realistic applications in several obvious ways.  I ran out of steam before turning this case study into a self-contained tutorial on Bayesian modeling.  So I leave the next steps to the reader.^[If you complete a few of these exercises and write them up, please [let me know](mailto:carp@alias-i.com).  I'd be happy to extend this case study and add a co-author or publish a follow-on case study.]
 
 1.  *Forecasting and backcasting*.  Extend predictions another 50 years into the future and plot as in the last plot.  This can be done by extending the solution points in the transformed parameters, but is more efficiently done in the generated quantities block.  Next, extend the predictions 50 years into the past.^[Hint: the initial time will have to be changed in the call to `ode_integrate`.]
-1.  *Model calibration*.  Write a Stan model to simulate data from this model.  First simulate parameters from the prior (or pick ones consistent with the priors).  Then simulate data from the parameters.  Finally, fit the model in Stan and compare the coverage as in the last plot in the case study.^[In general, this technique was extended and converted to a statistical test by Cook, Gelman and Rubin (2006).  As extra credit, apply this test to validate the model.].
+1.  *Model calibration*.  Write a Stan model to simulate data from this model.  First simulate parameters from the prior (or pick ones consistent with the priors).  Then simulate data from the parameters.  Finally, fit the model in Stan and compare the coverage as in the last plot in the case study.^[This basic validation technique was extended and converted to a statistical test of MCMC algorithm fit by Cook, Gelman and Rubin (2006).  Their test of Bayesian calibration relies on data simulated from the model being calibrated by construction in full Bayesian posterior inference. As extra credit, apply this test to validate the model.].
 1.  *Missing data*.  Suppose that several of the measurements are missing.  Write a Stan program that uses only the observed measurements.  How robust is the fit to missing a few data points?
 1.  *Error model.* Replace the lognormal error with a simple normal error model.  What does this do to the `z` estimates and to the basic parameter estimates?  Which error model fits better?
 1.  *Prior choice*.  Perform a sensitivity analysis on the prior choices made for this model.  When the prior means or scales are varied, how much does the posterior vary?  Does the model become easier or harder to fit (in terms of effective sample size per unit time or divergent transitions) with different prior choices?  What does this imply about the number of digits with which we report results and thus the effective sample sizes necessary for most inferences?
+1. *Model misspecification.* The folk theorem says that if there's something wrong with your computation, maybe there's something wrong with your model.  Swap the coding of the lynx and hare in the input so that the predator is modeled as prey and vice-versa.  What happens to the model fit time?  R-hats?  How well does it fit the data?
+1. *Multiple species.* Extend the model to deal with more than one species.  Treat each species as as having a mixture of predators and a mixture of prey affecting its growth.  Simulate and fit data with this model.  Do the equations become stiff as more species and interactions are added?  How much data is required to identify the model as the number of species and their mixing increases?^[*Hint*:  see Michael Betancourt's case study on mixture models for general advice on mixture modeling.]
+1. *Covariates.*  Suppose we have measured covariates such as temperature, water, and plant abundance.  Set up a model where these have further effects on populations modeled as unconstrained multiplies of the existing species size.  
+1. *Mixing mark-recapture population models*.  Consider the simple predator-prey model, but suppose that we also have mark-recapture data for each species over the same time period.  Find or simulate such data.   Build a mark-recapture model such as Cormack-Jolly-Seber and jointly model the population in terms of the CJS model and the Lotka-Volterra model.  How can you scale the population dynamics model in order to work at the same scale as the mark-recapture model.  Does this reduce uncertainty in the population dynamics?  Does the dynamics model improve o fitting the mark-recapture model separately?
+1. *Measurement error*.  Suppose the number of lynx pelts collected varied with respect to the population, being a larger proportion of the population when the lynx are hungry and a smaller population when the lynx are well fed.  How cold this be included as a component of the model?  What parameter would be introduced?  Simulate data and see if the true populations can be recovered with the model.
+1. *Carrying capacity*.  How can a carrying capacity (upper bound on population size) be incorporated into the Lotka-Volterra model?  Formulate the model in Stan and fit it to simulated data.  If the data is simulated near the carrying capacity, how does it fit using the simpler Lotka-Volterra model?
+1. *Sensitivity analysis.*  One prior at a time, vary the priors across an order of magnitude scale and report how it affects the posterior.  Is there danger in only analyzing a single prior at a time?
 
-
-# References
+## References {-}
 
 * Cook, S. R., Gelman, A., & Rubin, D. B. (2006)  Validation of software for Bayesian models using posterior quantiles. *Journal of Computational and Graphical Statistics*, 15(3), 675--692.
 * Hewitt, C. G. (1921) [*The Conservation of the Wild Life of Canada*](https://books.google.com/books?id=8hVDAAAAIAAJ). Charles Scribner's Sons.
@@ -734,14 +767,17 @@ I ran out of steam before turning this case study into a self-contained tutorial
 * Volterra, V. (1926). Fluctuations in the abundance of a species considered mathematically. *Nature*, 118(2972), 558-560.
 * Volterra, V. (1927). *Variazioni e fluttuazioni del numero d'individui in specie animali conviventi*. C. Ferrari.
 
+## Acknowledgements {-}
 
+Thanks to Simon Woodward, Arya Pourzanjani, and Leo Lahti for helpful comments on earlier drafts.
 
 <br />
 
-## Appendix
+## Appendix: Stan program {-}
 
 Here is the complete Stan program for solving the inverse problem for the Lotka-Volterra model, including posterior predictive checks. 
 
+<div style="font-size:90%">
 ```
 functions {
   real[] dz_dt(real t,       // time
@@ -803,16 +839,21 @@ generated quantities {
   }
 }
 ```
+</div>
 
 
-## Appendix: Session information
+## Appendix: Session information  {-}
 
+<div style="font-size:90%">
 ```{r}
 sessionInfo()
 ```
+</div>
 
 
-## Appendix: Licenses
+## Appendix: Licenses  {-}
 
-* <span style="font-size:85%">Code &copy; 2017--2018, Columbia University, licensed under BSD-3.</span>
+<div style="font-size:90%">
+* <span style="font-size:85%">Code &copy; 2017--2018, Trustees of Columbia University in New York, licensed under BSD-3.</span>
 * <span style="font-size:85%">Text &copy; 2017--2018, Bob Carpenter, licensed under CC-BY-NC 4.0.</span>
+</div>

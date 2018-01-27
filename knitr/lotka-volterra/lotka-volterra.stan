@@ -39,7 +39,7 @@ model {
   theta[{1, 3}] ~ normal(1, 0.5);
   theta[{2, 4}] ~ normal(0.05, 0.05);
 
-  z_init ~ lognormal(10, 1);
+  z_init ~ lognormal(log(10), 1);
   sigma ~ lognormal(-1, 1);
 
   for (k in 1:2) {
