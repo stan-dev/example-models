@@ -8,9 +8,6 @@ output:
     toc_depth: 1
     highlight: pygments
     number_sections: false
-  html_document:
-      includes:
-          in_header: stan-rmd.sty
 ---
 
 ```{r setup, include=FALSE, echo=FALSE}
@@ -755,7 +752,7 @@ The Lotka-Volterra model is easily extended for realistic applications in severa
 
 1.  *Forecasting and backcasting*.  Extend predictions another 50 years into the future and plot as in the last plot.  This can be done by extending the solution points in the transformed parameters, but is more efficiently done in the generated quantities block.  Next, extend the predictions 50 years into the past.^[*Hint*: the initial time will have to be changed in the call to `ode_integrate`.]
 1.  *Model calibration*.  Write a Stan model to simulate data from this model.  First simulate parameters from the prior (or pick ones consistent with the priors).  Then simulate data from the parameters.  Finally, fit the model in Stan and compare the coverage as in the last plot in the case study.^[This basic validation technique was extended and converted to a statistical test of MCMC algorithm fit by Cook, Gelman and Rubin (2006).  Their test of Bayesian calibration relies on data simulated from the model being calibrated by construction in full Bayesian posterior inference. As extra credit, apply this test to validate the model.].
-1.  *Missing data*.  Suppose that several of the measurements are missing.  Write a Stan program that uses only the observed measurements.  How robust is the fit to missing a few data points?  What happens to the computation and posterior inferences when most of the data is missing?
+1.  *Missing data*.  Suppose that several of the measurements are missing.  Write a Stan program that uses only the observed measurements.  How robust is the fit to missing a few data points?  What happens to the computation and posterior inferences when most of the data is missing?  How can the missing data points be imputed?
 1.  *Error model.* Replace the lognormal error with a simple normal error model.  What does this do to the `z` estimates and to the basic parameter estimates?  Which error model fits better?
 1.  *Sensitivity analysis and prior choice*.  Perform a sensitivity analysis on the prior choices made for this model.  When the prior means or scales are varied, how much does the posterior vary?  Does the model become easier or harder to fit (in terms of effective sample size per unit time or divergent transitions) with different prior choices?  What does this imply about the number of digits with which we report results and thus the effective sample sizes necessary for most inferences?
 1. *Model misspecification.*  Andrew Gelman's [folk theorem](http://andrewgelman.com/2008/05/13/the_folk_theore/) says that if there's something wrong with your computation, maybe there's something wrong with your model.  Swap the coding of the lynx and hare in the input so that the predator is modeled as prey and vice-versa.  What happens to the model fit time?  R-hats?  How well does it fit the data?
@@ -775,6 +772,12 @@ The Lotka-Volterra model is easily extended for realistic applications in severa
 * Stan Development Team (2017) *Stan Modeling Language Users Guide and Reference Manual*, Version 2.17.0, [http://mc-stan.org](http://mc-stan.org).
 * Volterra, V. (1926). Fluctuations in the abundance of a species considered mathematically. *Nature*, 118(2972), 558-560.
 * Volterra, V. (1927). *Variazioni e fluttuazioni del numero d'individui in specie animali conviventi*. C. Ferrari.
+
+## Source Code {-}
+
+All of the source for the text and code is available on GitHub from 
+
+* [stan-dev/example-models/knitr/lotka-volterra](https://github.com/stan-dev/example-models/tree/master/knitr/lotka-volterra)
 
 ## Acknowledgements {-}
 
