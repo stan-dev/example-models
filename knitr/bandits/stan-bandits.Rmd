@@ -1,0 +1,458 @@
+---
+title: "A/B Testing with Multi-Armed Contextual Bandits in Stan"
+author: "Bob Carpenter"
+date: "29 January 2018"
+output:
+  tufte::tufte_html:
+    toc: true
+    toc_depth: 1
+---
+
+```{r setup, include=FALSE, echo=FALSE}
+options(htmltools.dir.version = FALSE)
+options(digits = 2)
+
+library(ggplot2)
+
+library(gridExtra)
+
+library(knitr)
+knitr::opts_chunk$set(cache = TRUE)
+knitr::opts_chunk$set(tidy = FALSE, cache.extra = packageVersion('tufte'))
+knitr::opts_chunk$set(comment = "")
+
+library(reshape)
+
+library(rstan)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores(logical = FALSE))
+
+library(tufte)
+
+ggtheme_tufte <- function() {
+  theme(plot.background =
+          element_rect(fill = "#fffff8",
+                       colour = "#fffff8",
+                       size = 0.5,
+                       linetype = "solid"),
+        plot.margin=unit(c(1, 1, 0.5, 0.5), "lines"), 
+        panel.background =
+          element_rect(fill = "#fffff8",
+                       colour = "#fffff8",
+                       size = 0.5,
+                       linetype = "solid"),
+        panel.grid.major = element_line(colour = "white", size = 1, linetype="dashed"),
+          # blank(),
+        panel.grid.minor = element_blank(),
+        legend.box.background =
+          element_rect(fill = "#fffff8",
+                       colour = "#fffff8",
+                       linetype = "solid"), 
+        axis.ticks = element_blank(),
+        axis.text = element_text(family = "Palatino", size = 16),
+        axis.title.x = element_text(family = "Palatino", size = 20,
+                                    margin = margin(t = 15, r = 0, b = 0, l = 0)),
+        axis.title.y = element_text(family = "Palatino", size = 18,
+                                    margin = margin(t = 0, r = 15, b = 0, l = 0)),
+        strip.background = element_rect(fill = "#fffff8",
+                                        colour = "#fffff8",
+                                        linetype = "solid"),
+        strip.text = element_text(family = "Palatino", size = 16),
+        legend.text = element_text(family = "Palatino", size = 16),
+        legend.title = element_text(family = "Palatino", size = 16,
+                                    margin = margin(b = 5)),
+        legend.background = element_rect(fill = "#fffff8",
+                                        colour = "#fffff8",
+                                        linetype = "solid"),
+        legend.key = element_rect(fill = "#fffff8",
+                                        colour = "#fffff8",
+                                        linetype = "solid")
+  )
+}
+
+printf <- function(msg = "%5.3f", ...) {
+  cat(sprintf(msg, ...))
+}
+```
+
+
+
+## Abstract {-}
+
+This short case study shows how to use Stan to perform online A/B testing using multi-armed bandits (Robbins 1953).  Stan is used for Bayesian estimation and event probabilty estimation for probability matching (Thompson 1931).  We analyze both Bernoulli bandits and their natural extension to predictors with logistic regression.
+
+# Online A/B Testing and Bandits
+
+## Multi-armed bandits
+
+The multi-armed bandit problem involves a fixed number of one-armed bandits.  Each bandit represents a different option (A, B, etc.) being tested and each provides a different return when played.
+
+The is that each bandit is assumed to provide independent and identically distributed (i.i.d.) returns.^[This is the *fundamental assumption* of multi-armed A/B testing.]  That is, no matter when or how many times a given bandit is played, the probability of a payout does not change.  Each pull of the arm, so to speak, is an indepdent trial.
+
+## Exploration and exploitation
+
+A player must *explore* the distribution of returns of the bandits and then *exploit* this knowledge to play the bandit with the best return.  A general policy of how exploration is carried out, here defined by a decision rule for which arm to pull.^[Our decision rules can be non-deterministic.]  Viewed this way, the multi-armed bandit problem is a form of reinforcement learning.
+
+
+## Traditional A/B test designs
+
+The general problem of A/B testing is that of having two (or more) alternatives and some data with which to tell them apart.  Traditionally, an experiment would be designed based on the sample size needed to detect significant differences in the alternatives.^[This is called a *power analysis* becaus it is based on the power of a data set to derive significant results given assumptions about effect sizes and population variation.]  Because the arms are exchangeable, ^[Being *exhchangeable* doesn't mean the arms are identical, just that we have no information with which to distinguish them a priori.] such a design would amount to a number of times to pull each arm.  Then the experiment would be run and the best result selected.
+
+## Sequential designs
+
+Rather than a static policy of choosing arms, a sequential design decides at each step of the experiment which piece of data to collect next.  In this case, that amounts to a decision about which arm to pull based on the arms that have been pulled previously and the results.
+
+## Regret
+
+Different policies are compared based on *regret*, the difference between the expected return of the policy and the expected return of always pulling the optimal arm.
+
+
+# Bernoulli Bandits
+
+In this section, we consider the simplest form of the multi-armed bandit problem.  We will assume there are $K > 0$ bandits and each one has a probability of $\theta_k$ of paying a unit (1) reward and a probability of $1 - \theta_k$ of paying nothing.  In other words, the reward for pulling the arm on bandit $k$ is independent and distributed as  $\mathsf{Bernoulli}(\theta_k)$.^[The Bernoulli distribution is defined for $y \in \{ 0, 1 \}$ and $\theta \in [0, 1]$ by $$\mathsf{Bernoulli}(y \mid \theta) = \left\{ \begin{array}{cc} \theta & \mbox{if } y = 1 \\ 1 - \theta & \mbox{if } y = 0 \end{array}\right.$$.]
+
+For trial $n \in {1, 2, \ldots }$, let $z_n \in 1:K$ denote the arm pulled and $y_n \in \{ 0, 1 \}$ the subsequent reward.  From our assumptions about the structure of Bernoulli bandits, we know^[We write $z[n]$ instead of $z_n$ to avoid illegible subscripts.]
+$$
+y_n \sim \mathsf{Bernoulli}(\theta_{z[n]}).
+$$
+
+
+# Bernoulli Bandit Policies
+
+In the Bernoulli bandit problem, the player knows the reward is 1 or 0.  The only uncertainty is due to not knowing the reward probabilities $\theta_k$.  A bandit must be selected each turn to be played to learn about the reward structure and reap rewards.  The way in which the bandit is selection is called a *policy*.  Formally, a *deterministic policy* may be expressed as a function $z_n] = f(y_{1:n-1}, \, z_{1:n-1})$ and more generally a *stochastic policy* may be expressed as a conditional distribution $p(z_n \mid y_{1:n-1}, \, z_{1:n-1})$.  
+
+## Uniform random policy
+
+A uniform random policy chooses an arm at random in each iteration,
+
+$$
+p(z_n \mid y_{1:n-1}, \, z_{1:n-1})
+\ = \ \mathsf{Categorical}\left( \textstyle \frac{1}{K}, \ldots, \frac{1}{K} \right).
+$$
+
+By definition, this policy can do no better than chance.  
+
+## Tit-for-tat policy
+
+Robbins (1952, 1956) analyzed a simple policy of choosing which arm to pull next.  Each arm is pulled until it returns 0, then the next arm in sequence is pulled.  The first pull will be of the first bandit, $z_1 = 1$.  For each subsequent pull, it returns the same value as last time if the last pull was successful and otherwise advances one bandit, rolling over to 1 after all $K$ have been tried once.
+
+$$
+z_{n+1} = 
+\begin{cases}
+z_n & \mbox{if } y_n = 1 
+\\[4pt]
+z_n + 1 & \mbox{if } y_n = 0 \mbox{ and } z_n < K
+\\[4pt]
+1 & \mbox{if } y_n = 0 \mbox{ and } z_n = K
+\end{cases}
+$$
+
+In the limit as $\theta_k \rightarrow 0$, the tit-for-tat policy approaches the uniform random policy.
+
+## Probability matching policy
+
+Thompson (1931) introduced a Bayesian stochastic policy whereby a bandit's arm is pulled with probability equal to its probability of being the best bandit conditioned on the previous observations.   In symbols, bandit $k$ will be the best bandit if $\max(\theta) = \theta_k$.  With that in mind, the probability after $n$ trials that bandit $k$ is the best is then defined by
+
+$$
+\phi_{n, k} = \mbox{Pr}\left[ \theta_k = \max(\theta) \ \big| \ y_{1:n}, z_{1:n} \right]
+$$
+The probability matching policy then selects $z_{n+1}$ based on the simplex $\phi_n$.^[A simplex is a vector of non-negative values summing to one;  here $\sum_{k=1}^K \phi_{n,k} = 1$.]
+
+Given the simple Bernoulli sampling distribution for bandit returns and the exchangeability assumption about the bandits, we use independent, exchangeable, and symmetric Beta priors on each bandit's probability of return,
+
+$$
+\theta_k \sim \mathsf{Beta}(\alpha, \alpha)
+$$
+
+With $\alpha = 1$, we have uniform priors and with $\alpha > 1$ the prior begins to concentrate around 0.5.  
+
+Given a prior, we can formulate the posterior inference for the the event probability that a given bandit is the best as an expectation, which may easily be calculated by Stan with sampling, 
+
+$$
+\begin{array}{rcl}
+\phi_{n,k} & = & \mbox{Pr}\left[ \theta_k = \max \theta \ \big| \ y_{1:n}, z_{1:n} \right]
+\\[6pt]
+& = & \mathbb{E}\left[ \, \mathrm{I}[\theta_k = \max \theta] \  \big| \ y_{1:n}, \ z_{1:n} \, \right]
+\\[6pt]
+& = & \displaystyle \int_{\Theta} \mathrm{I}[\theta_k = \max \theta] \ \ p(\theta \mid y_{1:n}, \, z_{1:n}) \ \mathrm{d} \theta
+\\[6pt]
+& \approx & \displaystyle \frac{1}{M} \sum_{m=1}^M \mathrm{I}\left[ \theta_k^{(m)} = \max \theta^{(m)} \right],
+\end{array}
+$$
+
+
+where $\theta^{(1)}, \ldots, \theta^{(M)}$ are posterior draws produced by Stan according to the posterior $p(\theta \mid z_{1:n}, \, y_{1:n})$.  Working out the sampling, $\phi_{n,k}$ is just the proportion of posterior draws $\theta^{(m)}$ in which bandit $k$ had the highest estimated payout probability $\theta_k^{(m)}$.
+
+
+# Coding the Bandits in Stan for Probability Matching
+
+Coding the model in Stan directly mirrors the mathematical definition
+above.  We are coding the model for the observations up to trial `N`,
+so the data blocks looks as follows.
+
+```
+data {
+  int<lower = 1> K;                       // num arms
+  int<lower = 0> N;                       // num trials
+  int<lower = 1, upper = K> z[N];         // arm on trial n
+  int<lower = 0, upper = 1> y[N];         // reward on trial n
+}
+```
+
+The parameters consist of a chance of success for each bandit.
+
+```
+parameters {
+  vector<lower = 0, upper = 1>[K] theta;  // arm return prob
+}
+```
+
+The Stan program uses vectorization for the prior and sampling distribution.
+
+```
+model {
+  theta ~ beta(1, 1);                     // uniform
+  y ~ bernoulli(theta[z]);                // i.i.d. by arm
+}
+```
+
+Vectorizations just distribute through, so the vectorized sampling distribution has the same effect as the following loop.
+
+```
+for (n in 1:N)
+  y[n] ~ bernoulli(theta[z[n]]);
+```
+
+
+Finally, the generated quantities block is used to define the simplex $\phi^{(m)}_k$.  It is declared as a simplex, with the draw index being implicit as usual in Stan's treatment of random variables.  Here, a local block is introduced with braces to allow the local variable `best_prob` to be defined without being saved.
+
+```
+generated quantities {
+  simplex[K] is_best;  // one hot or uniform with ties
+  {
+    real best_prob = max(theta);
+    for (k in 1:K)
+      is_best[k] = (theta[k] >= best_prob);
+    is_best /= sum(is_best);  // uniform for ties
+  }
+}
+```
+
+The final subtlety in the definition is that with rounding to floating point, it is conceivable that we get a tie for best;  in that case, the probability is shared over all of the options.  In the end, the simplex divides 1 by all the tied options, with zero elsewhere, so it's guaranteed to sum to 1.  As usual, these are being treated like indicator variables in order to compute the appropriate expectation (as expressed in the integral above) for $\phi_{n,k}$.
+
+
+# Testing Policies with R and RStan
+
+## Probability matching policy
+
+Given the model implemented in Stan, we can write a driver function in R.
+
+```{r results="hide"}
+mod <- stan_model("bernoulli-bandits.stan")
+K <- 2
+theta <- c(0.5, 0.4)
+MAX_N <- 200
+p_best <- matrix(0, MAX_N, 2)
+r_hat <- matrix(0, MAX_N, 4)
+y <- array(0.0, 0)
+z <- array(0.0, 0)
+prefix <- function(y, n) array(y, dim = n - 1)
+for (n in 1:MAX_N) {
+  data <- list(K = K, N = n - 1, y = prefix(y, n), z = prefix(z, n))
+  fit <- sampling(mod, data = data, chains = 3, iter = 1000, refresh=0,
+                  init = 1, control = list(stepsize=0.1, adapt_delta=0.95))
+  p_best[n, ] <-
+    summary(fit, pars="is_best", probs = c())$summary[ , "mean"]
+  r_hat[n, ] <-
+    summary(fit, pars=c("theta", "is_best"), probs = c())$summary[ , "Rhat"]  
+  z[n] <- sample(K, 1, replace = TRUE, p_best[n, ])
+  y[n] <- rbinom(1, 1, theta[z[n]])
+}
+```
+
+To make sure we're converging, here's a histogram of all the relevant $\hat{R}$ convergence statistics, 
+
+```{r fig.margin=TRUE, fig.cap="Histogram of Rhat values for estimators in the previous bandit policy simulation."}
+# print(r_hat)
+ggplot(data.frame(Rhat = melt(r_hat)$value)) +
+  geom_histogram(aes(x = Rhat), color="white") +
+  scale_x_continuous(limits = c(0.99, 1.02), breaks = c(0.99, 1, 1.01, 1.02)) +
+  ggtheme_tufte()
+```
+
+A single chain is used here with control parameters defined to have a low initial `stepsize` and high `adapt_delta` so that the target stepsize after adaptation is low.  This will decrease efficiency but improve robustness. 
+
+
+```{r  fig.margin=TRUE, fig.cap="Learning rate of Bernoulli bandit for theta = (0.5, 0.4)."}
+ggplot(data.frame(trial = 1:MAX_N, prob_best = p_best[1:MAX_N, 1])) +
+  geom_line(aes(trial, prob_best)) +
+  ggtheme_tufte()
+```
+
+
+# General Banditry Simulation
+
+We can abstract this approach to to simulating policies over bandits and encapsulate it in a general simulation function based on the concept of a policy.
+
+## General Banditry
+
+A *play history* is the sequence of arms that were pulled and the corresponding rewards $(y_{1:n}, z_{1:n})$ for $n \geq 0$.  A *policy* is nothing more than a function from histories to a number in $1:K$ representing the arm to pull in the next turn, $n + 1$.  A *bandit* is nothing more than a random number generator---it generates a reward (real number) every time it is pulled.  
+
+
+## Representing bandits
+
+In R, a bandit will be represented as a nullary function that generates a double value representing the next return. A Bernoulli bandit with a 50% chance of winning can be represented by the function
+
+```{r}
+flip_bandit <- function() rbinom(1, 1, 0.5)
+```
+
+To play the bandit, just call it like a function,
+
+```{r}
+flip_bandit(); flip_bandit()
+```
+
+We can go further and write a factory function to produce Bernoulli bandits with a specified chance of success.^[This is an example of a *higher-order function* which takes a double-valued argument and returns a function.  It can be called with `bernoulli_bandit_factory(0.3)()`.  R's syntax `function(x)` is essentially a lambda-abstraction, though it can take tuples.  The result is a fairly clean but verbose syntax for higher-order functions.]  
+
+```{r}
+bernoulli_bandit_factory <- function(theta) function() rbinom(1, 1, theta)
+```
+
+The flip bandit we defined previously could be defined with the factory as
+
+```
+flip_bandit <- bernoulli_bandit_factory(0.5)
+```
+
+It is then played as before,
+
+```
+flip_bandit(); flip_bandit()
+```
+
+
+## Representing history
+
+The sequence of arms pulled `z` will be represented as an array of integers in `1:K`; the sequence of returns `y` must be an array of double values of the same length.  Usually the entries in `y` are non-negative.  Together, the history of arms pulled and subsequent returns will be represented as a list `list(x, y)`.  
+
+
+## Representing policy
+
+A policy will be represented by a function from histories and the number of bandits to integers in `1:K` representing arm selections. 
+
+In R, we can represent the policy that randomly selects a bandit as follows.
+
+```{r}
+random_policy <-
+  function(y, z, K) sample(1:K, 1)
+```
+
+A policy that begins on the first bandit then cycles through them may be defined as follows.
+
+```{r}
+cyclic_policy <-
+  function(y, z, K) ifelse(size(y) == 0, 
+                           1,
+                           z[length(z)] + 1)
+```
+
+The Thompson sampling probability is given by implementing our above approach.
+
+```{r}
+fit_bernoulli_bandit <- function(y, z, K) {
+  data <- list(K = K, N = length(y), y = y, z = z)
+  control <- list(stepsize = 0.1, adapt_delta = 0.98)
+  sampling("bernoulli-bandits.stan", data = data, 
+           init = 1, control = control, 
+           chains = 4, iter = 1000, refresh = 0)
+}
+
+posterior_expectation <- function(fit, param) {
+  posterior_summary <- summary(posterior, pars = param, probs = c())
+  posterior_summary$summary[ , "mean"]
+}
+
+bernoulli_prob_matching_policy <- function(y, z, K) {
+  posterior <- fit_bernoulli_bandit(y, z, K)
+  p_best <- posterior_expectation(posterior, "is_best")
+  sample(K, 1, replace = TRUE, p_best)
+}  
+```
+
+Written modularly this way, with only the probability matching part of the code to compute p_best and then sample from it, the code is much easier to understand.   In the previous version, several outside concerns were mixed togehter such as saving results for later and pulling results out of larger arrays for reuse.  In the next section, we'll see where all that code is going to wind up.
+
+
+## Simulating policies in R
+
+Finally, we can put this all together and write a general simulator for any class of bandits or policies.  
+
+```{r}
+prefix <- function(y, n) array(y, dim = n - 1)
+
+sim_policy <- function(N, policy, bandits) {
+  K <- length(bandits)
+  y <- array(0.0, 0)
+  z <- array(0, 0)
+  for (n in 1:N) {
+    # temp to avoid aliasing
+    k <- policy(y, z, K)  
+    y[n] <- bandits[k]()
+    z[n] <- k
+  }
+  data.frame(y = y, z = z)
+}
+```
+
+
+## Putting it all together
+
+Our previous simulation can now be pieced together as a particular instance of this framework.
+
+```{r}
+bandits <- c(bernoulli_bandit_factory(0.5),
+             bernoulli_bandit_factory(0.4))
+policy <- bernoulli_prob_matching_policy
+N <- 20
+yz <- sim_policy(N, policy, bandits)
+yz
+```
+
+But it no longer saves the intermediate probability estimates, so it's not so easy to plot.
+
+```{r  fig.margin=TRUE, fig.cap="Learning rate of Bernoulli bandit for theta = (0.5, 0.4)."}
+#ggplot(data.frame(trial = 1:MAX_N, prob_best = p_best[1:MAX_N, 1])) +
+#  geom_line(aes(trial, prob_best)) +
+#  ggtheme_tufte()
+```
+
+## Appendix: Why Andrew Gelman dislikes the term "multi-armed bandit"
+
+First, Each slot machine (or "bandit") only has one arm.  Hence it's many one-armed bandits, not one multi-armed bandit.
+
+Second, the basic strategy in these problems is to play on lots of machines until you find out which is the best, and then concentrate your plays on that best machine.  This all presupposes that either (a) you're required to play, or (b) at least one of the machines has positive expected value.  But with slot machines, they all have negative expected value for the player (that's why they're called "bandits"), and the best strategy is not to play at all. So the whole analogy seems backward to me.
+
+Third, I find the "bandit" terminology obscure and overly cute.  It's an analogy removed at two levels from reality: the optimization problem is not really like playing slot machines, and slot machines are not actually bandits.  It's basically a math joke, and I'm not a big fan of math jokes.
+
+
+## References {-}
+
+* Agrawal, Shipra and Navin Goyal. 2012. Analysis of Thompson sampling for the multi-armed bandit problem. *Proceedings of the 25th Annual Conference on Learning Theory* (COLT).
+
+* Chapelle, Olivier and Lihong Li.  2011.  An empirical evaluation of Thompson sampling. *Neural Information Processing Systems 24* (NIPS).
+
+* Robbins, Herbert.  1952.  Some aspects of the sequential design of experiments.  *Bulletin of the American Mathematical Society*. 58:527--535.
+
+* Robbins, Herbert. 1956.  A sequential decision problem with a finite memory.  *Proceedings of the National Academy of Science*. 12:920--923.
+
+* Scott, Steve L. 2010. A modern Bayesian look at the multi-armed bandit. *Applied Stochastic Models
+in Business and Industry* 26(6):639--658.
+
+* Thompson, William R. 1933. On the likelihood that one unknown probability exceeds another in view of the evidence of two samples. *Biometrika* 25(3/4):285--294.
+
+
+## Licenses  {-}
+
+<span style="font-size:85%">Code &copy; 2017--2018, Trustees of Columbia University in New York, licensed under BSD-3.</span>
+
+<span style="font-size:85%">Text &copy; 2017--2018, Bob Carpenter, licensed under CC-BY-NC 4.0.</span>
