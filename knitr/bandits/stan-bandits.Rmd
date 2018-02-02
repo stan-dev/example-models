@@ -1,5 +1,5 @@
 ---
-title: "A/B Testing with Multi-Armed Contextual Bandits in Stan"
+title: "A Bayesian Approach to Sequential A/B Testing: Multi-Armed Contextual Bandits in Stan"
 author: "Bob Carpenter"
 date: "29 January 2018"
 output:
@@ -17,7 +17,7 @@ library(ggplot2)
 library(gridExtra)
 
 library(knitr)
-knitr::opts_chunk$set(cache = TRUE)
+knitr::opts_chunk$set(cache = FALSE)
 knitr::opts_chunk$set(tidy = FALSE, cache.extra = packageVersion('tufte'))
 knitr::opts_chunk$set(comment = "")
 
@@ -251,7 +251,7 @@ Given the model implemented in Stan, we can write a driver function in R.
 mod <- stan_model("bernoulli-bandits.stan")
 K <- 2
 theta <- c(0.5, 0.4)
-MAX_N <- 200
+MAX_N <- 20
 p_best <- matrix(0, MAX_N, 2)
 r_hat <- matrix(0, MAX_N, 4)
 y <- array(0.0, 0)
@@ -259,8 +259,7 @@ z <- array(0.0, 0)
 prefix <- function(y, n) array(y, dim = n - 1)
 for (n in 1:MAX_N) {
   data <- list(K = K, N = n - 1, y = prefix(y, n), z = prefix(z, n))
-  fit <- sampling(mod, data = data, chains = 3, iter = 1000, refresh=0,
-                  init = 1, control = list(stepsize=0.1, adapt_delta=0.95))
+  fit <- sampling(mod, data = data, init = 1, refresh = 0)
   p_best[n, ] <-
     summary(fit, pars="is_best", probs = c())$summary[ , "mean"]
   r_hat[n, ] <-
@@ -357,31 +356,56 @@ cyclic_policy <-
                            z[length(z)] + 1)
 ```
 
-The Thompson sampling probability is given by implementing our above approach.
+The Thompson sampling probability is given by implementing our above approach.  First, we break out a function to fit.
 
 ```{r}
 fit_bernoulli_bandit <- function(y, z, K) {
   data <- list(K = K, N = length(y), y = y, z = z)
-  control <- list(stepsize = 0.1, adapt_delta = 0.98)
-  sampling("bernoulli-bandits.stan", data = data, 
-           init = 1, control = control, 
-           chains = 4, iter = 1000, refresh = 0)
-}
-
-posterior_expectation <- function(fit, param) {
-  posterior_summary <- summary(posterior, pars = param, probs = c())
-  posterior_summary$summary[ , "mean"]
-}
-
-bernoulli_prob_matching_policy <- function(y, z, K) {
-  posterior <- fit_bernoulli_bandit(y, z, K)
-  p_best <- posterior_expectation(posterior, "is_best")
-  sample(K, 1, replace = TRUE, p_best)
-}  
+  stan("binomial-bandits.stan", data = data, init = 1, refresh = 0)}
 ```
 
-Written modularly this way, with only the probability matching part of the code to compute p_best and then sample from it, the code is much easier to understand.   In the previous version, several outside concerns were mixed togehter such as saving results for later and pulling results out of larger arrays for reuse.  In the next section, we'll see where all that code is going to wind up.
+And then a function to compute posterior expectations from fits.
 
+```{r}
+expectation <- function(fit, param) {
+  posterior_summary <- summary(fit, pars = param, probs = c())
+  posterior_summary$summary[ , "mean"]
+}
+```
+
+Finally, we can define a Thompson sampler.  This implementation uses the crude expedient of keeping the history in a global whose size is preallocated in order to not dominate computation through resizing.  Each history is a `K`-simplex, where `K` is the number of bandits.  The global history is updated using the global assignment operator `<<-`.
+
+
+```{r}
+thompson_next <- 1
+thompson_history <- NA
+
+add_thompson_history <- function(p_best) {
+  thompson_history[thompson_next, ] <<- p_best 
+  thompson_next <<- thompson_next + 1
+}
+```
+
+Given a way to record history, Thompson sampling amounts to fitting the model to existing data (`y[n]` reward for pulling arm `z[n]` from among `K` bandits), calclulating the posterior expectation of the indicator function as to which bandit has the best reward, adding that distribution `p_best` to the history, then sampling a value according to the distribution `p_best` to return.
+
+```{r}
+thompson_sample <- function(y, z, K) {
+  posterior <- fit_bernoulli_bandit(y, z, K)
+  p_best <- expectation(posterior, "is_best")
+  add_thompson_history(p_best)
+  sample(K, 1, replace = TRUE, p_best)
+}
+```
+
+Finally, it's wrapped up in a function to create the policy after resetting the global variables to track histories.
+
+```{r}
+thompson_sample_policy <- function(M, K) {
+  thompson_next <<- 1
+  thompson_history <<- matrix(NA, M, K)
+  thompson_sample
+}
+```
 
 ## Simulating policies in R
 
@@ -396,12 +420,13 @@ sim_policy <- function(N, policy, bandits) {
   z <- array(0, 0)
   for (n in 1:N) {
     # temp to avoid aliasing
-    k <- policy(y, z, K)  
-    y[n] <- bandits[k]()
+    k <- policy(array(y, length(y)), array(z, length(z)), K)
+    y[n] <- bandits[[k]]()
     z[n] <- k
   }
   data.frame(y = y, z = z)
 }
+
 ```
 
 
@@ -410,20 +435,20 @@ sim_policy <- function(N, policy, bandits) {
 Our previous simulation can now be pieced together as a particular instance of this framework.
 
 ```{r}
-bandits <- c(bernoulli_bandit_factory(0.5),
-             bernoulli_bandit_factory(0.4))
-policy <- bernoulli_prob_matching_policy
-N <- 20
-yz <- sim_policy(N, policy, bandits)
-yz
+M <- 100
+bandits <- list(bernoulli_bandit_factory(0.5),
+                bernoulli_bandit_factory(0.4))
+policy <- thompson_sample_policy(M, length(bandits))
+yz <- sim_policy(M, policy, bandits)
 ```
 
-But it no longer saves the intermediate probability estimates, so it's not so easy to plot.
 
-```{r  fig.margin=TRUE, fig.cap="Learning rate of Bernoulli bandit for theta = (0.5, 0.4)."}
-#ggplot(data.frame(trial = 1:MAX_N, prob_best = p_best[1:MAX_N, 1])) +
-#  geom_line(aes(trial, prob_best)) +
-#  ggtheme_tufte()
+We can now plot the probability of the first bandit being the best. 
+
+```{r  fig.margin=TRUE, fig.cap="Learning rate of Bernoulli bandit for theta = (0.5, 0.4) expressed as trajectory of estimates of probability that first bandit is the best (as it is in this example)."}
+ggplot(data.frame(trial = 1:M, prob_best = thompson_history[1:M, 1])) +
+  geom_line(aes(trial, prob_best)) +
+  ggtheme_tufte()
 ```
 
 ## Appendix: Why Andrew Gelman dislikes the term "multi-armed bandit"
