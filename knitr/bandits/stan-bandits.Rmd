@@ -79,7 +79,7 @@ printf <- function(msg = "%5.3f", ...) {
 
 ## Abstract {-}
 
-This short case study shows how to use Stan to perform online A/B testing using multi-armed bandits (Robbins 1953).  Stan is used for Bayesian estimation and event probabilty estimation for probability matching (Thompson 1931).  We analyze both Bernoulli bandits and their natural extension to predictors with logistic regression.
+This short case study shows how to use Stan to perform online A/B testing using multi-armed bandits (Robbins 1952).  Stan is used for Bayesian estimation and event probabilty estimation for probability matching (Thompson 1931).  We analyze both Bernoulli bandits and their natural extension to predictors with logistic regression.
 
 # Online A/B Testing and Bandits
 
@@ -118,7 +118,7 @@ $$
 y_n \sim \mathsf{Bernoulli}(\theta_{z_n}).
 $$
 
-# Policies for Play
+# Player Policies
 
 A player is defined in terms of a strategic policy for deciding which arm to play based on the behavior of the bandits in previous rounds.  To be effective, policies need to balance the exploration of the bandits' returns and the exploitation of bandits with high expected returns.  Mathematically, a *policy* may be stochastic and is expressed as a distribution $p(z_{n + 1} \mid y_{1:n}, \, z_{1:n})$ over choice of bandit conditioned on the history of the previous $n$ rounds.  
 
@@ -212,7 +212,7 @@ $$
 where $\theta^{(1)}, \ldots, \theta^{(M)}$ are posterior draws produced by Stan according to the posterior $p(\theta \mid z_{1:n}, \, y_{1:n})$.  Working out the sampling, $\phi_{n,k}$ is just the proportion of posterior draws $\theta^{(m)}$ in which bandit $k$ had the highest estimated payout probability $\theta_k^{(m)}$.
 
 
-# Coding Bernoulli Bandits in Stan
+# Bernoulli Bandits in Stan
 
 Coding the model in Stan directly mirrors the mathematical definition
 above.  We are coding the model for the observations up to trial `N`,
@@ -307,8 +307,6 @@ This implementation in Stan produces a standard Monte Carlo sampler.^[Unlike Mar
 
 This implementation is blazingly fast as it only needs to draw $K$ random Beta variates each iteration and then normalize with $K - 1$ additions and $K$ divisions and assignments.  
 
-# Testing Policies
-
 ## Probability matching policy
 
 Given the model implemented in Stan, we can write a driver function in R.
@@ -361,7 +359,7 @@ ggplot(data.frame(trial = 1:N, prob_best = p_best[1:N, 1])) +
 ```
 
 
-# A Policy Simulation Framework
+# An R Framework for Policy Simulation
 
 We can abstract this approach to to simulating policies over bandits and encapsulate it in a general simulation function based on the concept of a policy.
 
@@ -593,18 +591,22 @@ Thompson, William R. 1933. On the likelihood that one unknown probability exceed
 </div>
 
 
-## Appendix: Why Andrew Gelman dislikes the term "multi-armed bandit"
+## Appendix:  Objection to the term "bandits"
 
-*First*, Each slot machine (or "bandit") only has one arm.  Hence it's many one-armed bandits, not one multi-armed bandit.
+Andrew Gelman sent along the following comments.  In the spirit of [his blog](http://andrewgelman.com), I repeat those comments here with some commentary.
 
-*Second*, the basic strategy in these problems is to play on lots of machines until you find out which is the best, and then concentrate your plays on that best machine.  This all presupposes that either (a) you're required to play, or (b) at least one of the machines has positive expected value.  But with slot machines, they all have negative expected value for the player (that's why they're called "bandits"), and the best strategy is not to play at all. So the whole analogy seems backward to me.
+> *First*, Each slot machine (or "bandit") only has one arm.  Hence it's many one-armed bandits, not one multi-armed bandit.
 
-*Third*, I find the "bandit" terminology obscure and overly cute.  It's an analogy removed at two levels from reality: the optimization problem is not really like playing slot machines, and slot machines are not actually bandits.  It's basically a math joke, and I'm not a big fan of math jokes.
+> *Second*, the basic strategy in these problems is to play on lots of machines until you find out which is the best, and then concentrate your plays on that best machine.  This all presupposes that either (a) you're required to play, or (b) at least one of the machines has positive expected value.  But with slot machines, they all have negative expected value for the player (that's why they're called "bandits"), and the best strategy is not to play at all. So the whole analogy seems backward to me.
+
+> *Third*, I find the "bandit" terminology obscure and overly cute.  It's an analogy removed at two levels from reality: the optimization problem is not really like playing slot machines, and slot machines are not actually bandits.  It's basically a math joke, and I'm not a big fan of math jokes.
 
 
-## <small>Licenses</small>  {-}
+<small>
+## Licenses  {-}
 
-<small style="margin:-2em 0 0 0; padding:-2em 0 0 0">Code &copy; 2017--2018, Trustees of Columbia University in New York, licensed under BSD-3.
+&nbsp;<span style= style="margin:-3em 0 0 0; padding:-3em 0 0 0">&nbsp;</span><small style="margin:-2em 0 0 0; padding:-2em 0 0 0">Code &copy; 2017--2018, Trustees of Columbia University in New York, licensed under BSD-3.
 <br />
 Text &copy; 2017--2018, Bob Carpenter, licensed under CC-BY-NC 4.0.
+</small>
 </small>
