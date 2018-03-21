@@ -1,0 +1,626 @@
+---
+title: "The Bradley-Terry Model of Ranking via Paired Comparisons"
+author: "Bob Carpenter"
+date: "19 March 2018"
+output:
+  tufte::tufte_html:
+    toc: true
+    toc_depth: 1
+---
+
+```{r setup, include=FALSE, echo=FALSE}
+options(htmltools.dir.version = FALSE)
+options(digits = 2)
+
+library(ggplot2)
+
+library(gridExtra)
+
+library(knitr)
+knitr::opts_chunk$set(cache = FALSE)
+knitr::opts_chunk$set(tidy = FALSE, cache.extra = packageVersion('tufte'))
+knitr::opts_chunk$set(comment = "")
+
+library(reshape)
+
+library(rstan)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores(logical = FALSE))
+
+library(tufte)
+
+ggtheme_tufte <- function() {
+  theme(plot.background =
+          element_rect(fill = "#fffff8",
+                       colour = "#fffff8",
+                       size = 0.5,
+                       linetype = "solid"),
+        plot.margin=unit(c(1, 1, 0.5, 0.5), "lines"),
+        panel.background =
+          element_rect(fill = "#fffff8",
+                       colour = "#fffff8",
+                       size = 0.5,
+                       linetype = "solid"),
+        panel.grid.major = element_line(colour = "white", size = 1, linetype="dashed"),
+          # blank(),
+        panel.grid.minor = element_blank(),
+        legend.box.background =
+          element_rect(fill = "#fffff8",
+                       colour = "#fffff8",
+                       linetype = "solid"),
+        axis.ticks = element_blank(),
+        axis.text = element_text(family = "Palatino", size = 16),
+        axis.title.x = element_text(family = "Palatino", size = 20,
+                                    margin = margin(t = 15, r = 0, b = 0, l = 0)),
+        axis.title.y = element_text(family = "Palatino", size = 18,
+                                    margin = margin(t = 0, r = 15, b = 0, l = 0)),
+        strip.background = element_rect(fill = "#fffff8",
+                                        colour = "#fffff8",
+                                        linetype = "solid"),
+        strip.text = element_text(family = "Palatino", size = 16),
+        legend.text = element_text(family = "Palatino", size = 16),
+        legend.title = element_text(family = "Palatino", size = 16,
+                                    margin = margin(b = 5)),
+        legend.background = element_rect(fill = "#fffff8",
+                                        colour = "#fffff8",
+                                        linetype = "solid"),
+        legend.key = element_rect(fill = "#fffff8",
+                                        colour = "#fffff8",
+                                        linetype = "solid")
+  )
+}
+
+printf <- function(msg = "%5.3f", ...) {
+  cat(sprintf(msg, ...))
+}
+```
+
+
+
+## Abstract {-}
+
+Bradley and Terry (1952) modeled paired comparison data, such as
+comparisons of pairs of products by consumers or outcomes of sporting
+contests between two players.  The data is binary, with each paired
+comparison having a single "winner."  The case study will provide
+simulated data and demonstrate the inference of contestan abilities
+and ranks as well as predicting the outcomes of future contests.
+
+We will show how the Bradley-Terry likelihood may be paired with a
+prior to produce a Bayesian model for which it is possible to perform
+inference on parameters from observed data using full Bayesian
+inference (the so-called "Bayesian inversion").  This then allows
+inference for future matches.
+
+After introducing a Bayesian Bradley-Terry model, we replace the
+simple fixed population prior with a hierarchical model in which we
+jointly estimate the population variation in ability along with the
+ability parameters.  This allows tighter estimation of ability
+parameters and reduces uncertainty in future, unobserved outcome
+predictions.
+
+Finally, we will introduce a Bradley-Terry model for team contests,
+where each team consists of multiple players.  The assumption will be
+that each player has an ability and the team's ability is additive on
+the log odds scale.
+
+
+# The Bradley-Terry Model
+
+Like all good probability stories, this one is a generative story.
+Nevertheless, we will begin historically with the likelihood
+introduced by Bradley and Terry (1952) and earlier discussed by Zermelo (1929).
+The observed data is
+the outcome of matches between players and the (latent) parameters are
+the player abilities; we postpone from now the model of the abilities
+and concentrate on the model of match outcomes.
+
+We will suppose that there are $K$ players.  Each contestant will
+have an ability $\alpha_k \in \mathbb{R}$.  The probability that
+contestant $i$ will beat contestant $j$ is given by^[The log odds function $$\mathrm{logit}:(0, 1) \rightarrow (-\infty, \infty)$$ is defined by $$\mathrm{logit}(u) = \log \left( \frac{u}{1 - u} \right).$$  Its inverse, $$\mathrm{logit}^{-1}:(-\infty, \infty) \rightarrow (0, 1),$$ is given by $$\mathrm{logit}^{-1}(v) = \frac{1}{1 + \exp(-v)} = \frac{\exp(v)}{1 + \exp(v)}.$$]
+
+$$
+\mathrm{Pr}\left[ i \mbox{ beats } j \right]
+\ = \
+\mathrm{logit}^{-1}(\alpha_i - \alpha_j).
+$$
+
+Furthermore, the flexibility of the long-form data means not every pair of players need play each other and there may be multiple matches between the same two players.  
+play each other.  If there are multiple matches between the same two players, the
+results are assumed to be independent.
+
+## Long form data {-}
+
+Because the data is "incomplete" (i.e., not all players need play each
+other), the easiest way to encode the data is in long form, e.g.,
+
+$$
+\begin{array}{c|cc|c}
+n & \mathrm{player}^0 & \mathrm{player}^1 & y
+\\ \hline
+1 & 1 & 2 & 1
+\\
+2 & 1 & 13 & 0
+\\
+3 & 1 & 5 & 0
+\\
+4 & 2 & 9 & 0
+\\
+5 & 3 & 4 & 1
+\\
+6 & 2 & 9 & 1
+\end{array}
+$$
+
+
+The first column, labeled $n$ is the match index.  With $N$ matches, $n \in 1, 2, \ldots, N$.  The second two columns indicate which players participated in the match.  The last column is the result $y_n \in \{ 0, 1 \}$, indicating which player won the match.  For example, the fourth row ($n = 4$) records a match between player 2 ($\mathrm{player}^0 = 2$) and player 9 ($\mathrm{player}^1 = 9$) in which player 2 won ($y = 0$).  
+
+
+
+## Simulating data {-}
+
+In order to simulate data, we need to assume a distribution over the
+ability parameters.  For simplicity and because we are not assuming anything about the structure of the data, we will assume they are distributed standard normal (mean zero, standard deviation one).^[More elaborate models would be appropriate, if, for example, we knew that the population was made up out of two groups, amateurs and professionals, a mixture prior would be more appropriate.]
+
+```{r}
+# map (-infinity, infinty) -> (0, 1)
+inv_logit <- function(u) 1 / (1 + exp(-u))
+
+# map vector to vector with sum of zero
+center <- function(u) u - sum(u) / length(u)
+
+# parameters
+K <- 50
+alpha <- center(rnorm(K))
+
+# observations
+N <- K^2    # may not have this many matches in practice
+player1 <- rep(NA, N)
+player0 <- rep(NA, N)
+for (n in 1:N) {
+  players <- sample(1:K, 2)
+  player0[n] <- players[1]
+  player1[n] <- players[2]
+}
+log_odds_player1 <- alpha[player1] - alpha[player0]
+prob_win_player1 <- inv_logit(log_odds_player1)
+y <- rbinom(N, 1, prob_win_player1)
+```
+
+Rendering the first few rows of the data frame shows that it is in the
+same form as the long-form table shown in the previous section.
+
+```{r}
+df <- data.frame(player0 = player0, player1 = player1, y = y)
+head(df)
+```
+
+
+## Coding the Bradley-Terry model for maximum likelihood {-}
+
+Suppose have some data data in the appropriate long form.  With RStan,
+we can write the model out directly in terms of its log likelihood.
+The first part of the program encodes the data, beginning with the
+constant number of players `K` and matches `N`.  Then there are three
+plarallel arrays of integers indicating the players in each match and
+the outcome.
+
+```
+data {
+  int<lower = 0> K;                     // players
+  int<lower = 0> N;                     // matches
+  int<lower=1, upper = K> player1[N];   // player 1 for game n
+  int<lower=1, upper = K> player0[N];   // player 0 for game n
+  int<lower = 0, upper = 1> y[N];       // winner for match n
+}
+parameters {
+  vector[K] alpha;                      // ability for player n
+}
+model {
+  y ~ bernoulli_logit(alpha[player1] - alpha[player0]);
+}
+```
+
+The parameters are coded as a $K$-vector, and the likelihood coded as
+defined above.  The vectorized sampling statement is equivalent to the
+following less efficient loop form.^[The loop form illustrates how the likelihood function is defined as $$p(y \mid \alpha) = \prod_{n=1}^N \mathsf{Bernoulli}\!\left(y_n \ \bigg| \ \mathrm{logit}^{-1}\!\left(\alpha_{\mathrm{player1}[n]} - \alpha_{\mathrm{player0}[n]}\right)\right)\!$$]
+
+```
+for (n in 1:N)
+  y[n] ~ bernoulli_logit(alpha[player1[n]] - alpha[player2[n]]);
+```
+
+The distribution `bernoulli_logit` is the Bernoulli distribution with
+a parameter on the logit (log odds) scale, where for $y \in \{ 0, 1 \}$ and $\theta \in (0, 1)$, 
+
+$$
+\mathsf{Bernoulli}(y \mid \theta)
+\ = \
+\begin{cases}
+\theta & \mbox{if} \ \ y = 1
+\\
+1 - \theta & \mbox{if} \ \ y = 0.
+\end{cases}
+$$
+
+and for $\alpha \in (-\infty, \infty)$,
+
+$$
+\mathsf{BernolliLogit}(y \mid \alpha)
+\ = \
+\mathsf{Bernoulli}(y \mid \mathrm{logit}^{-1}(\alpha)).
+$$
+
+Building in the link function makes the arithmetic more stable and the
+code less error prone.  Thus rather than writing
+
+```
+y ~ bernoulli(inv_logit(u));
+```
+
+we encourage users to use the logit (log odds) parameterized version.
+
+
+```
+y ~ bernoulli_logit(u);
+```
+
+
+## Maximum likelihood estimation {-}
+
+All that we need to do to fit the data with Stan is pack the data into
+a list, compile the model using `stan_model`, then find the maximum
+likelihood estimate $\theta^*$, that is, the estimate for the parameter values
+that maximizes the probability of the match outcomes that were
+observed.
+
+$$
+\begin{array}{rcl}
+\theta^* & = & \mathrm{argmax}_{\theta} p(y | \theta)
+\\
+& = & \mathrm{argmax}_{\theta} \ \prod_{n=1}^N \mathsf{Bernoulli}(y_n
+\mid \mathrm{logit}^{-1}(\alpha_{\mathrm{player1[n]}} - \alpha_{\mathrm{player0[n]}})
+\end{array}
+$$
+
+```{r}
+mle_model_data <-
+  list(K = K, N = N, player0 = player0, player1 = player1, y = y)
+mle_model <-
+  stan_model("individual-uniform.stan")
+mle_model_estimates <-
+  optimizing(mle_model, data = mle_model_data)
+```
+
+We can now see how well we recovered the parameters by plotting the
+maximum likelihood estimates against the true values, which takes some
+wrangling to wrench out of the fit object.
+
+```{r fig.margin=TRUE, fig.cap="Fit of true value (horizontal axis) versus maximum likelihood estimate (vertical axis).  The nearly linear relationship shows that maximum likelihood estimation does a good job estimating parameters with this number and scale of parameters and number of matches."}
+alpha_star <- mle_model_estimates$par[paste("alpha[", 1:K, "]", sep="")]
+mle_fit_plot <-
+  ggplot(data.frame(alpha = alpha, alpha_star = alpha_star),
+         aes(x = alpha, y = alpha_star)) +
+      geom_abline(slope = 1, intercept = 0, color="green", size = 2) +
+      geom_point(size = 2) +
+      ggtheme_tufte()
+mle_fit_plot
+```
+
+
+# Ranking with the Bradley-Terry Model
+
+Players (or other items) may be ranked using the Bradley-Terry model.  In Stan, functions of parameters, such as rankings, may be coded in the generated quantities.  So we only need to add the following lines to the end of our original program to define the ranking.
+
+```
+generated quantities {
+  int<lower=1, upper=K> ranked[K] = sort_indices_desc(alpha);
+}
+```
+
+This returns the sorting of the indexes in descending order. 
+
+```{r}
+ranked_players <-
+  mle_model_estimates$par[paste("ranked[", 1:K, "]",
+                                sep="")]
+print(ranked_players, digits=0)
+```
+
+The value of `ranked[1]` is the index of the top-ranked player, `ranked[2]` of the second-ranked player, and so on.  We can print the rankings we derive as follows.
+
+
+# Bayesian Bradley-Terry Model
+
+To convert our simple likelihood into a proper Bayesian model, we need a prior for the ability parameters.  Such a prior will characterize the population of players in terms of the distribution of their abilities.
+
+## Population model for abilities
+
+We follow Leonard (1977) in laying out simple non-conjugate priors for the ability parameters.^[This is in some sense cheating because it guarantees the model is well specified in the sense of exactly matching the data-generating process.  In reality, models are almost always approximations and thus not perfectly well specified for the data sets they model.]
+
+$$
+\alpha_k \sim \mathsf{Normal}(0, 1)
+$$
+
+
+## Coding the Bayesian Bradley-Terry model
+
+The form of the data does not change.  The declarations of parameters is simplified and no longer centered by construction.  
+
+```
+parameters {
+  vector[K] alpha;                      // ability for player n
+}
+model {
+  alpha ~ normal(0, 1);
+  y ~ bernoulli_logit(alpha[player1] - alpha[player0]);
+}
+```
+
+Instead of hard centering, the normal prior with location parameter zero will implicitly center the paremters around zero by assigning them higher density.  The unit scale of the normal prior provides an indication of how much variation there is in player ability.
+
+## Fitting the model
+
+```{r}
+individual_model <- stan_model("individual.stan")
+individual_posterior <- sampling(individual_model, data = mle_model_data)
+print(individual_posterior, "alpha", probs=c(0.05, 0.5, 0.95))
+```
+
+For the posterior fit object, we are taking draws $\alpha^{(m)}$ from the posterior^[Not indendently, but by using Markov chain Monte Carlo.] 
+
+$$
+p(\alpha | y) \propto p(y | \alpha) \, p(\alpha).
+$$
+
+To calculate Bayesian estimates, we take posterior means, which are guaranteed to minimize expected square error when the model is well specified.
+
+$$
+\begin{array}{rcl}
+\hat{\alpha}_k & = & \displaystyle \mathbb{E}\left[\alpha_k \mid y \, \right]
+\\[4pt]
+& = & \displaystyle \int_{-\infty}^{\infty} \alpha_k \  p(\alpha_k | y) \ \mathrm{d}\alpha
+\\[4pt]
+& \approx &  \displaystyle \frac{1}{M} \sum_{m=1}^M \alpha^{(m)}_k
+\end{array}
+$$
+
+This is an example of full Bayesian inference, which is nearly always based on calculating conditional expectations of quantities of interest over the posterior.  The second line defining the expectation shows the general form---a weighted average of the quantity of interest, $\alpha_k$, over the posterior distribution $p(\alpha_k | y)$.  This weighted average is calculated by Markov chain Monte Carlo (MCMC) using an average of the posterior draws.
+
+The `extract()` function in RStan returns a structure from which the draws $\alpha^{(m)}$ may be extracted.  These are easily converted into posterior means.^[They can be extracted even more easily using utility functions in RStan;  this long form is just for pedagogical purposes.]
+
+```{r}
+alpha_hat <- rep(NA, K)
+for (k in 1:K)
+  alpha_hat[k] <- mean(extract(individual_posterior)$alpha[ , k])
+```
+
+These can then be scatterplotted against the true values just as the maximum likelihood was previously.
+
+```{r fig.margin=TRUE, fig.cap="Fit of true value (horizontal axis) versus Bayesian (posterior mean) estimate (vertical axis).  The nearly linear relationship shows that the Bayesian estimates also do a good job of fitting this data."}
+bayes_fit_plot <-
+  ggplot(data.frame(alpha = alpha, alpha_hat = alpha_hat),
+         aes(x = alpha, y = alpha_hat)) +
+      geom_abline(slope = 1, intercept = 0, color="green", size = 2) +
+      geom_point(size = 2) +
+      ggtheme_tufte()
+bayes_fit_plot
+```
+
+With this much data, the Bayesian estimates are very similar to the maximum likelihood estimates.  
+
+
+## Ranking in the Bayesian model
+
+Because of the way posterior quantities are calculated with uncertainty, it does not make sense to return a single answer for the ranking.  Instead, we have a probabilistic notion of ranking which can be coded in Stan as follows.
+
+```
+generated quantities {
+  int<lower=1, upper=K> ranking[K];       // rank of player ability
+  {
+    int ranked_index[K] = sort_indices_desc(alpha);
+    for (k in 1:K)
+      ranking[ranked_index[k]] = k;
+  }
+}
+```
+
+With this definition, `ranking[k]` holds the rank of player `k` (rather than the index of the player at rank `k` as before).  This allows for full Bayesian inference for posterior uncertainty.
+
+
+## Intercepts and home-field advantage
+
+With player abilities $\alpha_k$ centered around zero and the total predictor being additive in player abilities, this model has no intercept term.  This is because there is symmetry between the player identified as player 0 and the player identified as player 1.  If these identifiers are assigned randomly, the expected difference $\alpha_i - \alpha_j$ is zero.
+
+In situations where there is a distinction between the players assigned as player 0 and as player 1, it will be necessary to introduce an intercept term to model the advantage of being player 1 (which may be negative and thus actually be a disadvantage).  This intercept could model the advantage for playing the white pieces in chess and moving first, or the home-field advantage in basketball games.  For this case study, we stick to random assignment and assume there is no advantage to player 0 or player 1 in any match.^[Technically, the prior and likelihood with random assignment ensure the prior predictive expectation of $y_n$ is zero.  Such an assumption is easily tested.]
+
+
+# Hierarcical Bayesian Bradley-Terry Model
+
+Rather than hard-coding the prior for abilities, we can use a hierarchical prior to estimate the amount of variation in the population at the same time as we estimate the parameters themselves.   
+
+## Priors and Hyperprior
+
+We introduce a new parameter $\sigma > 0$ for the scale of variation in the population.  We then use the scale $\sigma$ in the prior for the population parameters,
+
+$$
+\alpha_k \sim \mathsf{Normal}(0, \sigma).
+$$
+We then need a hyperprior on $\sigma$ to complete the model;  we will somewhat arbitrarily choose a lognormal prior with scale 0.5.  
+$$
+\sigma \sim \mathsf{LogNormal}(0, \, 0.5).
+$$
+When there are large numbers of players, player ability estimates and the estimate of the scale of variation should not be very sensitive to the choice of prior scale (see the exercises).
+
+If there is not much variation among the abilities of the players in the population, $\sigma$ will be estimated with a value near zero;  otherwise, if the abilities are estimated to be widely varying, $\sigma$ will be large.  In the limit as $\sigma \rightarrow 0$, the model reverts to a complete pooling model where every player will have the same ability value (zero).  In the other limit, as $\sigma \rightarrow \infty$, the model reverts to a model with no pooling, where the amount of variation in the population means no information can be used from the population of player abilities to help estimate an individual player's ability.
+
+## Coding the model
+
+We add a parameter `sigma` for $\sigma$.  It is important to include the lower bound of zero, because scales must be positive.^[If parameters are not appropriately constrained to their support, sampling may fail to initialize or revert to inefficient rejection sampling behaviors.  Constraints on data, and generated quantities are just for error checking.]
+
+```
+parameters {
+  real<lower = 0> sigma;                // scale of ability variation
+  vector[K] alpha;                      // ability for player n
+}
+model {
+  sigma ~ lognormal(0, 0.5);            // boundary avoiding
+  alpha ~ normal(0, sigma);             // hierarchical
+  y ~ bernoulli_logit(alpha[player1] - alpha[player0]);
+}
+```
+
+The prior on `sigma` is coded as before, and now the prior on `alpha` uses `sigma` as its scale parameter.  
+
+## Fitting the model
+
+The model is fit just as before.
+
+```{r}
+model_hier <- stan_model("individual-hierarchical.stan")
+posterior_hier <- sampling(model_hier, data = mle_model_data)
+```
+
+The fit can be examined as before for convergence violations.
+
+```{r}
+print(posterior_hier, c("sigma", "alpha"), probs=c(0.05, 0.5, 0.95))
+```
+
+The $\hat{R}$ values are all near 1 and the effective sample sizes are reasonable, so we have no reason to distrust the fit.
+
+
+# Hierarchical, Bayesian, Team Bradley-Terry Model
+
+Many extensions to the Bradley-Terry model are possible, as it is really nothing more than a multi-intercept logistic regression.  We will consider a team-based model in which two teams made up of several players compete in a match. Or equivalently, when two baskets of consumer goods are compared to one another.  The point of such a model will be to infer the ability of the players (goods in the baskets) from the performance of the teams (baskets) in which they participate.  
+
+## Additivity
+
+As before, each player is still modeled as having an undlerlying ability on the log odds scale.  The ability of a team will be the sum of the abilities of its players.  This makes sense when the contributions of players are independent, but is only an approximation when there are interaction effects (such as synergies or interference among participants on the team).  
+
+## Identifiability
+
+This model will be most appropriate in situations where team membership is varied.  Many games among teams with the same sets of players will not be identified.  That is, there will be know way to infer the relative contributions of the players on a team if the players only ever play with each other.  This model could be applied to sports in which the players participating varies during a game, as long as the segments were comparable in terms of variance.^[For example, continuous games like football (soccer, not American), hockey, or basketball might be divided into one minute segments where a winner was assigned based on the scoring during that interval; for most of these sports, a mechanism for accounting for ties would be necessary.]
+
+## Data for team Bradley-Terry model
+
+The data for the team Bradley-Terry model needs to indicate which players are on the teams playing each other.  This will perhaps be easiest to see through a concrete simulation of a complete data set.
+
+```{r}
+K <- 50                                # players
+J <- 3                                 # players / team
+N <- K^2 * J                           # matches
+sigma <- 1                             # scale of player ability variation
+alpha <- center(rnorm(K, 0, sigma))    # player abilities, centered log odds
+team0 <- matrix(NA, N, J)              # players on team 0
+team1 <- matrix(NA, N, J)              # players on team 1
+for (n in 1:N) {
+   players <- sample(1:K, 2 * J)       # 1:K w/o replacement for distinct teams
+   team0[n, 1:J] <- players[1:J]
+   team1[n, 1:J] <- players[(J + 1) : (2 * J)]
+}
+y <- rep(NA, N)
+for (n in 1:N) {
+  alpha_team0 = sum(alpha[team0[n, 1:J]])
+  alpha_team1 = sum(alpha[team1[n, 1:J]])
+  y[n] <- rbinom(1, 1, inv_logit(alpha_team1 - alpha_team0))
+}
+team_data <- list(K = K, J = J, N = N, team0 = team0, team1 = team1, y = y)
+```
+
+There are $K$ players in total, with $J$ players on each team.  There are a total of $N$ matches.  Here we use quite a few matches to make it easy to visualize the model fit (as it will be close to the true values).  We set the population variation of abilities at $\sigma = 1$, and then generate the vector of player abilities $\alpha \sim \mathsf{Normal}(0, \sigma)$.  We then generate the teams by sampling $J$ players for each team without replacement from among the $K$ teams.  Then $y$ is sampled using a binomial random number generator given the sum of the team one's abilities minus the sum of team zero's.  
+
+## Stan model
+
+Coding up that generative process in Stan leads to the following model.
+
+```
+data {
+  int<lower = 0> K;                       // players
+  int<lower = 0> J;                       // players per team
+  int<lower = 0> N;                       // matches
+  int<lower = 1, upper = K> team0[N, J];  // team 0 players
+  int<lower = 1, upper = K> team1[N, J];  // team 1 players
+  int<lower = 0, upper = 1> y[N];         // winner
+}
+parameters {
+  vector[K] alpha;
+  real<lower = 0> sigma;
+}
+model {
+  sigma ~ lognormal(0, 0.5);           // zero avoiding, weakly informative
+  alpha ~ normal(0, sigma);                   // hierarchical, zero centered
+  for (n in 1:N)                          // additive Bradley-Terry model
+    y[n] ~ bernoulli_logit(sum(alpha[team1[n]]) - sum(alpha[team0[n]]));
+}
+generated quantities {
+  int<lower=1, upper=K> ranking[K];       // rank of player ability
+  {
+    int ranked_index[K] = sort_indices_desc(alpha);
+    for (k in 1:K)
+      ranking[ranked_index[k]] = k;
+  }
+}
+```
+
+```{r}
+team_model <- stan_model("team.stan")
+team_posterior <- sampling(team_model, data = team_data, init=0.5)
+print(team_posterior, c("sigma", "alpha"), probs=c(0.05, 0.5, 0.95))
+```
+
+As before, we will pull out the Bayesian parameter estimates.
+
+```{r}
+alpha_hat <- rep(NA, K)
+for (k in 1:K)
+  alpha_hat[k] <- mean(extract(team_posterior)$alpha[ , k])
+```
+
+and plot against the simulated values.
+
+```{r fig.margin=TRUE, fig.cap="Fit of true value (horizontal axis) versus Bayesian (posterior mean) estimate (vertical axis) for team-based Bradley-Terry model.  As with the previous model, inference for true abilities is very good."}
+team_bayes_fit_plot <-
+  ggplot(data.frame(alpha = alpha, alpha_hat = alpha_hat),
+         aes(x = alpha, y = alpha_hat)) +
+      geom_abline(slope = 1, intercept = 0, color="green", size = 2) +
+      geom_point(size = 2) +
+      ggtheme_tufte()
+team_bayes_fit_plot
+```
+
+## Exercises
+
+1. Explore the sensitivity of the prior by contrasting fits with priors on the scale parameter of $\sigma \sim \mathsf{LogNormal}(0, 1)$ and $\sigma \sim \mathsf{LogNormal}(0, 0.25)$.  Then consider a simple half-Cauchy prior $\sigma \sim \mathsf{Cauchy}(0, 1)$ and a half-normal prior $\sigma \sim \mathsf{Normal}(0, 1)$.
+
+1. Consider an extended Bradley-Terry model where there is a "home-field advantage."  This may literally be a home-field advantage to the sports team playing in their home field (stadium, arena, etc.), or it may be something like the advantage to the player with the white pieces in chess.  Assume that player 1 is the "home" player in the data coding and that there is a global intercept term representing this advantage on the log scale.  Simulate data and fit it as in the above examples.  Is the home-field advantage recovery?  Given that we know home-field advantages are positive, does it make sense to constrain the home-field advantage parameter to be positive?  If you do and the effect is fairly small and consistent with zero in the posterior, what happens to its estimate with the constraint versus without the constraint (assuming the same prior)?
+
+## References {-}
+
+* Bradley, Ralph Allan and Milton E. Terry. 1952.  [Rank analysis of
+incomplete block designs: I. The method of paired
+comparisons](https://doi.org/10.2307%2F2334029). *Biometrika* **39**(3/4): 324.
+
+* Leonard, T. 1977. An alternative Bayesian approach to the Bradley-Terry model for paired comparisons. *Biometrics* 33(1):121--132.
+
+* Zermelo, E. 1929. Die berechnung der turnier-ergebnisse als ein maximumproblem der wahrscheinlichkeitsrechnung. *Mathematische Zeitschrift* 29(1), 436--460.
+
+## Source code {-}
+
+All of the source code, data, text, and images for this case study are available on GitHub at
+
+* [stan-dev/example-models/knitr/bradley-terry](https://github.com/stan-dev/example-models/tree/master/knitr/bradley-terry)
+
+## Session information  {-}
+
+<div style="font-size:90%">
+```{r}
+sessionInfo()
+```
+</div>
+
+## Licenses  {-}
+
+<span style="font-size:85%">Code &copy; 2017--2018, Trustees of Columbia University in New York, licensed under BSD-3.</span>
+
+<span style="font-size:85%">Text &copy; 2017--2018, Bob Carpenter, licensed under CC-BY-NC 4.0.</span>
