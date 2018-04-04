@@ -261,7 +261,7 @@ The log probability density of $\phi$ is:
 $$-{\frac{1}{2}} \left( \sum_{i \sim j} {({\phi}_i - {\phi}_j)}^2 \right) + \mbox{const}$$
 Since Stan computes up to a proportion, the constant term drops out.
 
-As noted above,  $\phi$ is non-centered;
+As noted above,  $\phi$ is non-identifiable;
 adding any constant to all of the elements of $\phi$ leaves the distribution unchanged.
 Therefore we must add the constraint $\sum_{i} {\phi}_i = 0$.
 This can be implemented as a hard  sum-to-zero constraint
@@ -439,8 +439,7 @@ called "fixed effects."
 
 - $\phi$ is an ICAR spatial component.
 
-The pairwise difference formulation of the ICAR spatial component $\phi$ is non-centered,
-thus models with include both an ICAR spatial effects component and an intercept term are non-identifiable.
+The pairwise difference formulation of the ICAR spatial component $\phi$ is non-identifiable.
 Adding the constraint that $\phi$ must sum to zero centers it, allowing the model to
 fit both the fixed-effect intercept term as well as $\phi$ and $\theta$.
 
