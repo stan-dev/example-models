@@ -1,10 +1,10 @@
 data {
   int<lower=0> N;
-  int<lower=0> J;
+  int<lower=0> n_county;
   vector[N] y;
   vector[N] u;
   int<lower=0,upper=1> x[N];
-  int county[N];
+  int<lower=1,upper=n_county> county[N];
 }
 parameters {
   real<lower=0> sigma;
@@ -14,14 +14,13 @@ parameters {
   real g_a_1;
   real g_b_0;
   real g_b_1;
-  vector[J] a;
-  vector[J] b;
+  vector[n_county] a;
+  vector[n_county] b;
   real mu_a;
   real mu_b;
 }
 transformed parameters {
   vector[N] y_hat;
-
   for (i in 1:N)
     y_hat[i] = a[county[i]] + b[county[i]] * x[i];
 }
