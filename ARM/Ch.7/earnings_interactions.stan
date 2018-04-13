@@ -2,7 +2,7 @@ data {
   int<lower=0> N; 
   vector[N] earnings;
   vector[N] height;
-  vector[N] sex;
+  vector[N] sex1;
 } 
 transformed data {
   vector[N] log_earnings;
