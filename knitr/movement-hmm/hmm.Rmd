@@ -1,0 +1,643 @@
+---
+title: "Hidden Markov Models in Stan"
+author: "Bob Carpenter"
+date: "9 April 2018"
+output:
+  tufte::tufte_html:
+    toc: true
+    toc_depth: 1
+---
+
+```{r setup, include=FALSE, echo=FALSE}
+options(htmltools.dir.version = FALSE)
+options(digits = 2)
+
+library(ggplot2)
+
+library(gridExtra)
+
+library(knitr)
+knitr::opts_chunk$set(cache = FALSE)
+knitr::opts_chunk$set(tidy = FALSE, cache.extra = packageVersion('tufte'))
+knitr::opts_chunk$set(comment = "")
+
+library(reshape)
+
+library(rstan)
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores(logical = FALSE))
+
+library(tufte)
+
+ggtheme_tufte <- function() {
+  theme(plot.background =
+          element_rect(fill = "#fffff8",
+                       colour = "#fffff8",
+                       size = 0.5,
+                       linetype = "solid"),
+        plot.margin=unit(c(1, 1, 0.5, 0.5), "lines"),
+        panel.background =
+          element_rect(fill = "#fffff8",
+                       colour = "#fffff8",
+                       size = 0.5,
+                       linetype = "solid"),
+        panel.grid.major = element_line(colour = "white", size = 1, linetype="dashed"),
+          # blank(),
+        panel.grid.minor = element_blank(),
+        legend.box.background =
+          element_rect(fill = "#fffff8",
+                       colour = "#fffff8",
+                       linetype = "solid"),
+        axis.ticks = element_blank(),
+        axis.text = element_text(family = "Palatino", size = 16),
+        axis.title.x = element_text(family = "Palatino", size = 20,
+                                    margin = margin(t = 15, r = 0, b = 0, l = 0)),
+        axis.title.y = element_text(family = "Palatino", size = 18,
+                                    margin = margin(t = 0, r = 15, b = 0, l = 0)),
+        strip.background = element_rect(fill = "#fffff8",
+                                        colour = "#fffff8",
+                                        linetype = "solid"),
+        strip.text = element_text(family = "Palatino", size = 16),
+        legend.text = element_text(family = "Palatino", size = 16),
+        legend.title = element_text(family = "Palatino", size = 16,
+                                    margin = margin(b = 5)),
+        legend.background = element_rect(fill = "#fffff8",
+                                        colour = "#fffff8",
+                                        linetype = "solid"),
+        legend.key = element_rect(fill = "#fffff8",
+                                        colour = "#fffff8",
+                                        linetype = "solid")
+  )
+}
+
+printf <- function(msg = "%5.3f", ...) {
+  cat(sprintf(msg, ...))
+}
+```
+
+## Abstract
+
+Hidden Markov models (HMM) are finite mixture models where the
+sequence of latent (unobserved, or hidden) states determining the
+mixture component forms a Markov chain.  This case study focuses on
+efficient inference for these discrete models using dynamic
+programming to marginalize the discrete parameters.  Algorithms
+covered in this case study include (1) the forward algorithm for the
+likelihood of the observed sequence, (2) the forward-backward
+algorithm for marginal latent state probabilities and sufficient
+statistics, and (3) the Viterbi algorithm for the latent state
+sequence of highest posterior probability given the observed sequence.
+
+Two examples are provided with full Stan programs.  The first example
+is animal movement, with change in bearing (turn angle) and direction
+traveled being observed and latent states corresponding to transiting
+(long movement, small change in bearing), foraging (short movement,
+large change in bearing), and resting (no movement).  The second
+example is natural language sentence tagging.  The states are
+partially observed in the training data and correspond to parts of
+speech like noun and verb; the observed outputs are word sequences
+like "Riley ran".  This is an example of semi-supervised machine
+learning.
+
+
+# Mixture Models
+
+In a simple mixture model, there is a discrete responsibility
+parameter determining from which mixture component an item is drawn.
+For example, in a simple two-component normal mixture, $z_n$ is the
+mixture component responsible for item $y_n$,
+$$
+\begin{array}{rcl}
+z_n & \sim & \mathsf{Bernoulli}(\lambda)
+\\
+y_n & \sim & \mathsf{Normal}(\mu_{z_n}, \sigma_{z_n})
+\end{array}
+$$
+The responsibility parameter may be marginalized out in the usual
+way, starting from the expression for the joint density,
+$$
+p(y_n, z_n \mid \lambda, \mu, \sigma)
+\ = \
+\mathsf{Bernoulli}(z_n | \lambda)
+\cdot \mathsf{Normal}(y_n | \mu_{z_n}, \sigma_{z_n}),
+$$
+and then marginalizing out $z_n$ using the law of total probability,
+$$
+\begin{array}{rcl}
+p(y_n \mid \lambda, \mu, \sigma)
+& = &
+\sum_{k=0}^1 p(y_n, z_n = k \mid \lambda, \mu, \sigma)
+\\[4pt]
+& = &
+\sum_{k=0}^1
+  \mathsf{Bernoulli}(k | \lambda)
+  \cdot \mathsf{Normal}(y_n | \mu_k, \sigma_k)
+\\[4pt]
+& = &
+\mathsf{Bernoulli}(0 | \lambda) \cdot \mathsf{Normal}(y_n | \mu_0, \sigma_0)
++
+\mathsf{Bernoulli}(1 | \lambda) \cdot \mathsf{Normal}(y_n | \mu_1, \sigma_1)
+\\[4pt]
+& = &
+(1 - \lambda) \cdot \mathsf{Normal}(y_n | \mu_0, \sigma_0)
+\ + \
+\lambda \cdot \mathsf{Normal}(y_n | \mu_1, \sigma_1)
+\end{array}
+$$
+
+**[draw that mixture density in the margin]**
+
+Mixture models of this kind can be composed of any sequence of
+distributions. The component distributions are not required to have
+the same support.  It's even possible in principle to have one
+discrete component and one continuous component.
+
+
+# Markov Chains
+
+Hidden Markov models extend the notion of mixture models to sequences
+of observations $y = y_1, y_2, \ldots, y_n, \ldots$ generated from a
+latent (unobserved) sequence of mixture components $z = z_1, z_2,
+\ldots, z_n, \ldots$.^[A sequence of random variables is known as a
+*stochastic process*.  If the sequence represents points in time, the
+sequence is called a *time series.*]
+
+These sequences are unbounded in principle, but data sets will always
+be of finite subsequences $y_{1:N}$ and $z_{1:N}$, which will be
+numbered from one for convenience.
+
+
+## Finite state space
+
+A hidden Markov model is based on a finite number of mixture
+components.^[In general, a Markov chain may have continuously states,
+as in the typical application to Bayesian inference using Markov chain
+Monte Carlo (MCMC).]  For concreteness, suppose there are $K$ possible
+states, numbered from one, so that $z_n \in 1{:}K$ for $n \in 1{:}N$.
+
+The *state space* of a Markov chain $z$ is the set of possible values
+for the sequence of random variables $z$.  Here, because we have
+assumed discrete states $1{:}K$ and a sequence of length $N$, the
+state space is
+$$
+(1{:}K)^N
+\ = \
+\{ z_1, \ldots, z_N \mid z_n \in 1{:}K \mbox{ for } n \in 1{:}N \}.
+$$
+The state space $(1{:}K)^N$ is of size $K^N$, so the number of
+sequences in the state space grows exponentially in the length $N$ of
+the sequence, with base $K$ determined by the number of possible
+states.  Considerable effort will be required to mitigate this
+combinatorial explosion in computing the required likelihoods.
+
+## Markov property
+
+Hidden Markov models assume that the latent sequence $z$ of mixture
+component responsibilities satisfies the Markov property.  The Markov
+property requires element $z_n$ in the sequence to be conditionally
+independent given the previous element $z_{n-1}$.  In words, a
+Markovian system only has a memory of one time step.  A sequence of
+random variables $z = z_1, z_2, \ldots, z_n, \ldots$ is a *Markov
+chain* if it satisfies
+$$
+p\!\left(z_n \mid z_1, \ldots, z_{n-1}\right)
+=
+p\!\left(z_{n} \mid z_{n-1}\right)
+$$
+for all $n > 0$.  Just a little reminder that we will only be
+observing finite subsequences of this unbounded sequence.
+
+
+## Stochastic transition matrix
+
+A discrete Markov chain with $K$ possible states can be parameterized
+with a $K \times K$ stochastic matrix^[A square $K \times K$ matrix $\theta$ is a
+*stochastic matrix* if each row vector $\theta_k = \theta_{k,1},
+\ldots, \theta_{k,K}$ forms a unit $K\!$-simplex.  A $K\!$-vector is a
+*unit simplex* if its elements are non-negative and sum to one.]
+$\theta$, with
+$$
+z_n \sim \mathsf{Categorical}\!\left( \theta_{z_{n-1}} \right).
+$$
+This sampling notation is meant to indicate that $z_n$ is
+conditionally independent given $z_{n-1}$ and indicate its
+distribution, so that
+$$
+p\!\left(z_n \mid z_{n - 1}, \theta\right)
+= \mathsf{Categorical}\!\left( z_n \mid \theta_{z_{n-1}} \right).
+$$
+
+
+## Initial state distribution
+
+To get a chain started, there needs to be an initial distribution over
+the first state, which may be parameterized with a unit $K$-simplex
+$\psi$,
+$$
+z_1 \sim \mathsf{Categorical}\!\left( \psi \right).
+$$
+
+## Stationary distribution
+
+Given a stochastic $K \times K$ matrix $\theta$ with no zero entries,
+its stationary distribution is the unique unit $K$-simplex $\psi$ such
+that
+$$
+\psi^{\top} = \psi^{\top} \theta.
+$$
+Breaking this down by component, the probability of being in state $j$
+is
+$$
+\psi_j \ = \ \sum_{i} \psi_i \, \theta_{i,\, j}.
+$$
+In words, the probability of being in state $j$ is equal to the sum
+over states $i$ of the probability of being in state $i$ ($\psi_i$)
+and transitioning to state $j$ ($\theta_{i,j}$).  Thus marginally, the
+distribution of each variable is the same, so that for all $n \in 1{:}N$,
+$$
+p\!\left( z_n \right) = \ = \ \mathsf{Categorical}(\psi).
+$$
+Although identically distributed, the states $z_n$ are not
+independent---each state is only conditionally independent given the
+previous state.^[If states $z_{n+1}$ and $z_n$ were independent, then
+$p(z_{n+1} \mid z_n) = p(z_{n+1})$;  rather $p(z_{n+1} \mid z_n) =
+\mathsf{Categorical}\!\left(\theta_{z_n}\right)$].
+
+For observations of a sequence taken from a longer sequence, it is
+conventional to take the initial distribution to be the stationary
+distribution.
+
+## Priors
+
+One possible prior for the Markov transition matrix $\theta$ is
+uniform over matrices whose rows form simplexes.  This is the prior
+one gets by default in Stan if no other prior is specified.
+
+A weakly informative prior intended to allow some probability of each
+state transitioning to any other state might be
+$\mathsf{Dirichlet}(5\,\mathrm{I}_K)$ or even
+$\mathsf{Dirichlet}(10\,\mathrm{I}_K)$.
+
+
+
+# Hidden Markov Models
+
+## Observed data
+
+The fundamental unit of observed data for an HMM likelihood is a
+sequence $y = y_1, \ldots, y_N$ where each $y_n \in \mathcal{Y}$ for
+some domain of observation $\mathcal{Y}$.  These $y_n$ may be binary,
+categorical, counts, concentrations, locations, distances, etc., or
+they may be multivariate quantities consisting of more than one
+quantity.
+
+## Generative process
+
+The generative process for a hidden Markov model is to
+
+* generate a transition matrix $\theta$ from its prior $p(\theta)$,
+
+* generate parameters $\phi = \phi_1, \ldots, \phi_K$ for the $K$
+  mixture components from their joint prior $p(\phi)$,
+
+* generate the first latent state $z_1$ from the stationary
+  distribution of $\theta$ (or another initial distribution)
+
+* for each subsequent state $z_n$, generate it from the
+  categorical distribution based on the previous state according to
+  $\theta_{z_{n-1}}$
+
+* for each element $y_n$ of the observed state sequence, generate it
+  from the distribution parameterized by $\phi_{z_n}$
+
+## Joint probability function
+
+The joint probability function implied by the generative process may
+be factored as
+$$
+\begin{array}{rcl}
+p(y, z, \theta, \phi)
+& = &
+p(y, z \mid \theta, \phi) \cdot p(\theta, \phi)
+\\[4pt]
+& = &
+p(y \mid z, \phi) \cdot p(z \mid \theta) \cdot p(\theta) \cdot p(\phi)
+\\[4pt]
+& = &
+\begin{array}[t]{l}
+\prod_{n=1}^N p(y_n \mid \phi_{z_n})
+\\
+{ } \cdot p(z_1 \mid \theta)
+\\
+{ } \cdot \prod_{n=2}^N p(z_n \mid \theta_{z_{n-1}})
+\\
+{ } \cdot p(\theta) \cdot p(\phi)
+\end{array}
+\end{array}
+$$
+
+The exact form of the $z_n$ terms was shown in the previous section on
+Markov models.  The forms of the other terms will be application
+dependent.
+
+## The likelihood
+
+The term $p(\theta, \phi)$ is the prior, but the likelihood is a
+little more difficult to discern because of the complication of the
+latent state sequence $z$.  The terms $\theta$ and $\phi$ are
+parameters and $y$ is the observed data, but where does that leave
+$z$?  It's latent, unobserved data in one sense and a parameter in
+another sense.  Because teh number of $z$ parameters grows with the
+data size $y$, the likelihood function does not include the $z$
+parameters, but rather marginalizes them out, yielding the likelihood
+$$
+p(y \mid \theta, \phi)
+\ = \
+\sum_{z \, \in \, (1{:}K)^N} p(y, z \mid \theta, \phi).
+$$
+The point of the first algorithm introduced, the forward algorithm is
+to compute the likelihood efficiently.
+
+
+## Observed latent states and semi-supervised estimation
+
+In some situations, the latent states $z_1, \ldots, z_N$ are
+observed.  An example is when there is human generated or other
+training data.
+
+# The Forward Algorithm
+
+The forward algorithm is a *dynamic programming algorithm*^[Dynamic programming typically involves caching or "memoizing" intermediate values for use in computing subsequent values; dynamic programming algorithms typically compute exponentially sized summations in polynomial time.] for computing the seemingly intractable summation in the definition of the likelihood in time $\mathcal{O}(N \cdot K^2)$ where $N$ is the length of the sequence and $K$ the number of latent states.
+
+## Forward algorithm target values
+
+The forward algorithm operates by inductively calculating an $N \times
+K$ array of forward values
+$$
+\alpha_{n, k} = p(y_1, \ldots, y_n, z_n = k \mid \theta, \phi).
+$$
+
+The likelihood^[The likelihood considers $p(y \mid \theta, \phi)$ as a function of $\theta$ and $\phi$ for fixed data $y$; the sampling distribution considers $p(y \mid \theta, \phi)$ as a probability function over observations $y$ given fixed parameters $\theta$ and $\phi$.] is then calculated in the final step as
+$$
+\begin{array}{rcl}
+p(y \mid \theta, \phi)
+& = & \sum_{k = 1}^K p(y_1, \ldots, y_N, z_N = k \mid \theta, \phi)
+\\[4pt]
+& = & \sum_{k = 1}^K \alpha_{N, \, k}.
+\end{array}
+$$
+
+
+## Base case of forward algorithm
+
+The algorithm proceeds inductively, from $n = 1$ to $n = N$.  For $k
+\in 1{:}K$,
+$$
+\begin{array}{rcl}
+\alpha_{1, \, k}
+& = & p(y_1, z_1 = k \mid \phi, \theta)
+\\
+& = & p(y_1 \mid \phi_k) \cdot p(z_1 = k \mid \theta)
+\\
+& = & p(y_1 \mid \phi_k) \cdot \mathrm{stationary}(\theta)_k
+\end{array}
+$$
+The emission probability function $p(y_1 \mid \phi_k)$ will be
+application dependent.  The initial state probability is taken to be
+the stationary distribution of $\theta$, as discussed in the section
+on Markov models.^[This assumption could be replaced by providing an
+initial distribution $\psi$ and replacing
+$\mathrm{stationary}(\theta)_k$ with $\psi_k$.]
+
+## Inductive case of forward algorithm
+
+For $n > 0$, $\alpha_{n + 1}$ is defined inductively in terms of
+$\alpha_n$ by
+$$
+\begin{array}{rcl}
+\alpha_{n + 1, \, k}
+& = & p(y_1, \ldots, y_{n + 1}, z_{n + 1} = k)
+\\[4pt]
+& = &
+p(y_{n + 1} \mid \phi_k)
+\cdot \sum_{k' = 1}^K p(y_1, \ldots, y_n, z_n = k' \mid \phi, \theta)
+                      \cdot p(z_{n + 1} = k \mid z_n = k', \theta)
+\\[4pt]
+& = &
+p(y_{n + 1} \mid \phi_k)
+\cdot \sum_{k' = 1}^K \alpha_{n - 1, \, k'} \cdot \theta_{k', k}
+\end{array}
+$$
+
+## Likelihood calculation with the forward algorithm
+
+As noted above, the total likelihood $p(y \mid \theta, \phi)$ may be
+calculated directly from $\alpha_N$, the final forward values
+calculated.
+$$
+\begin{array}
+p(y \mid \theta, \phi)
+& = & \sum_{k = 1} p(y, z_N = k \mid \theta, \phi)
+\\[4pt]
+& = & \sum_{k = 1} \alpha_{N, k}.
+\end{array}
+$$
+
+
+## Forward algorithm on the log scale
+
+The forward algorithm on the probability scale is prone to overflow by
+multiplying many probability function values.  To mitigate this
+problem, the forward algorithm is traditionally calculated on the log
+scale.  The base case becomes
+$$
+\log \alpha_{1, k}
+\ = \
+\log p(y_1 \mid \phi_k) + \log \mathrm{stationary}(\theta)_k.
+$$
+The inductive case is then
+$$
+\begin{array}{rcl}
+\log \alpha_{n+1, k}
+& = &
+\log p(y_{n + 1} \mid \phi_k)
++ \log \sum_{k' = 1}^K
+  \exp\left(
+    \log \alpha_{n, \, k'} + \log \theta_{k', k}
+  \right)
+\\[4pt]
+& = & \log p(y_{n + 1} \mid \phi_k)
++ \mathrm{log\_sum\_exp}_{k=1}^K \log \alpha_{n, k} + \log \theta_{k',k}
+\end{array}
+$$
+where we use the arithmetically stable compound log sum of exponents operation,^[The log-sum-exp operation both prevents overflow and maintains high precision by calculating as $\mathrm{log\_sum\_exp}_{k=1}^K u_k$ as $$\max(u) + \log \sum_{k=1}^K \exp\left( u_k - \max(u) \right).$$  Only values less than zero are exponentiated and leading digit accuracy is preserved with $\max(u)$.]
+$$
+\mathrm{log\_sum\_exp}_{k = 1}^K u_k
+\ = \
+\log \sum_{k=1}^K \exp(u_k).
+$$
+
+The final log likelihood is then just
+$$
+\begin{array}{rcl}
+\log p(y \mid \theta, \phi)
+& = &
+\log \sum_{k=1}^K \exp\left( \log \alpha_{N, k} \right).
+\\[4pt]
+& = & \mathrm{log\_sum\_exp}_{k = 1}^K  \log \alpha_{N, k}.
+\end{array}
+$$
+
+## Forward algorithm and complexity
+
+The forward algorithm is very simple
+
+1.  For $k \in 1{:}K$, calculate $\log \alpha_{1, k}$
+2.  for $n \in 2{:}N$, for $k \in 1{:}K$, calculate $\log \alpha_{n,\, k}$ based on $\log \alpha_{n-1}$
+
+Step (1) involves $K$ evaluations of $\log \alpha_{1, k}$, each of which has constant cost.  Step (2) involves $(N - 1) \cdot K$ evaluations of an $\alpha_{n, k}$ term, each of which involves $K$ steps (one for each possible previous state).  Thus the overall algorithm is $\mathcal{O}(K + N \cdot K^2) = \mathcal{O}(N \cdot K^2)$.  This is linear in the size $N$ of the input with a constant factor that's quadratic in the number of states.
+
+
+# The Forward-Backward Algorithm
+
+The forward-backward algorithm adds a backward dynamic programming algorithm to the forward algorithm to copute sufficient statistics for efficient inference in hidden Markov models. Specifically, the forward-backward algorithm computes marginal emission probabilities $p(z_n = k \mid y, \theta, \phi)$ and marginal transition probabilities $p(z_{n - 1} = k', z_n = k' \mid y, \theta, \phi)$.  These may be collected into sufficient statistics for estimating $\phi$ and $\theta$, and is thus the key to efficient inference with hidden Markov models.
+
+## Backward algorithm target values
+
+The backward algorithm targets the conditional probability of completing the sequence $y_1, \ldots, y_n$ with $y_{n+1}, \ldots, y_N$ given that the state $z_n = k$,
+$$
+\beta_{n,\, k} = p(y_{n+1}, \ldots, y_N \mid z_n = k, \theta, \phi).
+$$
+
+## Backward algorithm base case
+
+Because the algorithm works from the end of the sequence back to the front, the base case is for the last position,
+$$
+\begin{array}{rcl}
+\beta_{N,\, k}
+& = &
+p(\epsilon \mid z_N = k, \theta, \phi)
+\\
+& = & 1.
+\end{array}
+$$
+The $\epsilon$ here indicates the empty sequence (the sequence of size zero), which is why the value is one---there is only one possible empty sequence, so the distribution is discrete with one outcome, and hence has probability one.
+
+## Backward algorithm inductive case
+
+The backwards algorithm is so named because its induction works from $N$ down to $1$, i.e., backwards compared to the forward algorithm.  The inductive case defining the components of $\beta_{n-1}$ in terms of $\beta_n$ is
+$$
+\begin{array}{rcl}
+\beta_{n - 1, \, k}
+& = & p(y_n, \ldots, y_N \mid z_n = k, \theta, \phi)
+\\[4pt]
+& = &
+\sum_{k' = 1}^K p(z_n = k' \mid z_{n - 1} = k, \theta)
+                \cdot p(y_n \mid z_n = k', \phi)
+		\cdot p(y_{n + 1}, \ldots, y_N \mid z_n = k', \theta, \phi)
+\\[4pt]
+& = &
+\sum_{k' = 1}^K  \theta_{k,\, k'}
+                \cdot p(y_n \mid \phi_{k'})
+		\cdot \beta_{n,\, k'}
+\end{array}
+$$
+
+## Forward-backward target values
+
+The product of the forward and backward values at a given position are the basis of the marginal calculations we need.  A new forward-backward term $\gamma$ is defined as the elementwise products of the $\alpha$ and $\beta$ arrays.  Considering an element, that reduces to
+$$
+\begin{array}{rcl}
+\gamma_{n, k}
+& = & \alpha_{n, k} \cdot \beta_{n, k}
+\\
+& = &
+p(y_1, \ldots, y_n, z_n = k \mid \theta, \phi)
+\cdot p(y_{n + 1}, y_N \mid z_n = k \mid \theta, \phi)
+\\
+& = &
+p(y_1, \ldots, y_N, z_n = k \mid \theta, \phi)
+\\
+& = &
+p(y, z_n = k \mid \theta, \phi)
+\end{array}
+$$
+
+## Marginal responsibilities with forward-backward
+
+The marginal we care about is $p(z_n = k \mid y, \theta, \phi)$, the probability the element $y_n$ of $y = y_1, \ldots, y_N$ is generated from mixture component $k$.  This conditional probability is calculated from the joint probability.
+$$
+\begin{array}{rcl}
+p(z_n = k \mid y, \theta, \phi)
+& = &
+\frac{\displaystyle p(z_n = k, y \mid \theta, \phi)}
+     {\displaystyle p(y \mid \theta, \phi)}
+\\[6pt]
+& = & \frac{\displaystyle \gamma_{n,\, k}}
+           {\sum_{k'=1}^K \displaystyle \alpha_{N,\, k'}}.
+\end{array}
+$$
+The numerator is what is calculated by the forward-backward algorithm, and the denominator is the likelihood, calculated by the sum of the final $\alpha_N$ values in the forward algorithm.
+
+On the log scale,
+$$
+\begin{array}{rcl}
+\log p(z_n = k \mid y, \theta, \phi)
+& = &
+\log p(z_n = k, y \mid \theta, \phi)
+- \log p(y \mid \theta, \phi)
+\\
+& = &
+\log \gamma_{n,\, k}
+- \mathrm{log\_sum\_exp}_{k' = 1}^K \log \alpha_{N,\, k'}.
+\end{array}
+$$
+Here, the term on the left is the log forward-backward target, whereas the term on the right is the log likelihood as computed with the forward algorithm.
+
+## Marginal transitions with forward-backward
+
+The marginal transitions are calculated much like the marginal states using the forward and backward targets. The difference is that that there's a transition mediating the forward and backward values.
+$$
+\begin{array}{rcl}
+p(z_{n - 1} = k, z_n = k', y \mid \theta, \phi)
+& = &
+p(y_1, \ldots, y_{n-1}, z_{n-1} = k \mid \theta, \phi)
+\cdot p(z_n = k' \mid z_n = k, \theta)
+\cdot p(y_n, \ldots, y_N \mid z_n = k' \mid \theta, \phi)
+\\
+& = &
+\alpha_{n-1, k} \cdot \theta_{k, k'} \cdot \beta{n, k'}.
+\end{array}
+$$
+
+To get the conditional transition probabilities given $y$, we divide by the marginal for $y$, as before,
+$$
+\begin{array}{rcl}
+p(z_{n - 1} = k, z_n = k' \mid y, \theta, \phi)
+& = &
+\frac{\displaystyle p(z_{n - 1} = k, z_n = k' \mid y, \theta, \phi)}
+     {\displaystyle p(y \mid \theta, \phi)}
+\\[4pt]
+& = &
+\frac{\displaystyle \alpha_{n-1, k} \cdot \theta_{k, k'} \cdot \beta{n, k'}}
+     {\sum_{k'' = 1}^K \displaystyle \alpha_{N,\, k''}}
+\end{array}
+$$
+
+## Collecting sufficient statistics
+
+Given $p(z_{n-1} = k, z_n = k' \mid y, \phi, \theta)$, we can collect the number of expected transitions from state $k$ to state $k'$ given $y$ as
+$$
+T_{k,\, k'}
+\ = \
+\sum_{n = 2}^N \, p(z_{n-1} = k, z_n = k \mid y, \theta, \phi).
+$$
+Along with $p(z_1 = k \mid y, \theta)$, this provides a sufficient statistic for estimating the stochastic transition matrix $\theta$.
+
+Similarly, we can collect the sufficient statistics for emissions.
+$$
+E_{n,\, k} = p(z_n = k \mid y, \phi, \psi).
+$$
+If there are duplicate $y_n$ values, which is unlikely in most applications, the emission statistics may be summed.
+
+Together, the statistics $T_{k,\, k'}$ and $E_{n, k}$ may be used to define the log density.
