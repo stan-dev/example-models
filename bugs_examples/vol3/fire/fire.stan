@@ -22,8 +22,7 @@ parameters {
   real<lower=0> theta;
 } 
 transformed parameters {
-  real mu;
-  mu <- log(theta) - alpha * sigma * sigma; 
+  real mu = log(theta) - alpha * sigma * sigma; 
 } 
 model { 
   real lpa[N];
@@ -36,25 +35,25 @@ model {
   alpha ~ gamma(.001, .001); 
   sigma ~ gamma(.001, .001); 
 
-  tmp <- ( sqrt(2 * pi()) 
+  tmp = ( sqrt(2 * pi()) 
            * alpha 
            * sigma 
            * Phi(alpha * sigma) 
            * exp(0.5 * pow(alpha * sigma, 2)) );  
-  log_tmp <- log(tmp);
-  neg_log1p_temp <- - log1p(tmp);
-  log_Phi_alpha_times_sigma <- log(Phi(alpha * sigma));
+  log_tmp = log(tmp);
+  neg_log1p_temp = - log1p(tmp);
+  log_Phi_alpha_times_sigma = log(Phi(alpha * sigma));
   for (i in 1:N) {  
     if (theta > x[i]) 
-      lpa[i] <- ( log_tmp,
+      lpa[i] = ( log_tmp 
                   + neg_log1p_temp
                   - log_Phi_alpha_times_sigma
-                  + lognormal_log(x[i], mu, sigma) ); 
+                  + lognormal_lpdf(x[i] | mu, sigma) ); 
     else 
-      lpa[i] <- ( neg_log1p_temp
-                  + pareto_log(x[i], theta, alpha) ); 
+      lpa[i] = ( neg_log1p_temp
+                  + pareto_lpdf(x[i] | theta, alpha) ); 
   } 
-  increment_log_prob(sum(lpa));
+  target += sum(lpa);
 }
 
 

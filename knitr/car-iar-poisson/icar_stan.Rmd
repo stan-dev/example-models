@@ -52,7 +52,7 @@ $\mathbf{\phi} = ({\phi}_1, \ldots, {\phi}_n)^T$.
 
 For CAR models, spatial relationship between the $n$ areal units
 are represented as an adjacency matrix $W$ with dimensions $n \times n$
-where entries $w_{i,j}$ and $w_{j,i}$ are positive when regions ${n_i}$ and ${n_j}$ are neighbors
+where entries $w_{i,j}$ and $w_{j,i}$ are positive when regions $i$ and $j$ are neighbors
 and zero otherwise.
 The _neighbor_ relationship $i \sim j$ is defined in terms of this matrix:
 the neighbors of region $i$ are those regions who have non-zero entries in row or column $i$.
@@ -92,9 +92,9 @@ where
 
 - $\alpha$ is between 0 and 1
 - $B$ is the $n \times n$ matrix weights matrix $W$ where entries $\{i,i\}$ are zero and the off-diagonal elements
-describe the spatial proximity of regions $n_i$ and $n_j$
+describe the spatial proximity of regions $i$ and $j$
 - $I$ is an $n \times n$ identity matrix
-- $D_{\tau} = \tau D$ where D is an $n \times n$ diagonal matrix
+- $D_{\tau} = \tau D$ where $D$ is an $n \times n$ diagonal matrix
 
 The construction of the spatial proximity matrix $B$ determines the class of CAR model structure.
 
@@ -261,7 +261,7 @@ The log probability density of $\phi$ is:
 $$-{\frac{1}{2}} \left( \sum_{i \sim j} {({\phi}_i - {\phi}_j)}^2 \right) + \mbox{const}$$
 Since Stan computes up to a proportion, the constant term drops out.
 
-As noted above,  $\phi$ is non-centered;
+As noted above,  $\phi$ is non-identifiable;
 adding any constant to all of the elements of $\phi$ leaves the distribution unchanged.
 Therefore we must add the constraint $\sum_{i} {\phi}_i = 0$.
 This can be implemented as a hard  sum-to-zero constraint
@@ -439,8 +439,7 @@ called "fixed effects."
 
 - $\phi$ is an ICAR spatial component.
 
-The pairwise difference formulation of the ICAR spatial component $\phi$ is non-centered,
-thus models with include both an ICAR spatial effects component and an intercept term are non-identifiable.
+The pairwise difference formulation of the ICAR spatial component $\phi$ is non-identifiable.
 Adding the constraint that $\phi$ must sum to zero centers it, allowing the model to
 fit both the fixed-effect intercept term as well as $\phi$ and $\theta$.
 

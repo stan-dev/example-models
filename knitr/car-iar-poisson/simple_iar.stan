@@ -6,9 +6,12 @@ data {
 }
 parameters {
   vector[N] phi;
+  real sigma;
 }
 model {
   target += -0.5 * dot_self(phi[node1] - phi[node2]);
-  // soft sum-to-zero constraint on phi)
-  sum(phi) ~ normal(0, 0.01 * N);  // equivalent to mean(phi) ~ normal(0,0.01)
+
+  // soft sum-to-zero constraint on phi,
+  // equivalent to mean(phi) ~ normal(0,0.01)
+  sum(phi) ~ normal(0, 0.01 * N);
 }

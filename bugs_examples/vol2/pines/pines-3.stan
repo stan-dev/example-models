@@ -5,13 +5,9 @@ data {
   vector[N] z;
 }
 transformed data {
-  vector[N] y_std;
-  vector[N] x_std;
-  vector[N] z_std;
-
-  y_std <- (y - mean(y)) / sd(y);
-  x_std <- (x - mean(x)) / sd(x);
-  z_std <- (z - mean(z)) / sd(z);
+  vector[N] y_std = (y - mean(y)) / sd(y);
+  vector[N] x_std = (x - mean(x)) / sd(x);
+  vector[N] z_std = (z - mean(z)) / sd(z);
 }
 parameters {
   real alpha;
@@ -23,7 +19,7 @@ parameters {
 transformed parameters {
   vector<lower=0>[2] sigma;
   for (i in 1:2)
-    sigma[i] <- 1 / sqrt(tau[i]);
+    sigma[i] = 1 / sqrt(tau[i]);
 }
 model {
   alpha ~ normal(0,sqrt(1e6));
@@ -41,18 +37,18 @@ generated quantities {
   vector[2] log_py;
   real lambda;
 
-  log_py[1] <- log(0.9995)
-    + normal_log(y_std, alpha + beta * x_std, sigma[1])
-    + normal_log(alpha, 0, sqrt(1e6))
-    + normal_log(beta, 0, sqrt(1e4))
-    + gamma_log(tau[1], 0.0001, 0.0001)
-    + normal_log(gamma, 
+  log_py[1] = log(0.9995)
+    + normal_lpdf(y_std | alpha + beta * x_std, sigma[1])
+    + normal_lpdf(alpha | 0, sqrt(1e6))
+    + normal_lpdf(beta | 0, sqrt(1e4))
+    + gamma_lpdf(tau[1] | 0.0001, 0.0001)
+    + normal_lpdf(gamma | 0.0001, 0.0001);
 
-  log_py[2] <- log(0.0005)
-    + normal_log(y_std, gamma + delta * z_std, sigma[2])
-    + normal_log(gamma, 0, sqrt(1e6))
-    + normal_log(delta, 0, sqrt(1e4))
-    + gamma_log(tau[2], 0.0001, 0.0001);
+  log_py[2] = log(0.0005)
+    + normal_lpdf(y_std | gamma + delta * z_std, sigma[2])
+    + normal_lpdf(gamma | 0, sqrt(1e6))
+    + normal_lpdf(delta | 0, sqrt(1e4))
+    + gamma_lpdf(tau[2] | 0.0001, 0.0001);
 
-  lambda <- softmax(log_py)[1];
+  lambda = softmax(log_py)[1];
 }
