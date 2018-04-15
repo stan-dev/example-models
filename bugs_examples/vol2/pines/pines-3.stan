@@ -8,6 +8,7 @@ transformed data {
   vector[N] y_std = (y - mean(y)) / sd(y);
   vector[N] x_std = (x - mean(x)) / sd(x);
   vector[N] z_std = (z - mean(z)) / sd(z);
+  print("pines-3")
 }
 parameters {
   real alpha;
