@@ -10,7 +10,7 @@ transformed data {
   vector[N] height_male_inter;
 
   log_earnings = log(earnings);
-  male = 2 - sex;
+  male = 2 - sex1;
   height_male_inter = height .* male;
 }
 parameters {

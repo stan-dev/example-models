@@ -12,6 +12,7 @@ transformed data {
   y_std <- (y - mean(y)) / sd(y);
   x_std <- (x - mean(x)) / sd(x);
   z_std <- (z - mean(z)) / sd(z);
+  print("pines_independant");
 }
 parameters {
   real alpha;

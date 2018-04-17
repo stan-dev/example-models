@@ -12,6 +12,7 @@ transformed data {
   y_std <- (y - mean(y)) / sd(y);
   x_std <- (x - mean(x)) / sd(x);
   z_std <- (z - mean(z)) / sd(z);
+  print("pines-4")
 }
 parameters {
   real alpha;
@@ -49,5 +50,5 @@ model {
     // + normal_log(beta,1,1/sqrt(400))
     // + gamma_log(tau[1],46,4.5);
 
-  increment_log_prob(log_sum_exp(log_p));
+    target += log_sum_exp(log_p);
 }
