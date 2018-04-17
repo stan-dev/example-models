@@ -77,16 +77,7 @@ printf <- function(msg = "%5.3f", ...) {
 
 ## Abstract
 
-Hidden Markov models (HMM) are finite mixture models where the
-sequence of latent (unobserved, or hidden) states determining the
-mixture component forms a Markov chain.  This case study focuses on
-efficient inference for these discrete models using dynamic
-programming to marginalize the discrete parameters.  Algorithms
-covered in this case study include (1) the forward algorithm for the
-likelihood of the observed sequence, (2) the forward-backward
-algorithm for marginal latent state probabilities and sufficient
-statistics, and (3) the Viterbi algorithm for the latent state
-sequence of highest posterior probability given the observed sequence.
+A hidden Markov model (HMM) is a sequential finite mixture model where the sequence of latent (unobserved, or hidden) states determining the mixture component forms a Markov chain.  This case study focuses on efficient inference HMMs using dynamic programming.  Algorithms covered include (1) the forward algorithm for the likelihood of the observed sequence, (2) the forward-backward algorithm for marginal latent state probabilities and sufficient statistics, and (3) the Viterbi algorithm for the latent state sequence of highest posterior probability given the observed sequence.
 
 Two examples are provided with full Stan programs.  The first example
 is animal movement, with change in bearing (turn angle) and direction
@@ -100,7 +91,11 @@ like "Riley ran".  This is an example of semi-supervised machine
 learning.
 
 
-# Mixture Models
+# Finite Mixture Models
+
+The basic idea of a finite mixture model is that there is a mixture of two or more populations from which observations are drawn.  Each population is characterized by its own distribution, though these distributions may share parameters.  Each observation is drawn from a single population.
+
+## Finite mixture model generative process
 
 In a simple mixture model, there is a discrete responsibility
 parameter determining from which mixture component an item is drawn.
@@ -113,15 +108,53 @@ z_n & \sim & \mathsf{Bernoulli}(\lambda)
 y_n & \sim & \mathsf{Normal}(\mu_{z_n}, \sigma_{z_n})
 \end{array}
 $$
-The responsibility parameter may be marginalized out in the usual
-way, starting from the expression for the joint density,
+
+The generative process can be explored by simulation.
+
+```{r echo=FALSE, fig.margin=TRUE, fig.cap="Histogram of 10000 simulated values with 60% chance of drawing from a population with mean of -2 and standard deviation of 0.75 and a 40% chance of drawing from a population with mean of 2 and standard deviation of 1.5.  Blue lines highlight the means of the two mixture components."}
+N <- 10000
+lambda <- 0.4
+mu <- c(-2, 2)
+sigma <- c(0.75, 1.5)
+z <- 1 + rbinom(N, 1, lambda)
+y <- rnorm(N, mu[z], sigma[z])
+plot_mix_sim <- ggplot(data.frame(y = y), aes(x = y)) +
+  geom_histogram(color="gray", bins=32) +
+  scale_y_continuous(name = "count", breaks=c()) +
+  scale_x_continuous(name = "y", lim = c(-6, 8), breaks=c(-6, -4, -2, 0, 2, 4, 6)) +
+  geom_vline(xintercept = mu[1], color="red") +
+  geom_vline(xintercept = mu[2], color="blue") +
+  ggtheme_tufte()
+plot_mix_sim
+```
+
+```{r echo=FALSE, fig.margin=TRUE, fig.cap="Plot of the mixture density of two normals corresponding to the previous plot.  The underlying mixture components are colored and scaled, with the dotted black line indicating the mixture density."}
+plot_mix_density <-
+  ggplot(data.frame(x = c(-6, 8)), aes(x = x)) +
+  stat_function(fun = function(x) 0.6 * dnorm(x, mean = -2, sd = 0.75),
+                colour="red", alpha = 0.6, size = 0.75) +
+  stat_function(fun = function(x) 0.4 * dnorm(x, mean = 2, sd = 1.5),
+                colour="blue", alpha = 0.4, size = 0.75) +
+  stat_function(fun = function(x) 0.6 * dnorm(x, mean = -2, sd = 0.75) +
+                                  0.4 * dnorm(x, mean = 2, sd = 1.5),
+                colour="black", linetype="dotted", size = 1) +
+  scale_y_continuous(name = "density", breaks=c()) +
+  scale_x_continuous(name = "y", breaks=c(-6, -4, -2, 0, 2, 4, 6)) +
+  ggtheme_tufte()
+plot_mix_density
+```
+
+
+## Finite mixture model likelihood
+
+In order to compute the likelihood^[The likelihood is the distribution of the observed data given the parameters.  Data-specific parameters must be marginalized out in order to get the distribution of the data itself, as required for the likelihood.] $p(y_n \mid \lambda, \mu, \sigma)$, it is necessary to marginalize out the responsibility parameter $z_n$ from
 $$
 p(y_n, z_n \mid \lambda, \mu, \sigma)
 \ = \
 \mathsf{Bernoulli}(z_n | \lambda)
-\cdot \mathsf{Normal}(y_n | \mu_{z_n}, \sigma_{z_n}),
+\cdot \mathsf{Normal}(y_n | \mu_{z_n}, \sigma_{z_n}).
 $$
-and then marginalizing out $z_n$ using the law of total probability,
+The discrete responsibility parameter $z_n$ governing the population from which $y_n$ is drawn may be marginalized out using the law of total probability,
 $$
 \begin{array}{rcl}
 p(y_n \mid \lambda, \mu, \sigma)
@@ -134,23 +167,23 @@ p(y_n \mid \lambda, \mu, \sigma)
   \cdot \mathsf{Normal}(y_n | \mu_k, \sigma_k)
 \\[4pt]
 & = &
+\begin{array}[t]{l}
 \mathsf{Bernoulli}(0 | \lambda) \cdot \mathsf{Normal}(y_n | \mu_0, \sigma_0)
-+
+\\
+{ } \ + \
 \mathsf{Bernoulli}(1 | \lambda) \cdot \mathsf{Normal}(y_n | \mu_1, \sigma_1)
+\end{array}
 \\[4pt]
 & = &
 (1 - \lambda) \cdot \mathsf{Normal}(y_n | \mu_0, \sigma_0)
-\ + \
-\lambda \cdot \mathsf{Normal}(y_n | \mu_1, \sigma_1)
+\ + \  \lambda \cdot \mathsf{Normal}(y_n | \mu_1, \sigma_1)
 \end{array}
 $$
 
-**[draw that mixture density in the margin]**
 
-Mixture models of this kind can be composed of any sequence of
-distributions. The component distributions are not required to have
-the same support.  It's even possible in principle to have one
-discrete component and one continuous component.
+## Flexible mixture modeling
+
+Although the example was of a simple mixture of two normals, any finite number of populations may be mixed.  The mixture model itself may be composed of a matching sequence of distributions, but they need not come from the same family or be simply distributions.  The component distributions are not even required to have the same support.  It's even possible in principle to have one discrete component and one continuous component.  The mixture models considered here will draw the mixture components from the same parametric family for simplicity.
 
 
 # Markov Chains
@@ -158,8 +191,8 @@ discrete component and one continuous component.
 Hidden Markov models extend the notion of mixture models to sequences
 of observations $y = y_1, y_2, \ldots, y_n, \ldots$ generated from a
 latent (unobserved) sequence of mixture components $z = z_1, z_2,
-\ldots, z_n, \ldots$.^[A sequence of random variables is known as a
-*stochastic process*.  If the sequence represents points in time, the
+\ldots, z_n, \ldots$.^[A sequence of random variables such as $z$ is known as a
+*discrete stochastic process*. If the sequence represents points in time, the
 sequence is called a *time series.*]
 
 These sequences are unbounded in principle, but data sets will always
@@ -167,7 +200,7 @@ be of finite subsequences $y_{1:N}$ and $z_{1:N}$, which will be
 numbered from one for convenience.
 
 
-## Finite state space
+## Markov chains with finite state spaces
 
 A hidden Markov model is based on a finite number of mixture
 components.^[In general, a Markov chain may have continuously states,
@@ -190,7 +223,7 @@ the sequence, with base $K$ determined by the number of possible
 states.  Considerable effort will be required to mitigate this
 combinatorial explosion in computing the required likelihoods.
 
-## Markov property
+## The Markov property
 
 Hidden Markov models assume that the latent sequence $z$ of mixture
 component responsibilities satisfies the Markov property.  The Markov
@@ -208,7 +241,7 @@ for all $n > 0$.  Just a little reminder that we will only be
 observing finite subsequences of this unbounded sequence.
 
 
-## Stochastic transition matrix
+## Stochastic transition matrixes
 
 A discrete Markov chain with $K$ possible states can be parameterized
 with a $K \times K$ stochastic matrix^[A square $K \times K$ matrix $\theta$ is a
@@ -228,7 +261,7 @@ p\!\left(z_n \mid z_{n - 1}, \theta\right)
 $$
 
 
-## Initial state distribution
+## Markov chain initial state distribution
 
 To get a chain started, there needs to be an initial distribution over
 the first state, which may be parameterized with a unit $K$-simplex
@@ -237,46 +270,191 @@ $$
 z_1 \sim \mathsf{Categorical}\!\left( \psi \right).
 $$
 
-## Stationary distribution
+## Markov chain stationary distributions
 
-Given a stochastic $K \times K$ matrix $\theta$ with no zero entries,
-its stationary distribution is the unique unit $K$-simplex $\psi$ such
-that
+Given a stochastic $K \times K$ matrix $\theta$ with no zero entries,^[This condition, originally due to Markov, may be relaxed slightly to aperiodic and ergodic stochastic matrixes.]
+its *stationary distribution* is parameterized by the unique unit $K$-simplex
+row vector $\psi$ such that
 $$
-\psi^{\top} = \psi^{\top} \theta.
+\psi = \psi \, \theta
 $$
+It is important that $\psi$ is a row vector so that the dimensions align.
 Breaking this down by component, the probability of being in state $j$
 is
 $$
-\psi_j \ = \ \sum_{i} \psi_i \, \theta_{i,\, j}.
+\begin{array}{rcl}
+\psi_j & = & \psi \, \theta_{\cdot,\, j}
+\\
+& = & \sum_{i=1}^K \psi_i \cdot \theta_{i,\, j}.
+\end{array}
 $$
+
 In words, the probability of being in state $j$ is equal to the sum
 over states $i$ of the probability of being in state $i$ ($\psi_i$)
-and transitioning to state $j$ ($\theta_{i,j}$).  Thus marginally, the
-distribution of each variable is the same, so that for all $n \in 1{:}N$,
+and transitioning to state $j$ ($\theta_{i,\, j}$).  Each state
+$z_i$ in the sequence has the stationary distribution as its marginal
+distribution, so that for all $n \in 1{:}N$,
 $$
 p\!\left( z_n \right) = \ = \ \mathsf{Categorical}(\psi).
 $$
-Although identically distributed, the states $z_n$ are not
-independent---each state is only conditionally independent given the
-previous state.^[If states $z_{n+1}$ and $z_n$ were independent, then
-$p(z_{n+1} \mid z_n) = p(z_{n+1})$;  rather $p(z_{n+1} \mid z_n) =
-\mathsf{Categorical}\!\left(\theta_{z_n}\right)$].
+
+## Calculating the stationary distribution
+
+The stationary distribution may be computed by repeated multiplication of the stochastic matrix,^[Natural *powers of matrices* are defined in the base case by $\theta^0 \ = \mathrm{I}_K$ and in the inductive case by $\theta^{n + 1} = \theta^n \ \theta$.]
+$$
+\psi
+\ = \
+\lim_{n \rightarrow \infty}
+\begin{bmatrix}
+1/K & \cdots & 1/K
+\end{bmatrix}
+\,
+\theta^n
+$$
+It is more efficient to grow the sequence multiplicatively^[The difference is $\mathcal{O}(n)$ versus $\mathcal{O}(\log n)$.] by setting
+$$
+\theta^{2 n} = \theta^n \theta^n.
+$$
+For example, consider the stochastic matrix
+$$
+\theta
+\ = \
+\begin{bmatrix}
+0.9 & 0.1 \\
+0.4 & 0.6
+\end{bmatrix}.
+$$
+Multiplying it by itself gives
+$$
+\theta^2
+\ = \
+\begin{bmatrix}
+0.85 & 0.15 \\
+0.60 & 0.40
+\end{bmatrix}.
+$$
+Continuing the sequence,
+$$
+\theta^4
+\ = \
+\begin{bmatrix}
+0.81 & 0.19 \\
+0.75 & 0.25
+\end{bmatrix}
+\ \ \ \ \ \
+\theta^8
+\ = \
+\begin{bmatrix}
+0.80 & 0.20 \\
+0.80 & 0.20
+\end{bmatrix}.
+$$
+The limit is
+$$
+\lim_{n \rightarrow \infty} \theta^n
+\ = \
+\begin{bmatrix}
+0.8 & 0.2 \\
+0.8 & 0.2
+\end{bmatrix}
+$$
+
+After convergence of the sequence $\theta^n$, each row will be the same up to the required or available arithmetic precision, transitioning according to the stationary distribution.
+
+To verify $\psi = \begin{bmatrix}0.8 & 0.2\end{bmatrix}$ is the stationary distribution for the stochastic matrix $\theta$,
+$$
+\psi \, \theta
+\ = \
+\begin{bmatrix}
+0.8 & 0.2
+\end{bmatrix}
+\
+\begin{bmatrix}
+0.9 & 0.1 \\
+0.4 & 0.6
+\end{bmatrix}
+=
+\begin{bmatrix}
+0.8 & 0.2
+\end{bmatrix}.
+$$
+
+
+
+## Stationary distribution as initial distribution
 
 For observations of a sequence taken from a longer sequence, it is
 conventional to take the initial distribution to be the stationary
 distribution.
 
-## Priors
+## Independent draws from Markov chains
 
-One possible prior for the Markov transition matrix $\theta$ is
-uniform over matrices whose rows form simplexes.  This is the prior
-one gets by default in Stan if no other prior is specified.
+Each draw from a Markov chain (after convergence) is independently distributed.  But typically they are not independent---each state is only conditionally independent given the previous state.  In the special case where each row of the stochastic transition matrix is the same, then the stationary distribution is given by the rows, and
+$$
+\begin{array}{rcl}
+p(z_{n + 1} \mid z_n)
+& = & p(z_{n+1})
+\\
+& = & \mathsf{Categorical}(z_{n+1} \mid \psi).
+\end{array}
+$$
 
-A weakly informative prior intended to allow some probability of each
-state transitioning to any other state might be
-$\mathsf{Dirichlet}(5\,\mathrm{I}_K)$ or even
-$\mathsf{Dirichlet}(10\,\mathrm{I}_K)$.
+
+## Dirichlet prior for Markov model transitions
+
+A convenient prior for the Markov transition matrix $\theta$ is an exchangeable Dirichlet distribution.^[The Dirichlet density for $K$-simplex $\lambda$ given parameter $K$-vector $\alpha$ with $\alpha_k > 0$, is $$\mathsf{Dirichlet}(\lambda \mid \alpha) \propto \prod_{k=1}^K \lambda_k^{\alpha_k - 1}.$$]
+
+scalar $\alpha > 0$ and $K$-simplex $\theta$, let
+$$
+\mathsf{DirichletSym}(\psi \mid \alpha)
+\ = \
+\mathsf{Dirichlet}(\psi \mid [\underbrace{\alpha \ \alpha \ \cdots \ \alpha}_{K \ \mathrm{ times}}]^{\top})
+$$
+Writing out the density up to a proportion for a scalar parameter,
+$$
+\mathsf{DirichletSym}(\psi \mid \alpha)
+\propto
+\prod_{k=1}^K \psi_k^{\alpha - 1}.
+$$
+
+*Exchangeability*: It is easy to see the exchangeability in that the density is the same for any permutation of $\psi$.
+
+*Uniformity*:  One convenient feature of the Dirichlet prior is that it reduces to a uniform distribution if $\alpha = 1$, because the $\alpha - 1$ exponent renders the density constant.  A simplex parameter receives a uniform prior by default in Stan.^[In general, priors are by default uniform on parameter values satisfying the declared constraints.]
+
+*Conjugacy*: The Dirichlet is the conjugate prior for the multinomial distribution.  This means that if the prior is Dirichlet and the likelihood is multinomial, the posterior will be Dirichlet.  Conjugate priors act like fractional (or even negative) data counts for the distributions for which they are conjugate.  For the Dirichlet, the prior acts as $\alpha - 1$ prior counts for each of the $K$ possible states.  This renders the parameters of the posterior by addition.  The multinomial is defined for a one-dimensional size $K$ array of counts $y$ totaling $N = \sum_{k=1}^K y_k$, and $K$-simplex parameter $\theta$, by
+$$
+\mathsf{Multinomial}(y \mid N, \theta)
+\ \propto \
+\prod_{k=1}^K \theta_k^{y_k}.
+$$
+Suppose the sampling distribution is given by $y \sim \mathsf{Multinomial}(N, \theta)$ and the prior by $\theta \sim \mathsf{Dirichlet}(\alpha)$ for $K$-vector parameter $\alpha$.  Then the posterior is proportional to the product of the sampling distribution and the prior,
+$$
+\begin{array}{rcl}
+p(\theta \mid y)
+& \propto &
+\mathsf{Dirichlet}(\theta \mid \alpha)
+\cdot \mathsf{Multinomial}(y \mid N, \theta)
+\\[2pt]
+& \propto &
+\prod_{k=1}^K \theta^{\alpha_k \, - \, 1}
+\prod_{k=1}^K \theta^{y_k}
+\\[2pt]
+& = &
+\prod_{k=1}^K \theta^{y_k \, + \, \alpha_k \, - \, 1}
+\\[2pt]
+& \propto &
+\mathsf{Dirichlet}(\theta \mid y + \alpha).
+\end{array}
+$$
+This conjugacy may be exploited in Stan by coding the posterior using the final Dirichlet rather than as a product of a Dirichlet and multinomial.
+
+*Non-exchangeable priors*
+
+An exchangeable, weakly informative prior intended to allow some probability of each state transitioning to any other state might be $\mathsf{Dirichlet}(5\,\mathrm{I}_K)$ or even $\mathsf{Dirichlet}(10\,\mathrm{I}_K)$.
+
+The major advantage of a Dirichlet prior is that it's conjugate to the categorical sampling defining the model.  This means that if we observe the state sequence $z$, we can count the number of transitions and immediately calculate the posterior analytically.
+
+
 
 
 
@@ -291,26 +469,22 @@ categorical, counts, concentrations, locations, distances, etc., or
 they may be multivariate quantities consisting of more than one
 quantity.
 
-## Generative process
+## HMM Generative process
 
 The generative process for a hidden Markov model is to
 
-* generate a transition matrix $\theta$ from its prior $p(\theta)$,
-
-* generate parameters $\phi = \phi_1, \ldots, \phi_K$ for the $K$
+1. generate a transition matrix $\theta$ from its prior $p(\theta)$,
+2. generate parameters $\phi = \phi_1, \ldots, \phi_K$ for the $K$
   mixture components from their joint prior $p(\phi)$,
-
-* generate the first latent state $z_1$ from the stationary
+3. generate the first latent state $z_1$ from the stationary
   distribution of $\theta$ (or another initial distribution)
-
-* for each subsequent state $z_n$, generate it from the
+4. for each subsequent state $z_n$, generate it from the
   categorical distribution based on the previous state according to
   $\theta_{z_{n-1}}$
-
-* for each element $y_n$ of the observed state sequence, generate it
+5. for each element $y_n$ of the observed state sequence, generate it
   from the distribution parameterized by $\phi_{z_n}$
 
-## Joint probability function
+## HMM joint probability function
 
 The joint probability function implied by the generative process may
 be factored as
@@ -340,7 +514,7 @@ The exact form of the $z_n$ terms was shown in the previous section on
 Markov models.  The forms of the other terms will be application
 dependent.
 
-## The likelihood
+## HMM likelihood
 
 The term $p(\theta, \phi)$ is the prior, but the likelihood is a
 little more difficult to discern because of the complication of the
@@ -425,7 +599,7 @@ p(y_{n + 1} \mid \phi_k)
 \\[4pt]
 & = &
 p(y_{n + 1} \mid \phi_k)
-\cdot \sum_{k' = 1}^K \alpha_{n - 1, \, k'} \cdot \theta_{k', k}
+\cdot \sum_{k' = 1}^K \alpha_{n - 1,\, k'} \cdot \theta_{k', k}
 \end{array}
 $$
 
@@ -563,6 +737,25 @@ p(y, z_n = k \mid \theta, \phi)
 \end{array}
 $$
 
+## Forward-backward on the log scale
+
+In order to provide stable arithmtic, the backward algorithm is computed on the log scale, as is the combination.  The base case is straightforward,
+$$
+\log \beta_{N, k} \ = \ \log 1 \ = \ 0.
+$$
+For the induction, the summation on the original scale becomes a log sum of exponentials on the log scale,
+$$
+\log \beta{n - 1,\, k}
+= \mathrm{log\_sum\_exp}_{k' = 1}^K
+    \log \theta_{k, k'}
+    + \log p(y_n \mid \phi_{k'})
+    + \log \beta_{n, k'}.
+$$
+The combined forward-backward target is also computed on the log scale,
+$$
+\log \gamma_{n, k} = \log \alpha_{n, k} + \log \beta_{n, k}.
+$$
+
 ## Marginal responsibilities with forward-backward
 
 The marginal we care about is $p(z_n = k \mid y, \theta, \phi)$, the probability the element $y_n$ of $y = y_1, \ldots, y_N$ is generated from mixture component $k$.  This conditional probability is calculated from the joint probability.
@@ -601,12 +794,16 @@ $$
 \begin{array}{rcl}
 p(z_{n - 1} = k, z_n = k', y \mid \theta, \phi)
 & = &
+\begin{array}[t]{l}
 p(y_1, \ldots, y_{n-1}, z_{n-1} = k \mid \theta, \phi)
-\cdot p(z_n = k' \mid z_n = k, \theta)
-\cdot p(y_n, \ldots, y_N \mid z_n = k' \mid \theta, \phi)
 \\
+{ } \cdot p(z_n = k' \mid z_n = k, \theta)
+\\
+{ } \cdot p(y_n, \ldots, y_N \mid z_n = k' \mid \theta, \phi)
+\end{array}
+\\[4pt]
 & = &
-\alpha_{n-1, k} \cdot \theta_{k, k'} \cdot \beta{n, k'}.
+\alpha_{n-1,\, k} \cdot \theta_{k,\, k'} \cdot \beta{n,\, k'}.
 \end{array}
 $$
 
@@ -619,14 +816,26 @@ p(z_{n - 1} = k, z_n = k' \mid y, \theta, \phi)
      {\displaystyle p(y \mid \theta, \phi)}
 \\[4pt]
 & = &
-\frac{\displaystyle \alpha_{n-1, k} \cdot \theta_{k, k'} \cdot \beta{n, k'}}
+\frac{\displaystyle \alpha_{n-1,\, k}
+                    \cdot \theta_{k,\, k'}
+		    \cdot \beta{n,\, k'}}
      {\sum_{k'' = 1}^K \displaystyle \alpha_{N,\, k''}}
 \end{array}
 $$
 
+
+
+
+
 ## Collecting sufficient statistics
 
-Given $p(z_{n-1} = k, z_n = k' \mid y, \phi, \theta)$, we can collect the number of expected transitions from state $k$ to state $k'$ given $y$ as
+Given $p(z_{n-1} = k, z_n = k' \mid y, \phi, \theta)$, we can collect the
+expectation for $z_{1,\, k}$ conditioned on the data as
+$$
+I_k = p(z_1 = k \mid y, \theta, \phi).
+$$
+
+The number of expected transitions from state $k$ to state $k'$ given $y$ as
 $$
 T_{k,\, k'}
 \ = \
@@ -636,8 +845,20 @@ Along with $p(z_1 = k \mid y, \theta)$, this provides a sufficient statistic for
 
 Similarly, we can collect the sufficient statistics for emissions.
 $$
-E_{n,\, k} = p(z_n = k \mid y, \phi, \psi).
+E_{n,\, k} = p(z_n = k \mid y, \theta, \phi).
 $$
 If there are duplicate $y_n$ values, which is unlikely in most applications, the emission statistics may be summed.
 
 Together, the statistics $T_{k,\, k'}$ and $E_{n, k}$ may be used to define the log density.
+$$
+\log p(y, z \mid \theta, \phi)
+\ = \
+\begin{array}[t]{l}
+\sum_{k = 1}^K I_k \cdot \log \psi_k
+\\[2pt]
+{ } + \sum_{k=1}^K \sum_{k'=1}^K T_{k,\, k'} \cdot \log \theta_{k,\, k'}
+\\[2pt]
+{ } + \sum_{n=1}^N \sum_{k=1}^K E_{n,\, k} \cdot \log p(y_n \mid \phi_k).
+\end{array}
+$$
+The variable $\psi$ here is initial distribution, assumed to be equal to the stationary distribution of the transition matrix, $\psi = \mathrm{stationary}(\theta)$.
