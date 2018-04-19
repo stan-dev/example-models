@@ -1,21 +1,25 @@
 ---
 title: "Hidden Markov Models in Stan"
 author: "Bob Carpenter"
-date: "9 April 2018"
+date: "`r format(Sys.Date(), format='%d %B %Y')`"
 output:
   tufte::tufte_html:
     toc: true
     toc_depth: 1
+    fig_caption: yes
+  tufte::tufte_book:
+    citation_package: natbib
+    latex_engine: xelatex
+    fig_caption: yes
+link-citations: yes
 ---
 
 ```{r setup, include=FALSE, echo=FALSE}
 options(htmltools.dir.version = FALSE)
 options(digits = 2)
-
+library(tufte)
 library(ggplot2)
-
 library(gridExtra)
-
 library(knitr)
 knitr::opts_chunk$set(cache = FALSE)
 knitr::opts_chunk$set(tidy = FALSE, cache.extra = packageVersion('tufte'))
@@ -75,6 +79,7 @@ printf <- function(msg = "%5.3f", ...) {
 }
 ```
 
+
 ## Abstract
 
 A hidden Markov model (HMM) is a sequential finite mixture model where the sequence of latent (unobserved, or hidden) states determining the mixture component forms a Markov chain.  This case study focuses on efficient inference HMMs using dynamic programming.  Algorithms covered include (1) the forward algorithm for the likelihood of the observed sequence, (2) the forward-backward algorithm for marginal latent state probabilities and sufficient statistics, and (3) the Viterbi algorithm for the latent state sequence of highest posterior probability given the observed sequence.
@@ -91,25 +96,6 @@ like "Riley ran".  This is an example of semi-supervised machine
 learning.
 
 
-# Finite Mixture Models
-
-The basic idea of a finite mixture model is that there is a mixture of two or more populations from which observations are drawn.  Each population is characterized by its own distribution, though these distributions may share parameters.  Each observation is drawn from a single population.
-
-## Finite mixture model generative process
-
-In a simple mixture model, there is a discrete responsibility
-parameter determining from which mixture component an item is drawn.
-For example, in a simple two-component normal mixture, $z_n$ is the
-mixture component responsible for item $y_n$,
-$$
-\begin{array}{rcl}
-z_n & \sim & \mathsf{Bernoulli}(\lambda)
-\\
-y_n & \sim & \mathsf{Normal}(\mu_{z_n}, \sigma_{z_n})
-\end{array}
-$$
-
-The generative process can be explored by simulation.
 
 ```{r echo=FALSE, fig.margin=TRUE, fig.cap="Histogram of 10000 simulated values with 60% chance of drawing from a population with mean of -2 and standard deviation of 0.75 and a 40% chance of drawing from a population with mean of 2 and standard deviation of 1.5.  Blue lines highlight the means of the two mixture components."}
 N <- 10000
@@ -128,6 +114,8 @@ plot_mix_sim <- ggplot(data.frame(y = y), aes(x = y)) +
 plot_mix_sim
 ```
 
+
+
 ```{r echo=FALSE, fig.margin=TRUE, fig.cap="Plot of the mixture density of two normals corresponding to the previous plot.  The underlying mixture components are colored and scaled, with the dotted black line indicating the mixture density."}
 plot_mix_density <-
   ggplot(data.frame(x = c(-6, 8)), aes(x = x)) +
@@ -144,15 +132,36 @@ plot_mix_density <-
 plot_mix_density
 ```
 
+# Finite Mixture Models
 
-## Finite mixture model likelihood
+The basic idea of a finite mixture model is that there is a mixture of two or more populations from which observations are drawn.  Each population is characterized by its own distribution, though these distributions may share parameters.  Each observation is drawn from a single population.
+
+
+## Binary mixture model generative process
+
+In a simple mixture model, there is a discrete responsibility
+parameter determining from which mixture component an item is drawn.
+For example, in a simple two-component normal mixture, $z_n$ is the
+mixture component responsible for item $y_n$,
+$$
+\begin{array}{rcl}
+z_n & \sim & \mathsf{Bernoulli}(\lambda)
+\\
+y_n & \sim & \mathsf{Normal}(\mu_{z_n}, \sigma_{z_n})
+\end{array}
+$$
+
+The generative process can be explored by simulation.
+
+
+## Binary mixture model likelihood
 
 In order to compute the likelihood^[The likelihood is the distribution of the observed data given the parameters.  Data-specific parameters must be marginalized out in order to get the distribution of the data itself, as required for the likelihood.] $p(y_n \mid \lambda, \mu, \sigma)$, it is necessary to marginalize out the responsibility parameter $z_n$ from
 $$
 p(y_n, z_n \mid \lambda, \mu, \sigma)
 \ = \
-\mathsf{Bernoulli}(z_n | \lambda)
-\cdot \mathsf{Normal}(y_n | \mu_{z_n}, \sigma_{z_n}).
+\mathsf{Bernoulli}(z_n \mid \lambda)
+\cdot \mathsf{Normal}(y_n \mid \mu_{z_n}, \sigma_{z_n}).
 $$
 The discrete responsibility parameter $z_n$ governing the population from which $y_n$ is drawn may be marginalized out using the law of total probability,
 $$
@@ -163,22 +172,189 @@ p(y_n \mid \lambda, \mu, \sigma)
 \\[4pt]
 & = &
 \sum_{k=0}^1
-  \mathsf{Bernoulli}(k | \lambda)
-  \cdot \mathsf{Normal}(y_n | \mu_k, \sigma_k)
+  \mathsf{Bernoulli}(k \mid \lambda)
+  \cdot \mathsf{Normal}(y_n \mid \mu_k, \sigma_k)
 \\[4pt]
 & = &
 \begin{array}[t]{l}
-\mathsf{Bernoulli}(0 | \lambda) \cdot \mathsf{Normal}(y_n | \mu_0, \sigma_0)
+\mathsf{Bernoulli}(0 \mid \lambda) \cdot \mathsf{Normal}(y_n \mid \mu_0, \sigma_0)
 \\
 { } \ + \
-\mathsf{Bernoulli}(1 | \lambda) \cdot \mathsf{Normal}(y_n | \mu_1, \sigma_1)
+\mathsf{Bernoulli}(1 \mid \lambda) \cdot \mathsf{Normal}(y_n \mid \mu_1, \sigma_1)
 \end{array}
 \\[4pt]
 & = &
-(1 - \lambda) \cdot \mathsf{Normal}(y_n | \mu_0, \sigma_0)
-\ + \  \lambda \cdot \mathsf{Normal}(y_n | \mu_1, \sigma_1)
+(1 - \lambda) \cdot \mathsf{Normal}(y_n \mid \mu_0, \sigma_0)
+\ + \  \lambda \cdot \mathsf{Normal}(y_n \mid \mu_1, \sigma_1).
 \end{array}
 $$
+
+
+## Finite mixture model
+
+The mixture model naturally extends beyond two components to an arbitrary number of components.  Now the mixing proportions $\theta$ are modeled as a $K$-simplex^[A $K$-*simplex* is a vector with $K$ non-negative entries that sum to one.].  
+
+The generative model for the latent mixture component $z_n$ and observation $y_n$ can be written in full detail using sampling notation as
+$$
+\begin{array}{rcl}
+z_n & \sim & \mathsf{Categorical}(\theta)
+\\
+y_n & \sim & \mathsf{Normal}(\mu_{z_n}, \sigma_{z_n})
+\end{array}
+$$
+
+```{r, engine="tikz", fig.ext="pdf", fig.width=2, fig.margin=TRUE, echo=FALSE, external=FALSE, fig.cap="Directed graphical model sketch for a mixture of normal distributions.  $\\theta$ is a simplex for the mixture proportions, $z_n$ is the mixture component for observation $y_n$, and $\\mu_k$ and $\\sigma_k$ are the location and scale of mixture component $k$. The plates indicate $z$ and $y$ are size $N$ and $\\mu$ and $\\sigma$ are size $K$.  Edges indicate dependencies in the generative model."}
+%
+% Copyright 2010-2011 by Laura Dietz
+% Copyright 2012 by Jaakko Luttinen
+%
+% The MIT License
+%
+% See LICENSE file for more details.
+
+% Load other libraries
+\usetikzlibrary{shapes}
+\usetikzlibrary{fit}
+\usetikzlibrary{chains}
+\usetikzlibrary{arrows}
+
+% Latent node
+\tikzstyle{latent} = [circle,fill=white,draw=black,inner sep=1pt,
+minimum size=20pt, font=\fontsize{10}{10}\selectfont, node distance=1]
+% Observed node
+\tikzstyle{obs} = [latent,fill=gray!25]
+% Constant node
+\tikzstyle{const} = [rectangle, inner sep=0pt, node distance=1]
+% Factor node
+\tikzstyle{factor} = [rectangle, fill=black,minimum size=5pt, inner
+sep=0pt, node distance=0.4]
+% Deterministic node
+\tikzstyle{det} = [latent, diamond]
+
+% Plate node
+\tikzstyle{plate} = [draw, rectangle, rounded corners, fit=#1]
+% Invisible wrapper node
+\tikzstyle{wrap} = [inner sep=0pt, fit=#1]
+% Gate
+\tikzstyle{gate} = [draw, rectangle, dashed, fit=#1]
+
+% Caption node
+\tikzstyle{caption} = [font=\footnotesize, node distance=0] %
+\tikzstyle{plate caption} = [caption, node distance=0, inner sep=0pt,
+below left=5pt and 0pt of #1.south east] %
+\tikzstyle{factor caption} = [caption] %
+\tikzstyle{every label} += [caption] %
+
+%\pgfdeclarelayer{b}
+%\pgfdeclarelayer{f}
+%\pgfsetlayers{b,main,f}
+
+% \factoredge [options] {inputs} {factors} {outputs}
+\newcommand{\factoredge}[4][]{ %
+  % Connect all nodes #2 to all nodes #4 via all factors #3.
+  \foreach \f in {#3} { %
+    \foreach \x in {#2} { %
+      \path (\x) edge[-,#1] (\f) ; %
+      %\draw[-,#1] (\x) edge[-] (\f) ; %
+    } ;
+    \foreach \y in {#4} { %
+      \path (\f) edge[->, >={triangle 45}, #1] (\y) ; %
+      %\draw[->,#1] (\f) -- (\y) ; %
+    } ;
+  } ;
+}
+
+% \edge [options] {inputs} {outputs}
+\newcommand{\edge}[3][]{ %
+  % Connect all nodes #2 to all nodes #3.
+  \foreach \x in {#2} { %
+    \foreach \y in {#3} { %
+      \path (\x) edge [->, >={triangle 45}, #1] (\y) ;%
+      %\draw[->,#1] (\x) -- (\y) ;%
+    } ;
+  } ;
+}
+
+% \factor [options] {name} {caption} {inputs} {outputs}
+\newcommand{\factor}[5][]{ %
+  % Draw the factor node. Use alias to allow empty names.
+  \node[factor, label={[name=#2-caption]#3}, name=#2, #1,
+  alias=#2-alias] {} ; %
+  % Connect all inputs to outputs via this factor
+  \factoredge {#4} {#2-alias} {#5} ; %
+}
+
+% \plate [options] {name} {fitlist} {caption}
+\newcommand{\plate}[4][]{ %
+  \node[wrap=#3] (#2-wrap) {}; %
+  \node[plate caption=#2-wrap] (#2-caption) {#4}; %
+  \node[plate=(#2-wrap)(#2-caption), #1] (#2) {}; %
+}
+
+% \gate [options] {name} {fitlist} {inputs}
+\newcommand{\gate}[4][]{ %
+  \node[gate=#3, name=#2, #1, alias=#2-alias] {}; %
+  \foreach \x in {#4} { %
+    \draw [-*,thick] (\x) -- (#2-alias); %
+  } ;%
+}
+
+% \vgate {name} {fitlist-left} {caption-left} {fitlist-right}
+% {caption-right} {inputs}
+\newcommand{\vgate}[6]{ %
+  % Wrap the left and right parts
+  \node[wrap=#2] (#1-left) {}; %
+  \node[wrap=#4] (#1-right) {}; %
+  % Draw the gate
+  \node[gate=(#1-left)(#1-right)] (#1) {}; %
+  % Add captions
+  \node[caption, below left=of #1.north ] (#1-left-caption)
+  {#3}; %
+  \node[caption, below right=of #1.north ] (#1-right-caption)
+  {#5}; %
+  % Draw middle separation
+  \draw [-, dashed] (#1.north) -- (#1.south); %
+  % Draw inputs
+  \foreach \x in {#6} { %
+    \draw [-*,thick] (\x) -- (#1); %
+  } ;%
+}
+
+% \hgate {name} {fitlist-top} {caption-top} {fitlist-bottom}
+% {caption-bottom} {inputs}
+\newcommand{\hgate}[6]{ %
+  % Wrap the left and right parts
+  \node[wrap=#2] (#1-top) {}; %
+  \node[wrap=#4] (#1-bottom) {}; %
+  % Draw the gate
+  \node[gate=(#1-top)(#1-bottom)] (#1) {}; %
+  % Add captions
+  \node[caption, above right=of #1.west ] (#1-top-caption)
+  {#3}; %
+  \node[caption, below right=of #1.west ] (#1-bottom-caption)
+  {#5}; %
+  % Draw middle separation
+  \draw [-, dashed] (#1.west) -- (#1.east); %
+  % Draw inputs
+  \foreach \x in {#6} { %
+    \draw [-*,thick] (\x) -- (#1); %
+  } ;%
+}
+\begin{tikzpicture}
+    \node[latent] (theta) {$\theta$} ; %
+    \node[latent, right=of theta] (z) {$z_n$} ; %
+    \node[obs, right=of z] (y) {$y_n$} ; %
+    \node[latent, above=of z] (mu) {$\mu_k$} ; %
+    \node[latent, above=of y] (sigma) {$\sigma_k$} ; %
+    \plate[inner sep=0.25cm, xshift=-0.12cm, yshift=0.12cm] {plateN} {(z) (y)} {$N$}; %
+    \plate[inner sep=0.25cm, xshift=-0.12cm, yshift=0.12cm] {plateK} {(mu) (sigma)} {$K$}; %
+    \edge {theta} {z} ; %
+    \edge {z} {y} ; %
+    \edge {mu, sigma} {y} ; %
+\end{tikzpicture}
+```
+
+To complete the model, we need priors on $\theta$ (by default uniform) and on $\mu$ and $\sigma$ (by default improper uniform).
 
 
 ## Flexible mixture modeling
@@ -197,7 +373,7 @@ sequence is called a *time series.*]
 
 These sequences are unbounded in principle, but data sets will always
 be of finite subsequences $y_{1:N}$ and $z_{1:N}$, which will be
-numbered from one for convenience.
+numbered from one for convenience.  This section concentrates on the distribution for $z$.
 
 
 ## Markov chains with finite state spaces
@@ -240,6 +416,22 @@ $$
 for all $n > 0$.  Just a little reminder that we will only be
 observing finite subsequences of this unbounded sequence.
 
+```{r, engine="tikz", fig.ext="pdf", fig.margin=TRUE, echo=FALSE, external=FALSE, fig.cap="Directed graphical model notation for a Markov process $z = z_1, z_2, \\ldots$.  The nodes are shaded to indicate that they are observed.  The arcs indicate that each node is conditionally independent given the previous node (i.e., the Markov property).  When used as the basis for an HMM, the Markov states will be hidden (i.e., not observed)."}
+\begin{tikzpicture}[->, auto, node distance=1cm, font=\tiny]
+\tikzstyle{state}=[circle,draw=black!70,fill=black!6,
+                   inner sep=0pt,minimum size=5mm]
+\node[state] (A) {$z_1$};
+\node[state] (B) [right of=A] {$z_2$};
+\node[state] (C) [right of=B] {$z_3$};
+\node[circle] (D) [right of=C] {$\cdots$};
+\node[state] (E) [right of=D] {$z_N$};
+\path (A) edge [left] node {{}} (B);
+\path (B) edge [left] node {{}} (C);
+\path (C) edge [left] node {{}} (D);
+\path (D) edge [left] node {{}} (E);
+\end{tikzpicture}
+```
+
 
 ## Stochastic transition matrixes
 
@@ -259,6 +451,7 @@ $$
 p\!\left(z_n \mid z_{n - 1}, \theta\right)
 = \mathsf{Categorical}\!\left( z_n \mid \theta_{z_{n-1}} \right).
 $$
+
 
 
 ## Markov chain initial state distribution
@@ -300,7 +493,7 @@ $$
 
 ## Calculating the stationary distribution
 
-The stationary distribution may be computed by repeated multiplication of the stochastic matrix,^[Natural *powers of matrices* are defined in the base case by $\theta^0 \ = \mathrm{I}_K$ and in the inductive case by $\theta^{n + 1} = \theta^n \ \theta$.]
+The stationary distribution may be computed by repeated multiplication of the stochastic matrix,^[Natural *powers of matrices* are defined in the base case by taking $\theta^0$ to be the identity matrix and inductively defining $\theta^{n + 1} = \theta^n \ \theta$.]
 $$
 \psi
 \ = \
@@ -311,7 +504,7 @@ $$
 \,
 \theta^n
 $$
-It is more efficient to grow the sequence multiplicatively^[The difference is $\mathcal{O}(n)$ versus $\mathcal{O}(\log n)$.] by setting
+Because only the limit is needed, it is much more efficient to grow the sequence multiplicatively^[The multiplicative method is $\mathcal{O}(\log n)$ rather than the $\mathcal{O}(n)$ of the natural additive definition.] by setting
 $$
 \theta^{2 n} = \theta^n \theta^n.
 $$
@@ -455,7 +648,24 @@ An exchangeable, weakly informative prior intended to allow some probability of 
 The major advantage of a Dirichlet prior is that it's conjugate to the categorical sampling defining the model.  This means that if we observe the state sequence $z$, we can count the number of transitions and immediately calculate the posterior analytically.
 
 
+## Higher-order Markov models
 
+Markov models have only a single sep of memory.  Each latent state is conditionally independent given the previous state.  But what if a process has a longer-term memory?  If the process is discrete, it is easy to expand the state space to a product space and effectively *reduce*^[Reduction is a powerful technique used in many facets of theoretical computer science to establish orderings and equivalence classes among algorithms.] a higher-order Markov model to a first-order model.
+
+The second-order example illustrates how the reduction goes in general.  For example, consider a state sequence $z = z_1, \ldots, z_N$ with second-order history, 
+$$
+p(z_n \mid z_{n - 1}, z_{n - 2}, \ldots, z_1) 
+\ = \ p(z_n \mid  z_{n - 1}, z_{n - 2}),
+$$
+so that a state $z_n$ is conditionally independent of other states given the previous two states.
+
+If there are $K$ possible values for $z_n$, define a new state space with $K^2$ states using pairs $(k, k') \in K \times K$.  Then the non-zero transition probabilities are
+$$
+\theta_{(k,k'),\, (k',k'')} = p(z_n = k'' \mid z_{n-1} = k', z_{n - 2} = k).
+$$
+The $k'$ index is duplicated here across the two states to maintain the history. The transition goes from a state with history $(k, k')$ to a state with history $(k', k'')$---the state $k$ is dropped from the history, $k'$ goes back one position, and $k'' is added.  The initial stationary distribution is calculated in the same way, with the states now being pairs.
+
+For state pairs where the inner states don't match, the transition probability is zero.  The stationary distribution may be computed in the same way.^[The existence proof is beyond the scope of this case study---it requires establishing more general recurrence conditions under which Markov chains have stationary distributions.]
 
 
 # Hidden Markov Models
