@@ -83,7 +83,7 @@ Bradley and Terry (1952) modeled paired comparison data, such as
 comparisons of pairs of products by consumers or outcomes of sporting
 contests between two players.  The data is binary, with each paired
 comparison having a single "winner."  The case study will provide
-simulated data and demonstrate the inference of contestan abilities
+simulated data and demonstrate the inference of contestant abilities
 and ranks as well as predicting the outcomes of future contests.
 
 We will show how the Bradley-Terry likelihood may be paired with a
@@ -202,7 +202,7 @@ Suppose have some data data in the appropriate long form.  With RStan,
 we can write the model out directly in terms of its log likelihood.
 The first part of the program encodes the data, beginning with the
 constant number of players `K` and matches `N`.  Then there are three
-plarallel arrays of integers indicating the players in each match and
+parallel arrays of integers indicating the players in each match and
 the outcome.
 
 ```
@@ -435,7 +435,7 @@ With player abilities $\alpha_k$ centered around zero and the total predictor be
 In situations where there is a distinction between the players assigned as player 0 and as player 1, it will be necessary to introduce an intercept term to model the advantage of being player 1 (which may be negative and thus actually be a disadvantage).  This intercept could model the advantage for playing the white pieces in chess and moving first, or the home-field advantage in basketball games.  For this case study, we stick to random assignment and assume there is no advantage to player 0 or player 1 in any match.^[Technically, the prior and likelihood with random assignment ensure the prior predictive expectation of $y_n$ is zero.  Such an assumption is easily tested.]
 
 
-# Hierarcical Bayesian Bradley-Terry Model
+# Hierarchical Bayesian Bradley-Terry Model
 
 Rather than hard-coding the prior for abilities, we can use a hierarchical prior to estimate the amount of variation in the population at the same time as we estimate the parameters themselves.   
 
