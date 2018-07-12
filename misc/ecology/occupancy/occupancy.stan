@@ -24,8 +24,8 @@ model {
   // local variables to avoid recomputing log(psi1) and log(1 - psi1)
   real log_psi1;
   real log1m_psi1;
-  log_psi1 <- log(psi1);
-  log1m_psi1 <- log1m(psi1);
+  log_psi1 = log(psi1);
+  log1m_psi1 = log1m(psi1);
 
   // priors
   psi1 ~ uniform(0,1);
@@ -34,9 +34,9 @@ model {
   // likelihood
   for (r in 1:R) {
     if (sum(y[r]) > 0)
-      increment_log_prob(log_psi1 + bernoulli_log(y[r],p));
+      target += log_psi1 + bernoulli_lpmf(y[r] | p);
     else
-      increment_log_prob(log_sum_exp(log_psi1 + bernoulli_log(y[r],p),
-                                     log1m_psi1));
+      target += log_sum_exp(log_psi1 + bernoulli_lpmf(y[r] | p),
+			    log1m_psi1);;
   }
 }
