@@ -37,6 +37,6 @@ model {
       target += log_psi1 + bernoulli_lpmf(y[r] | p);
     else
       target += log_sum_exp(log_psi1 + bernoulli_lpmf(y[r] | p),
-			    log1m_psi1);;
+			    log1m_psi1);
   }
 }
