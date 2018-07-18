@@ -32,9 +32,9 @@ model {
 
   target += -0.5 * dot_self(phi[node1] - phi[node2]);
 
-  beta0 ~ normal(0, 5);
+  beta0 ~ normal(0, 1);
   theta ~ normal(0, 1);
-  sigma ~ normal(0, 5);
+  sigma ~ normal(0, 1);
   rho ~ beta(0.5, 0.5);
   // soft sum-to-zero constraint on phi)
   sum(phi) ~ normal(0, 0.001 * N);  // equivalent to mean(phi) ~ normal(0,0.001)
