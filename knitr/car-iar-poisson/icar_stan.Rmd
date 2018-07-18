@@ -989,7 +989,6 @@ Funded in part by the National Institute of Child Health and Human Development, 
 
 * Spatial Data: [maptools](https://cran.r-project.org/web/packages/maptools),
 [spdep](https://cran.r-project.org/web/packages/spdep),
-[gpclib](https://cran.r-project.org/web/packages/gpclib)
 [rgdal](https://cran.r-project.org/web/packages/rgdal)
 
 ### Licenses
