@@ -1,0 +1,29 @@
+---
+title: "Pedantic Stan (for the Bayes in Stan book)"
+author: "Andrew Gelman"
+date: "12 Jul 2018"
+output:
+  html_document:
+    theme: readable
+---
+
+```{r setup, include=FALSE, echo=FALSE}
+options(htmltools.dir.version = FALSE)
+options(digits = 2)
+
+library(knitr)
+knitr::opts_chunk$set(cache = TRUE)
+knitr::opts_chunk$set(tidy = FALSE, cache.extra = packageVersion('tufte'))
+knitr::opts_chunk$set(comment = "")
+
+print_file <- function(file) {
+  cat(paste(readLines(file), "\n", sep=""), sep="")
+}
+
+library("arm")
+library("rstan")
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+```
+
+This could be an appendix to the Bayes in Stan book.  It's a list of things to avoid.

@@ -1,0 +1,148 @@
+---
+title: "A surprisingly tricky model (for the Bayes in Stan book)"
+author: "Andrew Gelman"
+date: "17 Jul 2018"
+output:
+  html_document:
+    theme: readable
+  pdf_document: default
+---
+
+```{r setup, include=FALSE, echo=FALSE}
+options(htmltools.dir.version = FALSE)
+options(digits = 2)
+
+library(knitr)
+knitr::opts_chunk$set(cache = TRUE)
+knitr::opts_chunk$set(tidy = FALSE, cache.extra = packageVersion('tufte'))
+knitr::opts_chunk$set(comment = "")
+
+print_file <- function(file) {
+  cat(paste(readLines(file), "\n", sep=""), sep="")
+}
+
+library("arm")
+library("rstan")
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+```
+
+From the numerical analysis literature, here is an example of an inference problem that appears simple but can be suprisingly difficult.  The challenge is to esitmate the parameters of a sum of declining exponentials:  $y = a_1e^{-b_1x} + a_2e^{-b_2x}$.  This is also called an inverse problem, and it can be challenging to decompose these two declining functions.
+
+This expression, and others like it, arise in many examples, including in pharmacology, where $x$ represents time and $y$ could be the concentration of a drug in the blood of someoone who was given a specfied dose at time 0.  In a simple _two-compartment model_, the total concentration will look like a sum of declining exponentials.
+
+To set this up as a statistics problem, we add some noise to the system.  We want the data to always be positive so our noise will be multiplicative:
+$$
+y_i = (a_1e^{-b_1x_i} + a_2e^{-b_2x_i}) * \epsilon_i, \mbox{ for } i=1,\dots,N,
+$$
+with lognormally-distributed errors $\epsilon$.
+
+Here is the model in Stan:
+
+```{r, echo=FALSE}
+print_file("sum_of_exponentials.stan")
+```
+The coefficients $a$ and the residual standard deviation $\sigma$ are constrained to be positive.  The parameters $b$ are also positive---these are supposed to be declining, not increasing, exponentials---and are also constrained to be ordered, so that $b_1<b_2$.  We need this to keep the model _identified_:  Without some sort of restriction, there would be no way from the data to tell which component is labeled 1 and which is 2.  So we arbitrarily label the component with lower value of $b$---that is, the one that declines more slowly---as the first one, and the component with higher value of $b$ to be the second.  We programmed the positive_ordered type into Stan because this sort of identification problem comes up fairly often in applications.
+  
+We'll try out our Stan model by simulating fake data from a model where the two curves should be cleanly distinguished, setting $b_1=0.1$ and $b_2=2.0$, a factor of 20 apart in scale.  We'll simulate 1000 data points where the predictors $x$ are uniformlly spaced from 0 to 10, and, somewhat arbitrarily, set $a_1=1.0$, $a_2=0.8$, and $\sigma=0.2$.  We can then simulate from the lognormal distribution to generate the data $y$.
+```{r, echo=FALSE}
+a <- c(1, 0.8)
+b <- c(0.1, 2)
+N <- 1000
+x <- seq(0, 10, length=N)
+sigma <- 0.2
+epsilon <- exp(rnorm(N, 0, sigma))
+y <- (a[1]*exp(-b[1]*x) + a[2]*exp(-b[2]*x)) * epsilon
+```
+
+Here is a graph of the true curve and the simulated data:
+
+```{r, echo=FALSE}
+data_graph <- function(a, b, sigma, x, y) {
+  curve(a[1]*exp(-b[1]*x) + a[2]*exp(-b[2]*x), from=min(x), to=max(x), ylim=c(0, 1.05*max(y)), xlim=c(0, max(x)), 
+     xlab="x", ylab="y", xaxs="i", yaxs="i", bty="l", main="Data and true model", cex.main=1)
+  points(x, y, pch=20, cex=0.2)
+  text(max(x), 0.5*max(y), paste("y = ", fround(a[1], 1), "*exp(", fround(-b[1], 1), "*x) + ", fround(a[2], 1), "*exp(", fround(-b[2], 1), "*x)", sep=""), adj=1)
+}
+data_graph(a, b, sigma, x, y)
+```
+
+And then we fit the model:
+
+```{r, echo=FALSE, warnings=FALSE, results=FALSE}
+data_1 <- list(N=N, x=x, y=y)
+fit_1 <- stan("sum_of_exponentials.stan", data=data_1)
+```
+```{r, echo=FALSE}
+print(fit_1)
+```
+
+The parameters are recovered well, with the only difficulty being $b_2$, where the estimate is 1.89 but the true value is 2.0---but that is well within the posterior uncertainty.  Stan worked just fine on this nonlinear model.
+
+But now let's make the problem just slightly more difficult.  Instead of setting the two parameters $b$ to 0.1 and 2.0, we'll make them 0.1 and 0.2, so now only a factor of 2 separates the scales of the two declining exponentials.
+
+```{r, echo=FALSE}
+b <- c(0.1, 0.2)
+y_2 <- (a[1]*exp(-b[1]*x) + a[2]*exp(-b[2]*x)) * epsilon
+data_2 <- list(N=N, x=x, y=y_2)
+```
+
+This should still be easy to fit in Stan, right?  Wrong:
+
+```{r, echo=FALSE, warnings=FALSE, results=FALSE}
+fit_2 <- stan("sum_of_exponentials.stan", data=data_2)
+```
+```{r, echo=FALSE}
+print(fit_2)
+```
+
+What happened??  It turns out that these two declining exponentials are _very_ hard to detect.  Look:  here's a graph of the two-component model for the expected data, $y=1.0e^{-0.1x}+0.8e^{-0.2x}$:
+
+```{r, echo=FALSE}
+curve(a[1]*exp(-b[1]*x) + a[2]*exp(-b[2]*x), from=0, to=10, ylim=c(0, 1.9), xlim=c(0, 10), 
+     xlab="x", ylab="y", xaxs="i", yaxs="i", bty="l", main="True model", cex.main=1)
+text(5.3, 0.8, "y = 1.0*exp(-0.1x) + 0.8*exp(-0.2x)", adj=1)
+```
+
+And now we'll overlay a graph of a particular _one-component_ model, $y=1.8e^{-0.135x}$:
+
+```{r, echo=FALSE}
+curve(a[1]*exp(-b[1]*x) + a[2]*exp(-b[2]*x), from=0, to=10, ylim=c(0, 1.9), xlim=c(0, 10), 
+     xlab="x", ylab="y", xaxs="i", yaxs="i", bty="l", main="True model and scarily-close one-component approximation", cex.main=1)
+curve(1.8*exp(-0.135*x), from=0, to=10, add=TRUE)
+text(5.3, 0.8, "y = 1.0*exp(-0.1x) + 0.8*exp(-0.2x)", adj=1)
+text(6.1, 1.2, "y = 1.8*exp(-0.135x)", adj=1)
+```
+
+The two lines are strikingly close, and it would be essentially impossible to tell them apart based on noisy data, even 1000 measurements.  So Stan had trouble recovering the true parameters from the data.
+
+Still, if the parameters are difficult to fit, this should just result in a high posterior uncertainty.  Why did the Stan fit explode?  The problme in this case is that, since only one term in the model was required to fit these data, the second term was completely free---and the parameter $\beta_2$ was unbounded:  there was nothing stopping it from being estimated as arbitrarily large.  This sort of unbounded posterior distribution is called _improper_ (see Bayesian Data Analysis for a more formal definition), and there is no way of drawing simulations from such a distribution, hence Stan does not converge. The simulations drift off to infinity, as there is nothing in the prior or likeliood that is keeping them from doing so.
+
+To fix the problem, we can add some prior information.  Here we shall use our default, which is independent $\mbox{norma}(0,1)$ prior densities on all the parameters; thus, we add these lines to the model block in the Stan program:
+
+```
+  a ~ normal(0, 1);
+  b ~ normal(0, 1);
+  sigma ~ normal(0, 1);
+```
+  
+For this particular example, all we really need is a prior on $b$ (really, just $b_2$ because of the ordering), but to demonstrate the point we shall assign default priors to everyhing.  The priors are in addition to the rest of the model; that is, they go on top of the positivity and ordering constraints.  So, for example, the prior for $\sigma$ is the positive half of a normal, which is sometimes written as $\mbox{normal}^+(0,1)$.
+
+We now can fit this new model to our data, and the results are much more stable:
+
+```{r, echo=FALSE, warnings=FALSE, results=FALSE}
+fit_2_with_priors <- stan("sum_of_exponentials_with_priors.stan", data=data_2)
+```
+```{r, echo=FALSE}
+print(fit_2_with_priors)
+```
+
+The fit is far from perfect---compare to the true parameter values, $a_1=1.0, a_2=0.8, b_1=0.1, b_2=0.2---but we have to expect that.  As explained above, the data at hand do not identify the parameters, so all we can hope for in a posterior distribution is some summary of uncertainty.
+
+The question then arises, what about those prior distributions?  We can think about them in a couple different ways.
+
+From one direction, we can think of scaling.  We are using priors centered at 0 with a scale of 1; this can be reasonable if the parameters are on "unit scale," meaning that we expect them to be of order of magnitude around 1.  Not all statistical models are on unit scale.  For example, in the above model, if the data $y_i$ are on unit scale, but the data values $x_i$ take on values in the millions, then we'd probably expect the parameters $b_1$ and $b_2$ to be roungly on the scale of $10^{-6}$.  In such a case, we'd want to rescale $x$ so that the coefficients $b$ are more interpretable.  Similarly, if the values of $y$ ranged in the millions, then the coefficents $a$ would have to be of order $10^6$, and, again, we would want ot reascale the data or the model so that $a$ would be on unit scale.  By using unit scale priors, we are implicitly assuming the model has been scaled.
+
+From the other direction, instead of adapting the model to the prior distribution, we could adapt the prior to the model.  That would imply an understanding of a reasonable range of values for the parameters, based on the context of the problem.  In any particular example this could be done by simulating parameter vectors from the prior distribution and graphing the corresponding curves of expected data, and seeing if these could plausibly cover the possible cases that might arise in the particular problem being studied.
+
+No matter how it's done, infernece has to come from somewhere, and if the data are weak, you need to put in prior information if your goal is to make some statement about possible parameter values, and from there to make probabilistic predictions and decisions.

@@ -1,0 +1,222 @@
+---
+title: "Chapter 1:  Introduction (for the Bayes in Stan book)"
+author: "Andrew Gelman"
+date: "13 Jul 2018"
+output:
+  html_document:
+    theme: readable
+    code folding:  hide
+---
+
+```{r setup, include=FALSE, echo=FALSE}
+options(htmltools.dir.version = FALSE)
+options(digits = 2)
+
+library(knitr)
+knitr::opts_chunk$set(cache = TRUE)
+knitr::opts_chunk$set(tidy = FALSE, cache.extra = packageVersion('tufte'))
+knitr::opts_chunk$set(comment = "")
+
+print_file <- function(file) {
+  cat(paste(readLines(file), "\n", sep=""), sep="")
+}
+
+library("arm")
+library("rstan")
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+```
+
+## Hello World
+
+_Bayesian inference_ is a framework for estimating parameters and constructing predictions given probability models and data.  _Bayesian data analysis_ is the larger process of building, fitting, and checking probability models.  _Stan_ is an open-source computer program for Bayesian inference and simulation.  Stan can be run from R, Python, Julia, or other scientific/statistical software.  In the examples in this book, we set up data and run Stan from R, but our focus is on Stan, not the R code.
+
+We demonstrate with a simple example of linear regression fit to simulated data.  The model is,
+$$y_i=a+bx_i +\mbox{error}_i, \mbox{ for } i=1,\dots,N,$$
+Here is the Stan program:
+```{r, echo=FALSE}
+print_file("../simplest-regression/simplest-regression.stan")
+```
+In this example, we  simulate fake data, fit the model, and evaluate the fit.  Details from the case studies are here [link to ../simplest-regression/story.Rmd]
+
+## Bayesian workflow
+
+The first page of _Bayesian Data Analysis_ lists the following three idealized steps:
+
+1. Setting up a full probability model---a joint probability distribution for all observable and unobservable quantities in a problem. The model should be consistent with knowledge about the underlying scientific problem and the data collection process.
+
+2. Conditioning on observed data: calculating and interpreting the appropriate posterior distribution—the conditional probability distribution of the unobserved quantities of ultimate interest, given the observed data.
+
+3. Evaluating the fit of the model and the implications of the resulting posterior distribution: how well does the model fit the data, are the substantive conclusions reasonable, and how sensitive are the results to the modeling assumptions in step 1? In response, one can alter or expand the model and repeat the three steps.
+
+More recently we have been thinking about _workflow_, a general expression which, in addition to the above three steps, also includes the proceesses of trying out different models and checking computations with fake data.
+
+### Idealized plan for Bayesian case studies
+
+Chapter 2 includes several case studies to give some sense of Bayesian modeling on some fairly simple problems.  Our style of presentation is conversational and not rigid, but the ideal format for each example would follow these steps:
+
+1.  Applied example to give context
+
+2.  Fake-data simulation, including discussion of reasonable parameter values, in R or Stan
+
+3.  Graph of fake data
+
+4.  Stan program
+
+5.  Fit fake data in Stan; discuss convergence etc and parameter estimates and uncertainties
+
+6.  Graph the fitted model along with the data
+
+7.  Fit real data in Stan
+
+8.  Graph the fit
+
+9.  Model checking
+
+10.  Directions for model expansion
+
+## What is Stan?
+
+Stan is a platform for statistical modeling and high-performance statistical computation.  When you write a Stan program, you're writing C++ code that gives instructions for computing an "objective function."  In this book we will be using Stan for Bayesian inference, and the objective function is interpreted as the logarithm of the posterior density, up to an arbitrary constant.
+
+### Writing a Stan program
+
+A Stan program includes various blocks to declare data and parameters and make transformations, but the heart of a Stan program, where it computes the objective function, is in the model block.  The Stan program above has the following model block:
+```
+model {
+  y ~ normal(a + b * x, sigma);
+}
+```
+In this case, $y$ and $x$ are vectors of length $N$, and the above code is mathematically (but not computationally) equivalent to:
+```
+model {
+  for (n in 1:N){
+    y[n] ~ normal(a + b * x[n], sigma);
+  }
+}
+```
+Each line inside the loop adds a term to the objective function with the logarithm of the corresponding normal density; thus, $\log(\frac{1}{\sqrt{2\pi}\sigma}\exp(-\frac{1}{2}(\frac{y_n - (a + bx_n)}{\sigma})^2)) = - \frac{1}{2}\log(2\pi) - \frac{1}{2}\log\sigma - \frac{1}{2}(\frac{y_n - (a + bx_n)}{\sigma})^2$.  For most purposes, we do not care about arbitrary multiplicative constants in the posterior density or, equivalently, arbitrary additive constants in the log-posterior density, so it does not matter if the $- \frac{1}{2}\log(2\pi)$ term is present.  We {\em do} need to include $- \frac{1}{2}\log\sigma$, however, because $\sigma$ is a parameter in the model and thus we cannot consider this term as constant.
+
+For reasons that we shall discuss later, the above code is more efficient in vectorized form (without the loop).
+
+The relevant point of the above discussion is that the model block is where the objective function is computing, with distributional statements correspnodng to increments to the objective function.  We can make this explicit by rewriting the above code as:
+```
+model {
+  target += normal_lpdf(y | a + b * x, sigma);
+}
+```
+Or
+```
+model {
+  for (n in 1:N){
+    target += y[n] ~ normal_lpdf(y[n] | a + b * x[n], sigma);
+  }
+}
+```
+Here, "target" is the objective function, "lpdf" stands for "log probability density function," and the vertical bar is statistics notation for conditioning:  thus, we are adding to the objective function the normal log density function of $y$, given mean $a+bx$ and standard deviation $\sigma$.
+
+Here is a slightly more elaborate version, in which we include $\mbox{normal}(0,1)$ prior distributions for $a$, $b$, and $\sigma$ (actually the prior for $\sigma$ is half-normal as this parameter has been constrained to be positive:
+```
+model {
+  y ~ normal(a + b * x, sigma);
+  a ~ normal(0, 1);
+  b ~ normal(0, 1);
+  sigma ~ normal(0, 1);
+}
+```
+Or, equivalently:
+```
+model {
+  target += normal_lpdf(y | a + b * x, sigma);
+  target += normal_lpdf(a | 0, 1);
+  target += normal_lpdf(b | 0, 1);
+  target += normal_lpdf(sigma | 0, 1);
+}
+```
+Every line in the model block with a tilde (~) corresponds to an augmentation of the target, or objective function.
+
+We can also include lines in the code that do _not_ agument the objective function.  For example:
+```
+model {
+  real a_shifted;
+  a_shifted = a + 2*b;  // expected value of y when x=2
+  y ~ normal(a + b * x, sigma);
+  a_shifted ~ normal(0, 1);
+  b ~ normal(0, 1);
+  sigma ~ normal(0, 1);
+}
+```
+Here we wanted to assign a prior distribution not to the parameter $a$ but to the shifted parameter $a+2b$.  The above code is executed directly, with an augmentation of "target" for every line with a tilde.
+
+### Running Stan
+
+To run Stan, you pass it a Stan program and a list of data, then Stan runs, and when it's done it outputs an array of simulation draws.  For example, in the program above, the data are an integer $N$, a vector $x$ of $N$ real numbers, and a vector $y$ of $N$ real numbers.  In R, we can string these together as a "list" with three objects.  In its (current) default setting, Stan runs in parallel on four processors and returns 4000 simulation draws of the paarameters $a,b,\sigma$; thus, a (carefully labeled) $4000 \times 3$ matrix of simulation draws.  We can use these simulations to summarize posterior uncertainty, for example by computing the posterior median and 95\% interval for each parameter.  Stan also produces "metadata" regarding tuning, convergence, and potential problems with its fitting algorithm.
+
+Stan can be run from different platforms; for this book we shall run Stan from R.  What's important in a working environment is that 
+
+## Some Stan issues that come up
+
+### Blocks
+
+### Declarations
+
+### Semicolons
+
+### Vectors and arrays
+
+### Calling Stan from R or other packages
+
+### Nuts, ADVI, or optimization
+
+## Software environment
+
+### Working in R and Stan
+
+### Other options:  Python, Julia, etc.
+
+### How to use this book:  Github, knitr, etc.
+
+## Bayes and Stan
+
+### Prior, likelihood, posterior densities
+
+### Bayes as information aggregation
+
+### Posterior simulation
+
+## Where this book is going
+
+### Read it along with BDA or Statistical Rethinking
+
+## Pros and cons of Stan
+
+## Some Bayesian issues that come up
+
+### Concentration of the likelihood
+
+### Priors
+
+### The prior only matters where the likelihod is nonzero (and vice-versa)
+
+### Prior choice recommendations
+
+### Reparameterizations
+
+### Troubleshooting, warnings, etc
+
+### Stan and other probabilistic programming languages
+
+Programs that perform Bayesian inference are called _probabilistic programming languages_.  Compared to other such languages, Stan is particularly flexible in its expression of models . . .
+
+## Where to find more information about Bayesian data analysis and Stan
+
+In no particular order:
+\begin{itemize}
+\item Stan manual
+\item BDA
+\item McElreath's Rethinking book
+\item Regression and Other Stories
+\item List of example models translated from Bugs and Arm
+\item Stan case studies
+\item Stan Discourse list
+\end{itemize}

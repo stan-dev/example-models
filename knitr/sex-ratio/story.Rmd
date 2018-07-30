@@ -1,0 +1,111 @@
+---
+title: "Beauty and sex ratio (for the Bayes in Stan book)"
+author: "Andrew Gelman"
+date: "11 Jul 2018"
+output:
+  html_document:
+    theme: readable
+---
+
+```{r setup, include=FALSE, echo=FALSE}
+options(htmltools.dir.version = FALSE)
+options(digits = 2)
+
+library(knitr)
+knitr::opts_chunk$set(cache = TRUE)
+knitr::opts_chunk$set(tidy = FALSE, cache.extra = packageVersion('tufte'))
+knitr::opts_chunk$set(comment = "")
+
+print_file <- function(file) {
+  cat(paste(readLines(file), "\n", sep=""), sep="")
+}
+
+library("arm")
+library("rstan")
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+```
+We can use prior information to refine estimates from noisy studies.  For example, several years ago a researcher analyzed data from a survey of 3000 Americans and observed a correlation between attractiveness of parents and the sex of their children.  In particular, the survey coded adults into five attractiveness categories, and it turned out that 56\% of the children of parents in the highest attractiveness category were girls, compared to 48\% of the children of parents in the other categories.  The difference of 8\% had a standard error (based on the usual formula for the difference in proportions) of 3\%.
+
+The observed difference is more than 2 standard errors from zero, meeting the usual standard of statistical significance, and indeed the claim that beautiful parents have more daughters was published in a scientific journal and received wide publicity.
+
+This is, however, not the end of the story.  It is well known that the variation in the human sex ratio occurs in a very narrow range. For example a recent count in the United States reported 48.7\% girls among whites and 49.2\% among blacks.  Similar differences of half of a percentage point or less have been found when comparing based on factors such as birth order, maternal age, or season of birth.  Thus we would find it hard to believe that any difference between more and less attractive parents could be as large as 0.5\%.
+
+We now perform Bayesian inference using the template above.  The parameter of interest here, $\theta$, is the probability of girl births among beautiful parents, minus the probability among other parents, all in the general population of Americans.  As is often the case, we are interested in the comparison of $\theta$ to zero:  Is there strong evidence that $\theta>0$, which would imply that more attractive parents are more likely to have girls?
+
+We can express our scientific knowledge as a prior distribution on $\theta$ with mean 0\% and standard deviation 0.25\%.  The prior mean of zero says that, in advance of seeing the data we would have no reason to expect beautiful parents to have an elevated or depressed rate of girl births.  The prior standard deviation of 0.25\% says that we find it highly implausible that the true value of $\theta$ is higher than 0.5\% or lower than $-0.5\%$.
+
+For convenience we are expressing our estimates and uncertainties on a percentage scale, to avoid the awkwardness of working with expressions such as 0.0025 and possibly dropping a zero somewhere.
+
+In this case, we could perform Bayesian inference analytically:  with normally distributed data $y$ with standard error $\sigma_y$ and a normal$(\mu_0,\sigma_0)$ prior distribution, $\theta$ is normally distributed in its posterior distribution, with
+$$\mbox{posterior mean: } \ \frac{\frac{1}{\sigma_0^2}\mu_0 + \frac{1}{\sigma_y^2}y}{\frac{1}{\sigma_0^2} + \frac{1}{\sigma_y^2}}
+$$
+and
+$$\mbox{posterior sd: } \ \sqrt{\frac{1}{\frac{1}{\sigma_0^2} + \frac{1}{\sigma_y^2}}}
+$$
+But we are teaching Stan here, so we shall demonstrate the fit in Stan.  Here is the Stan code:
+```{r, echo=FALSE}
+print_file("normal_normal.stan")
+```
+One advantage of using Stan here, rather than the formula, is that with Stan it is easy to alter the model, for example changing the prior distribution from normal to $t$, or adding additional data in some way or another.
+
+But for now we shall stick with the above normal model, feeding in the data $y=8,\sigma_y=3,\mu_0=0,\sigma_0=0.25$, to obtain the following result:
+```{r, echo=FALSE, results=FALSE}
+sex_data <- list(y=8, sigma_y=3, mu_0=0, sigma_0=0.25)
+fit1 <- stan("normal_normal.stan", data=sex_data)
+```
+```{r, echo=FALSE}
+print(fit1)
+```
+Based on this analysis, the difference in proportion girls, comparing very attractive parents to other parents, has a posterior mean of 0.06\% and a posterior standard deviation of 0.25\%.
+
+We can also, for example, compute the posterior probability that $\theta$ is positive:
+```{r, echo=FALSE}
+theta <- as.matrix(fit1)[,"theta"]
+pfround(mean(theta > 0), 2)
+```
+Thus, the data are weak.  Despite the estimate being positive and more than two standard errors away from zero, there is less than a 60\% posterior probability that the underlying parammeter is greater than zero.
+
+One way to visualize this Bayesian inference is to plot the prior, likelihood, and posterior on the same graph:
+```{r, echo=FALSE}
+par(mar=c(3,3,3,1), mgp=c(1.7,.5,0), tck=-.02)
+curve(dnorm(x, mean(theta), sd(theta)), n=1000, xlim=c(-22, 22), yaxs="i", xlab="Percentage diff in Pr(girl), comparing beautiful parents to others", ylab="", yaxt="n", bty="n", type="n", main="Prior, posterior, and likelihood in sex-ratio example")
+curve(dnorm(x, sex_data$y, sex_data$sigma_y), n=1000, add=TRUE)
+curve(dnorm(x, sex_data$mu_0, sex_data$sigma_0), n=1000, add=TRUE)
+text(sex_data$y, 1.3*dnorm(0, 0, sex_data$sigma_y), "Likelihood")
+text(sex_data$mu_0, .9*dnorm(0, 0, sex_data$sigma_0), " Prior and\n posterior", adj=0)
+```
+
+In this case the posterior is so close to the prior that the two lines overlap.
+
+#### A mathematically equivalent problem
+
+To give a sense of what the inference looks like when the information in the prior and likelihood is more balanced, we set up the same problem with a slightly different "cover story" that allows us to plausibly manipulate the two pieces of information.
+
+An election is coming up, and a previously-fitted model using economic and political conditions gives a forecast that a certain candidate will receive 52.4\% of the two-party vote, with a predictive uncertainty of 4.1\%.  Using the notation above, $\mu_0=0.524$ and $\sigma_0=0.041$.
+
+We now conduct a survey of 400 people, of whom 190 say they will vote for this candidate.  For simplicity, assume the survey is a simple random sample of voters with no nonresponse, and that voters will not change their mind between the time of the survey and the election.  Then the data estimate is $y=190/400=0.475$ and standard error $\sigma_y=\sqrt{0.475*(1-0.475)/400}=0.025$.
+
+In this case, the prior standard error is 4.1\% and the data standard error is 2.5\%, so the data estimate is stronger than the prior estimate, and the Bayes estimate will be closer to the data than the prior.
+
+Here is the posterior inference:
+```{r, echo=FALSE, results=FALSE}
+poll_data <- list(y=47.5, sigma_y=2.5, mu_0=52.4, sigma_0=4.1)
+fit2 <- stan("normal_normal.stan", data=poll_data)
+```
+```{r, echo=FALSE}
+print(fit2)
+```
+And here is the graph showing prior, likelihood, and posterior densities:
+```{r, echo=FALSE}
+theta <- as.matrix(fit2)[,"theta"]
+par(mar=c(3,3,3,1), mgp=c(1.7,.5,0), tck=-.02)
+curve(dnorm(x, mean(theta), sd(theta)), n=1000, xlim=c(30, 70), yaxs="i", xlab="Percentage vote share in upcoming election", ylab="", yaxt="n", bty="n", type="n", main="Prior, likelihood, and posterior in polling example")
+curve(dnorm(x, poll_data$y, poll_data$sigma_y), n=1000, add=TRUE)
+curve(dnorm(x, poll_data$mu_0, poll_data$sigma_0), n=1000, add=TRUE)
+curve(dnorm(x, mean(theta), sd(theta)), n=1000, add=TRUE)
+text(poll_data$y, .95*dnorm(0, 0, poll_data$sigma_y), "Likelihood   ", adj=1)
+text(poll_data$mu_0, .95*dnorm(0, 0, poll_data$sigma_0), "     Prior", adj=0)
+text(mean(theta), .95*dnorm(0, 0, sd(theta)), "   Posterior", adj=0)
+```
+
