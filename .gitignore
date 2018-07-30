@@ -2,3 +2,7 @@
 .Rhistory
 .RData
 *.rda
+*.rds
+story_cache/
+story_files/
+.DS_Store
