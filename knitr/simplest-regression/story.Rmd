@@ -3,6 +3,7 @@ title: "Simplest regression (for the Bayes in Stan book)"
 author: "Andrew Gelman"
 date: "27 Jun 2018"
 output:
+  pdf_document: default
   html_document:
     theme: readable
 ---
@@ -29,8 +30,17 @@ extract_one_draw <- function(stanfit, chain = 1, iter = 1) {
   x[[chain]]
 }
 ```
+Our "Hello World" example for R and Stan is a linear regression,
+$$y_i=a+bx_i +\mbox{error}_i, \mbox{ for } i=1,\dots,N,$$
+with errors independent and normally distributed with mean 0 and standard deviation $\sigma$.  We will perform the following steps which are a key part of our workflow:
 
-We begin our R session by loading in Stan, setting it to run in parallel and to save compiled Stan programs in the working directory:
+1. _Simulate fake data._ Set the sample size $N$, predictor vector $x$, and parameters $a,b,\sigma$, and from that information simulate fake data $y$ from the model above.
+
+2. _Fit the model._ Express the model in Stan, pass the data $N,x,y$ into the program, and estimate the parameters.
+
+3. _Evaluate the fit._  Compare the estimated parameters (or, more fully, the posterior distribution of the parameters) to their true values, which in this simulated-data scenario are known.
+
+We begin by setting up R and Stan, setting it to run in parallel and to save compiled Stan programs in the working directory:
 ```{r}
 library("rstan")
 options(mc.cores = parallel::detectCores())
@@ -51,18 +61,33 @@ fake_data <- stan("fake-data.stan", chains=1, iter=1, algorithm="Fixed_param", d
 ```
 We only needed one chain and one iteration as we are just simulating one fake dataset (in this case, a vector $y$ of length 100).  Also, just to know:  the first time you run this on your computer, you'll have to wait 15 seconds or so for the Stan model to compile.  After that, it will save the compiled code in your home directory.
 
+We then extract the simulated data vector and append it to our data list:
+```{r}
+data$y <- extract_one_draw(fake_data)$y
+```
+
+Alternatively we could simulate the fake data in R:
+```{r}
+a <- 2
+b <- 3
+sigma <- 5
+x <- runif(N, 0, 10)
+data$y <- rnorm(N, a + b*x, sigma)
+```
+In this case it is simple enough to fit the fake data in R.  But we wanted to show above how to do it in Stan, as this can be useful for more complicated models.
+
+In any case, now that we have the data list, we can use it to estimate the parameters.
+
 Here is the Stan program to fit the model:
 ```{r}
-print_file("model.stan")
+print_file("simplest-regression.stan")
 ```
-To run this program from R, we must first put together the data:
-
+And now we can run it:
 ```{r, results=FALSE}
-data$y <- extract_one_draw(fake_data)$y
-fit <- stan("model.stan", data=data)
+fit <- stan("simplest-regression.stan", data=data)
 
 ```
-We can summarize the fitted model:
+Here is the summary of the fitted model:
 ```{r}
 print(fit)
 

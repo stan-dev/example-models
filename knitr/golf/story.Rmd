@@ -1,0 +1,128 @@
+---
+title: "Golf putting (for the Bayes in Stan book)"
+author: "Andrew Gelman"
+date: "11 Jul 2018"
+output:
+  html_document:
+    theme: readable
+---
+
+```{r setup, include=FALSE, echo=FALSE}
+options(htmltools.dir.version = FALSE)
+options(digits = 2)
+
+library(knitr)
+knitr::opts_chunk$set(cache = TRUE)
+knitr::opts_chunk$set(tidy = FALSE, cache.extra = packageVersion('tufte'))
+knitr::opts_chunk$set(comment = "")
+
+print_file <- function(file) {
+  cat(paste(readLines(file), "\n", sep=""), sep="")
+}
+
+library("arm")
+library("rstan")
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+```
+The following graph shows data on the proportion of successful golf putts as a function of distance from the hole.  Unsurprisingly, the probability of making the shot declines as a function of distance:
+```{r,echo=FALSE}
+golf <- read.table("golf.txt", header=TRUE, skip=2)
+x <- golf$x
+y <- golf$y
+n <- golf$n
+J <- length(y)
+r <- (1.68/2)/12
+R <- (4.25/2)/12
+se <- sqrt((y/n)*(1-y/n)/n)
+par(mar=c(3,3,2,1), mgp=c(1.7,.5,0), tck=-.02)
+plot(x, y/n, xlim=c(0, 1.1*max(x)), ylim=c(0, 1.02), xaxs="i", yaxs="i", pch=20, bty="l", xlab="Distance from hole (feet)", ylab="Probability of success", main="Data on putts in pro golf")
+segments(x, y/n + se, x, y/n-se, lwd=.5)
+text(x + .4, y/n + se + .02, paste(y, "/", n,sep=""), cex=.6, col="gray40") 
+```
+
+The error bars associated with each point $j$ in the above graph are simple binomial standard deviations,
+$\sqrt{\hat{p}_j(1-\hat{p}_j)/n_j}$, where $\hat{p_j}=y_j/n_j$ is the success rate for putts taken at distance $x_j$.
+
+#### Logistic regression
+
+Can we model the probability of success in golf putting as a function of distance from the hole?  Given usual statistical practice, the natural starting point would be logistic regression:
+$$
+y_j\sim\mbox{binomial}(n_j, \mbox{logit}^{-1}(a + bx_j)), \mbox{ for } j=1,\dots, J.
+$$
+In Stan, this is:
+```{r, echo=FALSE}
+print_file("golf_logistic.stan")
+```
+Here is the result of fitting this model to the data:
+```{r, echo=FALSE, results=FALSE}
+golf_data <- list(x=x, y=y, n=n, J=J)
+fit_logistic <- stan("golf_logistic.stan", data=golf_data)
+```
+```{r, echo=FALSE}
+print(fit_logistic)
+```
+Stan has computed the posterior means $\pm$ standard deviations of $a$ and $b$ to be $2.23\pm 0.06$ and $-0.26\pm 0.01$, respectively. The Monte Carlo standard error of the mean  of each of these parameters is 0 (to two decimal places), indicating that the simulations have run long enough to estimate the posterior means precisely.  The posterior quantiles give a sense of the uncertainty in the parameters, with 50\% posterior intervals of $[2.19,2.27]$ and $[-0.26,-0.25]$ for $a$ and $b$, respectively.   Finally, the values of $\widehat{R}$ near 1 tell us that the simulations from Stan's four simulated chains have mixed well.
+
+The following graph shows the fit plotted along with the data:
+```{r, echo=FALSE}
+sims_logistic <- as.matrix(fit_logistic)
+a_hat <- median(sims_logistic[,"a"])
+b_hat <- median(sims_logistic[,"b"])
+n_sims <- nrow(sims_logistic)
+par(mar=c(3,3,2,1), mgp=c(1.7,.5,0), tck=-.02)
+plot(x, y/n, xlim=c(0, 1.1*max(x)), ylim=c(0, 1.02), xaxs="i", yaxs="i", pch=20, bty="l", xlab="Distance from hole (feet)", ylab="Probability of success", main="Fitted logistic regression")
+segments(x, y/n + se, x, y/n-se, lwd=.5)
+for (i in sample(n_sims, 20))
+  curve(invlogit(sims_logistic[i,"a"] + sims_logistic[i,"b"]*x), from=0, to=1.1*max(x), lwd=0.5, add=TRUE)
+curve(invlogit(a_hat + b_hat*x), from=0, to=1.1*max(x), add=TRUE)
+text(10.6, .57, paste("Logistic regression,\n    a = ", fround(a_hat, 2), ", b = ", fround(b_hat, 2), sep=""))
+```
+
+The thick line shows the fit corresponding to the posterior median estimates of the parameters $a$ and $b$; the light lines show 20 draws from the posterior distribution.
+
+#### Modeling from first principles
+
+As an alternative to logistic regression, we shall build a model from first principles and fit it to the data.  The graph below shows a simplified sketch of a golf shot.  The dotted line represents the angle within which the ball of radius $r$ must be hit so that it falls within the hole of radius $R$.  This threshold angle is $\sin^{-1}((R-r)/x)$.
+
+![Golf diagram](golfpicture.png)
+
+The next step is to model human error.  We assume that the golfer is attempting to hit the ball completely straight but that many small factors interfere with this goal, so that the actual angle follows a normal distribution centered at 0 with some standard deviation $\sigma$.
+
+The probability the ball goes in the hole is then the probability that the angle is less than the threshold; that is, $2\Phi(\sin^{-1}((R-r)/x)) - 1$, where $\Phi$ is the cumulative normal distribution function.
+
+Our model then has two parts:
+$$y_j \sim \mbox{binomial}(n_j, p_j)$$
+$$p_j = 2\Phi(\sin^{-1}((R-r)/x)) - 1 , \mbox{ for } j=1,\dots, J.$$
+Here is the model in Stan:
+```{r, echo=FALSE}
+print_file("golf1.stan")
+```
+The data $J,n,x,y$ have already been set up; we just need to define $r$ and $R$ (the golf ball and hole have diameters 1.68 and 4.25 inches, respectively), and run the Stan model:
+```{r, echo=FALSE, results=FALSE}
+r <- (1.68/2)/12
+R <- (4.25/2)/12
+fit_trig <- stan("golf1.stan", data=golf_data)
+```
+Here is the result:
+```{r, echo=FALSE}
+print(fit_trig)
+```
+The model has a single parameter, $\sigma$.  From the output, we find that Stan has computed the posterior mean of $\sigma$ to be 0.0267 (multiplying this by $180/\pi$, this comes to 1.5 degrees).  The Monte Carlo standard error of the mean is 0 (to four decimal places), indicating that the simulations have run long enough to estimate the posterior mean precisely.  The posterior standard deviation is calculated at 0.0004 (that is, 0.02 degrees), indicating that $\sigma$ itself has been estimated with high precision, which makes sense given the large number of data points and the simplicity of the model.  The precise posterior distribution of $\sigma$ can also be seen from the narrow range of the posterior quantiles.  Finally, $\widehat{R}$ is near 1, telling us that the simulations from Stan's four simulated chains have mixed well.
+
+We next plot the data and the fitted model (here using the posterior median of $\sigma$ but in this case the uncertainty is so narrow that any reasonable posterior summary would give essentially the same result), along with the logistic regression fitted earlier:
+```{r, echo=FALSE}
+sims_trig <- as.matrix(fit_trig)
+sigma_hat <- median(sims_trig[,"sigma"])
+par(mar=c(3,3,2,1), mgp=c(1.7,.5,0), tck=-.02)
+plot(x, y/n, xlim=c(0, 1.1*max(x)), ylim=c(0, 1.02), xaxs="i", yaxs="i", pch=20, bty="l", xlab="Distance from hole (feet)", ylab="Probability of success", main="Two models fit to the golf putting data")
+segments(x, y/n + se, x, y/n-se, lwd=.5)
+curve(invlogit(a_hat + b_hat*x), from=0, to=1.1*max(x), add=TRUE)
+x_grid <- seq(R-r, 1.1*max(x), .01)
+p_grid <- 2*pnorm(asin((R-r)/x_grid) / sigma_hat) - 1
+lines(c(0, R-r, x_grid), c(1, 1, p_grid))
+text(10.3, .58, "Logistic regression")
+text(18.5, .24, "Geometry-based model")
+```
+
+The custom nonlinear model fits the data much better.  This is not to say that the model is perfect---any experience of golf will reveal that the angle is not the only factor determining whether the ball goes in the hole---but it seems like a useful start, and it is good to know that we can fit nonlinear models by just coding them up in Stan.
