@@ -41,7 +41,7 @@ _Bayesian inference_ is a framework for estimating parameters and constructing p
 Go to the Stan webpage (http://mc-stan.org) and navigate to users and interfaces.  Instructions for setting up Stan for use within R are here:  http://mc-stan.org/users/interfaces/rstan.html.  Follow all the steps on that page.
 
 ### A Stan program for simple linear regression
-
+ 
 Our "Hello World" example for R and Stan is a linear regression,
 $$y_i=a+bx_i +\mbox{error}_i, \mbox{ for } i=1,\dots,N,$$
 with errors independent and normally distributed with mean 0 and standard deviation $\sigma$.
