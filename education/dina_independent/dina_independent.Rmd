@@ -41,9 +41,9 @@ In educational measurement, cognitive diagnosis models (CDMs) have been used to 
 
 The *deterministic inputs, noisy "and"" gate* (DINA) model [@Junker2001] is a popular conjunctive CDM, which assumes that a respondent must have mastered all required attributes in order to correctly respond to an item on an assessment.
 
-To estimate respondents' knowledge of attributes, we need information about which attributes are required for each item. For this, we use a Q-matrix which is an $I \times K$ matrix where $q_{ik}$=1 if item $i$ requires attribute $k$ and 0 if not. $I$ is the number of items and $K$ is the number of attributes in the assessment. 
+To estimate respondents' mastery of attributes, we need information about which attributes are required for each item. For this, we use a Q-matrix which is an $I \times K$ matrix where $q_{ik}$=1 if item $i$ requires attribute $k$ and 0 if not. $I$ is the number of items and $K$ is the number of attributes in the assessment. 
 
-A binary latent variable $\alpha_{jk}$ indicates respondent $j$'s knowledge of attribute $k$, where $\alpha_{jk}=1$ if respondent $j$ has mastered attribute $k$ and 0 if he or she has not. Then, an underlying attribute profile of respondent $j$, $\boldsymbol{\alpha_j}$, is a binary vector of length $K$ that indicates whether or not the respondent has mastered each of the $K$ attributes. 
+A binary latent variable $\alpha_{jk}$ indicates respondent $j$'s mastery of attribute $k$, where $\alpha_{jk}=1$ if respondent $j$ has mastered attribute $k$ and 0 if he or she has not. Then, an underlying attribute profile of respondent $j$, $\boldsymbol{\alpha_j}$, is a binary vector of length $K$ that indicates whether or not the respondent has mastered each of the $K$ attributes. 
 
 The deterministic element of the DINA model is a latent variable $\xi_{ij}$ that indicates whether or not respondent $j$ has mastered all attributes required for item $i$:
 $$
@@ -309,7 +309,6 @@ for (k in 1:K){
   wanted_pars <- c(paste0("prob_resp_attr[", 1:dina_data_ind$J, ",", k, "]"))
   # Get predicted posterior probabilities of each attribute mastery for all respondents
   posterior_prob_attr <- sim_summary[wanted_pars, c("mean")]
-  dim(posterior_prob_attr)
   # Calculate mean of the probabilities for respondents who have mastered the attributes and for those who do not
   table_mean[k,"Group 1"] <- mean(posterior_prob_attr[A[,k]==1])
   table_mean[k,"Group 2"] <- mean(posterior_prob_attr[A[,k]==0])
@@ -371,10 +370,10 @@ colnames(alpha_patt) <- paste0("A", 1:5)
 alpha_patt
 
 # Assemble data list for Stan
-I=ncol(y)
-J=nrow(y)
-K=ncol(Q)
-C=nrow(alpha_patt)
+I <- ncol(y)
+J <- nrow(y)
+K <- ncol(Q)
+C <- nrow(alpha_patt)
 
 xi <- matrix(0,I,C)
 for (i in 1:I){
