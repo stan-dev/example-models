@@ -110,9 +110,9 @@ $$
 \mathrm{Pr}(\alpha_{jk}=1 \, | \, \boldsymbol{y}_j)=\sum_{c=1}^{C}\mathrm{Pr}(\boldsymbol{\alpha_j}=\boldsymbol{\alpha_c} \, | \, \boldsymbol{y}_j)\times\alpha_{ck}.
 $$
 
-Instead of conditioning on the parameters $\nu_c,s_i,g_i$ to obtain $\mathrm{Pr}(\boldsymbol{\alpha_j}=\boldsymbol{\alpha_c}|\boldsymbol{Y}_j=\boldsymbol{y}_j)$, we want to derive the posterior probabilities, averaged over the posterior distribution of the parameters. This is achieved by evaluating the expressions above for posterior draws of the parameters and averaging these over the MCMC iterations. Let the vector of all parameters be denoted $\boldsymbol{\theta}$ and let the posterior draw in iteration $s$ be denoted $\boldsymbol{\theta}^{(s)}_{.}$ Then we estimate the posterior probability, not conditioning on the parameters, as
+Instead of conditioning on the parameters $\nu_c,s_i,g_i$ to obtain $\mathrm{Pr}(\boldsymbol{\alpha_j}=\boldsymbol{\alpha_c}|\boldsymbol{Y}_j=\boldsymbol{y}_j)$, we want to derive the posterior probabilities, averaged over the posterior distribution of the parameters. This is achieved by evaluating the expressions above for posterior draws of the parameters and averaging these over the MCMC iterations. Let the vector of all parameters be denoted $\boldsymbol{\theta}$ and let the posterior draw in iteration $t$ be denoted $\boldsymbol{\theta}^{(t)}_{.}$ Then we estimate the posterior probability, not conditioning on the parameters, as
 $$
-\frac{1}{S}\sum_{s=1}^{S}\mathrm{Pr}(\boldsymbol{\alpha_j}=\boldsymbol{\alpha_c} \, | \, \boldsymbol{y}_j,\boldsymbol{\theta}^{(s)}).
+\frac{1}{T}\sum_{t=1}^{T}\mathrm{Pr}(\boldsymbol{\alpha_j}=\boldsymbol{\alpha_c} \, | \, \boldsymbol{y}_j,\boldsymbol{\theta}^{(t)}).
 $$
 
 In [Section 1.4](#stan_nostructure), we introduce the **Stan** program with no structure for $\nu_c$. [Section 2](#stan_ind) describes modification of this **Stan** program to specify the independence model for $\nu_c$ and presents simulation results. 
