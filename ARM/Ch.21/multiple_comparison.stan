@@ -5,6 +5,7 @@ data {
 parameters {
   real mu_theta;
   real<lower=0,upper=100> sigma_theta;
+  vector[N] theta;
   real<lower=0,upper=100> sigma_y;
 }
 model {
