@@ -3,8 +3,7 @@ data {
   vector[N] y;
 }
 transformed data {
-  vector[N] abs_y;
-  abs_y = abs(y);
+  vector[N] abs_y = fabs(y);
 }
 parameters {
   real theta;
