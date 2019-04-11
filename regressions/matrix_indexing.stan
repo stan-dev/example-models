@@ -24,8 +24,7 @@ parameters {
     vector[N_node] z_init;
 }
 
-transformed parameters{
-    
+model {
     matrix[N_node,N_time] x1;
     matrix[N_node,N_time] z;
 
@@ -38,8 +37,7 @@ transformed parameters{
             z[n,t+1] = z[n,t] + dt * tau* (4*(x1[n,t] - x0[n]) -z[n,t] -coupling(t,n,N_node, x1,z,K));
         }
     }
-}
-model {
+    
     //priors
     x1_init ~ normal(-2.0,0.1); 
     z_init ~ normal(4.0,0.1);
