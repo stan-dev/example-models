@@ -1,7 +1,7 @@
 ---
 title: "The Impact of Reparameterization on Point Estimates"
 author: "Bob Carpenter"
-date: "24 April 2016"
+date: "24 April 2016 (revised 15 April 2019)"
 output:
   html_document:
     theme: readable
@@ -174,7 +174,7 @@ library(rstan);
 
 Then we can compile the model as follows.
 
-```{r comment=NA}
+```{r comment=NA, message=FALSE, warning=FALSE}
 model_prob <- stan_model("prob.stan");
 ```
 
@@ -198,11 +198,11 @@ fit_bayes_prob <- sampling(model_prob, data=c("N", "y"),
 print(fit_bayes_prob, probs=c(0.1, 0.5, 0.9));
 ```
 
-The posterior mean is 0.42, not 0.4.  The reason for this is that the
-posterior is not symmetric around its mode, but rather skewed to the
-right.  In the case of this simple Bernoulli example with uniform
-prior, the posterior is available in closed form (because it is
-conjugate), with form
+The reason the posterior mean is greater than 0.5 is that the
+posterior is skewed to the right rather than being symmetric.  In the
+case of this simple Bernoulli example with uniform prior, the
+posterior is available in closed form (because it is conjugate), with
+form
 \[
 p(\theta \, | \, y) = \mathsf{Beta}(\theta \, | \, 1 + \mathrm{sum}(y), 1 + N -
 \mathrm{sum}(y))
@@ -241,7 +241,7 @@ for (n in 1:length(lines)) cat(lines[n],'\n');
 
 The model is compiled as before.
 
-```{r comment=NA}
+```{r comment=NA, message=FALSE, warning=FALSE}
 model_logodds <- stan_model("logodds.stan");
 ```
 
@@ -251,9 +251,11 @@ variables (we ignore the warning for now, but heed it in the next
 section).
 
 ```
-DIAGNOSTIC(S) FROM PARSER:Warning (non-fatal):
+DIAGNOSTIC(S) FROM PARSER:
+Info (non-fatal): assignment operator <- deprecated in the Stan language; use = instead.
+Info (non-fatal):
 Left-hand side of sampling statement (~) may contain a non-linear transform of a parameter or local variable.
-If so, you need to call increment_log_prob() with the log absolute determinant of the Jacobian of the transform.
+If it does, you need to include a target += statement with the log absolute determinant of the Jacobian of the transform.
 Left-hand-side of sampling statement:
     theta ~ uniform(...)
 ```
@@ -274,7 +276,7 @@ consider what happens with the posterior.
 
 ```{r comment=NA, echo=FALSE}
 fit_bayes_logodds <- sampling(model_logodds, data=c("N", "y"),
-                              refresh=5000, iter=10000);
+                              refresh=5000, iter=10000)
 ```
 
 ```{r comment=NA}
@@ -285,6 +287,13 @@ Model 2 uses the log odds as a parameterization, but because it does
 not apply an appropriate Jacobian adjustment, it produces the wrong
 Bayesian posterior.  That means that optimization does not produce the
 correct posterior mode (aka, maximum a posteriori or MAP estimate).
+
+It's also evident from the diagnostic warning about divergent
+transitions that there are computational problems.  Divergent
+transitions arise when the sampler runs into numerical errors
+simulating the Hamiltonian (it only uses gradient information, which
+is first order, and can require arbitrarily small step sizes in
+regions of curvature).
 
 
 ## Jacobian Adjustments
@@ -371,8 +380,8 @@ available) is as follows.
 ```
 model {
   y ~ bernoulli_logit(alpha);
-  increment_log_prob(log_inv_logit(alpha));
-  increment_log_prob(log1m_inv_logit(alpha));
+  target += log_inv_logit(alpha);
+  target += log1m_inv_logit(alpha);
 }
 ```
 
@@ -380,7 +389,7 @@ model {
 
 The steps are exactly the same as before.
 
-```{r comment=NA}
+```{r comment=NA, message=FALSE, warning=FALSE}
 model_logodds_jac <- stan_model("logodds-jac.stan");
 ```
 
@@ -480,8 +489,8 @@ Bayesian quantity](https://en.wikipedia.org/wiki/No_true_Scotsman).
 
 ## Acknowledgements
 
-Thanks to Stijn de Waele for corrections and clarifications on the
-first version of this document.
+Thanks to Stijn de Waele and Jean-Gabriel Young for corrections and
+clarifications.
 
 <br />
 
