@@ -1,6 +1,12 @@
 /**
  * Implementation of joint estimation of logistic regression and
- * annotator sensitivity and specifity.
+ * annotator sensitivity and specifity.  This is just like the Dawid-Skene
+ * model with the basic prevalence replaced with a logistic regression
+ * based on predictors.
+ *
+ * Raykar, V. C., Yu, S., Zhao, L. H., Valadez, G. H., Florin, C.,
+ * Bogoni, L., & Moy, L.  (2010). Learning from crowds. Journal of
+ * Machine Learning Research, 11(Apr), 1297-1322.
  *
  * TODO:  hierarchical priors for alpha, beta
  * TODO:  precompute counts for sum(y[ , r] == 1) and multiply

@@ -457,13 +457,15 @@ $\sigma$, to produce the general logistic distribution
 \[
 \mathsf{Logistic}(y \, | \, \mu, \sigma)
 \ = \
-\mathsf{Logistic}\left( \frac{y - \mu}{\sigma} \right).
+\frac{1}{\sigma} \times \mathsf{Logistic}\left( \frac{y - \mu}{\sigma} \right).
+\]
+The extra $1 / \sigma$ term derives from the Jacobian of the transform
+\[
+f(y) = (y - \mu) / sigma.
 \]
 We'll leave it as an exercise for the reader to work out the algebra
-and show this is the same as the [definition in the Wikipedia](https://en.wikipedia.org/wiki/Logistic_distribution).
-
-
-
+and show this is the same as the [definition in the
+Wikipedia](https://en.wikipedia.org/wiki/Logistic_distribution).
 
 
 ## Conclusion
