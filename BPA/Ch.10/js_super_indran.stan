@@ -226,11 +226,14 @@ generated quantities {
 
   // Generate w[] and z[]
   for (i in 1:M) {
+    int q = 1;
     if (bernoulli_rng(psi)) {      // Included
       z[i, 1] = bernoulli_rng(nu[1]);
-      for (t in 2:n_occasions)
-        z[i, t] = bernoulli_rng(z[i, t - 1] * phi[i, t - 1] +
-                                 (1 - z[i, t - 1]) * nu[t]);
+      for (t in 2:n_occasions) {
+        q = q * (1 - z[i, t - 1]);
+        z[i, t] = bernoulli_rng(z[i, t - 1] * phi[i, t - 1]
+                                 + q * nu[t]);
+      }
     } else {                       // Not included
       z[i, ] = rep_array(0, n_occasions);
     }
