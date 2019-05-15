@@ -23,15 +23,15 @@ data {
 }
 transformed data {
   real theta_max;
-  theta_max <- M;         
-  theta_max <- theta_max / (C - R + M);
+  theta_max = M;         
+  theta_max = theta_max / (C - R + M);
 }
 parameters {
   real<lower=(C - R + M)> N;
 }
 transformed parameters {
   real<lower=0,upper=theta_max> theta;
-  theta <- M / N;
+  theta = M / N;
 }
 model {
   increment_log_prob(-2 * log(N));
