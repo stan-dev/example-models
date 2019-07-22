@@ -204,6 +204,79 @@ functions {
              data real[] data_r, data int[] data_i) {
     return [1, 2, 3]';
   }
+
+  real foo_five_args(real x1, real x2, real x3, real x4, real x5) {
+    return x1;
+  }
+  real foo_five_args_lp(real x1, real x2, real x3, real x4, real x5) {
+    return x1;
+  }
+
+  matrix covsqrt2corsqrt(matrix mat, int invert) {
+    matrix[rows(mat), cols(mat)] o;
+    o = mat;
+    o[1] = o[2];
+    o[3:4] = o[1:2];
+    return o;
+  }
+  void f0(int a1, int[] a2, int[,] a3, real a4, real[] a5, real[,] a6, vector a7, vector[] a8, vector[,] a9, matrix a10, matrix[] a11, matrix[,] a12) {
+    print("hi");
+  }
+
+  int f1(int a1, int[] a2, int[,] a3, real a4, real[] a5, real[,] a6, vector a7, vector[] a8, vector[,] a9, matrix a10, matrix[] a11, matrix[,] a12) {
+    return a1;
+  }
+
+  int[] f2(int a1, int[] a2, int[,] a3, real a4, real[] a5, real[,] a6, vector a7, vector[] a8, vector[,] a9, matrix a10, matrix[] a11, matrix[,] a12) {
+    return a2;
+  }
+
+  int[,] f3(int a1, int[] a2, int[,] a3, real a4, real[] a5, real[,] a6, vector a7, vector[] a8, vector[,] a9, matrix a10, matrix[] a11, matrix[,] a12) {
+    return a3;
+  }
+
+  real f4(int a1, int[] a2, int[,] a3, real a4, real[] a5, real[,] a6, vector a7, vector[] a8, vector[,] a9, matrix a10, matrix[] a11, matrix[,] a12) {
+    return a4;
+  }
+
+  real[] f5(int a1, int[] a2, int[,] a3, real a4, real[] a5, real[,] a6, vector a7, vector[] a8, vector[,] a9, matrix a10, matrix[] a11, matrix[,] a12) {
+    return a5;
+  }
+
+  real[,] f6(int a1, int[] a2, int[,] a3, real a4, real[] a5, real[,] a6, vector a7, vector[] a8, vector[,] a9, matrix a10, matrix[] a11, matrix[,] a12) {
+    return a6;
+  }
+
+  vector f7(int a1, int[] a2, int[,] a3, real a4, real[] a5, real[,] a6, vector a7, vector[] a8, vector[,] a9, matrix a10, matrix[] a11, matrix[,] a12) {
+    return a7;
+  }
+
+  vector[] f8(int a1, int[] a2, int[,] a3, real a4, real[] a5, real[,] a6, vector a7, vector[] a8, vector[,] a9, matrix a10, matrix[] a11, matrix[,] a12) {
+    return a8;
+  }
+
+  vector[,] f9(int a1, int[] a2, int[,] a3, real a4, real[] a5, real[,] a6, vector a7, vector[] a8, vector[,] a9, matrix a10, matrix[] a11, matrix[,] a12) {
+    return a9;
+  }
+
+  matrix f10(int a1, int[] a2, int[,] a3, real a4, real[] a5, real[,] a6, vector a7, vector[] a8, vector[,] a9, matrix a10, matrix[] a11, matrix[,] a12) {
+    return a10;
+  }
+
+  matrix[] f11(int a1, int[] a2, int[,] a3, real a4, real[] a5, real[,] a6, vector a7, vector[] a8, vector[,] a9, matrix a10, matrix[] a11, matrix[,] a12) {
+    return a11;
+  }
+
+  matrix[,] f12(int a1, int[] a2, int[,] a3, real a4, real[] a5, real[,] a6, vector a7, vector[] a8, vector[,] a9, matrix a10, matrix[] a11, matrix[,] a12) {
+    return a12;
+  }
+ void foo_6() {
+    int a;
+    real b;
+    real c[20,30];
+    matrix[40,50] ar_mat[60,70];
+    ar_mat[1,1,1,1] = b;
+  }
 }
 data {
   int<lower=0> N;
@@ -229,6 +302,9 @@ data {
   cholesky_factor_cov[3] d_cfcov_33_ar[K];
 }
 transformed data {
+  int td_int;
+  int td_1d[N];
+  int td_1dk[M];
   int td_a = N;
   real td_b = N * J;
   real td_c = foo_bar1(td_b);
@@ -238,6 +314,8 @@ transformed data {
   simplex[N] td_3d_simplex[N,M,K];
   cholesky_factor_cov[5,5] td_cfcov_54; // TODO: Change to 5,4
   cholesky_factor_cov[3] td_cfcov_33;
+  td_int = 1 || 2;
+  td_int = 1 && 2;
   for (i in 1:2) {
     for (j in 1:3) {
       for (m in 1:4) {
@@ -264,9 +342,15 @@ transformed data {
       z = 0;
     }
   }
+  // some indexing tests for multi indices and slices
+  td_1dk = td_1d[td_1dk];
+  td_simplex = td_1d_simplex[1,:];
+  td_simplex = td_1d_simplex[1,];
+  td_simplex = td_1d_simplex[1,1:N];
 }
 parameters {
   real p_real;
+  real<offset=1, multiplier=2> offset_multiplier[5];
   real<lower=0> p_real_1d_ar[N];
   real<lower=0> p_real_3d_ar[N,M,K];
   vector<lower=0>[N] p_vec;
@@ -325,6 +409,7 @@ model {
   real r1 = foo_bar1(p_real);
   real r2 = foo_bar1(J);
   p_real ~ normal(0,1);
+  to_vector(offset_multiplier) ~ normal(0, 1);
 
   to_vector(p_real_1d_ar) ~ normal(0, 1);
   for (n in 1:N) {
@@ -373,12 +458,12 @@ generated quantities {
   cholesky_factor_cov[3] gq_cfcov_33;
   cholesky_factor_cov[3] gq_cfcov_33_ar[K];
 
-  gq_real_1d_ar = p_real_1d_ar;
+  gq_real_1d_ar = p_1d_simplex[,1];
   gq_real_3d_ar = p_real_3d_ar;
   gq_1d_vec = p_1d_vec;
   gq_3d_vec = p_3d_vec;
 
-  gq_simplex = p_simplex;
+  gq_simplex = p_1d_simplex[1,1:N];
   gq_1d_simplex = p_1d_simplex;
   gq_3d_simplex = p_3d_simplex;
 
