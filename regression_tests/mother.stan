@@ -208,7 +208,7 @@ functions {
   real foo_five_args(real x1, real x2, real x3, real x4, real x5) {
     return x1;
   }
-  real foo_five_args_lp(real x1, real x2, real x3, real x4, real x5) {
+  real foo_five_args_lp(real x1, real x2, real x3, real x4, real x5, real x6) {
     return x1;
   }
 
@@ -304,7 +304,7 @@ data {
 transformed data {
   int td_int;
   int td_1d[N];
-  int td_1dk[M];
+  int td_1dk[M] = rep_array(1, M);
   int td_a = N;
   real td_b = N * J;
   real td_c = foo_bar1(td_b);
@@ -409,7 +409,7 @@ model {
   real r1 = foo_bar1(p_real);
   real r2 = foo_bar1(J);
   p_real ~ normal(0,1);
-  to_vector(offset_multiplier) ~ normal(0, 1);
+  offset_multiplier ~ normal(0, 1);
 
   to_vector(p_real_1d_ar) ~ normal(0, 1);
   for (n in 1:N) {
