@@ -6,7 +6,6 @@
 //      generate_transform_inits_method(prog.parameter_decl_, o);
 
 functions {
-
   int foo(int n);
 
   int foo(int n) {
@@ -277,6 +276,11 @@ functions {
     matrix[40,50] ar_mat[60,70];
     ar_mat[1,1,1,1] = b;
   }
+  /* matrix foo_return_mat() { */
+  /*   return [ [1,2,3,4,5,6,7,8,9,10] */
+  /*            , [1,2,3,4,5,6,7,8,9,10] */
+  /*            , [1,2,3,4,5,6,7,8,9,10] ]; */
+  /* } */
 }
 data {
   int<lower=0> N;
@@ -404,6 +408,9 @@ transformed parameters {
           tp_ar_mat[m, n, i, j] = 0.4;}}}}
 
   for (i in 1:N) tp_vec[i] = -1.0 * p_vec[i];
+  tp_row_vec = tp_1d_vec[1]';
+  tp_1d_row_vec = p_1d_row_vec;
+  tp_3d_row_vec = p_3d_row_vec;
 }
 model {
   real r1 = foo_bar1(p_real);
@@ -457,11 +464,22 @@ generated quantities {
   cholesky_factor_cov[5,4] gq_cfcov_54;
   cholesky_factor_cov[3] gq_cfcov_33;
   cholesky_factor_cov[3] gq_cfcov_33_ar[K];
+  int indices[3] = {2, 3, 1};
+  matrix[3, 4] indexing_mat[5];
+  matrix[3, 4] idx_res1[3];
+  matrix[3, 4] idx_res2[5];
+  matrix[3, 3] idx_res3[3];
+  matrix[3, 4] idx_res11[3];
+  matrix[3, 4] idx_res21[5];
+  matrix[3, 3] idx_res31[3];
 
   gq_real_1d_ar = p_1d_simplex[,1];
   gq_real_3d_ar = p_real_3d_ar;
   gq_1d_vec = p_1d_vec;
   gq_3d_vec = p_3d_vec;
+  gq_row_vec = p_row_vec;
+  gq_1d_row_vec = p_1d_row_vec;
+  gq_3d_row_vec = p_3d_row_vec;
 
   gq_simplex = p_1d_simplex[1,1:N];
   gq_1d_simplex = p_1d_simplex;
@@ -479,4 +497,34 @@ generated quantities {
 
 
   for (i in 1:N) gq_vec[i] = -1.0 * p_vec[i];
+
+  // A fun thing about Stan is that we can test syntactic sugar in Stan itself:
+  for (i in 1:3)
+    for (j in 1:4)
+      for (k in 1:5)
+        indexing_mat[k, i, j] = normal_rng(0, 1);
+  // 2nd, 3rd, 1st indexing_matrix, 2nd, 3rd, 1st rows of each
+  for (i in 1:size(indices))
+    for (j in 1:size(indices))
+      idx_res1[i, j] = indexing_mat[indices[i], indices[j]];
+  idx_res11 = indexing_mat[indices, indices];
+  //broken in stanc3
+  //if (indexing_mat[indices, indices][2,1,1] != idx_res1[2,1,1]) reject("indexing test 1 failed");
+
+  //2nd, 3rd, 1st rows of every indexing_matrix
+  for (i in 1:5)
+    for (j in 1:size(indices))
+      idx_res2[i, j] = indexing_mat[i, indices[j]];
+  idx_res21 = indexing_mat[:, indices];
+  //broken in stanc3
+  //if (indexing_mat[:, indices][2,1,1] != idx_res2[2,1,1]) reject("indexing test 2 failed");
+
+  // (2nd, 3rd, 1st) indexing_matrices, all rows, 2nd, 3rd, 1st columns
+  for (i in 1:size(indices))
+    for (j in 1:3)
+      for (k in 1:size(indices))
+        idx_res3[i, j, k] = indexing_mat[indices[i], j, indices[k]];
+  idx_res31 = indexing_mat[indices, :, indices];
+  // broken in stanc3:
+  // if (indexing_mat[indices, :, indices][2,1,1] != sym3[2,1,1]) reject("indexing test 3 failed");
 }
