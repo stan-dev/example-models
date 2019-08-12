@@ -6,6 +6,7 @@
 //      generate_transform_inits_method(prog.parameter_decl_, o);
 
 functions {
+
   int foo(int n);
 
   int foo(int n) {
@@ -276,11 +277,22 @@ functions {
     matrix[40,50] ar_mat[60,70];
     ar_mat[1,1,1,1] = b;
   }
-  /* matrix foo_return_mat() { */
-  /*   return [ [1,2,3,4,5,6,7,8,9,10] */
-  /*            , [1,2,3,4,5,6,7,8,9,10] */
-  /*            , [1,2,3,4,5,6,7,8,9,10] ]; */
-  /* } */
+  matrix matfoo() {
+    return [ [1,2,3,4,5,6,7,8,9,10]
+             , [1,2,3,4,5,6,7,8,9,10]
+             , [1,2,3,4,5,6,7,8,9,10] ];
+  }
+  vector vecfoo() {
+    return [1,2,3,4,5,6,7,8,9,10]';
+  }
+  vector vecmufoo(real mu) {
+    vector[10] l = mu * vecfoo();
+    return l;
+  }
+  vector vecmubar(real mu) {
+    vector[10] l = mu * [1,2,3,4,5,6,7,8,9,10]';
+    return l[{1,2,3,4,5}];
+  }
 }
 data {
   int<lower=0> N;
@@ -425,10 +437,10 @@ model {
     to_vector(p_1d_simplex[n]) ~ normal(0, 1);
     for (m in 1:M) {
       for (k in 1:K) {
-        to_vector(p_3d_vec[n, m, k]) ~ normal(0, 1);
-        to_vector(p_3d_row_vec[n, m, k]) ~ normal(0, 1);
-        to_vector(p_3d_simplex[n, m, k]) ~ normal(0, 1);
-        p_real_3d_ar[n, m, k] ~ normal(0, 1);
+        to_vector(p_3d_vec[n, m, k]) ~ normal(d_3d_vec[n, m, k], 1);
+        to_vector(p_3d_row_vec[n, m, k]) ~ normal(d_3d_row_vec[n, m, k], 1);
+        to_vector(p_3d_simplex[n, m, k]) ~ normal(d_3d_simplex[n, m, k], 1);
+        p_real_3d_ar[n, m, k] ~ normal(p_real_3d_ar[n, m, k], 1);
       }
     }
   }
@@ -440,7 +452,7 @@ model {
   for (k in 1:K) {
     to_vector(p_cfcov_33_ar[k]) ~ normal(0, 1);
   }
-  to_vector(p_vec) ~ normal(0, 1);
+  to_vector(p_vec) ~ normal(d_vec, 1);
   to_vector(p_row_vec) ~ normal(0, 1);
   to_vector(p_simplex) ~ normal(0, 1);
   to_vector(p_cfcov_54) ~ normal(0, 1);
@@ -472,6 +484,8 @@ generated quantities {
   matrix[3, 4] idx_res11[3];
   matrix[3, 4] idx_res21[5];
   matrix[3, 3] idx_res31[3];
+  row_vector[4] idx_res4[3];
+  vector[2] idx_res5[2];
 
   gq_real_1d_ar = p_1d_simplex[,1];
   gq_real_3d_ar = p_real_3d_ar;
@@ -495,7 +509,6 @@ generated quantities {
         for (n in 1:5) {
           gq_ar_mat[m, n, i, j] = 0.4;}}}}
 
-
   for (i in 1:N) gq_vec[i] = -1.0 * p_vec[i];
 
   // A fun thing about Stan is that we can test syntactic sugar in Stan itself:
@@ -503,13 +516,14 @@ generated quantities {
     for (j in 1:4)
       for (k in 1:5)
         indexing_mat[k, i, j] = normal_rng(0, 1);
+
   // 2nd, 3rd, 1st indexing_matrix, 2nd, 3rd, 1st rows of each
   for (i in 1:size(indices))
     for (j in 1:size(indices))
       idx_res1[i, j] = indexing_mat[indices[i], indices[j]];
+
   idx_res11 = indexing_mat[indices, indices];
-  //broken in stanc3
-  //if (indexing_mat[indices, indices][2,1,1] != idx_res1[2,1,1]) reject("indexing test 1 failed");
+  if (indexing_mat[indices, indices][2,1,1] != idx_res1[2,1,1]) reject("indexing test 1 failed");
 
   //2nd, 3rd, 1st rows of every indexing_matrix
   for (i in 1:5)
@@ -517,7 +531,7 @@ generated quantities {
       idx_res2[i, j] = indexing_mat[i, indices[j]];
   idx_res21 = indexing_mat[:, indices];
   //broken in stanc3
-  //if (indexing_mat[:, indices][2,1,1] != idx_res2[2,1,1]) reject("indexing test 2 failed");
+  if (indexing_mat[:, indices][2,1,1] != idx_res2[2,1,1]) reject("indexing test 2 failed");
 
   // (2nd, 3rd, 1st) indexing_matrices, all rows, 2nd, 3rd, 1st columns
   for (i in 1:size(indices))
@@ -525,6 +539,8 @@ generated quantities {
       for (k in 1:size(indices))
         idx_res3[i, j, k] = indexing_mat[indices[i], j, indices[k]];
   idx_res31 = indexing_mat[indices, :, indices];
-  // broken in stanc3:
-  // if (indexing_mat[indices, :, indices][2,1,1] != sym3[2,1,1]) reject("indexing test 3 failed");
+  if (indexing_mat[indices, :, indices][2,1,1] != idx_res3[2,1,1]) reject("indexing test 3 failed");
+
+  idx_res4 = indexing_mat[:3, 1, :];
+  idx_res5 = indexing_mat[4:, 2:3, 1];
 }
