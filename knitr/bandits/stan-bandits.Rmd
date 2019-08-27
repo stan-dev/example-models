@@ -91,12 +91,18 @@ bandit, aka slot machine) and the goal is to minimize the amount of
 time exploring alternatives in order to exploit the rewards from the
 best alternative. The multi-armed bandit problem is a simple example
 of a sequential decision process and of reinforcement learning. This
-case study explores the Thompson sampling pollicy (Thomspon 1931),
+case study explores the probability matching policy,
 wherein a bandit is chosen at random with probability equal to its
-posterior probability of providing the highest expected return. The
+posterior probability of providing the highest expected return.  Thompson
+sampling is a popular low-cost policy that evaluates the expectations
+in the probability matching policy using a single draw from the posterior.
+
+The
 case study begins with simple Bernoulli A/B tests, extends to the
 sequential bandit setting with Bernoulli bandits, then generalizes to
-context-dependent rewards modeled with a generalized linear model.
+context-dependent rewards modeled with a generalized linear model, evaluating
+both the probability matching policy, the Thompson sampling policies, and
+policies in between.
 
 # Static A/B Tests
 
@@ -339,7 +345,7 @@ In the limit as $\theta_k \rightarrow 0$, the tit-for-tat policy approaches the 
 
 ## Probability matching policy
 
-Thompson (1931) introduced a Bayesian stochastic policy which employs the entire history of returns.  In Thompson's probability matching policy, a bandit's arm is pulled with probability equal to its probability of being the best bandit conditioned on the entire history of previous turns.  Given parameters $\theta = (\theta_1, \ldots, \theta_K)$, bandit $k$ will be the best bandit if $\max(\theta) = \theta_k$.  Given a Bayesian model, the posterior probability after $n$ trials that bandit $k$ is the best is then defined by
+Thompson (1933) introduced a Bayesian stochastic policy which employs the entire history of returns.  In Thompson's probability matching policy, a bandit's arm is pulled with probability equal to its probability of being the best bandit conditioned on the entire history of previous turns.  Given parameters $\theta = (\theta_1, \ldots, \theta_K)$, bandit $k$ will be the best bandit if $\max(\theta) = \theta_k$.  Given a Bayesian model, the posterior probability after $n$ trials that bandit $k$ is the best is then defined by
 
 The probability matching policy then selects the next bandit to play, $z_{n+1}$, according to
 

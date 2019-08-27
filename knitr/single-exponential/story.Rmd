@@ -1,0 +1,165 @@
+---
+title: "Example of nonlinear least squares: fitting a declining exponential"
+author: "Andrew Gelman"
+date: "29 Jul 2018"
+output:
+  html_document:
+    theme: readable
+  pdf_document: default
+---
+
+```{r setup, include=FALSE, echo=FALSE}
+options(htmltools.dir.version = FALSE)
+options(digits = 2)
+
+library(knitr)
+knitr::opts_chunk$set(cache = TRUE)
+knitr::opts_chunk$set(tidy = FALSE, cache.extra = packageVersion('tufte'))
+knitr::opts_chunk$set(comment = "")
+
+print_file <- function(file) {
+  cat(paste(readLines(file), "\n", sep=""), sep="")
+}
+
+library("arm")
+library("rstan")
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+```
+
+Let's fit the following simple model:  $y = ae^{-bx} + \mbox{error}$, given data $(x,y)_i$:
+$$
+y_i = ae^{-bx_i} + \epsilon_i, \mbox{ for } i=1,\dots,N,
+$$
+and we shall assume the errors are independent and normally distributed:  $\epsilon_i \sim \mbox{normal}(0,\sigma)$.
+
+Here is the model in Stan:
+
+```{r, echo=FALSE}
+print_file("exponential.stan")
+```
+
+We have given the parameters $a$, and $b$, and $\sigma$  normal prior distibutions centered at 0 with standard deviation 10.  In addition, the parameter $\sigma$ is constrained to be positive.  The purpose of the prior distributions is to keep the computations at a reasonable value.  If we were working on a problem in which we thought that $a$, $b$, or $\sigma$ could be much greater than 10, we would want to use a weaker prior distribution.
+
+Another point about the above Stan program:  the model for $y$ is vectorized and could instead have been written more explicitly as a loop:
+```
+  for (i in 1:N){
+    y[i] ~ normal(a*exp(-b*x[i]), sigma);
+  }
+```
+We prefer the vectorized version as it is more compact and it also runs faster in Stan, for reasons discussed elsewhere in this book.
+
+To demonstrate our exponential model, we fit it to fake data.  We'll simulate $N=100$ data points with predictors $x$ uniformly distributed between 0 and 10, from the above model with $a=0.2, b=0.3, \sigma=0.5$.
+
+```{r, echo=FALSE}
+a <- 5
+b <- 0.3
+sigma <- 0.5
+N <- 100
+x <- runif(N, 0, 10)
+y <- rnorm(N, a*exp(-b*x), sigma)
+```
+
+Here is a graph of the true curve and the simulated data:
+
+```{r, echo=FALSE}
+curve(a*exp(-b*x), from=0, to=10, ylim=range(x, y), xlab="x", ylab="y", bty="l", main="Data and true model", cex.main=1)
+points(x, y, pch=20, cex=0.2)
+```
+
+And then we fit the model:
+
+```{r, echo=FALSE, warnings=FALSE, results=FALSE}
+data_1 <- list(N=N, x=x, y=y)
+fit_1 <- stan("exponential.stan", data=data_1)
+```
+```{r, echo=FALSE}
+print(fit_1)
+```
+
+Recall that the true parameter values were $a=5.0, b=0.3, \sigma=0.5$.  Here the model is simple enough and the data are clean enough that we can estimate all three of these parameters with reasonable precision from the data, as can be seen from the 95\% intervals above.
+
+Alternatively, we might want to say ahead of time that we are fitting a declining exponential curve that starts positive and descends to zero. We would thus want to constrain the parameters $a$ and $b$ to be positive, which we can do in the parameters block:
+
+```
+  real<lower=0> a;
+  real<lower=0> b;
+```
+
+Otherwise we leave the model unchanged.  In this case the results turn out to be very similar:
+
+```{r, echo=FALSE, warnings=FALSE, results=FALSE}
+fit_1b <- stan("exponential_positive.stan", data=data_1)
+```
+```{r, echo=FALSE}
+print(fit_1b)
+```
+
+With weaker data, though, the constraints could make a difference.  We could experiment on this by doing the same simulation but with just $N=10$ data points:
+
+```{r, echo=FALSE}
+N <- 10
+x <- runif(N, 0, 10)
+y <- rnorm(N, a*exp(-b*x), sigma)
+curve(a*exp(-b*x), from=0, to=10, ylim=range(x, y), xlab="x", ylab="y", bty="l", main="Just 10 data points", cex.main=1)
+points(x, y, pch=20, cex=0.2)
+```
+
+First we fit the unconstrained model:
+
+```{r, echo=FALSE, warnings=FALSE, results=FALSE}
+data_2 <- list(N=N, x=x, y=y)
+fit_2 <- stan("exponential.stan", data=data_2)
+```
+```{r, echo=FALSE}
+print(fit_2)
+```
+
+Then we fit the constrained model:
+
+```{r, echo=FALSE, warnings=FALSE, results=FALSE}
+fit_2b <- stan("exponential_positive.stan", data=data_2)
+```
+```{r, echo=FALSE}
+print(fit_2b)
+```
+
+Different things can happen with different sets of simulated data, but the inference with the positivity constraints will typically be much more stable.  Of course, we would only want to constrain the model in this way if we knew that the positivity restriction is appropriate.
+
+Now suppose that the data are also restricted to be positive.  Then we need a different error distribution, as the above model with additive normal errors can yield negative data.
+
+Let's try a multiplicative error, with a lognormal distribution:
+
+$$
+y_i = ae^{-bx_i} * \epsilon_i, \mbox{ for } i=1,\dots,N\\
+\log\epsilon_i \sim \mbox{normal}(0,\log\sigma), \mbox{ for } i=1,\dots,N
+$$
+
+Here is the model in Stan:
+
+```{r, echo=FALSE}
+print_file("exponential_positive_lognormal.stan")
+```
+
+As before, we can simulate fake data from this model:
+```{r, echo=FALSE}
+a <- 5
+b <- 0.3
+sigma <- 0.5
+N <- 100
+x <- runif(N, 0, 10)
+epsilon <- exp(rnorm(N, 0, sigma))
+y <- a*exp(-b*x)*epsilon
+curve(a*exp(-b*x), from=0, to=10, ylim=range(x, y), xlab="x", ylab="y", bty="l", main="Data and true model", cex.main=1)
+points(x, y, pch=20, cex=0.2)
+```
+
+We can then fit the model to the simulated data and check that the parameters are approximately recovered:
+
+```{r, echo=FALSE, warnings=FALSE, results=FALSE}
+data_3 <- list(N=N, x=x, y=y)
+fit_3 <- stan("exponential_positive_lognormal.stan", data=data_3)
+```
+```{r, echo=FALSE}
+print(fit_3)
+```

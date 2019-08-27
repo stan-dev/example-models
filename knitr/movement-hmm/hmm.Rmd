@@ -710,11 +710,9 @@ p(y \mid z, \phi) \cdot p(z \mid \theta) \cdot p(\theta) \cdot p(\phi)
 & = &
 \begin{array}[t]{l}
 \prod_{n=1}^N p(y_n \mid \phi_{z_n})
-\\
-{ } \cdot p(z_1 \mid \theta)
-\\
-{ } \cdot \prod_{n=2}^N p(z_n \mid \theta_{z_{n-1}})
-\\
+\\[2pt]
+{ } \cdot p(z_1 \mid \theta) \cdot \prod_{n=2}^N p(z_n \mid \theta_{z_{n-1}})
+\\[2pt]
 { } \cdot p(\theta) \cdot p(\phi)
 \end{array}
 \end{array}
@@ -916,9 +914,14 @@ $$
 & = & p(y_n, \ldots, y_N \mid z_n = k, \theta, \phi)
 \\[4pt]
 & = &
-\sum_{k' = 1}^K p(z_n = k' \mid z_{n - 1} = k, \theta)
-                \cdot p(y_n \mid z_n = k', \phi)
-		\cdot p(y_{n + 1}, \ldots, y_N \mid z_n = k', \theta, \phi)
+\sum_{k' = 1}^K 
+\begin{array}[t]{l}
+p(z_n = k' \mid z_{n - 1} = k, \theta)
+\\
+{ } \cdot p(y_n \mid z_n = k', \phi)
+\\
+{ } \cdot p(y_{n + 1}, \ldots, y_N \mid z_n = k', \theta, \phi)
+\end{array}
 \\[4pt]
 & = &
 \sum_{k' = 1}^K  \theta_{k,\, k'}
@@ -1072,3 +1075,78 @@ $$
 \end{array}
 $$
 The variable $\psi$ here is initial distribution, assumed to be equal to the stationary distribution of the transition matrix, $\psi = \mathrm{stationary}(\theta)$.
+
+# Viterbi Decoder
+
+The Viterbi decoder is an algorithm for finding the highest probability state sequence $z$ given an observed sequence $y$, i.e.,^[In general, $\mathrm{argmax}_u \ f(u)$ is the $u$ that maximizes $f(u)$.  For example, $$\mathrm{argmax}_y\ -\frac{1}{2} \cdot (y-3)^2 = 3.$$  If the range of the maximization is restricted, the notation is $\mathrm{argmax}_{u \, \in \, \mathcal{U}} \ f(u)$.]
+$$
+z^* = \mathrm{argmax}_z \ p(z \mid y, \theta, \phi).
+$$
+By Bayes's rule, $p(z \mid y, \theta, \phi) \propto p(y, z \mid \theta, \phi)$, so
+$$
+z^* = \mathrm{argmax}_z \ p(y, z \mid \theta, \phi).
+$$
+
+## Best density and back pointers
+
+The Viterbi algorithm builds up two data structures as it goes, both in an $N \times K$ structure, where $N$ is the number of elements in the observed sequence $y$ and $K$ is the number of latent states.  The first structure, $\delta_{n,k}$, holds the best-path density up to observation $n$ with latent state $z_n = k$.  
+
+The second structure, $\xi_{n, k} \in 0{:}K$, holds an integer index to a previous state (the value may only be 0 for $n = 1$).  The point of this back-pointer structure is that the best path can be read off of the best final state by following the pointers backward.  
+
+## Base cases
+
+These two structures are defined together, starting with the base cases.  For the initial log density, we take
+$$
+\delta_{1, k} = p(y_1 \mid z_1 = k, \phi) \cdot p(z_1 = k \mid \theta).
+$$
+This is the same initial condition as for the forward algorithm, $p(y_1, z_1 = k \mid \theta, \phi)$.  
+
+The initial backpointer can hold a dummy value as the initial state is the last when traversing backward.  To distinguish the final entry when going backward, the first backpointers are arbitrarily set to zero,
+$$
+\xi_{1, k} = 0.
+$$
+
+## Inductive cases
+
+The inductive case for the best density is again very much like the forward inductive step, only taking a maximum rather than a sum,
+$$
+\delta_{n + 1,\, k} 
+\ = \
+\max_{k' \, \in \, 1:K}
+\delta_{n,\, k'} \cdot p(y_{n + 1} \mid z_{n + 1} = k, \phi) \cdot p(z_{n + 1} = k \mid z_n = k', \theta).
+$$
+
+The backpointer is defined to be the $k'$ that led to the highest density.  This can be achieved by replacing the max operator used to define $\delta$ with an argmax operator,
+$$
+\DeclareMathOperator*{\argmax}{argmax}
+\xi_{n + 1,\, k}
+\ = \
+\argmax_{k' \, \in \, 1:K} \
+\delta_{n,\, k'} \cdot p(y_{n + 1} \mid z_{n + 1} = k, \phi) \cdot p(z_{n + 1} = k \mid z_n = k', \theta).
+$$
+
+## Extracting the best state sequence
+
+Given the output densities $\delta$ and backpointers $\xi$ for an input $y_1, \ldots, y_N$, the optimal state sequence $z_1, \ldots, z_N$ is best path is constructed backwards, setting
+$$
+z_N = \argmax_k \, \delta_{N,\, k}.
+$$
+The rest of the state sequence is then defined inductively, setting for $n \in 1{:}N - 1$,
+$$
+z_{n - 1} = \xi_{n, z_n}.
+$$
+
+## Max-product and sum-product
+
+For a given observed state sequence $y$, the forward algorithm computes the likelihood, which is the probability function summed over all possible latent states,
+$$
+\sum_{z \in (1:K)^n} \ p(y, z \mid \theta, \phi).
+$$
+The Viterbi decoder computes the state sequence for which $y$ is most likely,
+$$
+\argmax_{z \, \in \, (1:K)^n} \ p(y, z \mid \theta, \phi).
+$$
+The Viterbi decoder replaces the sum in the forward algorithm with a maximization.
+
+The base cases are identical for the two algorithms.  The only difference between the inductive
+step is that the forward algorithm uses a sum and the Viterbi algorithm a maximization.  The Viterbi decoder is an instance of a *max-product* algorithm, whereas the forward algorithm is a *sum-product* algorithm.  The max-product algorithm and sum-product algorithm generalize the Viterbi decoder and forward algorithm to directed acyclic graphical dependency structures such as trees.

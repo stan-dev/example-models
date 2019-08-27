@@ -1,0 +1,211 @@
+---
+title: "World Cup (for the Bayes in Stan book)"
+author: "Andrew Gelman"
+date: "15 Jul 2018"
+output:
+  html_document:
+    theme: readable
+---
+
+```{r setup, include=FALSE, echo=FALSE}
+options(htmltools.dir.version = FALSE)
+options(digits = 2)
+
+library(knitr)
+knitr::opts_chunk$set(cache = TRUE)
+knitr::opts_chunk$set(tidy = FALSE, cache.extra = packageVersion('tufte'))
+knitr::opts_chunk$set(comment = "")
+
+print_file <- function(file) {
+  cat(paste(readLines(file), "\n", sep=""), sep="")
+}
+
+library("arm")
+library("rstan")
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+```
+We fit a model to estimate the abilities of the teams in the 2014 soccer World Cup.  We fit a simple linear item response model, using the score differentials as data (ignoring the shoot-outs). We also have a feeling that when the game is not close the extra goals don’t provide as much information so we’ll fit the model on the square-root scale.
+
+The model is as follows:   if game $i$ has teams $j_1$ and team $j_2$ playing, and they score $z_1$ and $z_2$ goals, respectively, then the data point for this game is $y_i = \mbox{sign}(z_1-z_2)*\sqrt{|z_1-z_2|}$, and the data model is:
+$y_i \sim \mbox{normal}(a_{j_1[i]}-a_{j_2[i]}, \sigma_y)$,
+where $a_{j_1}$ and $a_{j_2}$ are the ability parameters (to use psychometrics jargon) for the two teams and $\sigma_y$ is a scale parameter estimated from the data. But then before fitting the model we was thinking of occasional outliers such as that Germany-Brazil match so we decided that a $t$ model could make more sense:
+$$y_i \sim \mbox{t}(\nu, a_{j_1[i]}-a_{j_2[i]}, \sigma_y),$$
+setting the degrees of freedom to $\nu=7$ which has been occasionally recommended as a robust alternative to the normal.
+
+It turned out, when the model was all fit and we started tinkering with it, that neither the square root transformation nor the long-tailed $t$ distribution were really necessary to model the soccer scores; a simple normal model would have been fine.  But we'll work with this particular model because that was how we first thought of setting it up.
+
+There weren't so many World Cup games (only 64 games in total for 32 teams) so we augmented the dataset by partially pooling the ability parameters toward an external data source, something called the Soccer Power Index that was available on the internet a month before the tournament.  We took the rankings, with Brazil at the top (getting a score of 32) and Australia at the bottom (with a score of 1), and then for simplicity in interpretation of the parameters we rescaled these to have mean 0 and standard deviation 1/2, to get "prior scores" that ranged from $-0.83$ to + $0.83$.
+
+Our model for the team abilities was then simply,
+$a_j \sim \mbox{normal}(\mu + b*\mbox{prior_score}_j, \sigma_a)$, which we write as $a_j=\mu+b*\mbox{prior_score}_j+\sigma_a*\alpha_j$, with $\alpha_j\sim\mbox{normal}(0,1) \mbox{ for } j=1,\dots,J=32$.  Actually, though, all we care about are the relative, not the absolute, team abilities, so we can just set $\mu=0$, so that the model is,
+$$a_j = b*\mbox{prior_score}_j+\sigma_a*\alpha_j, \mbox{ with } \alpha_j \sim \mbox{normal}(0, 1), \mbox{ for } j=1,\dots,J=32.$$
+At this point we should probably add weakly informative priors for $b$, $\sigma_a$, and $\sigma_y$, but we didn’t bother. We can always go back and add these to stabilize the inferences, but 32 teams should be enough to estimate these parameters so we don’t think it will be necessary in this case.
+
+We now set up the model in Stan:
+```{r, echo=FALSE}
+print_file("worldcup_first_try.stan")
+```
+
+The stuff in the transformed data block is to transform the raw data into signed square root differentials.  (The function "fabs" is short for "floating point absolute value.")  It turns out this code has a mistake in it, which we will get to in a bit.
+
+```{r, echo=FALSE, warnings=FALSE, results=FALSE}
+teams <- as.vector(unlist(read.table("soccerpowerindex.txt", header=FALSE)))
+N_teams <- length(teams)
+prior_score <- rev(1:N_teams)
+prior_score <- (prior_score - mean(prior_score))/(2*sd(prior_score))
+data2014 <- read.table ("worldcup2014.txt", header=FALSE)
+N_games <- nrow(data2014)
+team_1 <- match(as.vector(data2014[[1]]), teams)
+score_1 <- as.vector(data2014[[2]])
+team_2 <- match(as.vector(data2014[[3]]), teams)
+score_2 <- as.vector(data2014[[4]])
+df <- 7
+data_worldcup <- c("N_teams","N_games","team_1","score_1","team_2","score_2","prior_score","df")
+fit_1 <- stan("worldcup_first_try.stan", data=data_worldcup)
+```
+
+The simulations converge, and the estimates seem reasonable.
+
+```{r, echo=FALSE}
+print(fit_1, c("a","b","sigma_a","sigma_y","lp__"))
+```
+
+The simulations converge, and we can look at the parameter estimates:
+
+*  Recall that the 32 teams are listed in order of their prior ranking, with Brazil and Argentina at the top and Australia at the bottom, so the posterior mean estimates for the team abilities $a$ seem reasonable.  The posterior intervals for the different teams overlap a lot, which makes sense given that most of teams only play 3 or 4 games in the tournament.
+
+* The estimated coefficient $b$ is positive, indicating that teams with higher prior rankings did better in the tournament, which makes sense; the estimate of 0.46 implies that a good team is about half a goal (on the square-root scale) better than a poor team.  We can give this latter interpretation because we have already put the prior score predictor on a standardized scale.
+
+* The group-level error standard deviation $\sigma_a$ is estimated at 0.13 which is a small value, which indicates that, unsurprisingly, our final estimates of team abilities are not far from the initial ranking. (If $\sigma_a$ were exactly zero, then the team abilities would be a perfect linear function of those prior rankings.  We can attribute this good fit to a combination of two factors: first, the initial ranking is pretty accurate; second, there aren't a lot of data points here so not much information that would pull the teams away from this assumed linear model.
+
+* The data-level error $\sigma_y$ is estimated at 0.42, implying that the uncertainty in any game is about half a goal on the square-root scale, about as much as the variation between good and bad teams.  On any given day, any team could beat any other team.
+
+Now it's time to make some graphs. First a simple list of estimates and standard errors of team abilities. We'll order the teams based on prior ranking, which makes sense for two reasons. First, this ordering is informative: there's a general trend from good to bad so it should be easy to understand the results. Second, the prior ranking is what we were using to pull toward in the multilevel model, so this graph is equivalent to a plot of estimate vs.\ group-level predictor, which is the sort of graph we like to make to understand what a multilevel model is doing.
+
+```{r, echo=FALSE}
+a_post <- extract(fit_1)$a
+a_hat <- apply(a_post, 2, median)
+a_se <- apply(a_post, 2, sd)
+coefplot (rev(a_hat), rev(a_se), CI=1, varnames=rev(teams), main="Team quality (estimate +/- 1 s.e.)\n", cex.var=.9, mar=c(0,4,5.1,2), xlim=c(-.5,.5))
+```
+
+At this point we could compute lots of fun things such as the probability that Argentina would beat Germany if the final were played again, but it's clear enough from this picture that the estimate will be close to 50\% so really the model isn't giving us much for that one game.
+
+One thing we should try to understand, though, is how much of these estimates are coming from the prior ranking? So we very slightly alter the model, changing two lines by moving $b$ from the parameters to the data block in the Stan program.  Then we call the model with $b$ set to 0.
+
+```{r, echo=FALSE, warnings=FALSE, results=FALSE}
+b <- 0
+fit_1_noprior <- stan("worldcup_first_try_noprior.stan", data=c(data_worldcup, "b"))
+```
+```{r, echo=FALSE}
+a_post <- extract(fit_1_noprior)$a
+a_hat <- apply(a_post, 2, median)
+a_se <- apply(a_post, 2, sd)
+coefplot (rev(a_hat), rev(a_se), CI=1, varnames=rev(teams), main="Team quality (estimate +/- 1 s.e.)\n", cex.var=.9, mar=c(0,4,5.1,2), xlim=c(-.5,.5))
+```
+
+This is roughly similar to before but a lot noisier.
+
+Now let's check model fit. For this we'll go back to the model that includes the prior ranking as a linear predictor, predicting replications of the games using a generated quantities block:
+
+```
+generated quantities {
+  vector[N_games] y_rep;
+  y_rep <- student_t_rng(df, a[team_1] - a[team_2], sigma_y);
+  y_rep_original_scale <- y_rep * abs(y_rep);
+}
+```
+
+We re-fit the model and produce the replications.  The result is a matrix of simulations, y_rep_original_scale, representing the posterior distribution of the outcomes of the 64 games, if the tournament were to be repeated.  For each game we can then collect a 95\% predictive interval, and we plot these along with the actual game outcomes:
+
+```{r, echo=FALSE, warnings=FALSE, results=FALSE}
+fit_1_rep <- stan("worldcup_with_replication.stan", data=data_worldcup)
+```
+```{r, echo=FALSE}
+sims <- extract(fit_1_rep)$y_rep_original_scale
+q25 <- apply(sims, 2, quantile, 0.025)
+q75 <- apply(sims, 2, quantile, 0.975)
+coefplot (rev(score_1 - score_2), sds=rep(0, N_games),
+          lower.conf.bounds=rev(q25), upper.conf.bounds=rev(q75), 
+          varnames=rev(paste(teams[team_1], "vs.", teams[team_2])),
+          main="Game score differentials\ncompared to 95% predictive interval from model\n",
+          mar=c(0,7,6,2))
+```
+
+Something went wrong.  Far more than 5% of the data points are outside the 95% intervals.
+
+The next step is to figure out what happened.  Our first thought was that there was some problem with the $t$ distribution---but replacing it by a normal, or keeping the $t$ but estimating the dsgrees of freedom parameter, did not change anything noticeably.  Our next idea was that the discretness of the data could be causing the problem.  But, no, that wasn't it either:  the poor coverage of these intervals goes well beyond rounding error.
+
+What about the square-root transformation?  Could that be the problem?  Let's re-fit the model on the original scale:
+
+```{r, echo=FALSE}
+print_file("worldcup_no_sqrt.stan")
+```
+
+And then again we fit the model and produce the graph of inferences:
+```{r, echo=FALSE, warnings=FALSE, results=FALSE}
+fit_2 <- stan("worldcup_no_sqrt.stan", data=data_worldcup)
+```
+```{r, echo=FALSE}
+a_post <- extract(fit_2)$a
+a_hat <- apply(a_post, 2, median)
+a_se <- apply(a_post, 2, sd)
+coefplot (rev(a_hat), rev(a_se), CI=1, varnames=rev(teams), main="Team quality (estimate +/- 1 s.e.)\n(model with no square root)\n", cex.var=.9, mar=c(0,4,5.1,2), xlim=c(-1.2,1.2))
+```
+
+The parameter estimates are similar to before, but on a different scale, which makes sense given that we're no longer working on the square root scale.
+
+Next we make the graph comparing game outcomes to 95% posterior predictive intervals:
+
+```{r, echo=FALSE}
+sims <- extract(fit_2)$y_rep
+q25 <- apply(sims, 2, quantile, 0.025)
+q75 <- apply(sims, 2, quantile, 0.975)
+coefplot (rev(score_1 - score_2), sds=rep(0, N_games),
+          lower.conf.bounds=rev(q25), upper.conf.bounds=rev(q75), 
+          varnames=rev(paste(teams[team_1], "vs.", teams[team_2])),
+          main="Game score differentials\ncompared to 95% predictive interval from model\n(model with no square root)\n",
+          mar=c(0,7,6,2))
+```
+
+This looks fine:  approximately 95% of the game outcomes fall within the 95% predictive intervals.
+
+At this point we could declare stop and declare victory, but first we would like to figure out what went wrong with that square root model.  We look again at the code and find the error, which is inside the transformed data block of our original Stan program:
+
+```
+    sqrt_dif[i] = (step(dif[i]) - 0.5)*sqrt(fabs(dif[i]));
+```
+
+That last line is wrong---it's missing a factor of 2.  Stan doesn't have a sign() function so I hacked something together using "step(dif[i]) - 0.5". But this difference takes on the value $+0.5$ if dif is positive or $-0.5$ if dif is negative.  Here is the correct code:
+
+```
+    sqrt_dif[i] = 2*(step(dif[i]) - 0.5)*sqrt(fabs(dif[i]));
+```
+
+We now put fix the Stan program, re-fit the model, and display the parameter estimates and the two graphs as before:
+```{r, echo=FALSE, warnings=FALSE, results=FALSE}
+fit_3 <- stan("worldcup_no_sqrt.stan", data=data_worldcup)
+```
+```{r, echo=FALSE}
+print(fit_3, pars=c("b", "sigma_a", "sigma_y", "lp__")) 
+a_post <- extract(fit_3)$a
+a_hat <- apply(a_post, 2, median)
+a_se <- apply(a_post, 2, sd)
+coefplot (rev(a_hat), rev(a_se), CI=1, varnames=rev(teams), main="Team quality (estimate +/- 1 s.e.)\n(corrected model)\n", cex.var=.9, mar=c(0,4,5.1,2), xlim=c(-1.2,1.2))
+```
+
+```{r, echo=FALSE}
+sims <- extract(fit_3)$y_rep
+q25 <- apply(sims, 2, quantile, 0.025)
+q75 <- apply(sims, 2, quantile, 0.975)
+coefplot (rev(score_1 - score_2), sds=rep(0, N_games),
+          lower.conf.bounds=rev(q25), upper.conf.bounds=rev(q75), 
+          varnames=rev(paste(teams[team_1], "vs.", teams[team_2])),
+          main="Game score differentials\ncompared to 95% predictive interval from model\n(corrected model)\n",
+          mar=c(0,7,6,2))
+```
+
+All is fine now.  In retrospect we never needed that square root in the first place, but it's good to have figured out our error, in case we need to fit such a model in the future.  It was also instructive how we found that mistake through a routine plot comparing data to the posterior predictive distribution.
+
+The final 95% predictive intervals are very wide, indicating that with the information used in this model, we can't say much about any individual game.  

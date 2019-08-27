@@ -185,7 +185,7 @@ transformed parameters {
   // Convert entry probs to conditional entry probs
   {
     real cum_b = b[1];
-    
+
     nu[1] = b[1];
     for (t in 2:n_occ_minus_1) {
       nu[t] = b[t] / (1.0 - cum_b);
@@ -215,11 +215,13 @@ generated quantities {
 
   // Generate w[] and z[]
   for (i in 1:M) {
+    int q = 1;
     if (bernoulli_rng(psi)) {      // Included
       z[i, 1] = bernoulli_rng(nu[1]);
       for (t in 2:n_occasions) {
+        q = q * (1 - z[i, t - 1]);
         z[i, t] = bernoulli_rng(z[i, t - 1] * phi[i, t - 1]
-                                 + (1 - z[i, t - 1]) * nu[t]);
+                                 + q * nu[t]);
       }
     } else {                       // Not included
       z[i, ] = rep_array(0, n_occasions);
@@ -234,7 +236,7 @@ generated quantities {
 
     for (i in 1:M) {
       int f = first_capture(z[i, ]);
-      
+
       if (f > 0)
         recruit[i, f] = 1;
     }
