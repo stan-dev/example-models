@@ -16,6 +16,21 @@ knitr::opts_chunk$set(cache=TRUE, message=FALSE, error=FALSE, warning=FALSE, com
 div.quote-container blockquote {  font-size: small; }
 </style>
 
+***
+#### Update, August 2019
+
+An expanded version of this case study is now available as:
+[Bayesian Hierarchical Spatial Models: Implementing the Besag York Mollié Model in Stan](https://authors.elsevier.com/c/1ZcRp6gwSsFyNt).
+Many thanks to my awesome co-authors:
+
+  - Katherine Wheeler-Martin
+  - Dan Simpson
+  - Stephen J. Mooney
+  - Andrew Gelman
+  - Charles DiMaggio
+
+***
+
 When areal data has a spatial structure such that observations from
 neighboring regions exhibit higher correlation than distant regions,
 this correlation can be accounted for using the class
