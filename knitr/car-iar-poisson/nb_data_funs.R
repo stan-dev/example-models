@@ -257,3 +257,22 @@ scale_nb_components = function(x) {
   }
   return(scales);
 }
+
+library(INLA)
+get_scaling_factor = function(nbs) {
+  #Build the adjacency matrix
+  adj.matrix = sparseMatrix(i=nbs$node1,j=nbs$node2,x=1,symmetric=TRUE)
+  #The ICAR precision matrix (note! This is singular)
+  Q=  Diagonal(nbs$N, rowSums(adj.matrix)) - adj.matrix
+
+  #Add a small jitter to the diagonal for numerical stability (optional but recommended)
+  Q_pert = Q + Diagonal(nbs$N) * max(diag(Q)) * sqrt(.Machine$double.eps)
+
+  # Compute the diagonal elements of the covariance matrix subject to the
+  # constraint that the entries of the ICAR sum to zero.
+  #See the function help for further details.
+  Q_inv = inla.qinv(Q_pert, constr=list(A = matrix(1,1,nbs$N),e=0))
+
+  #Compute the geometric mean of the variances, which are on the diagonal of Q.inv
+    return((mean(log(diag(Q_inv)))))
+}

@@ -9,11 +9,19 @@ N = data$N;
 node1 = nbs$node1;
 node2 = nbs$node2;
 N_edges = nbs$N_edges;
+y = data$y
+x = data$x
+E = data$E
 
-iar_stan = stan_model("simple_iar.stan");
-fit_stan = sampling(iar_stan, data=list(N,N_edges,node1,node2), control=list(adapt_delta = 0.97, stepsize = 0.1), chains=2, warmup=9000, iter=10000, save_warmup=FALSE);
+#icar_stan = stan_model("icar_prior.stan");
+#fit_icar_stan = sampling(icar_stan, data=list(N,N_edges,node1,node2), chains=3, warmup=4000, iter=5000, save_warmup=FALSE);
 
-ofile = "simple_iar_stan_010K_iters.txt";
-capture.output(print(fit_stan, digits=3, probs=c(0.025, 0.975)),file=ofile);
+#ofile = "icar_prior_stan_5K_iters.txt";
+#capture.output(print(fit_stan, digits=3, probs=c(0.025, 0.975)),file=ofile);
+
+pois_icar_stan = stan_model("pois_icar.stan");
+fit_pois_icar = sampling(pois_icar_stan, data=list(N,N_edges,node1,node2,y,x,E), chains=3, warmup=4000, iter=5000, save_warmup=FALSE);
 
 
+ofile = "icar_pois_stan_5K_iters.txt";
+capture.output(print(fit_pois_icar, digits=3, probs=c(0.025, 0.975)),file=ofile);
