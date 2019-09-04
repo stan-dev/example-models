@@ -1,0 +1,17 @@
+bugs_bym <- function() {
+for (i in 1 : N) {
+      y[i] ~ dpois(mu[i])
+      log(mu[i]) <- log(E[i]) + beta0 + beta1*x[i] + phi[i] + theta[i]*sigma_theta
+      theta[i] ~ dnorm(0.0, 1.0)  # non-centered theta, std normal
+   }
+   phi[1:N] ~ car.normal(adj[], weights[], num[], tau_phi)
+
+   beta0 ~ dnorm(0.0, 1.0E-5)  # vague prior on grand intercept
+   beta1 ~ dnorm(0.0, 1.0E-5)  # vague prior on covariate effect
+
+   tau_theta ~ dgamma(3.2761, 1.81)
+   tau_phi ~ dgamma(1.0, 1.0)
+
+   sigma_theta <- 1/sqrt(tau_theta)
+   sigma_phi <- 1/sqrt(tau_phi)
+}
