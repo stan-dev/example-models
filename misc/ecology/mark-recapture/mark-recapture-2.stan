@@ -5,8 +5,8 @@ data {
 }
 transformed data {
   real theta_max;
-  theta_max <- M;         
-  theta_max <- theta_max / (C - R + M);
+  theta_max = M;         
+  theta_max = theta_max / (C - R + M);
 }
 parameters {
   real<lower=0,upper=theta_max> theta;  // proportion marked
@@ -16,6 +16,6 @@ model {
 }
 generated quantities {
   real<lower=(C - R + M)> N;            // population
-  N <- M / theta;
+  N = M / theta;
 }
 
