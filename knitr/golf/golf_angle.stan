@@ -17,6 +17,6 @@ model {
   y ~ binomial(n, p);
 }
 generated quantities {
-  real sigma_degrees = (180/pi())*sigma;
+  real sigma_degrees = sigma * 180 / pi();
 }
 

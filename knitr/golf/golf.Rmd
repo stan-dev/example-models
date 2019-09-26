@@ -1,0 +1,515 @@
+---
+title: "Model building and expansion for golf putting"
+author: "Andrew Gelman"
+date: "24 Sep 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, comment = "")
+library("rstan")
+print_file <- function(file) {
+  cat(paste(readLines(file), "\n", sep=""), sep="")
+}
+logit <- qlogis
+invlogit <- plogis
+fround <- function (x, digits) format(round(x, digits), nsmall = digits)
+options("width"=120)
+```
+
+The following graph shows data from professional golfers on the proportion of successful
+putts as a function of distance from the hole.  Unsurprisingly, the
+probability of making the shot declines as a function of distance:
+
+```{r, echo=FALSE}
+golf <- read.table("golf_data.txt", header=TRUE, skip=2)
+x <- golf$x
+y <- golf$y
+n <- golf$n
+J <- length(y)
+r <- (1.68/2)/12
+R <- (4.25/2)/12
+se <- sqrt((y/n)*(1-y/n)/n)
+par(mar=c(3,3,2,1), mgp=c(1.7,.5,0), tck=-.02)
+plot(0, 0, xlim=c(0, 1.1*max(x)), ylim=c(0, 1.02),
+     xaxs="i", yaxs="i", bty="l",
+     xlab="Distance from hole (feet)",
+     ylab="Probability of success", main="Data on putts in pro golf", type="n")
+points(x, y/n, pch=20, col="blue")
+segments(x, y/n + se, x, y/n-se, lwd=.5, col="blue")
+text(x + .4, y/n + se + .02, paste(y, "/", n,sep=""), cex=.6, col="gray40")
+```
+
+The error bars associated with each point $j$ in the above graph are
+simple classical standard deviations,
+$\sqrt{\hat{p}_j(1-\hat{p}_j)/n_j}$, where $\hat{p}_j=y_j/n_j$ is the
+success rate for putts taken at distance $x_j$.
+
+### Logistic regression {-}
+
+Can we model the probability of success in golf putting as a function
+of distance from the hole?  Given usual statistical practice, the
+natural starting point would be logistic regression:
+
+$$
+y_j\sim\mbox{binomial}(n_j, \mbox{logit}^{-1}(a + bx_j)),
+\mbox{ for } j=1,\dots, J.
+$$
+In Stan, this is:
+
+```{r, echo=FALSE}
+print_file("golf_logistic.stan")
+```
+
+The code in the above model block is (implicitly) vectorized, so that it is mathematically equivalent to modeling each data point, `y[i] ~ binomial_logit(n[i], a + b*x[i])`.  The vectorized code is more compact (no need to write a loop, or to include the subscripts) and faster (because of more efficient gradient evaluations).
+
+We fit the model to the data:
+
+```{r, results=FALSE}
+golf_data <- list(x=x, y=y, n=n, J=J)
+fit_logistic <- stan("golf_logistic.stan", data=golf_data)
+a_sim <- extract(fit_logistic)$a
+b_sim <- extract(fit_logistic)$b
+```
+
+And here is the result:
+
+```{r, echo=FALSE}
+print(fit_logistic, probs=c(0.25, 0.5, 0.75), pars="lp__", include=FALSE)
+```
+
+Going through the columns of the above table:  Stan has computed the posterior means $\pm$ standard deviations of $a$
+and $b$ to be `r sprintf("%.2f", mean(a_sim))` $\pm$ `r sprintf("%.2f", sd(a_sim))` and `r sprintf("%.2f", mean(b_sim))` $\pm$ `r sprintf("%.2f", sd(b_sim))`, respectively. The
+Monte Carlo standard error of the mean of each of these parameters is
+0 (to two decimal places), indicating that the simulations have run
+long enough to estimate the posterior means precisely.  The posterior
+quantiles give a sense of the uncertainty in the parameters, with 50%
+posterior intervals of [`r sprintf("%.2f", quantile(a_sim, 0.25))`, `r sprintf("%.2f", quantile(a_sim, 0.75))`] and [`r sprintf("%.2f", quantile(b_sim, 0.25))`, `r sprintf("%.2f", quantile(b_sim, 0.75))`] for $a$ and
+$b$, respectively.  Finally, the values of $\widehat{R}$ near 1 tell
+us that the simulations from Stan's four simulated chains have mixed
+well.  (We have more sophisticated convergence diagnostics, and also we recommend checking the fit using simulated data, as discussed in the Bayesian Workflow Using Stan book, but checking that $\widehat{R}$ is near 1 is a good start.)
+
+The following graph shows the fit plotted along with the data:
+
+```{r, echo=FALSE}
+sims_logistic <- as.matrix(fit_logistic)
+a_hat <- median(sims_logistic[,"a"])
+b_hat <- median(sims_logistic[,"b"])
+n_sims <- nrow(sims_logistic)
+par(mar=c(3,3,2,1), mgp=c(1.7,.5,0), tck=-.02)
+plot(0, 0, xlim=c(0, 1.1*max(x)), ylim=c(0, 1.02),
+     xaxs="i", yaxs="i", bty="l",
+     xlab="Distance from hole (feet)",
+     ylab="Probability of success", main="Fitted logistic regression", type="n")
+for (i in sample(n_sims, 10))
+  curve(invlogit(sims_logistic[i,"a"] + sims_logistic[i,"b"]*x),
+        from=0, to=1.1*max(x), lwd=0.5, add=TRUE, col="green")
+curve(invlogit(a_hat + b_hat*x), from=0, to=1.1*max(x), add=TRUE)
+points(x, y/n, pch=20, col="blue")
+segments(x, y/n + se, x, y/n-se, lwd=.5, col="blue")
+text(11, .57, paste("Logistic regression,\n    a = ",
+                      fround(a_hat, 2), ", b = ", fround(b_hat, 2), sep=""))
+```
+
+The black line shows the fit corresponding to the posterior median
+estimates of the parameters $a$ and $b$; the green lines show 10 draws
+from the posterior distribution.
+
+In this example, posterior uncertainties in the fits are small, and for simplicity we will just plot point estimates based on posterior median parameter estimates for the remaining models.  Our focus here is on the sequence of models that we fit, not so much on uncertainty in particular model fits.
+
+### Modeling from first principles {-}
+
+As an alternative to logistic regression, we shall build a model from
+first principles and fit it to the data.
+
+The graph below shows a
+simplified sketch of a golf shot.  The dotted line represents the
+angle within which the ball of radius $r$ must be hit so that it falls
+within the hole of radius $R$.  This threshold angle is
+$\sin^{-1}((R-r)/x)$.  The graph, which is not to scale, is intended to illustrate the geometry of the
+ball needing to go into the hole.
+
+```{r, echo=FALSE, fig.height = 2, fig.width = 7}
+par(mar=c(0,0,0,0))
+dist <- 2
+r_plot <- r
+R_plot <- R
+plot(0, 0, xlim=c(-R_plot, dist+3*R_plot), ylim=c(-2*R_plot, 2*R_plot),
+     xaxs="i", yaxs="i", xaxt="n", yaxt="n", bty="n",
+     xlab="", ylab="", type="n", asp=1)
+symbols(0, 0, circles=r_plot, inches=FALSE, add=TRUE)
+symbols(dist, 0, circles=R_plot-r_plot, inches=FALSE, lty=2, add=TRUE)
+symbols(dist, 0, circles=R_plot, inches=FALSE, add=TRUE)
+curve(0*x, from=0, to=dist, add=TRUE)
+curve(((R_plot-r_plot)/dist)*x, from=0, to=dist, lty=2, add=TRUE)
+curve(-((R_plot-r_plot)/dist)*x, from=0, to=dist, lty=2, add=TRUE)
+text(0.5*dist, -1.5*R_plot, "x")
+arrows(0.5*dist + 0.05, -1.5*R_plot, dist, -1.5*R_plot, 2, length=.1)
+arrows(0.5*dist - 0.05, -1.5*R_plot, 0, -1.5*R_plot, 2, length=.1)
+text(dist+1.2*R_plot, .5*R_plot, "R")
+arrows(dist+1.2*R_plot, .7*R_plot, dist+1.2*R_plot, R_plot, length=.05)
+arrows(dist+1.2*R_plot, .3*R_plot, dist+1.2*R_plot, 0, length=.05)
+text(0, r_plot/2, "r")
+```
+
+The next step is to model human error.  We assume that the golfer is
+attempting to hit the ball completely straight but that many small
+factors interfere with this goal, so that the actual angle follows a
+normal distribution centered at 0 with some standard deviation
+$\sigma$.
+
+```{r echo=FALSE, fig.height = 2, fig.width = 5}
+par(mar=c(3,3,0,0), mgp=c(1.7,.5,0), tck=-.02)
+plot(0, 0, xlim=c(-4, 4), ylim=c(0, 1.02),
+     xaxs="i", yaxs="i", xaxt="n", yaxt="n", bty="n",
+     xlab="Angle of shot",
+     ylab="", type="n")
+axis(1, seq(-4,4), c("", "", expression(-2*sigma), "", 0, "", expression(2*sigma),"", ""))
+curve(dnorm(x)/dnorm(0), add=TRUE)
+```
+
+The probability the ball goes in the hole is then the probability that
+the angle is less than the threshold; that is,
+$\mbox{Pr}\left(|\mbox{angle}| < \sin^{-1}((R-r)/x)\right) = 2\Phi\left(\frac{\sin^{-1}((R-r)/x)}{\sigma}\right) - 1$, where $\Phi$ is the cumulative normal
+distribution function.  The only unknown parameter in this model is $\sigma$, the standard deviation of the distribution of shot angles. Stan (and, for that matter, R) computes trigonometry using angles in radians, so at the end of our calculations we will need to multiply by $180/\pi$ to convert to degrees, which are more interpretable by humans.
+
+Our model then has two parts:
+\begin{align}
+y_j &\sim \mbox{binomial}(n_j, p_j)\\
+p_j &= 2\Phi\left(\frac{\sin^{-1}((R-r)/x_j)}{\sigma}\right) - 1 , \mbox{ for } j=1,\dots, J.
+\end{align}
+Here is a graph showing the curve for some potential values of the parameter $\sigma$.
+
+```{r, echo=FALSE}
+par(mar=c(3,3,2,1), mgp=c(1.7,.5,0), tck=-.02)
+plot(0, 0, xlim=c(0, 1.1*max(x)), ylim=c(0, 1.02),
+     xaxs="i", yaxs="i", bty="l",
+     xlab="Distance from hole (feet)",
+     ylab="Probability of success", main=expression(paste("Modeled Pr(success) for different values of ", sigma)), type="n")
+sigma_degrees_plot <- c(0.5, 1, 2, 5, 20)
+x_text <- c(15, 10, 6, 4, 2)
+for (i in 1:length(sigma_degrees_plot)){
+  sigma <- (pi/180)*sigma_degrees_plot[i]
+  x_grid <- seq(R-r, 1.1*max(x), .01)
+  p_grid <- 2*pnorm(asin((R-r)/x_grid) / sigma) - 1
+  lines(c(0, R-r, x_grid), c(1, 1, p_grid))
+  text(x_text[i] + 0.7,  2*pnorm(asin((R-r)/x_text[i]) / sigma) - 1, bquote(sigma == .(sigma_degrees_plot[i])*degree), adj=0)
+}
+```
+
+The highest curve on the graph corresponds to $\sigma=0.5^\circ$:  if golfers could control the angles of their putts to an accuracy of approximately half a degree, they would have a very high probability of success, making over 80\% of their ten-foot putts, over 50\% of their fifteen-foot putts, and so on.  At the other extreme, the lowest plotted curve corresponds to $\sigma=20^\circ$:  if your putts could be off as high as 20 degrees, then you would be highly inaccurate, missing more than half of your two-foot putts. When fitting the model in Stan, the program moves around the space of $\sigma$, sampling from the posterior distribution.
+
+We now write the Stan model in preparation to estimating $\sigma$:
+
+```{r, echo=FALSE}
+print_file("golf_angle.stan")
+```
+
+In the transformed data block above, the `./` in the calculation of p corresponds to componentwise division in this vectorized computation.
+
+The data $J,n,x,y$ have already been set up; we just need to define
+$r$ and $R$ (the golf ball and hole have diameters 1.68 and 4.25
+inches, respectively), and run the Stan model:
+
+```{r, results=FALSE}
+r <- (1.68/2)/12
+R <- (4.25/2)/12
+golf_data <- c(golf_data, r=r, R=R)
+fit_trig <- stan("golf_angle.stan", data=golf_data)
+sigma_sim <- extract(fit_trig)$sigma
+sigma_degrees_sim <- extract(fit_trig)$sigma_degrees
+```
+
+Here is the result:
+
+```{r, echo=FALSE}
+print(fit_trig, probs=c(0.25, 0.5, 0.75), pars="lp__", include=FALSE)
+```
+
+The model has a single parameter, $\sigma$.  From the output, we find
+that Stan has computed the posterior mean of $\sigma$ to be `r sprintf("%.2f", mean(sigma_sim))`.
+Multiplying this by $180/\pi$, this comes to `r sprintf("%.2f", mean(sigma_degrees_sim))` degrees.  The Monte
+Carlo standard error of the mean is 0 (to two decimal places),
+indicating that the simulations have run long enough to estimate the
+posterior mean precisely.  The posterior standard deviation is
+calculated at `r sprintf("%.2f", sd(sigma_degrees_sim))` degrees, indicating that $\sigma$
+itself has been estimated with high precision, which makes sense given
+the large number of data points and the simplicity of the model.  The
+precise posterior distribution of $\sigma$ can also be seen from the
+narrow range of the posterior quantiles.  Finally, $\widehat{R}$ is
+near 1, telling us that the simulations from Stan's four simulated
+chains have mixed well.
+
+We next plot the data and the fitted model (here using the posterior
+median of $\sigma$ but in this case the uncertainty is so narrow that
+any reasonable posterior summary would give essentially the same
+result), along with the logistic regression fitted earlier:
+
+```{r, echo=FALSE}
+sims_trig <- as.matrix(fit_trig)
+sigma_hat <- median(sims_trig[,"sigma"])
+par(mar=c(3,3,2,1), mgp=c(1.7,.5,0), tck=-.02)
+plot(0, 0, xlim=c(0, 1.1*max(x)), ylim=c(0, 1.02),
+     xaxs="i", yaxs="i", bty="l",
+     xlab="Distance from hole (feet)",
+     ylab="Probability of success",
+     main="Two models fit to the golf putting data", type="n")
+segments(x, y/n + se, x, y/n-se, lwd=.5)
+curve(invlogit(a_hat + b_hat*x), from=0, to=1.1*max(x), add=TRUE)
+x_grid <- seq(R-r, 1.1*max(x), .01)
+p_grid <- 2*pnorm(asin((R-r)/x_grid) / sigma_hat) - 1
+lines(c(0, R-r, x_grid), c(1, 1, p_grid), col="blue")
+points(x, y/n, pch=20, col="blue")
+text(10.3, .58, "Logistic regression")
+text(18.5, .24, "Geometry-based model", col="blue")
+```
+
+The custom nonlinear model fits the data much better.  This is not to
+say that the model is perfect---any experience of golf will reveal
+that the angle is not the only factor determining whether the ball
+goes in the hole---but it seems like a useful start, and it is good to
+know that we can fit nonlinear models by just coding them up in Stan.
+
+### Testing the fitted model on new data {-}
+
+Recently a local business school professor and golfer, Mark Broadie, came by my office with tons of new data.  For simplicity we'll just look here at the summary data, probabilities of the ball going into the hole for shots up to 75 feet from the hole.  The graph below shows these new data (in red), along with our earlier dataset (in blue) and the already-fit geometry-based model from before, extending to the range of the new data.
+
+```{r, echo=FALSE}
+golf_new <- read.table("golf_data_new.txt", header=TRUE, skip=2)
+par(mar=c(3,3,2,1), mgp=c(1.7,.5,0), tck=-.02)
+plot(0, 0, xlim=c(0, 1.1*max(golf_new$x)), ylim=c(0, 1.02),
+     xaxs="i", yaxs="i", bty="l",
+     xlab="Distance from hole (feet)",
+     ylab="Probability of success",
+     main="Checking already-fit model to new data")
+x_grid <- seq(R-r, 1.1*max(golf_new$x), .01)
+p_grid <- 2*pnorm(asin((R-r)/x_grid) / sigma_hat) - 1
+lines(c(0, R-r, x_grid), c(1, 1, p_grid), col="blue")
+points(golf$x, golf$y/golf$n, pch=20, col="blue")
+points(golf_new$x, golf_new$y/golf_new$n, pch=20, col="red")
+legend(60, 0.4, legend=c("Old data", "New data"), col=c("blue", "red"), pch=20) 
+```
+
+Comparing the two datasets in the range 0-20 feet, the success rate is similar for longer putts but is much higher than before for the short putts. This could be a measurement issue, if the distances to the hole are only approximate for the old data, and it could also be that golfers are better than they used to be.
+
+Beyond 20 feet, the empirical success rates become lower than would be predicted by the old model. These are much more difficult attempts, even after accounting for the increased angular precision required as distance goes up.
+
+### A new model accounting for how hard the ball is hit {-}
+
+To get the ball in the hole, the angle isn’t the only thing you need to control; you also need to hit the ball just hard enough.
+
+Mark Broadie added this to our model by introducing another parameter corresponding to the golfer's control over distance.  Supposing $u$ is the distance that golfer's shot would travel if there were no hole, Broadie assumes that the putt will go in if (a) the angle allows the ball to go over the hole, and (b) $u$ is in the range $[x,x+3]$.  That is the ball must be hit hard enough to reach the whole but not go too far.  Factor (a) is what we have considered earlier; we must now add factor (b).
+
+The following sketch, which is not to scale, illustrates the need for the distance as angle as well as the angle of the shot to be in some range, in this case the gray zone which represents the trajectories for which the ball would reach the hole and stay in it.
+
+```{r, echo=FALSE, fig.height = 2, fig.width = 8}
+par(mar=c(0,0,0,0))
+dist <- 2
+r_plot <- r
+R_plot <- R
+distance_tolerance <- 0.6
+plot(0, 0, xlim=c(-R_plot, dist+3*R_plot+1.5*distance_tolerance), ylim=c(-2*R_plot, 2*R_plot),
+     xaxs="i", yaxs="i", xaxt="n", yaxt="n", bty="n",
+     xlab="", ylab="", type="n", asp=1)
+polygon(c(dist, dist, dist + distance_tolerance, dist + distance_tolerance),
+        c(R_plot-r_plot, -(R_plot-r_plot), -(R_plot-r_plot)*(dist + distance_tolerance)/dist,
+        (R_plot-r_plot)*(dist + distance_tolerance)/dist), border=NA, col="gray")
+symbols(0, 0, circles=r_plot, inches=FALSE, add=TRUE)
+symbols(dist, 0, circles=R_plot, inches=FALSE, add=TRUE)
+symbols(dist, 0, circles=R_plot-r_plot, inches=FALSE, lty=2, bg="gray", add=TRUE)
+curve(((R_plot-r_plot)/dist)*x, from=0, to=dist+1.5*distance_tolerance, lty=2, add=TRUE)
+curve(-((R_plot-r_plot)/dist)*x, from=0, to=dist+1.5*distance_tolerance, lty=2, add=TRUE)
+text(0.5*dist, -1.5*R_plot, "x")
+arrows(0.5*dist + 0.05, -1.5*R_plot, dist, -1.5*R_plot, 2, length=.1)
+arrows(0.5*dist - 0.05, -1.5*R_plot, 0, -1.5*R_plot, 2, length=.1)
+```
+
+Broadie supposes that a golfer will aim to hit the ball one foot past the hole but with a multiplicative error in the shot's potential distance, so that $u = (x+1)\cdot (1 + \mbox{error})$, where the error has a normal distribution with mean 0 and standard deviation $\sigma_{\rm distance}$.  This new parameter $\sigma_{\rm distance}$ represents the uncertainty in the shot's relative distance.  In statistics notation, this model is,
+$$u \sim \mbox{normal}\,(x+1, (x+1)\,\sigma_{\rm distance}),$$
+and the distance is acceptable if $u\in [x, x+3]$, an event that has probability $\Phi\left(\frac{2}{(x+1)\,\sigma_{\rm distance}}\right) - \Phi\left(\frac{-1}{(x+1)\,\sigma_{\rm distance}}\right)$.
+
+Putting these together, the probability a shot goes in becomes, $\left(2\Phi\left(\frac{\sin^{-1}((R-r)/x)}{\sigma_{\rm angle}}\right) - 1\right)\left(\Phi\left(\frac{2}{(x+1)\,\sigma_{\rm distance}}\right) - \Phi\left(\frac{-1}{(x+1)\,\sigma_{\rm distance}}\right)\right)$, where we have renamed the parameter $\sigma$ from our earlier model to $\sigma_{\rm angle}$ to distinguish it from the new $\sigma_{\rm distance}$ parameter.  We write the new model in Stan, giving it the name `golf_angle_distance_2.stan` to convey that it is the second model in a series, and that it accounts both for angle and distance:
+
+```{r, echo=FALSE}
+print_file("golf_angle_distance_2.stan")
+```
+
+Here we have defined `overshot` and `distance_tolerance` as data, which Broadie has specified as 1 and 3 feet, respectively.  We might wonder why if the distance range is 3 feet, the overshot is not 1.5 feet. One reason could be that it is riskier to hit the ball too hard than too soft.  In addition we assigned weakly informative half-normal(0,1) priors on the scale parameters, $\sigma_{\rm angle}$ and $\sigma_{\rm distance}$, which are required in this case to keep the computations stable.
+
+### Fitting the new model to data {-}
+
+We fit the model to the new dataset.
+
+```{r, results=FALSE, echo=FALSE}
+overshot <- 1
+distance_tolerance <- 3
+golf_new_data <- list(x=golf_new$x, y=golf_new$y, n=golf_new$n, J=nrow(golf_new), r=r, R=R, overshot=overshot, distance_tolerance=distance_tolerance)
+fit_2 <- stan("golf_angle_distance_2.stan", data=golf_new_data)
+```
+
+There is poor convergence, and we need to figure out what is going on here.  (Problems with computation often indicate underlying problems with the model being fit.  That's the folk theorem of statistical computing.)
+
+```{r, echo=FALSE}
+print(fit_2, probs=c(0.25, 0.5, 0.75), pars="lp__", include=FALSE)
+```
+
+To understand what is happening, we graph the new data and the fitted model, accepting that this "fit," based as it is on poorly-mixing chains, is only provisional:
+
+```{r, echo=FALSE}
+sims_2 <- as.matrix(fit_2)
+sigma_angle_hat <- median(sims_2[,"sigma_angle"])
+sigma_distance_hat <- median(sims_2[,"sigma_distance"])
+par(mar=c(3,3,2,1), mgp=c(1.7,.5,0), tck=-.02)
+plot(0, 0, xlim=c(0, 1.1*max(golf_new$x)), ylim=c(0, 1.02),
+     xaxs="i", yaxs="i", bty="l",
+     xlab="Distance from hole (feet)",
+     ylab="Probability of success",
+     main="Checking model fit", type="n")
+x_grid <- seq(R-r, 1.1*max(golf_new$x), .01)
+p_angle_grid <- (2*pnorm(asin((R-r)/x_grid) / sigma_angle_hat) - 1)
+p_distance_grid <- pnorm((distance_tolerance - overshot) / ((x_grid + overshot)*sigma_distance_hat)) -
+           pnorm((- overshot) / ((x_grid + overshot)*sigma_distance_hat))
+lines(c(0, R-r, x_grid), c(1, 1, p_angle_grid*p_distance_grid), col="red")
+points(golf_new$x, golf_new$y/golf_new$n, pch=20, col="red")
+```
+
+There are problems with the fit in the middle of the range of $x$.  We suspect this is a problem with the binomial error model, as it tries harder to fit points where the counts are higher.  Look at how closely the fitted curve hugs the data at the very lowest values of $x$.
+
+Here are the first few rows of the data:
+```{r}
+print(golf_new[1:5,])
+```
+
+With such large values of $n_j$, the binomial likelihood enforces an extremely close fit at these first few points, and that drives the entire fit of the model.
+
+To fix this problem we took the data model, $y_j \sim \mbox{binomial}(n_j, p_j)$, and added an independent error term to each observation.  There is no easy way to add error directly to the binomial distribution---we could replace it with its overdispersed generalization, the beta-binomial, but this would not be appropriate here because the variance for each data point $i$ would still be roughly proportional to the sample size $n_j$, and our whole point here is to get away from this assumption and allow for model misspecification---so instead we first approximate the binomial data distribution by a normal and then add independent variance; thus:
+$$y_j/n_j \sim \mbox{normal}\left(p_j, \sqrt{p_j(1-p_j)/n_j + \sigma_y^2}\right),$$
+To write this in Stan there are some complications:
+
+* $y$ and $n$ are integer variables, which we convert to vectors so that we can multiply and divide them.
+
+* To perform componentwise multiplication or division using vectors, you need to use `.*` or `./` so that San knows not to try to perform vector/matrix multiplication and division.  Stan is opposite from R in this way:  Stan defaults to vector/matrix operations and has to be told otherwise, whereas R defaults to componentwise operations, and vector/matrix multiplication in R is indicated using the `%*%` operator.
+
+We implement these via the following new code in the transformed data block:
+
+```
+  vector[J] raw_proportions = to_vector(y) ./ to_vector(n);
+```
+
+And then in the model block:
+
+```
+  raw_proportions ~ normal(p, sqrt(p .* (1-p) ./ to_vector(n) + sigma_y^2));
+```
+
+To complete the model we add $\sigma_y$ to the parameters block and assign it a weakly informative half-normal(0,1) prior distribution. Here's the new Stan program:
+
+```{r, echo=FALSE}
+print_file("golf_angle_distance_3.stan")
+```
+
+We now fit this model to the data:
+
+```{r, results=FALSE, echo=FALSE}
+fit_3 <- stan("golf_angle_distance_3.stan", data=golf_new_data)
+```
+
+```{r, echo=FALSE}
+print(fit_3, digits=3, probs=c(0.25, 0.5, 0.75), pars="lp__", include=FALSE)
+```
+
+The new parameter estimates are:
+
+* $\sigma_{\rm angle}$ is estimated at `r sprintf("%.2f", mean(extract(fit_3)$sigma_angle))`, which when corresponds to $\sigma_{\rm degrees}=$ `r sprintf("%.1f", mean(extract(fit_3)$sigma_degrees))`.  According to the fitted model, there is a standard deviation of `r sprintf("%.1f", mean(extract(fit_3)$sigma_degrees))` degree in the angles of putts taken by pro golfers.  The estimate of $\sigma_{\rm angle}$ has decreased compared to the earlier model that only had angular errors.  This makes sense:  now that distance errors have been included in the model, there is no need to explain so many of the missed shots using errors in angle.
+
+* $\sigma_{\rm distance}$ is estimated at `r sprintf("%.2f", mean(extract(fit_3)$sigma_distance))`.  According to the fitted model, there is a standard deviation of 8\% in the errors of distance.
+
+* $\sigma_y$ is estimated at `r sprintf("%.3f", mean(extract(fit_3)$sigma_y))`.  The fitted model fits the aggregate data (success rate as a function of distance) to an accuracy of `r sprintf("%.1f", mean(extract(fit_3)$sigma_y)*100)` percentage points.
+
+And now we graph:
+
+```{r, echo=FALSE}
+sims_3 <- as.matrix(fit_3)
+sigma_angle_hat <- median(sims_3[,"sigma_angle"])
+sigma_distance_hat <- median(sims_3[,"sigma_distance"])
+par(mar=c(3,3,2,1), mgp=c(1.7,.5,0), tck=-.02)
+plot(0, 0, xlim=c(0, 1.1*max(golf_new$x)), ylim=c(0, 1.02),
+     xaxs="i", yaxs="i", pch=20, bty="l",
+     xlab="Distance from hole (feet)",
+     ylab="Probability of success",
+     main="Checking model fit", type="n")
+x_grid <- seq(R-r, 1.1*max(golf_new$x), .01)
+p_angle_grid <- (2*pnorm(asin((R-r)/x_grid) / sigma_angle_hat) - 1)
+p_distance_grid <- pnorm((distance_tolerance - overshot) / ((x_grid + overshot)*sigma_distance_hat)) -
+           pnorm((- overshot) / ((x_grid + overshot)*sigma_distance_hat))
+lines(c(0, R-r, x_grid), c(1, 1, p_angle_grid*p_distance_grid), col="red")
+points(golf_new$x, golf_new$y/golf_new$n, pch=20, col="red")
+```
+
+We can go further and plot the residuals from this fit.  First we augment the Stan model to compute residuals in the generated quantities block.
+
+```{r, include=FALSE}
+fit_3_with_resids <- stan("golf_angle_distance_3_with_resids.stan", data=golf_new_data)
+residual <- colMeans(extract(fit_3_with_resids)$residual)
+```
+
+Then we compute the posterior means of the residuals, $y_j/n_j - p_j$, then plot these vs. distance:
+
+```{r, echo=FALSE}
+par(mar=c(3,3,2,1), mgp=c(1.7,.5,0), tck=-.02)
+plot(golf_new$x, residual, xlim=c(0, 1.1*max(golf_new$x)),
+     xaxs="i", pch=20, bty="l",
+     xlab="Distance from hole (feet)",
+     ylab="y/n - fitted E(y/n)",
+     main="Residuals from fitted model", type="n")
+abline(0, 0, col="gray", lty=2)
+lines(golf_new$x, residual)
+```
+
+The residuals are small (see the scale of the $y$-axis) and show no clear pattern, suggesting not that the model is perfect but that there are no clear ways to develop it further just given the current data.
+
+### Problems with the model and potential improvements {-}
+
+The error term in the above model is a hack.  It's useful to allow the model not to fit the data perfectly, but it can't be right to model these systematic errors as being independent.  In this case, though, it doesn't really matter, given how tiny these errors are:  their estimated standard deviation is less than one percentage point.
+
+The model has two parameters that were fixed as data: `distance_tolerance`, which was set to 3 (implying that the ball will only fall into the hole if it is hit on a trajectory that would go past the hole, but no more than 3 feet past) and `overshot`, which was set to 1 (implying that the golfer will aim 1 foot past the hole).  In theory it would be possible to estimate either or both these parameters from the data.  In practice, no way.  The model already fits the data so well (as shown by the above graph) that there's clearly no more information available to estimate any additional parameters.  If we were to do so, the estimates would be highly noisy and unstable (if their prior is weak) or highly dependent on the prior (if an informative prior distribution is specified). Either way we don't see the advantage of this sort of fit.
+
+Just for laughs, though, we constructed such a model and fit it, just to see what would happen. We simply took our previous Stan program and moved these two parameters from the data block to the parameters block along with zero-boundary constraints:
+
+```{r, eval=FALSE}
+  real<lower=0> overshot;
+  real<lower=0> distance_tolerance;
+```
+
+And then in the model block we added weak priors centered at Broadie's guesses and with wide uncertainties:
+
+```{r, eval=FALSE}
+  overshot ~ normal(1, 5);
+  distance_tolerance ~ normal(3, 5);
+```
+
+Fitting this model to the data yields poor convergence and no real gain beyond the simpler version already fit in which overshot and distance_tolerance were set to fixed values.
+
+```{r, include=FALSE}
+fit_4 <- stan("golf_angle_distance_4.stan", data=golf_new_data)
+print(fit_4)
+```
+
+The model is unrealistic in other ways, for example by assuming distance error is strictly proportional to distance aimed, and assuming independence of angular and distance errors.  Presumably, angular error is higher for longer putts.  Again, though, we can't really investigate such things well using these data which are already such a good fit to the simple two-parameter model we have already fit.
+
+Players vary in ability and golf courses vary in difficulty.  Given more granular data, we should be able to fit a multilevel model allowing parameters to vary by player, golf course, and weather conditions.
+
+## Summary of fitted models
+
+We have two datasets, `golf` and `golf_new`, to which we fit several Stan models.  First we fit `golf_logistic` and `golf_angle` to the `golf` dataset, then we fit `golf_angle` to the `golf_new` dataset and see a problem, then we fit `golf_angle_distance_2` and `golf_angle_distance_3` to `golf_new` and finally obtained a good fit, then we fit `golf_angle_distance_3_with_resids` which was the same model but also saving residuals.
+Finally, we fit `golf_angle_distance_4` to `golf_new` but we didn't display the fit, we just discussed it. 
+
+## References
+
+Don Berry (1995). Statistics: A Bayesian Perspective.  Duxbury Press.  The original golf dataset appears as an example in this book.
+
+Mark Broadie (2018). Two simple putting models in golf.  Linked from https://statmodeling.stat.columbia.edu/2019/03/21/new-golf-putting-data-and-a-new-golf-putting-model/.  Here is the larger dataset and a document describing the model with angular and distance errors.
+
+Andrew Gelman and Deborah Nolan (2002).  A probability model for golf putting.  Teaching Statistics 50, 151-153.  Our first explanation of the angular-error model.
+
+All code in this document is licensed via the BSD 3-clause license.
