@@ -512,4 +512,4 @@ Mark Broadie (2018). Two simple putting models in golf.  Linked from https://sta
 
 Andrew Gelman and Deborah Nolan (2002).  A probability model for golf putting.  Teaching Statistics 50, 151-153.  Our first explanation of the angular-error model.
 
-`licensed under CC-BY-NC 4.0`
+`All code in this document is licensed under BSD 3-clause license and all text licensed under CC-BY-NC 4.0`
