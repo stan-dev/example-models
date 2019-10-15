@@ -28,15 +28,15 @@ model {
     real acc[K];
     real gamma[T_unsup,K];
     for (k in 1:K)
-      gamma[1,k] <- log(phi[k,u[1]]);
+      gamma[1,k] = log(phi[k,u[1]]);
     for (t in 2:T_unsup) {
       for (k in 1:K) {
         for (j in 1:K)
-          acc[j] <- gamma[t-1,j] + log(theta[j,k]) + log(phi[k,u[t]]);
-        gamma[t,k] <- log_sum_exp(acc);
+          acc[j] = gamma[t-1,j] + log(theta[j,k]) + log(phi[k,u[t]]);
+        gamma[t,k] = log_sum_exp(acc);
       }
     }
-    increment_log_prob(log_sum_exp(gamma[T_unsup]));
+    target += log_sum_exp(gamma[T_unsup]);
   }
 }
 generated quantities {
@@ -47,26 +47,26 @@ generated quantities {
     int back_ptr[T_unsup,K];
     real best_logp[T_unsup,K];
     for (k in 1:K)
-      best_logp[1,K] <- log(phi[k,u[1]]);
+      best_logp[1,K] = log(phi[k,u[1]]);
     for (t in 2:T_unsup) {
       for (k in 1:K) {
-        best_logp[t,k] <- negative_infinity();
+        best_logp[t,k] = negative_infinity();
         for (j in 1:K) {
           real logp;
-          logp <- best_logp[t-1,j] + log(theta[j,k]) + log(phi[k,u[t]]);
+          logp = best_logp[t-1,j] + log(theta[j,k]) + log(phi[k,u[t]]);
           if (logp > best_logp[t,k]) {
-            back_ptr[t,k] <- j;
-            best_logp[t,k] <- logp;
+            back_ptr[t,k] = j;
+            best_logp[t,k] = logp;
           }
         }
       }
     }
-    log_p_y_star <- max(best_logp[T_unsup]);
+    log_p_y_star = max(best_logp[T_unsup]);
     for (k in 1:K)
       if (best_logp[T_unsup,k] == log_p_y_star)
-        y_star[T_unsup] <- k;
+        y_star[T_unsup] = k;
     for (t in 1:(T_unsup - 1))
-      y_star[T_unsup - t] <- back_ptr[T_unsup - t + 1,
+      y_star[T_unsup - t] = back_ptr[T_unsup - t + 1,
                                       y_star[T_unsup - t + 1]];
   }
 }
