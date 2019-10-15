@@ -14,7 +14,7 @@ parameters {
   simplex[V] phi[K];    // emit probs
 }
 model {
-  for (k in 1:K) 
+  for (k in 1:K)
     theta[k] ~ dirichlet(alpha);
   for (k in 1:K)
     phi[k] ~ dirichlet(beta);
@@ -23,7 +23,7 @@ model {
   for (t in 2:T)
     z[t] ~ categorical(theta[z[t-1]]);
 
-  { 
+  {
     // forward algorithm computes log p(u|...)
     real acc[K];
     real gamma[T_unsup,K];
@@ -42,11 +42,10 @@ model {
 generated quantities {
   int<lower=1,upper=K> y_star[T_unsup];
   real log_p_y_star;
-  { 
+  {
     // Viterbi algorithm
     int back_ptr[T_unsup,K];
     real best_logp[T_unsup,K];
-    real best_total_logp;
     for (k in 1:K)
       best_logp[1,K] <- log(phi[k,u[1]]);
     for (t in 2:T_unsup) {
@@ -67,7 +66,7 @@ generated quantities {
       if (best_logp[T_unsup,k] == log_p_y_star)
         y_star[T_unsup] <- k;
     for (t in 1:(T_unsup - 1))
-      y_star[T_unsup - t] <- back_ptr[T_unsup - t + 1, 
+      y_star[T_unsup - t] <- back_ptr[T_unsup - t + 1,
                                       y_star[T_unsup - t + 1]];
   }
 }
