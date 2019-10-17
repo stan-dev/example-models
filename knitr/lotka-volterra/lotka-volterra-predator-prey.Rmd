@@ -533,7 +533,7 @@ Next, the model is translated to C++ and compiled.
 model <- stan_model("lotka-volterra.stan")
 ```
 
-Finally, the compiled model and data are used for sampling.^[The independent steps of compiling the Stan model and running it are highlighted here.  These two steps may be composed into a single call as `stan("lotka_volterra.stan", data = lynx_hare_dat, seed = 123)`.  Calling `rstan_options(auto_write = TRUE)` configures `stan_model()` and `stan()` to reuse a compiled model if it hasn't changed.]  Stan's default settings are sufficient for this data set and model.
+Finally, the compiled model and data are used for sampling.^[The independent steps of compiling the Stan model and running it are highlighted here.  These two steps may be composed into a single call as `stan("lotka_volterra.stan", data = lynx_hare_data, seed = 123)`.  Calling `rstan_options(auto_write = TRUE)` configures `stan_model()` and `stan()` to reuse a compiled model if it hasn't changed.]  Stan's default settings are sufficient for this data set and model.
 
 ```{r results="hide"}
 fit <- sampling(model, data = lynx_hare_data, seed = 123)
