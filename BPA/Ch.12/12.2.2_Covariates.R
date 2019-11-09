@@ -31,7 +31,7 @@ inits <- lapply(1:nc, function(i)
 
 ## Call Stan from R
 out <- stan("binmix_cov.stan",
-            data = list(y = y, R = R, T = T, K = 100),
+            data = list(y = y, X = X, R = R, T = T, K = 100),
             init = inits, pars = params,
             chains = nc, iter = ni, warmup = nb, thin = nt,
             seed = 1,

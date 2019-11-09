@@ -64,7 +64,7 @@ model {
   
   L_Omega ~ lkj_corr_cholesky(4); 
   sigma ~ cauchy(0, 2.5); 
-  to_vector(deltahat_tilde) ~ normal(0, 1); 
+  to_vector(deltahat_tilde) ~ std_normal(); 
 
   // Data
   for (i in 1:nsubjs)

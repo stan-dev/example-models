@@ -31,7 +31,18 @@ Q_inv = inla.qinv(Q_pert, constr=list(A = matrix(1,1,nbs$N),e=0))
 #Compute the geometric mean of the variances, which are on the diagonal of Q.inv
 scaling_factor = exp(mean(log(diag(Q_inv))))
 
-scot_stanfit = stan("bym2_predictor_plus_offset.stan", data=list(N,N_edges,node1,node2,y,x,E,scaling_factor), control=list(adapt_delta = 0.97, stepsize = 0.1), chains=3, warmup=5000, iter=6000, save_warmup=FALSE);
+scot_stanfit_soft = stan("bym2_predictor_plus_offset_soft.stan",
+                         data=list(N,N_edges,node1,node2,y,x,E,scaling_factor),
+                         control=list(adapt_delta = 0.97, stepsize = 0.1),
+                         chains=3, warmup=5000, iter=6000, save_warmup=FALSE);
 
-print(scot_stanfit, pars=c("lp__", "beta0", "beta1", "rho", "sigma", "log_precision", "logit_rho", "mu[5]", "phi[5]", "theta[5]"), probs=c(0.025, 0.5, 0.975));
+
+
+scot_stanfit_hard = stan("bym2_predictor_plus_offset_hard.stan",
+                         data=list(N,N_edges,node1,node2,y,x,E,scaling_factor),
+                         control=list(adapt_delta = 0.97, stepsize = 0.1),
+                         chains=3, warmup=5000, iter=6000, save_warmup=FALSE);
+
+print(scot_stanfit_soft, pars=c("lp__", "beta0", "beta1", "rho", "sigma", "mu[5]", "phi[5]", "theta[5]"), probs=c(0.025, 0.5, 0.975));
+print(scot_stanfit_hard, pars=c("lp__", "beta0", "beta1", "rho", "sigma", "mu[5]", "phi[5]", "theta[5]"), probs=c(0.025, 0.5, 0.975));
 

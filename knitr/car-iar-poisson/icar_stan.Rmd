@@ -16,6 +16,21 @@ knitr::opts_chunk$set(cache=TRUE, message=FALSE, error=FALSE, warning=FALSE, com
 div.quote-container blockquote {  font-size: small; }
 </style>
 
+***
+#### Update, August 2019
+
+An expanded version of this case study is now available as:
+[Bayesian Hierarchical Spatial Models: Implementing the Besag York Mollié Model in Stan](https://authors.elsevier.com/c/1ZcRp6gwSsFyNt).
+Many thanks to my awesome co-authors:
+
+  - Katherine Wheeler-Martin
+  - Dan Simpson
+  - Stephen J. Mooney
+  - Andrew Gelman
+  - Charles DiMaggio
+
+***
+
 When areal data has a spatial structure such that observations from
 neighboring regions exhibit higher correlation than distant regions,
 this correlation can be accounted for using the class
@@ -523,7 +538,7 @@ We have edited the WinBUGS program so that the variable names match the names us
 also we have changed the parameterization of the heterogenous random effects component `theta` to
 the non-centered parameterization.
 Our version of the WinBUGS model is in file
-[bym_bugs_carlin.txt](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/bym_bugs_carlin.txt).
+[bym_bugs.txt](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/bym_bugs.txt).
 The R script
 [fit_scotland_bugs.R](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/fit_scotland_bugs.R)
 uses OpenBUGS to fit this model.
@@ -532,16 +547,16 @@ uses OpenBUGS to fit this model.
 library(R2OpenBUGS);
 library(rstan)  
 
-mfile = "bym_bugs_carlin.txt";
+source("scotland_data.R");
+
 
 iter = 100000;
 burn =  90000;
-nchain = 4;
+mfile = "bym_bugs.txt";
+ofile = "bym_bugs_100K_iters.txt";
 thin = 2;
+nchain = 2;
 
-pathOpenBugs = "/Users/mitzi/.wine/drive_c/Program\ Files/OpenBUGS/OpenBUGS323/OpenBUGS.exe";
-
-source("scotland_data.R");
 data$x = 0.1 * data$x;
 inits <- function () {
          list(beta0 = rnorm(1,0,1),
@@ -553,7 +568,9 @@ inits <- function () {
  
 params2save = c("beta0", "beta1", "sigma_phi", "sigma_theta",
   "tau_phi", "tau_theta", "mu", "phi", "theta");
- 
+
+pathOpenBugs = "/Users/mitzi/.wine/drive_c/Program\ Files/OpenBUGS/OpenBUGS323/OpenBUGS.exe";
+
 fit_bugs <- bugs(data, inits, params2save,
       n.iter=iter,
       n.chains=nchain,
@@ -567,13 +584,17 @@ fit_bugs <- bugs(data, inits, params2save,
       WINE="/usr/local/bin/wine",
       bugs.seed=1);
 
+capture.output(rstan::monitor(fit_bugs$sims.array,
+      digits=3,probs=c(0.025, 0.975), warmup=0, print=TRUE),
+      file=ofile);
+
 sims = rstan::monitor(fit_bugs$sims.array,
       probs=c(0.025, 0.975), warmup=0, print=TRUE);
 ```
       
 ```{r print-fit-scotland-bugs }
 options(digits=2);
-sims[c("beta0","beta1","sigma_phi","tau_phi","sigma_theta","tau_theta","mu[5]","phi[5]","theta[5]"),];
+sims[1:10, 1:7];
 ```
 
 WinBUGS and Stan produce compatible estimates of the parameters and quantities of interest for this model
