@@ -20,7 +20,7 @@ div.quote-container blockquote {  font-size: small; }
 #### Update, August 2019
 
 An expanded version of this case study is now available as:
-[Bayesian Hierarchical Spatial Models: Implementing the Besag York Mollié Model in Stan](https://authors.elsevier.com/c/1ZcRp6gwSsFyNt).
+[Bayesian Hierarchical Spatial Models: Implementing the Besag York Mollié Model in Stan](https://www.sciencedirect.com/science/article/pii/S1877584518301175?via%3Dihub)
 Many thanks to my awesome co-authors:
 
   - Katherine Wheeler-Martin
