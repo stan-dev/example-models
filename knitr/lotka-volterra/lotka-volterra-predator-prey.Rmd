@@ -524,7 +524,7 @@ ts <- 1:N
 y_init <- c(lynx_hare_df$Hare[1], lynx_hare_df$Lynx[1])
 y <- as.matrix(lynx_hare_df[2:(N + 1), 2:3])
 y <- cbind(y[ , 2], y[ , 1]); # hare, lynx order
-lynx_hare_data <- list(N, ts, y_init, y)
+lynx_hare_data <- list(N = N, ts = ts, y_init = y_init, y = y)
 ```
 
 Next, the model is translated to C++ and compiled.
@@ -804,7 +804,7 @@ All of the source code, data, text, and images for this case study are available
 
 ## Acknowledgements {-}
 
-Thanks to Simon Woodward, Arya Pourzanjani, and Leo Lahti for helpful comments on earlier drafts and Peter Howard for providing the provenance of the data and the original case study with the data.
+Thanks to Simon Woodward, Arya Pourzanjani, and Leo Lahti for helpful comments on earlier drafts and Peter Howard for providing the provenance of the data and the original case study with the data.  Thanks to Joss Wright for patching an illegally formed data object.
 
 <br />
 
@@ -873,6 +873,7 @@ generated quantities {
 }
 ```
 </div>
+
 
 
 ## Session information  {-}
