@@ -119,9 +119,9 @@ and file storage and server instances are limited - TANSTAAFL? Q.E.D.
 When you run a notebook on Colab, the Jupyter server is
 running on a virtual machine hosted by Google.
 Google makes no promises about VM availability or resources,
-see [https://research.google.com/colaboratory/faq.html].
-But you can inspect the virtual machine instance that a notebook
-is running on by executing system commands from within the notebook.
+(see https://research.google.com/colaboratory/faq.html),
+however you can inspect the virtual machine instance that a notebook
+is running on via system commands.
 To see how this works, I created a notebook called `show_VM_specs.ipynb`,
 which I ran in Colab and then saved to the
 [GitHub repo for this report](https://github.com/stan-dev/example-models/blob/case-study/stan-cloud/knitr/cloud-compute-2020/show_VM_specs.ipynb).
@@ -242,13 +242,17 @@ Anyone who has access to a Jupyter server can recreate and extend your analysis.
 #### Putting the R in Colab
 
 In order to run a Jupyter notebook via Colab, it must be available on the web or your Google Drive.
-With Google Drive, you can create new Python notebooks or upload existing notebooks from your local machine.
-To share a Jupyter R notebook with the world, you will need to author the notebook locally and then upload it.
+Google Drive lets you can create new Python notebooks or upload existing notebooks from your local machine.
+To share a Jupyter R notebook with the world, you will need to author the notebook locally and then upload it
+to Google Drive:
 
 ```{r figGgoogle, echo=FALSE, out.width = "75%", fig.cap="Upload to Google Drive"}
 library(knitr)
 include_graphics("img/gdrive_upload_notebook.png")
 ```
+
+Alternatively, you could use this [this empty R notebook](https://github.com/stan-dev/example-models/blob/case-study/stan-cloud/knitr/cloud-compute-2020/template_IR_notebook.ipynb).
+
 
 ### Challenge: Fast Spin-up
 
@@ -278,7 +282,8 @@ Fast spin-up using CmdStan binaries for Colab consists of three steps:
 To see how this works, I have created two example notebooks for Colab
 which run CmdStan's example model `bernoulli.stan`: 
 [CmdStanR_Example_Notebook.ipynb](https://github.com/stan-dev/example-models/blob/case-study/stan-cloud/knitr/cloud-compute-2020/CmdStanR_Example_Notebook.ipynb)
-and "CmdStanPy Example Notebook.ipynb".
+and 
+[CmdStanPy_Example_Notebook.ipynb](https://github.com/stan-dev/example-models/blob/case-study/stan-cloud/knitr/cloud-compute-2020/CmdStanPy_Example_Notebook.ipynb)
 
 #### CmdStanR notebook spin-up
 
