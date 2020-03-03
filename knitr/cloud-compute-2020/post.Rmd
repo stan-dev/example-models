@@ -1,6 +1,10 @@
 ---
-title: "Jupyter notebooks for Stan"
+title: "Jupyter notebooks for Stan using CmdStanPy and CmdStanR"
 author: "Mitzi Morris"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
 ---
 
 <style type="text/css">
@@ -10,6 +14,13 @@ blockquote {
     margin: 0 0 20px;
     font-size: 0.95em;
     border-left: 5px solid #eee;
+}
+p.caption {
+  font-size: 0.9em;
+  font-style: italic;
+  margin-right: 10%;
+  margin-left: 10%;  
+  text-align: justify;
 }
 
 </style>
@@ -29,10 +40,30 @@ Putting a Stan-based analysis into a notebook
 lets the audience step through your analysis and further
 experiment with your model and data.
 The challenge in a demo, talk, or classroom situation
-is giving the entire audience immediate and hassle-free 
-access to the notebook, ideally, access from any web browser.
+is giving the entire audience quick and easy access
+to the notebook via a web browser.
 This report explores these challenges and
 provides example notebooks for R and Python.
+
+This report also introduces two new lightweight interfaces to Stan:
+[CmdStanR](https://mc-stan.org/cmdstanr/articles/cmdstanr.html) and
+[CmdStanPy](https://cmdstanpy.readthedocs.io/en/latest/index.html).
+These interfaces have the following goals:
+
+- Simplicity and modularity: these packages wrap CmdStan and
+just provide functions to compile models, do inference,
+and assemble and save the results;
+other packages are needed for downstream analysis
+
+- Quick and easy installation: minimal dependencies with other packages and no direct calls to C++.
+
+- Flexible licensing:  BSD-3.
+
+- Keep up with Stan releases: these interfaces can use
+any (recent) version of CmdStan, including the current release, Stan 2.22.
+
+The example notebooks will use these interfaces to run Stan.
+
 
 ### Jupyter 101
 
@@ -56,12 +87,12 @@ work through the analysis step by step.
 However, in order to do this, they must have a local install of
 the Jupyter notebook server or other IDE that can run the notebook.
 This is not always possible for any number of reasons - they might
-not have the necessary permissions to install software
-or their machine might no have enough memory or a powerful enough CPU to run Stan.
-You could open up your own machine and run a
+not have the necessary permissions to install software on their computer
+or it might not have enough memory or a powerful enough CPU to run Stan.
+You could give them access to your machine by running a
 [Jupyter notebook server](https://jupyter-notebook.readthedocs.io/en/stable/public_server.html)
 for single-user access or
-[JupyterHub](https://jupyterhub.readthedocs.io/en/latest/) for multiple-user access,
+[JupyterHub server](https://jupyterhub.readthedocs.io/en/latest/) for multiple-user access,
 but this requires bandwidth, compute power, and careful attention to
 [security](https://jupyter-notebook.readthedocs.io/en/stable/public_server.html#notebook-server-security).
 Regarding security, here's some wisdom from the [Jupyter blog](https://blog.jupyter.org/public-notebooks-and-security-3058c433c884),
@@ -70,7 +101,7 @@ Regarding security, here's some wisdom from the [Jupyter blog](https://blog.jupy
 > It is important to keep in mind that, since **arbitrary code execution is the main point of IPython and Jupyter**, running a publicly accessible server without authentication or encryption is a very bad idea indeed.
 
 Hence the need for Jupyter servers in the cloud: many instances of
-someone else's server on which to run a notebook.
+someone else's server where the audience can run your notebook.
 
 ### Challenge: Free Servers
 
@@ -87,15 +118,19 @@ and file storage and server instances are limited - TANSTAAFL? Q.E.D.
 
 When you run a notebook on Colab, the Jupyter server is
 running on a virtual machine hosted by Google.
-You can inspect the virtual machine itself because
-from a notebook **you can execute arbitrary code**
-and this includes system commands.
+Google makes no promises about VM availability or resources,
+see [https://research.google.com/colaboratory/faq.html].
+But you can inspect the virtual machine instance that a notebook
+is running on by executing system commands from within the notebook.
 To see how this works, I created a notebook called `show_VM_specs.ipynb`,
-which I ran in Colab and then saved to the [GitHub repo for this report](https://github.com/stan-dev/example-models/blob/case-study/stan-cloud/knitr/cloud-compute-2020/show_VM_specs.ipynb).
+which I ran in Colab and then saved to the
+[GitHub repo for this report](https://github.com/stan-dev/example-models/blob/case-study/stan-cloud/knitr/cloud-compute-2020/show_VM_specs.ipynb).
 This is an [IPython notebook](https://jakevdp.github.io/PythonDataScienceHandbook/01.05-ipython-and-shell-commands.html),
-therefore exclamation point symbol '!' executes a shell command.
+therefore exclamation point symbol '!' executes a shell command. [^1]
 
-```{r figColabStats, echo=FALSE, out.width = "75%", fig.cap="Colab notebook for Colab VM stats"}
+[^1]: The red boxes around exclamation points and backticks are an artifact from GitHub's syntax highlighter and should be ignored.
+
+```{r figColabStats, echo=FALSE, out.width = "75%", fig.cap="Interrogate the Colab VM"}
 library(knitr)
 include_graphics("img/colab_stats_notebook.png")
 ```
@@ -111,9 +146,35 @@ A Colab VM persists for approximately 10 or 12 hours from first spin-up,
 therefore you must upload/download local files to your Google Drive or another cloud storage system
 in order to save your work.
 
-### A few words on security and authorization
 
-Notice the "open in colab" button - security, authorization
+#### A few words on Colab security and authorization
+
+The above notebook was notebook was saved to GitHub from Colab via
+the "Save a copy in GitHub" option from the Colab UI "File" tab.
+
+
+```{r figColabSave, echo=FALSE, out.width = "75%", fig.cap="Saving a notebook to GitHub"}
+library(knitr)
+include_graphics("img/colab_save_github.png")
+```
+
+This automatically added the "Open in Colab" button as the first notebook cell.
+In order to run this notebook in Colab, you must first be logged into your Google Account.
+Once logged in, when you first attempt to run the notebook, you will get a warning
+that the notebook may request access to your data or read stored credentials.
+
+
+```{r figColabWarn, echo=FALSE, out.width = "75%", fig.cap="Security warning for GitHub notebooks"}
+library(knitr)
+include_graphics("img/colab_warning.png")
+```
+
+This is a valid warning!
+However, in order for a notebook to access your Google Drive, it must use the
+the [Google Drive API](https://developers.google.com/drive/api/v3/about-sdk),
+and this will be evident by reading through the markdown and Python notebook cells.
+So don't take my word that these notebooks are safe;
+review the notebook source code before clicking "RUN ANYWAY" (or "CANCEL").
 
 
 ### Challenge: Putting the R in Jupyter
@@ -121,6 +182,15 @@ Notice the "open in colab" button - security, authorization
 This section is for all Stan users who work primarily in R and RStudio.
 It shows you how to get your local Jupyter environment set up and how
 to translate R Markdown documents to Jupyter notebooks.
+
+In order to author a Jupyter notebook on your machine, you need a local install
+of both Python and Jupyter, as outlined in the
+[Jupyter installation instructions]([https://jupyter.readthedocs.io/en/latest/install.html).
+Once the Jupyter server is running, you can then run existing notebooks and create new
+notebooks via your favorite web browser.
+In order to author Jupyter notebooks for R, you also need a local install of R as well as
+the [IRkernel package](https://irkernel.github.io), the R kernel for Jupyter notebook,
+[installation instructions here](https://irkernel.github.io/installation/).
 
 Jupyter notebooks for R are similar to RStudio's
 [R Markdown documents](https://rmarkdown.rstudio.com),
@@ -136,23 +206,13 @@ library(knitr)
 include_graphics("img/rstudio_notebook.png")
 ```
 
-Here is the listing of the contents of the resulting `.Rmd` file:
-```{r fit-stan-icar-listing, size="footnotesize", echo=FALSE,  fig.cap="Notebook file"}
+The RStudio interface calls this a notebook, but the resulting file is still in R Markdown format:
+```{r rmarkdown-notebook, size="footnotesize", echo=FALSE,  fig.cap="Notebook file"}
 cat(readLines('Untitled.Rmd', n=15), "...", sep="\n");
 ```
 
-In order to author a Jupyter notebook on your machine, you need a local install
-of both Python and Jupyter, as outlined in the
-[Jupyter installation instructions]([https://jupyter.readthedocs.io/en/latest/install.html).
-Once the Jupyter server is running, you can then run existing notebooks and create new
-notebooks via your favorite web browser.
-In order to author Jupyter notebooks for R, you also need a local install of R as well as
-the [IRkernel package](https://irkernel.github.io), the R kernel for Jupyter notebook,
-[installation instructions here](https://irkernel.github.io/installation/).
-
-
-A basic Jupyter installation treats R Markdown documents as text files.
-```{r fig2, echo=FALSE, out.width = "75%", fig.cap="R Markdown document in Jupyter, basic installation"}
+When viewed with Jupyter, this document is treated as a raw text file.
+```{r fig2, echo=FALSE, out.width = "75%", fig.cap="R Markdown document in Jupyter browser"}
 library(knitr)
 include_graphics("img/jupyter_local.png")
 ```
@@ -161,7 +221,7 @@ An extremely useful Python package called [Jupytext](https://jupytext.readthedoc
 allows you to convert from R Markdown to Jupyter notebook format and back again.
 After [installation](https://jupytext.readthedocs.io/en/latest/install.html),
 Jupyter now treats R Markdown documents as notebooks.
-```{r fig3, echo=FALSE, out.width = "75%", fig.cap="R Markdown document in Jupyter, juptext extension"}
+```{r fig3, echo=FALSE, out.width = "75%", fig.cap="R Markdown document in Jupyter with juptext extension"}
 library(knitr)
 include_graphics("img/jupyter_juptext.png")
 ```
@@ -171,7 +231,7 @@ and converted the next three chunks to notebook cells with celltype `markdown`, 
 After editing and testing the notebook in the browser, you can save it as
 a Jupyter R notebook via the options menu tab **"File"**, selection **"Download as"**, option **"notebook (.ipynb)"**.
 
-```{r fig4, echo=FALSE, out.width = "75%", fig.cap="Convert to Jupyter notebook"}
+```{r fig4, echo=FALSE, out.width = "75%", fig.cap="Convert R Markdown file to Jupyter notebook"}
 library(knitr)
 include_graphics("img/save_as_ipynb.png")
 ```
@@ -181,31 +241,154 @@ Anyone who has access to a Jupyter server can recreate and extend your analysis.
 
 #### Putting the R in Colab
 
-In order to run a Jupyter notebook via Colab, it must be available on the web or on your gdrive.
-You can either create a new notebook via Google Drive or upload an existing notebook.
-Because you can only create new Python notebooks from Google Drive,
-If you want to share a Jupyter R notebook with the world, you will need to author the notebook
-locally and then upload it.
+In order to run a Jupyter notebook via Colab, it must be available on the web or your Google Drive.
+With Google Drive, you can create new Python notebooks or upload existing notebooks from your local machine.
+To share a Jupyter R notebook with the world, you will need to author the notebook locally and then upload it.
 
-```{r figGgoogle, echo=FALSE, out.width = "75%", fig.cap="Uploads to Google Drive"}
+```{r figGgoogle, echo=FALSE, out.width = "75%", fig.cap="Upload to Google Drive"}
 library(knitr)
 include_graphics("img/gdrive_upload_notebook.png")
 ```
 
 ### Challenge: Fast Spin-up
 
-The cloud instance comes with a set of Python libraries or R packages installed.
-If your analysis requires other libraries of packages, these must be re-installed
-each time the instance spins up.
+In a talk, class, or demo situation, you don't want to spend precious introduction time waiting
+for machines to spin up and packages to install, however, there is necessarily some overhead
+in accessing notebooks and logging on to Colab.
 
-My solution is admittedly a hack and if anyone can suggest a more elegant solution,
-please submit it to the Stan forums.
+A Colab virtual machine instance has both Python and R already installed,
+as well as both the clang and gcc-7 C++ compilers.
+But to run the current Stan release (Stan 2.22) from R or Python, you need either
+CmdStanR or CmdStanPy as well as a local CmdStan installation.
+As CmdStanR and CmdStanPy are lightweight packages with minimal dependencies,
+it doesn't take much time to download and install them from GitHub, Cran, or PyPi.
+Both packages provide a function `install_cmdstan` which downloads and
+compiles the latest CmdStan release.  Unfortunately, this can take upwards of 10 minutes.
+To avoid this, we have created a CmdStan binary for Colab.
+Because Google is currently offering limited free storage on the Google Cloud Platform,
+we are storing these CmdStan binaries in the cloud.
+From a Colab notebook, downloading and unpacking the pre-compiled binaries takes on the order of 10 seconds.
 
-## Example
+Fast spin-up using CmdStan binaries for Colab consists of three steps:
 
-Show the utility of running a notebook in Colab - users can add cells to ask questions
-of the data, analysis and results.
+* Install the CmdStanPy or CmdStanR package.
+* Download the pre-compiled CmdStan binaries for Google Colab.
+* Register the CmdStan install location in the R or Python session.
 
-## Next steps
+To see how this works, I have created two example notebooks for Colab
+which run CmdStan's example model `bernoulli.stan`: 
+[CmdStanR_Example_Notebook.ipynb](https://github.com/stan-dev/example-models/blob/case-study/stan-cloud/knitr/cloud-compute-2020/CmdStanR_Example_Notebook.ipynb)
+and "CmdStanPy Example Notebook.ipynb".
 
-contributions welcome!
+#### CmdStanR notebook spin-up
+
+The initial cells of the CmdStanR_Example_Notebook follow the steps described above.
+To create this notebook, it was necessary to first create an
+IR notebook using Jupyter running on my notebook, then upload it to Google Drive.
+The first cell in the CmdStanR notebook installs the CmdStanR package, as needed.
+CmdStanR is not yet on CRAN, so we install from GitHub instead.
+To speed up the install process, only the necessary dependencies
+are are installed.
+```
+# Install package CmdStanR from GitHub
+library(devtools)
+if(!require(cmdstanr)){
+  devtools::install_github("stan-dev/cmdstanr", dependencies=c("Depends", "Imports"))
+  library(cmdstanr)
+}
+```
+The following cells download the precompiled CmdStan binaries
+and register the path to the CmdStan installation:
+```
+# Install CmdStan binaries
+if (!file.exists("cmdstan-2-22-1.tgz")) {
+  system("wget https://storage.googleapis.com/cmdstan-2-22-tgz/cmdstan-2-22-1.tgz", intern=T)
+  system("tar zxf cmdstan-2-22-1.tgz", intern=T)
+}
+list.files("cmdstan-2.22.1")
+
+# Set cmdstan path to CmdStan installation
+set_cmdstan_path("cmdstan-2.22.1")
+```
+
+#### Spinning up a CmdStanPy Notebook
+
+The CmdStanPy_Example_Notebook contains the Python version of the fast spin-up steps.
+CmdStanPy requires Python3, which is the default runtime for new Colab notebooks.
+CmdStanPy is a pure-Python package which can be installed from PyPI:
+
+```
+!pip install cmdstanpy
+```
+We can use Python to download and unpack the precompiled CmdStan binaries:
+```
+# Download, unpack CmdStan binaries
+import os
+import urllib.request
+import shutil
+tgz_file = 'cmdstan-2-22-1.tgz'
+tgz_url = 'https://storage.googleapis.com/cmdstan-2-22-tgz/cmdstan-2-22-1.tgz'
+
+if not os.path.exists(tgz_file):
+  try:
+    urllib.request.urlretrieve(tgz_url, tgz_file)
+    shutil.unpack_archive(tgz_file)
+  except Exception:
+    raise KeyboardInterrupt
+```
+The following cells check the CmdStan installation and register its location:
+```
+# Specify CmdStan location via environment variable
+import os
+os.environ['CMDSTAN'] = './cmdstan-2.22.1'
+
+# Check CmdStan path
+from cmdstanpy import cmdstan_path
+cmdstan_path()
+```
+
+### Next steps
+
+These notebooks provide a starting point for running Stan in the Cloud, but they are toy examples.
+An interesting, sharable Stan notebook to present your model and analysis would require the following structure, with cells to do the following computations:
+
+- Assemble, plot data
+- Compile, display Stan model
+- Fit the model to data
+- Display inferences
+- Graph data and fitted model
+
+An extremely interesting Stan notebook would expand the above to the full Bayesian workflow:
+
+- Read in data
+- Graph data
+- Fit model 1 to data
+- Graph data and fitted model
+- Simulate fake data from model 1, fit model 1, and informally check that the inferences are close to the assumed parameter values
+- Expand model 1 to create model 2
+- Repeat the above steps for model 2
+- Compare the two models
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
