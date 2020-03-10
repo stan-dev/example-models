@@ -1,5 +1,5 @@
 ---
-title: "Jupyter notebooks for Stan using CmdStanPy and CmdStanR"
+title: "Stan Notebooks in the Cloud for Talks, Lectures, and Storytime"
 author: "Mitzi Morris"
 output:
   html_document:
@@ -34,61 +34,76 @@ knitr::knit_hooks$set(chunk = function(x, options) {
 })
 ```
 
-"Here's my code, run it for yourself" - this is the promise of
-[Jupyter notebooks](https://jupyter-notebook.readthedocs.io/en/stable/notebook.html).
-Putting a Stan-based analysis into a notebook
-lets the audience step through your analysis and further
-experiment with your model and data.
+Putting your Stan model and data into a Jupyter notebook
+lets your audience work through your analysis step by step.
 The challenge in a demo, talk, or classroom situation
-is giving the entire audience quick and easy access
-to the notebook via a web browser.
-This report explores these challenges and
-provides example notebooks for R and Python.
+is getting everyone in the room on the same page,
+when the page in question is your notebook running in their browser.
+Unfortunately, the law of conservation of energy mandates that
+the easier things are for your audience, the harder they become for you.
+This report takes you through the tedious details of setting up
+a Jupyter Notebook so that anyone
+with a modern web browser and a Google account
+can run your Stan analysis in the cloud (Google Colaboratory).
 
-This report also introduces two new lightweight interfaces to Stan:
+
+### Introducing CmdStanR and CmdStanPy!!
+
+The example notebooks for R and Pythin in this report use
+two new lightweight interfaces to Stan:
 [CmdStanR](https://mc-stan.org/cmdstanr/articles/cmdstanr.html) and
 [CmdStanPy](https://cmdstanpy.readthedocs.io/en/latest/index.html).
-These interfaces have the following goals:
+They were developed with the following goals:
 
 - Simplicity and modularity: these packages wrap CmdStan and
 just provide functions to compile models, do inference,
 and assemble and save the results;
 other packages are needed for downstream analysis
 
+- Keep up with Stan releases: these interfaces can use
+any (recent) version of CmdStan, including the current release, Stan 2.22.
+
 - Quick and easy installation: minimal dependencies with other packages and no direct calls to C++.
 
 - Flexible licensing:  BSD-3.
 
-- Keep up with Stan releases: these interfaces can use
-any (recent) version of CmdStan, including the current release, Stan 2.22.
-
-The example notebooks will use these interfaces to run Stan.
 
 
 ### Jupyter 101
 
 A Jupyter notebook consists of blocks of markdown text interleaved
-with blocks of statements.  The three core languages supported are
-Julia, Python, and R, hence the name, *Ju-Pyt-R*.
-A notebook unifies the exposition of ideas and arguments
+with blocks of statements which unifies the exposition of ideas and arguments
 with the necessary supporting data, computation, and visualizations.
+The three core programming languages supported are
+Julia, Python, and R, hence the name, *Ju-Pyt-R*.
+In order to author a Jupyter notebook on your machine, you need a local install
+of both Python and Jupyter, as outlined in the
+[Jupyter installation instructions]([https://jupyter.readthedocs.io/en/latest/install.html).
+Once the Jupyter server is running, you can then run existing notebooks and create new
+notebooks via your favorite web browser.
 
-A Jupyter notebook server enables interactive computing from the browser.
-Underlyingly, the notebook is a JSON document with suffix `.ipynb`.
-Jupyter connects to a kernel for the specific language specified by the notebook.
-When viewed in a browser,  the text chunks are rendered by default while
-the code chunks are displayed with controls which allow them to be executed independently.
+A notebook document is a JSON file with suffix `.ipynb` which
+contains a list of cells, one cell per content block (code, text or image),
+and a dictionary of metadata which specifies the kernel used to run
+the notebook, here, either R or Python.
+When viewed in a browser,  the notebook is displayed as an HTML page where
+the contents of the text cells are rendered by default while
+the code cells are displayed with controls which allow them to be executed independently.
 Additional controls allow you to create, edit, 
 and publish notebooks as HTML or pdf documents.
 
-By distributing the `ipynb` notebook file,
-your audience can run it on their machine and
-work through the analysis step by step.
-However, in order to do this, they must have a local install of
+```{r figHelloNotebook, echo=FALSE, out.width = "75%", fig.cap="Jupyter notebook in the browser"}
+library(knitr)
+include_graphics("img/hello_notebook.png")
+```
+
+By distributing an `ipynb` notebook file together with your
+Stan model and data, your audience can replicate your analysis on their machine.
+But in order to do this, they must have a local install of
 the Jupyter notebook server or other IDE that can run the notebook.
-This is not always possible for any number of reasons - they might
-not have the necessary permissions to install software on their computer
-or it might not have enough memory or a powerful enough CPU to run Stan.
+This is not always possible; they might
+not have have enough permissions to install software on their computer
+or their machine might not have enough memory or a powerful enough CPU to run Stan.
 You could give them access to your machine by running a
 [Jupyter notebook server](https://jupyter-notebook.readthedocs.io/en/stable/public_server.html)
 for single-user access or
@@ -106,15 +121,18 @@ someone else's server where the audience can run your notebook.
 ### Challenge: Free Servers
 
 It is a truth, universally acknowledged,
-that there ain't no such thing as a free lunch (TANSTAAFL).
+that there ain't no such thing as a free lunch.
 Nonetheless, as of 2020, Google is providing
 free email via Gmail,
 free file storage via Google Drive,
 and free Jupyter notebook servers via 
 [Google Colab](https://en.wikipedia.org/wiki/Project_Jupyter#Colaboratory).
-Of course, to use these services, you must sign up for a [Google account](https://myaccount.google.com/intro).
-Google reads your email and serves you ads accordingly
-and file storage and server instances are limited - TANSTAAFL? Q.E.D.
+To use these services, you must sign up for a [Google account](https://myaccount.google.com/intro).
+The Colab server instances are limited, as is the amount of storage on your Google Drive,
+and should you use Gmail, Google examines all messages and serves ads accordingly;
+there ain't no such thing as a free lunch, Q.E.D.
+
+#### Colab 101
 
 When you run a notebook on Colab, the Jupyter server is
 running on a virtual machine hosted by Google.
@@ -125,6 +143,10 @@ is running on via system commands.
 To see how this works, I created a notebook called `show_VM_specs.ipynb`,
 which I ran in Colab and then saved to the
 [GitHub repo for this report](https://github.com/stan-dev/example-models/blob/case-study/stan-cloud/knitr/cloud-compute-2020/show_VM_specs.ipynb).
+
+
+******** walk through running of notebook, screenshot by screenshot **********
+
 This is an [IPython notebook](https://jakevdp.github.io/PythonDataScienceHandbook/01.05-ipython-and-shell-commands.html),
 therefore exclamation point symbol '!' executes a shell command. [^1]
 
@@ -134,6 +156,9 @@ therefore exclamation point symbol '!' executes a shell command. [^1]
 library(knitr)
 include_graphics("img/colab_stats_notebook.png")
 ```
+
+
+
 
 As can be seen from the saved output, when this notebook was last executed on Colab,
 it ran on a VM instance with 12 GB RAM, 2 Intel Xeon 2.2Ghz processors, and
@@ -177,86 +202,15 @@ So don't take my word that these notebooks are safe;
 review the notebook source code before clicking "RUN ANYWAY" (or "CANCEL").
 
 
-### Challenge: Putting the R in Jupyter
-
-This section is for all Stan users who work primarily in R and RStudio.
-It shows you how to get your local Jupyter environment set up and how
-to translate R Markdown documents to Jupyter notebooks.
-
-In order to author a Jupyter notebook on your machine, you need a local install
-of both Python and Jupyter, as outlined in the
-[Jupyter installation instructions]([https://jupyter.readthedocs.io/en/latest/install.html).
-Once the Jupyter server is running, you can then run existing notebooks and create new
-notebooks via your favorite web browser.
-In order to author Jupyter notebooks for R, you also need a local install of R as well as
-the [IRkernel package](https://irkernel.github.io), the R kernel for Jupyter notebook,
-[installation instructions here](https://irkernel.github.io/installation/).
-
-Jupyter notebooks for R are similar to RStudio's
-[R Markdown documents](https://rmarkdown.rstudio.com),
-in that both contain chunks of R code, interleaved with chunks of text.
-Underlyingly, Jupyter notebooks are JSON documents with suffix `.ipynb`
-while R markdown documents are in R Markdown format and have suffix `.Rmd`.
-Although the RStudio IDE provides an R Markdown notebook interface,
-notebooks authored via the RStudio IDE are in R Markdown format,
-not Jupyter Notebook format.
-
-```{r fig1, echo=FALSE, out.width = "75%", fig.cap="RStudio R Notebook"}
-library(knitr)
-include_graphics("img/rstudio_notebook.png")
-```
-
-The RStudio interface calls this a notebook, but the resulting file is still in R Markdown format:
-```{r rmarkdown-notebook, size="footnotesize", echo=FALSE,  fig.cap="Notebook file"}
-cat(readLines('Untitled.Rmd', n=15), "...", sep="\n");
-```
-
-When viewed with Jupyter, this document is treated as a raw text file.
-```{r fig2, echo=FALSE, out.width = "75%", fig.cap="R Markdown document in Jupyter browser"}
-library(knitr)
-include_graphics("img/jupyter_local.png")
-```
-
-An extremely useful Python package called [Jupytext](https://jupytext.readthedocs.io/en/latest/)
-allows you to convert from R Markdown to Jupyter notebook format and back again.
-After [installation](https://jupytext.readthedocs.io/en/latest/install.html),
-Jupyter now treats R Markdown documents as notebooks.
-```{r fig3, echo=FALSE, out.width = "75%", fig.cap="R Markdown document in Jupyter with juptext extension"}
-library(knitr)
-include_graphics("img/jupyter_juptext.png")
-```
-
-Juptext identified the R Markdown YAML header as its own block, with celltype `raw`,
-and converted the next three chunks to notebook cells with celltype `markdown`, `code`, and `markdown`, respectively.
-After editing and testing the notebook in the browser, you can save it as
-a Jupyter R notebook via the options menu tab **"File"**, selection **"Download as"**, option **"notebook (.ipynb)"**.
-
-```{r fig4, echo=FALSE, out.width = "75%", fig.cap="Convert R Markdown file to Jupyter notebook"}
-library(knitr)
-include_graphics("img/save_as_ipynb.png")
-```
-
-Congratulations, you now have a Jupyter R notebook that you can share with the world!
-Anyone who has access to a Jupyter server can recreate and extend your analysis.
-
-#### Putting the R in Colab
-
-In order to run a Jupyter notebook via Colab, it must be available on the web or your Google Drive.
-Google Drive lets you can create new Python notebooks or upload existing notebooks from your local machine.
-To share a Jupyter R notebook with the world, you will need to author the notebook locally and then upload it
-to Google Drive:
-
-```{r figGgoogle, echo=FALSE, out.width = "75%", fig.cap="Upload to Google Drive"}
-library(knitr)
-include_graphics("img/gdrive_upload_notebook.png")
-```
-
-Alternatively, you could use this [this empty R notebook](https://github.com/stan-dev/example-models/blob/case-study/stan-cloud/knitr/cloud-compute-2020/template_IR_notebook.ipynb).
-
-
 ### Challenge: Fast Spin-up
 
-In a talk, class, or demo situation, you don't want to spend precious introduction time waiting
+
+In a talk, class, or demo situation every minute spent installing
+software is a minute less for the presentation itself.
+
+
+
+introduction time waiting
 for machines to spin up and packages to install, however, there is necessarily some overhead
 in accessing notebooks and logging on to Colab.
 
@@ -351,6 +305,78 @@ os.environ['CMDSTAN'] = './cmdstan-2.22.1'
 from cmdstanpy import cmdstan_path
 cmdstan_path()
 ```
+
+### Challenge: Putting the R in Jupyter
+
+This section is for all Stan users who work primarily in R and RStudio.
+It shows you how to get your local Jupyter environment set up and how
+to translate R Markdown documents to Jupyter notebooks.
+
+In order to author Jupyter notebooks for R, you also need a local install of R as well as
+the [IRkernel package](https://irkernel.github.io), the R kernel for Jupyter notebook,
+[installation instructions here](https://irkernel.github.io/installation/).
+
+Jupyter notebooks for R are similar to RStudio's
+[R Markdown documents](https://rmarkdown.rstudio.com),
+in that both contain chunks of R code, interleaved with chunks of text.
+Underlyingly, Jupyter notebooks are JSON documents with suffix `.ipynb`
+while R markdown documents are in R Markdown format and have suffix `.Rmd`.
+Although the RStudio IDE provides an R Markdown notebook interface,
+notebooks authored via the RStudio IDE are in R Markdown format,
+not Jupyter Notebook format.
+
+```{r fig1, echo=FALSE, out.width = "75%", fig.cap="RStudio R Notebook"}
+library(knitr)
+include_graphics("img/rstudio_notebook.png")
+```
+
+The RStudio interface calls this a notebook, but the resulting file is still in R Markdown format:
+```{r rmarkdown-notebook, size="footnotesize", echo=FALSE,  fig.cap="Notebook file"}
+cat(readLines('Untitled.Rmd', n=15), "...", sep="\n");
+```
+
+When viewed with Jupyter, this document is treated as a raw text file.
+```{r fig2, echo=FALSE, out.width = "75%", fig.cap="R Markdown document in Jupyter browser"}
+library(knitr)
+include_graphics("img/jupyter_local.png")
+```
+
+An extremely useful Python package called [Jupytext](https://jupytext.readthedocs.io/en/latest/)
+allows you to convert from R Markdown to Jupyter notebook format and back again.
+After [installation](https://jupytext.readthedocs.io/en/latest/install.html),
+Jupyter now treats R Markdown documents as notebooks.
+```{r fig3, echo=FALSE, out.width = "75%", fig.cap="R Markdown document in Jupyter with juptext extension"}
+library(knitr)
+include_graphics("img/jupyter_juptext.png")
+```
+
+Juptext identified the R Markdown YAML header as its own block, with celltype `raw`,
+and converted the next three chunks to notebook cells with celltype `markdown`, `code`, and `markdown`, respectively.
+After editing and testing the notebook in the browser, you can save it as
+a Jupyter R notebook via the options menu tab **"File"**, selection **"Download as"**, option **"notebook (.ipynb)"**.
+
+```{r fig4, echo=FALSE, out.width = "75%", fig.cap="Convert R Markdown file to Jupyter notebook"}
+library(knitr)
+include_graphics("img/save_as_ipynb.png")
+```
+
+Congratulations, you now have a Jupyter R notebook that you can share with the world!
+Anyone who has access to a Jupyter server can recreate and extend your analysis.
+
+#### Putting the R in Colab
+
+In order to run a Jupyter notebook via Colab, it must be available on the web or your Google Drive.
+Google Drive lets you can create new Python notebooks or upload existing notebooks from your local machine.
+To share a Jupyter R notebook with the world, you will need to author the notebook locally and then upload it
+to Google Drive:
+
+```{r figGgoogle, echo=FALSE, out.width = "75%", fig.cap="Upload to Google Drive"}
+library(knitr)
+include_graphics("img/gdrive_upload_notebook.png")
+```
+
+Alternatively, you could use this [this empty R notebook](https://github.com/stan-dev/example-models/blob/case-study/stan-cloud/knitr/cloud-compute-2020/template_IR_notebook.ipynb).
+
 
 ### Next steps
 
