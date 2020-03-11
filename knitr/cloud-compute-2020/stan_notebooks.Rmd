@@ -86,7 +86,7 @@ The three core programming languages supported are
 Julia, Python, and R, hence the name, *Ju-Pyt-R*.
 In order to author a Jupyter notebook on your machine, you need a local install
 of both Python and Jupyter, as outlined in the
-[Jupyter installation instructions]([https://jupyter.readthedocs.io/en/latest/install.html).
+[Jupyter installation instructions](https://jupyter.readthedocs.io/en/latest/install.html).
 Once the Jupyter server is running, you can then run existing notebooks and create new
 notebooks via your favorite web browser.
 
@@ -197,7 +197,7 @@ include_graphics("img/save_2_github.png")
 ```
 
 This saves the notebook `show_VM_specs.ipynb` to the 
-[GitHub repo for this report](https://github.com/stan-dev/example-models/blob/case-study/stan-cloud/knitr/cloud-compute-2020/show_VM_specs.ipynb).
+[GitHub repo for this report](https://github.com/stan-dev/example-models/tree/master/knitr/cloud-compute-2020/show_VM_specs.ipynb).
 
 
 ```{r figViewNotebookOnGithub, echo=FALSE, out.width = "75%", fig.cap="Saved notebook in GitHub preview"}
@@ -262,9 +262,9 @@ With this shortcut, the Stan install process for Colab consists of three steps:
 
 To see how this works, I have created two example notebooks for Colab
 which run CmdStan's example model `bernoulli.stan`: 
-[CmdStanR_Example_Notebook.ipynb](https://github.com/stan-dev/example-models/blob/case-study/stan-cloud/knitr/cloud-compute-2020/CmdStanR_Example_Notebook.ipynb)
+[CmdStanR_Example_Notebook.ipynb](https://github.com/stan-dev/example-models/tree/master/knitr/cloud-compute-2020/CmdStanR_Example_Notebook.ipynb)
 and 
-[CmdStanPy_Example_Notebook.ipynb](https://github.com/stan-dev/example-models/blob/case-study/stan-cloud/knitr/cloud-compute-2020/CmdStanPy_Example_Notebook.ipynb)
+[CmdStanPy_Example_Notebook.ipynb](https://github.com/stan-dev/example-models/tree/master/knitr/cloud-compute-2020/CmdStanPy_Example_Notebook.ipynb)
 
 #### CmdStanR notebook spin-up
 
@@ -413,7 +413,7 @@ library(knitr)
 include_graphics("img/gdrive_upload_notebook.png")
 ```
 
-Alternatively, you could use this [this empty R notebook](https://github.com/stan-dev/example-models/blob/case-study/stan-cloud/knitr/cloud-compute-2020/template_IR_notebook.ipynb), but of course, if you want an R notebook that runs Stan, use the example CmdStanR notebook from the previous section.
+Alternatively, you could use this [this empty R notebook](https://github.com/stan-dev/example-models/tree/master/knitr/cloud-compute-2020/template_IR_notebook.ipynb), but of course, if you want an R notebook that runs Stan, use the example CmdStanR notebook from the previous section.
 
 
 ### Next steps
