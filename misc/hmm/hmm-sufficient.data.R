@@ -1,35 +1,23 @@
-require(MCMCpack)
-
-# CONSTANTS
-K <- 3;
-V <- 10;
-T <- 100;
-T_unsup <- 500;
-alpha <- rep(1,K);
-beta <- rep(0.1,V);
-
-# DATA
-w <- rep(0,T);
-z <- rep(0,T);
-u <- rep(0,T_unsup);
-
-# PARAMETERS
-theta <- rdirichlet(K,alpha);
-phi <- rdirichlet(K,beta);
-
-# SIMULATE DATA
-
-# supervised
-z[1] <- sample(1:K,1);
-for (t in 2:T)
-  z[t] <- sample(1:K,1,replace=TRUE,theta[z[t - 1], 1:K]);
-for (t in 1:T)
-  w[t] <- sample(1:V,1,replace=TRUE,phi[z[t],1:V]);
-
-# unsupervised
-y <- rep(0,T_unsup);  
-y[1] <- sample(1:K,1);
-for (t in 2:T_unsup)
-  y[t] <- sample(1:K,1,replace=TRUE,theta[y[t-1],1:K]);
-for (t in 1:T_unsup)
-  u[t] <- sample(1:V,1,replace=TRUE,phi[y[t], 1:V]);
+K <-
+3
+V <-
+10
+T <-
+100
+w <-
+c(1, 5, 9, 1, 10, 10, 9, 9, 10, 10, 9, 1, 9, 1, 10, 1, 10, 10, 
+9, 9, 1, 10, 1, 9, 10, 1, 10, 9, 10, 10, 9, 1, 9, 1, 9, 9, 1, 
+9, 1, 9, 10, 1, 9, 9, 10, 9, 5, 1, 10, 7, 1, 10, 9, 7, 8, 10, 
+9, 1, 9, 9, 10, 10, 9, 1, 10, 9, 9, 1, 9, 1, 9, 1, 9, 10, 9, 
+1, 9, 9, 7, 7, 9, 1, 9, 1, 10, 10, 9, 9, 1, 10, 10, 1, 7, 10, 
+1, 10, 9, 9, 10, 4)
+z <-
+c(2, 1, 3, 2, 1, 1, 3, 3, 1, 1, 3, 2, 3, 2, 1, 2, 1, 1, 3, 3, 
+2, 1, 2, 3, 1, 2, 1, 3, 1, 1, 3, 2, 1, 2, 3, 3, 2, 3, 2, 3, 1, 
+2, 1, 3, 1, 3, 1, 2, 1, 3, 2, 1, 3, 3, 2, 1, 3, 2, 3, 1, 1, 1, 
+3, 2, 1, 3, 3, 2, 1, 2, 3, 2, 3, 1, 3, 2, 3, 1, 1, 1, 3, 2, 3, 
+2, 1, 1, 1, 3, 2, 1, 1, 2, 3, 1, 2, 1, 3, 1, 1, 2)
+alpha <-
+c(1, 1, 1)
+beta <-
+c(0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1)
