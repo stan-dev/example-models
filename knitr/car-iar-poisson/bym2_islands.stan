@@ -28,10 +28,10 @@ transformed data {
   for (i in 1:N_components) {
     component_starts[i] = c_offset;
     c_offset = c_offset + nodes_per_component[i];
-    component_ends[i] = c_offset - 1;
+    component_ends[i] = c_offset - 2;
   }
   for (i in 1:N_con_comp) {
-    for (j in component_starts[i]:component_ends[i]) {
+    for (j in component_starts[i]:component_ends[i]+1) {
       scaling_factor[j] = scales[i];
     }
   }
