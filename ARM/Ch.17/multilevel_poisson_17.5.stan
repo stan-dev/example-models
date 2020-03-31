@@ -41,3 +41,5 @@ model {
 
   stops ~ poisson_log(lambda);
 }
+// Information on the data can be found in this blog:
+// http://www.clayford.net/statistics/poisson-regression-ch-6-of-gelman-and-hill/

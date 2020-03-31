@@ -20,7 +20,7 @@ parameters {
 model {
   real mu_adj;
   matrix[N,n_cut] Q;
-  matrix[N,n_cut] P;
+  matrix[N,n_cut+1] P;
 
   mu_c ~ normal(0, 1000);
   mu_log_s ~ normal(0, 100);

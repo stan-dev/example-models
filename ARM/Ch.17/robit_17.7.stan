@@ -12,8 +12,8 @@ data {
   int<lower=0, upper=n_state> region[n_state];
   int<lower=0, upper=n_state> state[N];
   int<lower=0, upper=1> y[N];
-  vector[N] z;
-  vector[N] v_prev;
+  vector[N] z; // latent variable initialisation values
+  vector[n_state] v_prev;
 }
 parameters {
   real<lower=0> sigma_age;
