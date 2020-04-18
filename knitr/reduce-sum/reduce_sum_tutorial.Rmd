@@ -1,0 +1,324 @@
+---
+title: "Reduce Sum: A Minimal Example"
+date: "17 April 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library("cmdstanr")
+```
+
+This introduction to `reduce_sum` copies directly from Richard McElreath's
+[Multithreading and Map-Reduce in Stan 2.18.0: A Minimal Example](https://github.com/rmcelreath/cmdstan_map_rect_tutorial).
+
+## Introduction
+
+Stan 2.23 introduced `reduce_sum`, a new way to parallelize the execution of
+a single Stan chain across multiple cores. This is in addition to the already
+existing `map_rect` utility, and introduces a number of features that make it
+easier to use parallelism:
+
+1. More flexible argument interface, avoiding the packing and
+   unpacking that is necessary with `map_rect`.
+2. Partitions data for parallelization automatically (this is done manually
+   in `map_rect`).
+3. Is easier to use.
+
+This tutorial will highlight these new features and demonstrate how to use
+`reduce_sum` on a simple logistic regression using `cmdstanr`.
+
+## Overview
+
+Modifying a Stan model for use with `reduce_sum` has three steps.
+
+(1) Identify the portion of the model that you want to parallelize. `reduce_sum`
+is design specifically for speeding up log likelihood evaluations that are
+composed of a number of conditionally independent terms that can be computed
+in parallel then added together.
+
+(2) Write a partial sum function that can compute a given number of terms in
+that sum. Pass this function (and other necessary arguments) to a call
+to `reduce_sum`.
+
+(3) Configure your compiler to enable multithreading. Then compile and
+sample as usual.
+
+To demonstrate this process, we'll first build a model first without
+`reduce_sum`, identify the part to be parallelized, and then work out how to use
+`reduce_sum` to parallelize it.
+
+## Prepping the data
+
+Let's consider a simple logistic regression. We'll use a reasonably large amount
+of data, the football red card data set from the recent crowdsourced data
+analysis project (<https://psyarxiv.com/qkwst/>). This data table contains
+146,028 player-referee dyads. For each dyad, the table records the total number
+of red cards the referee assigned to the player over the observed number of
+games. 
+
+`RedcardData.csv` is provided in the repository
+[here](https://github.com/bbbales2/cmdstan_map_rect_tutorial/blob/reduce_sum/RedcardData.csv).
+Load the data in R, and let's take a look at the distribution of red cards:
+
+```{r}
+d <- read.csv("RedcardData.csv", stringsAsFactors = FALSE)
+table(d$redCards)
+```
+
+The vast majority of dyads have zero red cards. Only 25 dyads show 2 red cards.
+These counts are our inference target.
+
+The motivating hypothesis behind these data is that referees are biased against
+darker skinned players. So we're going to try to predict these counts using the
+skin color ratings of each player. Not all players actually received skin color
+ratings in these data, so let's reduce down to dyads with ratings:
+
+```{r}
+d2 <- d[!is.na(d$rater1),]
+redcard_data <- list(n_redcards = d2$redCards, n_games = d2$games, rating = d2$rater1)
+redcard_data$N <- nrow(d2)
+```
+
+This leaves us with 124,621 dyads to predict. 
+
+At this point, you are thinking: "But there are repeat observations on players
+and referees! You need some cluster variables in there in order to build a
+proper multilevel model!" You are right. But let's start simple. Keep your
+partial pooling on idle for the moment.
+
+## Making the model
+
+A Stan model for this problem is just a simple logistic (binomial) GLM. I'll
+assume you know Stan well enough already that I can just plop the code down
+here. Save this code as `logistic0.stan` where you saved `RedcardData.csv`
+(we'll assume this is your current working directory):
+
+```{stan, output.var = "", eval = FALSE}
+data {
+  int N;
+  int n_redcards[N];
+  int n_games[N];
+  vector[N] rating;
+}
+parameters {
+  vector[2] beta;
+}
+model {
+  beta[1] ~ normal(0, 10);
+  beta[2] ~ normal(0, 1);
+
+  n_redcards ~ binomial_logit(n_games, beta[1] + beta[2] * rating);
+}
+```
+
+## Building and Running the Basic Model
+
+To install `cmdstanr`, follow the directions here: https://mc-stan.org/cmdstanr/
+
+To build the model in `cmdstanr` run:
+
+```{r}
+logistic0 <- cmdstan_model("logistic0.stan")
+```
+
+To sample from the model run:
+  
+```{r}
+time0 = system.time(fit0 <- logistic0$sample(redcard_data,
+                                             num_cores = 1,
+                                             num_chains = 4,
+                                             refresh = 1000))
+
+time0
+```
+
+In this case, we just look at the performance of four chains running in sequence
+on one core so we can compare that directly to four chains chain running with
+threads. The `elapsed` time is the time that we would have recorded if we were
+timing this process with a stop-watch, so that is the one relevant to understanding
+performance here (`system` time is time spent on system functions like I/O,
+                  and `user` time is for parallel calculations).
+
+## Rewriting the Model to Enable Multithreading
+
+The key to porting this calculation to `reduce_sum`, is recognizing that the
+statement:
+  
+```{stan, output.var = "", eval = FALSE}
+n_redcards ~ binomial_logit(n_games, beta[1] + beta[2] * rating);
+```
+
+can be rewritten (up to a proportionality constant) as:
+  
+```{stan, output.var = "", eval = FALSE}
+for(n in 1:N) {
+  target += binomial_logit_lpmf(n_redcards[n] | n_games[n], beta[1] + beta[2] * rating[n])
+}
+```
+
+Now it is clear that the calculation is the sum of a number of
+conditionally independent Bernoulli log probability statements. So
+whenever we need to calculate a large sum where each term is
+independent of all others and associativity holds, then `reduce_sum`
+is useful.
+
+To use `reduce_sum`, a function must be written that can be used to compute
+arbitrary sections of this sum.
+
+Using the reducer interface defined in
+[Reduce-Sum](https://mc-stan.org/docs/2_23/functions-reference/functions-reduce.html):
+  
+```{stan, output.var = "", eval = FALSE}
+functions {
+  real partial_sum(int[] slice_n_redcards,
+                   int start, int end,
+                   int[] n_games,
+                   vector rating,
+                   vector beta) {
+    return binomial_logit_lpmf(slice_n_redcards |
+                               n_games[start:end],
+                               beta[1] + beta[2] * rating[start:end]);
+  }
+}
+```
+
+The likelihood statement in the model can now be written:
+  
+```{stan, output.var = "", eval = FALSE}
+target += partial_sum(n_redcards, 1, N, n_games, rating, beta); // Sum terms 1 to N in the likelihood
+```
+
+Equivalently it could be broken into two pieces and written like:
+
+```{stan, output.var = "", eval = FALSE}
+int M = N / 2;
+target += partial_sum(n_redcards[1:M], 1, M, n_games, rating, beta) // Sum terms 1 to M
+  partial_sum(n_redcards[(M + 1):N], M + 1, N, n_games, rating, beta); // Sum terms M + 1 to N
+```
+
+By passing `partial_sum` to `reduce_sum`, we allow Stan to
+automatically break up these calculations and do them in parallel.
+
+Notice the difference in how `n_redcards` is split in half (to reflect
+                                                            which terms of the sum are being accumulated) and the rest of the arguments
+(`n_games`, `x`, and `beta`) are left alone. This distinction is important
+and more fully described in the User's Guide section on
+[Reduce-sum](https://mc-stan.org/docs/2_23/stan-users-guide/reduce-sum.html).
+
+Given the partial sum function, `reduce_sum` can be used to automatically parallelize the
+likelihood:
+
+```{stan, output.var = "", eval = FALSE}
+int grainsize = 1;
+target += reduce_sum(partial_sum, n_redcards, grainsize,
+                     n_games, rating, beta);
+```
+
+`reduce_sum` automatically breaks the sum into roughly `grainsize` sized pieces
+and computes them in parallel. `grainsize = 1` specifies that the grainsize should
+be estimated automatically (`grainsize` should be left at 1 unless specific tests
+are done to
+[pick a different one](https://mc-stan.org/docs/2_23/stan-users-guide/reduce-sum.html#reduce-sum-grainsize)).
+
+Making grainsize data (this makes it convenient to experiment with), the final
+model is:
+```{stan, output.var = "", eval = FALSE}
+functions {
+  real partial_sum(int[] slice_n_redcards,
+                   int start, int end,
+                   int[] n_games,
+                   vector rating,
+                   vector beta) {
+    return binomial_logit_lpmf(slice_n_redcards |
+                               n_games[start:end],
+                               beta[1] + beta[2] * rating[start:end]);
+  }
+}
+data {
+  int N;
+  int n_redcards[N];
+  int n_games[N];
+  vector[N] rating;
+}
+parameters {
+  vector[2] beta;
+}
+model {
+  int grainsize = 1;
+
+  beta[1] ~ normal(0, 10);
+  beta[2] ~ normal(0, 1);
+
+  target += reduce_sum(partial_sum, n_redcards, grainsize,
+                       n_games, rating, beta);
+}
+```
+
+Save this as `logistic1.stan`.
+
+## Running the Multithreaded Model
+
+Compile this model with threading support:
+
+```{r}
+logistic1 <- cmdstan_model("logistic1.stan", threads = TRUE)
+```
+
+Set the number of threads each chain will use with `set_num_threads`:
+
+```{r}
+set_num_threads(8) # This computer has eight cores
+```
+
+Run and time the model with:
+
+```{r}
+time1 = system.time(fit1 <- logistic1$sample(redcard_data,
+                                             num_cores = 1,
+                                             num_chains = 4,
+                                             refresh = 1000))
+
+time1
+```
+
+Again, `elapsed` time is the time recorded as if by a stopwatch. Computing the
+ratios of the two times gives the speedup on eight cores of:
+
+```{r}
+time0[["elapsed"]] / time1[["elapsed"]]
+```
+
+This model was particularly easy to parallelize because
+a lot of the arguments are data (and do not need to be autodiffed). If a
+model has a large number of arguments that are either defined in the
+parameters block, transformed parameters block, or model block, or do not
+do very much computation inside the reduce function, the speedup will be
+much more limited.
+
+We can always get speedup in terms of effective sample size per time
+by running multiple chains on different cores. `reduce_sum` is not a
+replacement for that, and it is still important to run multiple chains
+to check diagnostics. `reduce_sum` is a tool for speeding up single chain
+calculations, which can be useful for model development and on computers with
+large numbers of cores.
+
+We can do a quick check that these two methods are mixing with posterior.
+When parallelizing a model is a good thing to do to make sure something is not
+breaking:
+```{r}
+remotes::install_github("jgabry/posterior")
+library(posterior)
+summarise_draws(bind_draws(fit0$draws(), fit1$draws(), along = "chain"))
+```
+
+Ignoring `lp__` (remember the change to `bernoulli_logit_lpmf` means the
+likelihoods between the two models are only proportional up to a constant), the Rhats
+are less than 1.01, so our basic convergence checks pass. Unless something strange
+is going on, we probably parallelized our model correctly!
+
+## More Information
+
+For a more detailed description of how `reduce_sum` works, see the
+[User's Manual](https://mc-stan.org/docs/2_23/stan-users-guide/reduce-sum.html).
+For a more complete description of the interface, see the
+[Function Reference](https://mc-stan.org/docs/2_23/functions-reference/functions-reduce.html).
