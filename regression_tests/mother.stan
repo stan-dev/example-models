@@ -56,6 +56,10 @@ functions {
     return 1.0;
   }
 
+  real foo_rng(real mu, real sigma) {
+    return normal_rng(mu, sigma);
+  }
+
   void unit_normal_lp(real u) {
     increment_log_prob(normal_log(u,0,1));
     u ~ uniform(-100,100);
@@ -293,6 +297,21 @@ functions {
     vector[10] l = mu * [1,2,3,4,5,6,7,8,9,10]';
     return l[{1,2,3,4,5}];
   }
+  vector algebra_system(vector x,
+                        vector y,
+                        real[] dat,
+                        int[] dat_int) {
+    vector[2] f_x;
+    f_x[1] = x[1] - y[1];
+    f_x[2] = x[2] - y[2];
+    return f_x;
+  }
+
+  vector binomialf(vector phi, vector theta, data real[] x_r, data int[] x_i) {
+    vector[1] lpmf;
+    lpmf[1] = 0.0;
+    return lpmf;
+  }
 }
 data {
   int<lower=0> N;
@@ -324,12 +343,19 @@ transformed data {
   int td_a = N;
   real td_b = N * J;
   real td_c = foo_bar1(td_b);
+  real td_d = foo_rng(td_b, td_c);
   matrix<lower=0,upper=1>[2,3] td_ar_mat[4,5];
   simplex[N] td_simplex;
   simplex[N] td_1d_simplex[N];
   simplex[N] td_3d_simplex[N,M,K];
   cholesky_factor_cov[5,5] td_cfcov_54; // TODO: Change to 5,4
   cholesky_factor_cov[3] td_cfcov_33;
+  vector[2] x;
+  vector[2] y;
+  real dat[0];
+  int dat_int[0];
+  real x_r[0, 0];
+  int x_i[0, 0];
   td_int = 1 || 2;
   td_int = 1 && 2;
   for (i in 1:2) {
@@ -363,6 +389,11 @@ transformed data {
   td_simplex = td_1d_simplex[1,:];
   td_simplex = td_1d_simplex[1,];
   td_simplex = td_1d_simplex[1,1:N];
+
+  int arr_mul_ind[2,2];
+  arr_mul_ind[1,1:2] = {1, 1};
+
+  real x_mul_ind[2] = {1,2};
 }
 parameters {
   real p_real;
@@ -382,6 +413,8 @@ parameters {
   cholesky_factor_cov[5,4] p_cfcov_54;
   cholesky_factor_cov[3] p_cfcov_33;
   cholesky_factor_cov[3] p_cfcov_33_ar[K];
+  vector[2] x_p;
+  vector[2] y_p;
 }
 transformed parameters {
   real<lower=0> tp_real_1d_ar[N];
@@ -399,6 +432,7 @@ transformed parameters {
   cholesky_factor_cov[5,4] tp_cfcov_54;
   cholesky_factor_cov[3] tp_cfcov_33;
   cholesky_factor_cov[3] tp_cfcov_33_ar[K];
+  vector[2] theta_p;
 
   tp_real_1d_ar = p_real_1d_ar;
   tp_real_3d_ar = p_real_3d_ar;
@@ -423,10 +457,21 @@ transformed parameters {
   tp_row_vec = tp_1d_vec[1]';
   tp_1d_row_vec = p_1d_row_vec;
   tp_3d_row_vec = p_3d_row_vec;
+
+  theta_p = algebra_solver(algebra_system, x, y, dat, dat_int);
+  theta_p = algebra_solver(algebra_system, x, y, dat, dat_int, 0.01, 0.01, 10);
+  theta_p = algebra_solver(algebra_system, x, y_p, dat, dat_int, 0.01, 0.01, 10);
+  theta_p = algebra_solver(algebra_system, x_p, y, dat, dat_int);
+  theta_p = algebra_solver(algebra_system, x_p, y, dat, dat_int, 0.01, 0.01, 10);
+  theta_p = algebra_solver(algebra_system, x_p, y_p, dat, dat_int);
+  theta_p = algebra_solver(algebra_system, x_p, y_p, dat, dat_int, 0.01, 0.01, 10);
 }
 model {
+  vector[0] tmp;
+  vector[0] tmp2[0];
   real r1 = foo_bar1(p_real);
   real r2 = foo_bar1(J);
+  unit_normal_lp(p_real);
   p_real ~ normal(0,1);
   offset_multiplier ~ normal(0, 1);
 
@@ -457,6 +502,8 @@ model {
   to_vector(p_simplex) ~ normal(0, 1);
   to_vector(p_cfcov_54) ~ normal(0, 1);
   to_vector(p_cfcov_33) ~ normal(0, 1);
+
+  target += map_rect(binomialf, tmp, tmp2, x_r, x_i);
 }
 generated quantities {
   real gq_r1 = foo_bar1(p_real);
