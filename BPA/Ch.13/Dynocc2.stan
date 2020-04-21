@@ -17,8 +17,8 @@ transformed data {
 }
 
 parameters {
-  real<lower=0,upper=1> psi1;
-  real<lower=0,upper=1> p;
+  real<lower=0,upper=1> psi1;   // Occupancy probability at t=1
+  real<lower=0,upper=1> p;      // Detection probability
   simplex[2] ps[2, nyear-1];    // Transition probability
   // This is euqivalent to the following.
   //  ps[1, t, 1] = phi[t];
@@ -33,8 +33,8 @@ transformed parameters {
 
   for (t in 1:nyear) {
     for (r in 1:3) {
-      po[1, t, r] = exp(binomial_lpmf(r - 1 | 2, p));
-      po[2, t, r] = (r == 1);
+      po[1, t, r] = exp(binomial_lpmf(r - 1 | 2, p)); // occupied
+      po[2, t, r] = (r == 1);                         // not occupied
     }
   }
 }
@@ -66,7 +66,7 @@ model {
 }
 
 generated quantities {
-  // Sample and population occupancy, growth rate and turnover
+  // Population occupancy, growth rate and turnover
   vector<lower=0,upper=1>[nyear] psi;        // Occupancy probability
   vector<lower=0,upper=1>[ny_minus_1] phi;   // Survival probability
   vector<lower=0,upper=1>[ny_minus_1] gamma; // Colonization probability
@@ -76,7 +76,7 @@ generated quantities {
   vector[nyear-1] turnover;                  // Turnover rate
 
   // Latent state z[,] is estimated with a full simulation
-  // without using observed y[,].
+  // unconditional on the observed y[,].
   for (k in 1:ny_minus_1) {
     phi[k] = ps[1, k, 1];
     gamma[k] = ps[2, k, 1];
