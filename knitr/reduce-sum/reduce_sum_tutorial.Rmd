@@ -95,9 +95,9 @@ here. Save this code as `logistic0.stan` where you saved `RedcardData.csv`
 
 ```{stan, output.var = "", eval = FALSE}
 data {
-  int N;
-  int n_redcards[N];
-  int n_games[N];
+  int<lower=0> N;
+  int<lower=0> n_redcards[N];
+  int<lower=0> n_games[N];
   vector[N] rating;
 }
 parameters {
@@ -125,16 +125,16 @@ To sample from the model run:
   
 ```{r}
 time0 = system.time(fit0 <- logistic0$sample(redcard_data,
-                                             num_cores = 1,
+                                             num_cores = 4,
                                              num_chains = 4,
                                              refresh = 1000))
 
 time0
 ```
 
-In this case, we just look at the performance of four chains running in sequence
-on one core so we can compare that directly to four chains chain running with
-threads. The `elapsed` time is the time that we would have recorded if we were
+In this case, we'll compute four chains using four cores. This computer has eight
+cores though, and we'll see how we can make use of those other cores later.
+The `elapsed` time is the time that we would have recorded if we were
 timing this process with a stop-watch, so that is the one relevant to understanding
 performance here (`system` time is time spent on system functions like I/O,
                   and `user` time is for parallel calculations).
@@ -193,7 +193,7 @@ Equivalently it could be broken into two pieces and written like:
 ```{stan, output.var = "", eval = FALSE}
 int M = N / 2;
 target += partial_sum(n_redcards[1:M], 1, M, n_games, rating, beta) // Sum terms 1 to M
-  partial_sum(n_redcards[(M + 1):N], M + 1, N, n_games, rating, beta); // Sum terms M + 1 to N
+target += partial_sum(n_redcards[(M + 1):N], M + 1, N, n_games, rating, beta); // Sum terms M + 1 to N
 ```
 
 By passing `partial_sum` to `reduce_sum`, we allow Stan to
@@ -220,7 +220,7 @@ be estimated automatically (`grainsize` should be left at 1 unless specific test
 are done to
 [pick a different one](https://mc-stan.org/docs/2_23/stan-users-guide/reduce-sum.html#reduce-sum-grainsize)).
 
-Making grainsize data (this makes it convenient to experiment with), the final
+Making `grainsize` data (this makes it convenient to experiment with), the final
 model is:
 ```{stan, output.var = "", eval = FALSE}
 functions {
@@ -235,16 +235,16 @@ functions {
   }
 }
 data {
-  int N;
-  int n_redcards[N];
-  int n_games[N];
+  int<lower=0> N;
+  int<lower=0> n_redcards[N];
+  int<lower=0> n_games[N];
   vector[N] rating;
+  int<lower=1> grainsize;
 }
 parameters {
   vector[2] beta;
 }
 model {
-  int grainsize = 1;
 
   beta[1] ~ normal(0, 10);
   beta[2] ~ normal(0, 1);
@@ -267,14 +267,23 @@ logistic1 <- cmdstan_model("logistic1.stan", threads = TRUE)
 Set the number of threads each chain will use with `set_num_threads`:
 
 ```{r}
-set_num_threads(8) # This computer has eight cores
+set_num_threads(2)
 ```
+
+As this computer has 8 cores and we intend to run the usual 4 chains,
+we will use 2 threads per chain to make full use of the processor
+(4 chains with 2 threads each can make use of the full eight cores).
+The within-chain parallelism is generally less effiecient as compared to
+running chains in parallel, but if greater single-chain speedups are desired,
+then the user can choose to run fewer chains (i.e. 2 chains with 4 threads
+each) or use more machines.
 
 Run and time the model with:
 
 ```{r}
+redcard_data$grainsize <- 1
 time1 = system.time(fit1 <- logistic1$sample(redcard_data,
-                                             num_cores = 1,
+                                             num_cores = 4,
                                              num_chains = 4,
                                              refresh = 1000))
 
@@ -289,11 +298,13 @@ time0[["elapsed"]] / time1[["elapsed"]]
 ```
 
 This model was particularly easy to parallelize because
-a lot of the arguments are data (and do not need to be autodiffed). If a
-model has a large number of arguments that are either defined in the
-parameters block, transformed parameters block, or model block, or do not
-do very much computation inside the reduce function, the speedup will be
-much more limited.
+a lot of the arguments are data (and do not need to be autodiffed). It is
+possible to get a speedup over two even though we are only doubling the
+computational resources because of the way `reduce_sum` breaks up work and
+uses CPU cache more efficiently. If a model has a large number of arguments
+that are either defined in the parameters block, transformed parameters block,
+or model block, or do not do very much computation inside the reduce function,
+or does not get lucky with caching, the speedup will be much more limited.
 
 We can always get speedup in terms of effective sample size per time
 by running multiple chains on different cores. `reduce_sum` is not a
