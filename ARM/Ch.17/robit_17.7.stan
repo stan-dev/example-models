@@ -48,6 +48,12 @@ model {
   b_female ~ normal(0, 100);
   b_black ~ normal(0, 100);
   b_female_black ~ normal(0, 100);
+  
+  sigma_age ~ normal(0, 10);
+  sigma_edu ~ normal(0, 10);
+  sigma_state ~ normal(0, 10);
+  sigma_region ~ normal(0, 10);
+  sigma_age_edu ~ normal(0, 10);
 
   b_age ~ normal(0, sigma_age);
   b_edu ~ normal(0, sigma_edu);
