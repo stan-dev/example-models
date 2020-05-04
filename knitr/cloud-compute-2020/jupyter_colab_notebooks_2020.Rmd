@@ -225,6 +225,41 @@ and this will be evident by reading through the markdown and Python notebook cel
 So don't take my word that these notebooks are safe;
 review the notebook source code before clicking "RUN ANYWAY" (or "CANCEL").
 
+#### Editing files and data on Colab
+
+The Colab interface provides a "files" utility which lets you upload
+data and models in your notebook, and also gives you minimal editing facilities
+over files on the Colab instance.  This is the file folder icon to the left
+of the main window
+```{r fig11, echo=FALSE, out.width = "75%", fig.cap="Colab Files Utility"}
+library(knitr)
+include_graphics("img/colab_files_util_1.png")
+```
+Clicking on this icon opens the files utility, which shows a view of the files
+in the current working directory of the Colab instane.  Across the top of
+the files utility are controls to upload files from your local computer,
+refresh the files view, and connect to your Google Drive.
+```{r fig12, echo=FALSE, out.width = "75%", fig.cap="Files utility, controls"}
+library(knitr)
+include_graphics("img/colab_files_util_2.png")
+```
+The file upload utility opens a file browser that lets you select one or more files to upload.
+```{r fig13, echo=FALSE, out.width = "75%", fig.cap="Files utility file browser"}
+library(knitr)
+
+include_graphics("img/colab_files_util_3.png")
+```
+Once uploaded, Colab provides minimal editing facilities for data and test files.
+
+```{r fig15, echo=FALSE, out.width = "75%", fig.cap="Files utility file editor"}
+library(knitr)
+include_graphics("img/colab_files_util_5.png")
+```
+Unfortunately, the extension `.stan` is not recognized; however `.json` data files
+can be edited.
+This makes editing program files in Colab challenging.
+Fundamentally, Colab is a notebook viewer, not an IDE.
+
 
 ### Challenge: Fast Spin-up
 
@@ -248,23 +283,20 @@ As a Colab VM only persists for at most 12 hours, this means that most of the
 time your class, talk, or demo will require waiting on this installation process
 before you or your audience can start running Stan.
 
-To avoid this, I created a CmdStan binary for Colab by installing CmdStan on
-a Colab instance and then making a tar-gzip archive of the resulting compiled executable.
-Because Google is currently offering limited free storage on the Google Cloud Platform,
-these CmdStan binaries are stored in a Google storage bucket in the cloud;
-GitHub would be another way to host them.
-From a Colab notebook, downloading and unpacking the pre-compiled binaries takes on the order of 10 seconds.
+To avoid this, we've created a CmdStan binary for Colab for the CmdStan 2.23.0 release,
+[colab-cmdstan-2.23.0.tar.gz](https://github.com/stan-dev/cmdstan/releases/download/v2.23.0/colab-cmdstan-2.23.0.tar.gz).
+From a Colab notebook, downloading and unpacking this set of pre-compiled binaries takes on the order of 10 seconds.
 With this shortcut, the Stan install process for Colab consists of three steps:
 
 * Install the CmdStanPy or CmdStanR package.
 * Download the pre-compiled CmdStan binaries for Google Colab.
-* Register the CmdStan install location in the R or Python session.
+* Register the CmdStan install location in the Python or R session.
 
 To see how this works, I have created two example notebooks for Colab
 which run CmdStan's example model `bernoulli.stan`: 
-[CmdStanR_Example_Notebook.ipynb](https://github.com/stan-dev/example-models/tree/master/knitr/cloud-compute-2020/CmdStanR_Example_Notebook.ipynb)
-and 
 [CmdStanPy_Example_Notebook.ipynb](https://github.com/stan-dev/example-models/tree/master/knitr/cloud-compute-2020/CmdStanPy_Example_Notebook.ipynb)
+and 
+[CmdStanR_Example_Notebook.ipynb](https://github.com/stan-dev/example-models/tree/master/knitr/cloud-compute-2020/CmdStanR_Example_Notebook.ipynb)
 
 #### CmdStanR notebook spin-up
 
@@ -301,10 +333,13 @@ set_cmdstan_path("cmdstan-2.23.0")
 The CmdStanPy_Example_Notebook contains the Python version of the fast spin-up steps.
 CmdStanPy requires Python3, which is the default runtime for new Colab notebooks.
 CmdStanPy is a pure-Python package which can be installed from PyPI:
+```
+!pip install --update cmdstanpy
+```
+We specify the `--update` flag in order to get the latest version,
+in case any of the pre-installed Python packages for the Colab Python runtime
+are using older versions of CmdStanPy.
 
-```
-!pip install cmdstanpy
-```
 We can use Python to download and unpack the precompiled CmdStan binaries:
 ```
 # Install pre-built CmdStan binary
@@ -435,20 +470,13 @@ An extremely interesting Stan notebook would expand the above to the full Bayesi
 - Repeat the above steps for model 2
 - Compare the two models
 
+### Update, May 2020
 
+We've just added notebooks for both Python and R which correspond to Andrew's blogpost on an early
+study on Covid-19 prevalence in Santa Clara county, CA:
 
+- https://statmodeling.stat.columbia.edu/2020/05/01/simple-bayesian-analysis-inference-of-coronavirus-infection-rate-from-the-stanford-study-in-santa-clara-county/
 
+The notebooks, models, and data are available from GitHub:
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+- https://github.com/stan-dev/example-models/tree/master/jupyter/covid-inf-rate
