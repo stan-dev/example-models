@@ -1,0 +1,1 @@
+Notebooks corresponding to models, data from blogpost https://statmodeling.stat.columbia.edu/2020/05/01/simple-bayesian-analysis-inference-of-coronavirus-infection-rate-from-the-stanford-study-in-santa-clara-county/
