@@ -284,17 +284,16 @@ if(!require(cmdstanr)){
 }
 ```
 The following cells download the precompiled CmdStan binaries
-and register the path to the CmdStan installation:
+and registers the path to the CmdStan installation:
 ```
 # Install CmdStan binaries
-if (!file.exists("cmdstan-2-22-1.tgz")) {
-  system("wget https://storage.googleapis.com/cmdstan-2-22-tgz/cmdstan-2-22-1.tgz", intern=T)
-  system("tar zxf cmdstan-2-22-1.tgz", intern=T)
+if (!file.exists("cmdstan-2.23.0.tgz")) {
+  system("wget https://github.com/stan-dev/cmdstan/releases/download/v2.23.0/colab-cmdstan-2.23.0.tar.gz", intern=T)
+  system("tar zxf colab-cmdstan-2.23.0.tar.gz", intern=T)
 }
-list.files("cmdstan-2.22.1")
 
 # Set cmdstan_path to CmdStan installation
-set_cmdstan_path("cmdstan-2.22.1")
+set_cmdstan_path("cmdstan-2.23.0")
 ```
 
 #### Spinning up a CmdStanPy Notebook
@@ -308,28 +307,20 @@ CmdStanPy is a pure-Python package which can be installed from PyPI:
 ```
 We can use Python to download and unpack the precompiled CmdStan binaries:
 ```
-# Download, unpack CmdStan binaries
-import os
-import urllib.request
-import shutil
-tgz_file = 'cmdstan-2-22-1.tgz'
-tgz_url = 'https://storage.googleapis.com/cmdstan-2-22-tgz/cmdstan-2-22-1.tgz'
-
+# Install pre-built CmdStan binary
+# (faster than compiling from source via install_cmdstan() function)
+tgz_file = 'colab-cmdstan-2.23.0.tar.gz'
+tgz_url = 'https://github.com/stan-dev/cmdstan/releases/download/v2.23.0/colab-cmdstan-2.23.0.tar.gz'
 if not os.path.exists(tgz_file):
-  try:
     urllib.request.urlretrieve(tgz_url, tgz_file)
     shutil.unpack_archive(tgz_file)
-  except Exception:
-    raise KeyboardInterrupt
 ```
 The following cells check the CmdStan installation and register its location:
 ```
 # Specify CmdStan location via environment variable
-import os
-os.environ['CMDSTAN'] = './cmdstan-2.22.1'
-
+os.environ['CMDSTAN'] = './cmdstan-2.23.0'
 # Check CmdStan path
-from cmdstanpy import cmdstan_path
+from cmdstanpy import CmdStanModel, cmdstan_path 
 cmdstan_path()
 ```
 
@@ -443,12 +434,6 @@ An extremely interesting Stan notebook would expand the above to the full Bayesi
 - Expand model 1 to create model 2
 - Repeat the above steps for model 2
 - Compare the two models
-
-
-
-
-
-
 
 
 
