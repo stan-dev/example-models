@@ -353,7 +353,7 @@ whenever
 $$
 \log y_{n, k} \sim \mathsf{Normal}(z_{n, k}, \sigma_n).
 $$
-The $\mathsf{LogNormal}$ density accounts for the non-linear change of variables through a Jacobian adjustment.^[The Stan manual chapter on changes of variables works through this particular example.]
+The $\mathsf{LogNormal}$ density accounts for the non-linear change of variables through a Jacobian adjustment.^[The [Stan manual chapter on changes of variables](https://mc-stan.org/docs/stan-users-guide/changes-of-variables.html) works through this particular example.]
 
 ## Weakly informative priors
 
@@ -373,7 +373,7 @@ $$
 
 ## Prior for noise scale
 
-The noise scale is proportional, so the following prior should be weakly informative, as a value smaller than 0.05 or larger than 3 would be unexpected.^[The 95% interval is approximately the mean plus or minus two standard deviations, which here is $\exp(-1 - 2) \approx 0.05$ and $\exp(-1 + 2) \approx 3$]. Because values are positive, this prior adopts the lognormal distribution.^[A lognormal prior on $\sigma$ is not consistent with zero values of $\sigma$, but we do not expect the data to be consistent with values of $\sigma$ near zero because the model will is not particularly accurate.  It makes well calibrated predictions, but they are not very sharp.]
+The noise scale is proportional, so the following prior should be weakly informative, as a value smaller than 0.05 or larger than 3 would be unexpected.^[The 95% interval is approximately the mean plus or minus two standard deviations, which here is $\exp(-1 - 2) \approx 0.05$ and $\exp(-1 + 2) \approx 3$]. Because values are positive, this prior adopts the lognormal distribution.^[A lognormal prior on $\sigma$ is not consistent with zero values of $\sigma$, but we do not expect the data to be consistent with values of $\sigma$ near zero because the model is not particularly accurate.  It makes well calibrated predictions, but they are not very sharp.]
 
 $$
 \sigma \sim \mathsf{LogNormal}(-1, 1)
