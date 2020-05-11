@@ -347,11 +347,11 @@ Because $\exp(\epsilon_{n,k})$ is positive and the underlying population size $z
 This transform and its associated fractional error is so common that they are jointly known as the lognormal distribution, so that we can simplify the above notation as we did with linear regression and write
 
 $$
-y_{n, k} \sim \mathsf{LogNormal}(z_{n, k}, \sigma_n).
+y_{n, k} \sim \mathsf{LogNormal}(\log(z_{n, k}), \sigma_n).
 $$
 whenever
 $$
-\log y_{n, k} \sim \mathsf{Normal}(z_{n, k}, \sigma_n).
+\log y_{n, k} \sim \mathsf{Normal}(\log(z_{n, k}), \sigma_n).
 $$
 The $\mathsf{LogNormal}$ density accounts for the non-linear change of variables through a Jacobian adjustment.^[The [Stan manual chapter on changes of variables](https://mc-stan.org/docs/stan-users-guide/changes-of-variables.html) works through this particular example.]
 
