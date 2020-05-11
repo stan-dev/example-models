@@ -79,7 +79,7 @@ printf <- function(msg = "%5.3f", ...) {
 
 ## Abstract {-}
 
-Lotka (1925) and Volterra (1926) formulated parameteric differential equations that characterize the oscillating populations of predators and prey.   A statistical model to account for measurement error and unexplained variation uses the deterministic solutions to the Lotka-Volterra equations as expected population sizes. Stan is used to encode the statistical model and perform full Bayesian inference to solve the inverse problem of inferring parameters from noisy data.  The model is fit to Canadian lynx^[*Predator*: Canadian lynx
+Lotka (1925) and Volterra (1926) formulated parameteric differential equations that characterize the oscillating populations of predators and prey. A statistical model to account for measurement error and unexplained variation uses the deterministic solutions to the Lotka-Volterra equations as expected population sizes. Stan is used to encode the statistical model and perform full Bayesian inference to solve the inverse problem of inferring parameters from noisy data. The model is fit to Canadian lynx^[*Predator*: Canadian lynx
 ![Canadian lynx](img/lynx.jpg)
 <span style="font-size:70%; float:right">&copy; 2009, Keith Williams, CC-BY 2.0</span>
 ] and snowshoe hare^[*Prey*: snowshoe hare
@@ -103,14 +103,12 @@ Following up on the original source, Hewitt (1921) provides plots of the number 
 ![](img/hewitt-plot.png)
 <span style="float:right; font-size: 70%">&copy; Scribner's Sons 1921</span>
 ]
-Hewitt's discussion ranges over many natural factors affecting the population sizes, such as plagues, migrations, and weather-related events.  Hewitt even discusses measurement confounders such as the fact that lynx are easier to trap when they are hungry and weak, which is correlated with a relative decline in the hare population.  The models we consider here for illustrative purposes will not consider any of these factors, though they could be extended to do so through the usual strategy of the inclusion of covariates (see the exercises).  Hewitt also discusses many other species;  hares and lynxes occupy only a small part of a single chapter.
+Hewitt's discussion ranges over many natural factors affecting the population sizes, such as plagues, migrations, and weather-related events.  Hewitt even discusses measurement confounders such as the fact that lynx are easier to trap when they are hungry and weak, which is correlated with a relative decline in the hare population.  The models we consider here for illustrative purposes will not consider any of these factors, though they could be extended to do so through the usual strategy of the inclusion of covariates (see the exercises). Hewitt also discusses many other species; hares and lynxes occupy only a small part of a single chapter.
 
-Howard (2009)^[Howard (personal communication) traces the numerical data to Joseph
-M. Mahaffy's (2010) [lecture notes on mathematical
-modeling](http://jmahaffy.sdsu.edu/courses/f09/math636/lectures/lotka/qualde2.html)
-for his San Diego State University course (Math 636), which in turn
-cites Purves, Sadava, Orians, and Heller's book, *Life: The Science of
-Biology.*] provides numerical data for the number of pelts collected by the Hudson's Bay Company in the years 1900-1920, which we have included in comma-separated value (CSV) form in the source repository with the case study.
+Howard (2009)^[Howard (personal communication) traces the numerical data to Joseph M. Mahaffy's (2010) [lecture notes on mathematical modeling](http://jmahaffy.sdsu.edu/courses/f09/math636/lectures/lotka/qualde2.html) for his San Diego State University course (Math 636), which in turn cites Purves, Sadava, Orians, and Heller's book, *Life: The Science of Biology.*]
+provides numerical data for the number of pelts collected by the Hudson's Bay
+Company in the years 1900-1920, which we have included in comma-separated value
+(CSV) form in the source repository with the case study.
 
 ```{r}
 lynx_hare_df <-
@@ -204,7 +202,8 @@ As usual in writing differential equations, $u(t)$ and $v(t)$ are rendered as $u
 As measures of population sizes, the values of $u(t)$ and $v(t)$ must be non-negative.^[As in much of ecology, undead are frowned upon.]  Nothing in the differential equations here explicitly enforces positivity.  Nevertheless, as long as the initial populations are non-negative, i.e., $u(0) \geq 0$ and $v(0) \geq 0$, the values $u(t)$ and $v(t)$ for other times $t$ must also be non-negative.
 This is because the rate of change in each population is a factor of the population size itself.
 
-Although a population following the Lotka-Volterra dynamics will never become extinct,^[The dodo (right), in 1682, before the population became extinct.  ![](img/dodo.jpg) <br /> <span style="float:right; font-size:60%">1682, Sir Thomas Herbert, public domain.</span>]  it may become arbitrarily small.   In reality, random events such as accidents can cause extinction events as can not so random events such as extensive hunting.  Therefore, the Lotka-Volterra model should not be expected to adequately model the dynamics of small populations.
+Although a population following the Lotka-Volterra dynamics will never become extinct,^[The dodo (right), in 1682, before the population became extinct.  ![](img/dodo.jpg) <br /> <span style="float:right; font-size:60%">1682, Sir Thomas Herbert, public domain.</span>]
+it may become arbitrarily small.   In reality, random events such as accidents can cause extinction events as can not so random events such as extensive hunting.  Therefore, the Lotka-Volterra model should not be expected to adequately model the dynamics of small populations.
 
 
 ## Behavior in the limit
@@ -226,9 +225,12 @@ Specifically, a Bayesian model requires a mathematical model of what we know abo
 
 Mathematically, a prior density $p(\theta)$ over the sequence of parameters $\theta$ encapsulates our knowledge of the parameters before seeing the data.  A sampling distribution,^[The sampling distribution $p(\theta | y)$ is called a likelihood function when considered as a function $\mathcal{L}(\theta)$ of the parameters $\theta$ for fixed data $y$.] which may have a continuous, discrete or mixed probability function, $p(y | \theta)$ characterizes the distribution of observable data $y$ given parameters $\theta$.
 
-Bayes's rule gives us a general solution to the inverse problem, expressing the posterior $p(\theta | y)$ in terms of the prior $p(\theta)$ and likelihood $p(y | \theta)$.^[Bayes's rule for parameters $\theta$ and observed data $y$ is $$ \begin{array}{rcl} p(\theta\,|\, y) & = & \displaystyle \frac{p(\theta, y)}{p(y)} \\[4pt] & = & \displaystyle \frac{p(y | \theta) \, p(\theta)}{p(y)} \\[4pt] & = & \displaystyle \frac{p(y | \theta) \, p(\theta)}{\int_{\Theta} p(y | \theta) \, p(\theta) \, \mathrm{d}\theta} \\[4pt] & \propto & p(y | \theta) \, p(\theta). \end{array} $$]
+Bayes's rule gives us a general solution to the inverse problem, expressing the posterior $p(\theta | y)$
+in terms of the prior $p(\theta)$ and likelihood $p(y | \theta)$.^[Bayes's rule for parameters $\theta$ and observed data $y$ is $$ \begin{array}{rcl} p(\theta\,|\, y) & = & \displaystyle \frac{p(\theta, y)}{p(y)} \\[4pt] & = & \displaystyle \frac{p(y | \theta) \, p(\theta)}{p(y)} \\[4pt] & = & \displaystyle \frac{p(y | \theta) \, p(\theta)}{\int_{\Theta} p(y | \theta) \, p(\theta) \, \mathrm{d}\theta} \\[4pt] & \propto & p(y | \theta) \, p(\theta). \end{array} $$]
 
-Stan provides a form of Markov chain Monte Carlo (MCMC) sampling that draws a sample $\theta^{(1)}, \ldots, \theta^{(M)}$ from the posterior to use for computational inference.^[The matrix of $\theta^{(m)}$ values (parameter by draw) is what is returned by the `extract()` function in Stan.]  Posterior quantities of interest may be expressed as derived random variables using functions $f(\theta)$ of parameters. Such functions may be used for posterior expectation calculations such as parameter estimates that minimize expected square error when $f(\theta) = \theta$, or event probabilities such as the probability of the hare population falling below some fraction of the lynx population, when $f(\theta)$ is some indicator function.^[The convergence result (as well as error bounds) follows from the MCMC central limit theorem when $\theta^{(m)}$ are drawn according to $p(\theta | y)$ with an appropriate MCMC algorithm,  $$ \begin{array}{rcl} \displaystyle \mathbb{E}[ \, f(\theta) \mid y \, ] & = & \int_{\Theta} \, f(\theta) \, p(\theta | y) \, \mathrm{d}\theta \\[4pt] & = & \lim_{M \rightarrow \infty} \, \frac{1}{M} \sum_{m=1}^M \, f\!\left(\theta^{(m)}\right) \\[4pt] & \approx & \frac{1}{M} \sum_{m=1}^M \, f\!\left(\theta^{(m)}\right) \ \ \mbox{ for some finite } M \end{array} $$]
+Stan provides a form of Markov chain Monte Carlo (MCMC) sampling that draws a sample $\theta^{(1)}, \ldots, \theta^{(M)}$ from the posterior to use for computational inference.^[The matrix of $\theta^{(m)}$ values (parameter by draw) is what is returned by the `extract()` function in Stan.]
+Posterior quantities of interest may be expressed as derived random variables using functions $f(\theta)$ of parameters.
+Such functions may be used for posterior expectation calculations such as parameter estimates that minimize expected square error when $f(\theta) = \theta$, or event probabilities such as the probability of the hare population falling below some fraction of the lynx population, when $f(\theta)$ is some indicator function.^[The convergence result (as well as error bounds) follows from the MCMC central limit theorem when $\theta^{(m)}$ are drawn according to $p(\theta | y)$ with an appropriate MCMC algorithm,  $$ \begin{array}{rcl} \displaystyle \mathbb{E}[ \, f(\theta) \mid y \, ] & = & \int_{\Theta} \, f(\theta) \, p(\theta | y) \, \mathrm{d}\theta \\[4pt] & = & \lim_{M \rightarrow \infty} \, \frac{1}{M} \sum_{m=1}^M \, f\!\left(\theta^{(m)}\right) \\[4pt] & \approx & \frac{1}{M} \sum_{m=1}^M \, f\!\left(\theta^{(m)}\right) \ \ \mbox{ for some finite } M \end{array} $$]
 
 ## Measurement Error and Unexplained Variation
 
@@ -250,7 +252,9 @@ y_n & = & x_n \beta + \epsilon_n
 \end{eqnarray}
 $$
 
-The deterministic part of the equation is the linear predictor $x_n \beta$ with predictor $x_n$ (row $n$ of the data matrix $x$) and coefficient (column) vector $\beta$.  The stochastic error term, $\epsilon_n$, is assigned a normal distribution located at zero with scale parameter $\sigma > 0$.^[Gauss initially noted that the maximum likelihood estimate derived from the normal error model is identical to the least square error estimate derived by minimizing the sum of squared errors, $\epsilon^{\top} \, \epsilon$.  With Markov, Gauss further proved that it was the lowest variance unbiased estimator.].  We typically formulate this model without the latent error variable $\epsilon_n$ as follows,^[The latent error variable may be defined in terms of $x$, $y$, and $\beta$ as $$\epsilon_n = y_n - x_n \beta$$.]
+The deterministic part of the equation is the linear predictor $x_n \beta$ with predictor $x_n$ (row $n$ of the data matrix $x$) and coefficient (column) vector $\beta$.
+The stochastic error term, $\epsilon_n$, is assigned a normal distribution located at zero with scale parameter $\sigma > 0$.^[Gauss initially noted that the maximum likelihood estimate derived from the normal error model is identical to the least square error estimate derived by minimizing the sum of squared errors, $\epsilon^{\top} \, \epsilon$.  With Markov, Gauss further proved that it was the lowest variance unbiased estimator.].
+We typically formulate this model without the latent error variable $\epsilon_n$ as follows,^[The latent error variable may be defined in terms of $x$, $y$, and $\beta$ as $$\epsilon_n = y_n - x_n \beta$$.]
 
 $$
 y_n \sim \mathsf{Normal}(x_n \beta, \sigma).
@@ -353,7 +357,7 @@ whenever
 $$
 \log y_{n, k} \sim \mathsf{Normal}(\log(z_{n, k}), \sigma_n).
 $$
-The $\mathsf{LogNormal}$ density accounts for the non-linear change of variables through a Jacobian adjustment.^[The [Stan manual chapter on changes of variables](https://mc-stan.org/docs/stan-users-guide/changes-of-variables.html) works through this particular example.]
+The $\mathsf{LogNormal}$ density accounts for the non-linear change of variables through a Jacobian adjustment.^[The [Stan manual chapter on changes of variables](https://mc-stan.org/docs/stan-users-guide/changes-of-variables.html) works through the Jacobian adjustment for this particular change of variables.]
 
 ## Weakly informative priors
 
@@ -598,7 +602,7 @@ One inference we would like to make from our data is the size of the lynx and ha
 
 Rather than plugging in point estimates to get point predictions, we will follow the fully Bayesian approach of adjusting for uncertainty.  This uncertainty takes two forms in inference.  First, there is estimation uncertainty, which is fully characterized by the joint posterior density $p(\alpha, \beta, \gamma, \delta, z^{\mathrm init}, \sigma \mid y)$.^[In well-behaved models in which the data is broadly consistent with the prior and likelihood, estimation uncertainty is reduced by larger samples; as more data is available, it will overwhelm the fixed priors and the posterior will concentrate around the true values of the parameters.]
 
-The second form of uncertainty stems from measurement error and unexplained variation, which are both rolled into a single sampling distribution, $\log y_n \sim \mathsf{Normal}(\log z_n, \sigma)$.  As in the Stan implementation, $z_n = (u_n, v_n)$ is the solution to the differential equation conditioned on the parameters $\theta = (\alpha, \beta, \gamma, \delta, \sigma)$ and initial state $z^{\mathrm init}$.
+The second form of uncertainty stems from measurement error and unexplained variation, which are both rolled into a single sampling distribution, $\log y_n \sim \mathsf{LogNormal}(\log z_n, \sigma)$.  As in the Stan implementation, $z_n = (u_n, v_n)$ is the solution to the differential equation conditioned on the parameters $\theta = (\alpha, \beta, \gamma, \delta, \sigma)$ and initial state $z^{\mathrm init}$.
 
 ## Posterior predictive checks
 
@@ -856,7 +860,7 @@ model {
   theta[{1, 3}] ~ normal(1, 0.5);
   theta[{2, 4}] ~ normal(0.05, 0.05);
   sigma ~ lognormal(-1, 1);
-  z_init ~ lognormal(10, 1);
+  z_init ~ lognormal(log(10), 1);
   for (k in 1:2) {
     y_init[k] ~ lognormal(log(z_init[k]), sigma[k]);
     y[ , k] ~ lognormal(log(z[, k]), sigma[k]);
