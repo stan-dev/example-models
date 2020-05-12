@@ -1,6 +1,6 @@
 ---
 title: "Reduce Sum: A Minimal Example"
-date: "17 April 2020"
+date: "11 May 2020"
 output: html_document
 ---
 
@@ -261,8 +261,11 @@ Save this as `logistic1.stan`.
 Compile this model with threading support:
 
 ```{r}
-logistic1 <- cmdstan_model("logistic1.stan", threads = TRUE)
+logistic1 <- cmdstan_model("logistic1.stan", cpp_options = list(stan_threads = TRUE))
 ```
+
+**Note:** If you get an error `Error in self$compile(...) : unused argument (cpp_options = list(stan_threads = TRUE))`, [update](https://mc-stan.org/cmdstanr/) your `cmdstanr` to the latest version (the threading interface was changed in May 2020, shortly after this tutorial was originally published).
+
 
 Set the number of threads each chain will use with `set_num_threads`:
 
