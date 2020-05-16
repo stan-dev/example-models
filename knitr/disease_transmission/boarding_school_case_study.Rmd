@@ -1,12 +1,12 @@
 ---
 title: "Bayesian workflow for disease transmission modeling in Stan"
-author: "Léo Grinsztajn^[leo.grinsztajn@polytechnique.edu], Elizaveta Semenova, Charles C. Margossian, Julien Riou"
+author: "Léo Grinsztajn^[École polytechnique, Palaiseau, France, leo.grinsztajn@polytechnique.edu], Elizaveta Semenova^[Data Sciences and Quantitative Biology, Discovery Sciences, R&D, AstraZeneca, Cambridge, UK], Charles C. Margossian^[Department of Statistics, Columbia University, New York, NY, USA], Julien Riou^[Institute of Social and Preventive Medicine, University of Bern, Bern, Switzerland]"
 link-citations: true
 output:
   html_document:
-    toc: true
-    toc_depth: 5
-    toc_float: true
+  toc: true
+  toc_depth: 5
+  toc_float: true
 bibliography: biblio.bib
 biblio-style: imsmart-nameyear
 abstract: This tutorial shows how to build, fit, and criticize disease transmission models in Stan, and should be useful to researchers interested in modeling the COVID-19 outbreak and doing Bayesian inference. Bayesian modeling provides a principled way to quantify uncertainty and incorporate prior knowledge into the model. What is more, Stan's main inference engine, Hamiltonian Monte Carlo sampling, is amiable to diagnostics, which means we can verify whether our inference is reliable. Stan is an expressive probabilistic programing language that abstracts the inference and allows users to focus on the modeling. The resulting code is readable and easily extensible, which makes the modeler's work more transparent and flexible. In this tutorial, we demonstrate with a simple Susceptible-Infected-Recovered (SIR) model how to formulate, fit, and diagnose a compartmental model in Stan. We also introduce more advanced topics which can help practitioners fit sophisticated models; notably, how to use simulations to probe our model and our priors, and computational techniques to scale ODE-based models.
@@ -96,7 +96,7 @@ and scale up ODEs in Stan.
 Throughout the tutorial, we use R as a scripting language^[Note that Stan can also be used with other langages such as Python or Julia, see [here](https://mc-stan.org/users/interfaces/) for the list of Stan interfaces],
 and, while we review some elementary concepts,
 assume the reader has basic familiarity with Bayesian inference
-and Stan.
+and Stan. The source code of this case study can be found on Github [here](https://github.com/stan-dev/example-models/tree/master/knitr/disease_transmission).
 
 
 # 1 Simple SIR 
@@ -163,7 +163,6 @@ Let's give some intuition behind these ODEs. The proportion of infected people a
 The above model holds under several assumptions: 
 
 * births and deaths are not contributing to the dynamics and the total population $N=S+I+R$ remains constant, 
-
 * recovered individuals do not become susceptible again over time,
 
 * the infection rate $\beta$ and recovery rate $\gamma$ are constant, 
@@ -538,7 +537,8 @@ Here we see that the model gives a satisfying fit to the data,
 and that the model uncertainty is able to capture the variation of the data.
 
 ```{r}
-smr_pred <- cbind(as.data.frame(summary(fit_sir_negbin, pars = "pred_cases", probs = c(0.05, 0.5, 0.95))$summary), t, cases)
+smr_pred <- cbind(as.data.frame(summary(
+  fit_sir_negbin, pars = "pred_cases", probs = c(0.05, 0.5, 0.95))$summary), t, cases)
 colnames(smr_pred) <- make.names(colnames(smr_pred)) # to remove % in the col names
 
 ggplot(smr_pred, mapping = aes(x = t)) +
@@ -551,7 +551,8 @@ ggplot(smr_pred, mapping = aes(x = t)) +
 Maybe we also want to access the true number of infected people at each time, and not just the number of students in bed. This is a latent variable for which we have an estimation.
 ```{r}
 params <- lapply(t, function(i){sprintf("y[%s,2]", i)}) #number of infected for each day
-smr_y <- as.data.frame(summary(fit_sir_negbin, pars = params, probs = c(0.05, 0.5, 0.95))$summary)
+smr_y <- as.data.frame(summary(fit_sir_negbin, 
+                               pars = params, probs = c(0.05, 0.5, 0.95))$summary)
 colnames(smr_y) <- make.names(colnames(smr_y)) # to remove % in the col names
 
 ggplot(smr_y, mapping = aes(x = t)) +
@@ -686,7 +687,7 @@ ggplot(data = df_test) +
   scale_x_log10()
 ```
 
-We can do the same thing for R0 (again, on the log-scale), the loose bounds being 0.3 and 30.
+We can do the same thing for $R_0$ (again, on the log-scale), the loose bounds being 0.3 and 30.
 ```{r}
 df_test <- tibble(r = s_prior$R0)
 ggplot(data = df_test) + 
@@ -698,38 +699,37 @@ ggplot(data = df_test) +
 ```
 
 We thus see that these distributions are coherent with domain knowledge. See [here](https://github.com/stan-dev/stan/wiki/Prior-Choice-Recommendations) for more recommendations on prior choice.
-^[Previoulsy, we fitted the data with these priors and found a posteriori R0 ~ 3 and a recovery time of ~ 2 days. This is quite unexpected from our basic domain knowledge, but can probably be explained (R0 bigger among students? isolated students counts for recovered in the model? etc). This shows that the prior should not be too constraining in order to incorporate both prior knowledge and unexpected knowledge from the data.]
+^[Previoulsy, we fitted the data with these priors and found a posteriori $R_0$ ~ 3 and a recovery time of ~ 2 days. This is quite unexpected from our basic domain knowledge, but can probably be explained ($R_0$ bigger among students? isolated students counts for recovered in the model? etc). This shows that the prior should not be too constraining in order to incorporate both prior knowledge and unexpected knowledge from the data.]
 
 We can also plot trajectories of infection according to the prior, 
 that is the number of infected people at each time accoring to prior distributions of parameters.
-```{r}
-plot(1, type = "n", main = "Prior Predictive Infection Samples", xlim = c(t[1], t[length(t)]), xlab="y", ylim = c(0, 1000), ylab = "")
- 
-for (r in 1:1000){
-  lines(t, s_prior$y[,,2][r,],lw = 0.3, col = rgb(0, 0, 0, alpha = 0.6))
-}
-text(x = 1.8, y = 550, label = "Population size", col = rgb(1,0,0), cex = 0.8)
-abline(a = 577, b = 0, col = "red")
+```{r, warning=FALSE}
+n_draws <- 1000
+draws <- as_tibble(t(s_prior$y[,,2][1:n_draws,])) %>% add_column(t=t)
+draws <-  pivot_longer(draws, c(1:1000) , names_to = "draw")
+draws %>% 
+  ggplot() + 
+  geom_line(mapping = aes(x = t, y=value, group = draw), alpha = 0.6, size=0.1) +
+  geom_hline(yintercept=763, color="red")  +
+  geom_text(x=1.8, y=747, label="Population size", color="red") +
+  labs(x = "Day", y="Number of infected students")
 ```
 
 And the median (black line) and 90% interval of the *a priori* number of student in bed (i.e the observed number of infected students).
 ```{r}
-smr_pred <- cbind(as.data.frame(summary(fit_sir_prior, pars="pred_cases", probs=c(0.05, 0.5, 0.95))$summary), t)
+smr_pred <- cbind(as.data.frame(summary(fit_sir_prior, pars="pred_cases", 
+                                        probs=c(0.05, 0.5, 0.95))$summary), t)
 colnames(smr_pred) <- make.names(colnames(smr_pred)) # to remove % in the col names
 
 ggplot(smr_pred, mapping=aes(x=t)) +
   geom_ribbon(aes(ymin = X5., ymax = X95.), fill = "orange", alpha = 0.6) +
   geom_line(mapping=aes(x=t, y=X50.)) + 
-  geom_abline(intercept=577, color="red" ) +
-  geom_text(x=1.8, y=560, label="Population size", color="red") +
+  geom_hline(yintercept=763, color="red" ) +
+  geom_text(x=1.8, y=747, label="Population size", color="red") +
   labs(x = "Day", y="Number of students in bed")
 ```
 
-It seems that most trajectories are reasonable 
-(the number of infected stays below the total number of people depicted in red, 
-we see the number growing then decreasing etc.), 
-and quite diverse. Still, some of the curves look a little bit funky 
-and suggest we could refine our priors and make them more informative, although it may not be needed here. 
+It seems that most trajectories are reasonable and quite diverse. Still, some of the curves look a little bit funky and suggest we could refine our priors and make them more informative, although it may not be needed here. 
 
 Typically, we can get away with priors that do not capture all our *a priori* knowledge,
 provided the data is informative enough.
@@ -799,8 +799,10 @@ These are all questions this simple test can help us tackle.
 
 We take one arbitrary draw from the prior distribution
 ```{r}
-draw <- 12 # one arbitrary draw from the prior distribution
-cases_simu <- s_prior$pred_cases[draw,] # the number of predicted cases sampled from the prior distribution, which we will use as data
+# one arbitrary draw from the prior distribution
+draw <- 12 
+# the number of predicted cases sampled from the prior distribution, which we will use as data
+cases_simu <- s_prior$pred_cases[draw,] 
 ```
 
 And use it as data which we fit to our model.
@@ -814,7 +816,8 @@ We can then examine the estimated posterior distribution.
 
 ```{r}
 params = c("beta", "gamma", "phi")
-paste("true beta :", toString(s_prior$beta[draw]), ", true gamma :", toString(s_prior$gamma[draw]), ", true phi :", toString(s_prior$phi[draw]))
+paste("true beta :", toString(s_prior$beta[draw]), 
+      ", true gamma :", toString(s_prior$gamma[draw]), ", true phi :", toString(s_prior$phi[draw]))
 print(fit_simu, pars = params)
 ```
 We plot the posterior density (in red) to check if it matches the true value of the parameter (black line). 
@@ -1156,7 +1159,9 @@ where $y$ is the 4-entry state of the system, and $\phi_\text{death}$ is the dea
 
 7. Spatial heterogeneity could be modelled either via metapopulation models or models capturing neighbouring structure explicitly, such as CAR models.
 
+# Acknowledgments
 
+We thank Ben Bales and Andrew Gelman for their helpful comments on this case study.
 
 # References
 
