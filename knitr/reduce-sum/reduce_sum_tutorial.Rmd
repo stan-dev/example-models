@@ -1,6 +1,6 @@
 ---
 title: "Reduce Sum: A Minimal Example"
-date: "17 April 2020"
+date: "13 May 2020"
 output: html_document
 ---
 
@@ -122,15 +122,16 @@ logistic0 <- cmdstan_model("logistic0.stan")
 ```
 
 To sample from the model run:
-  
+
 ```{r}
 time0 = system.time(fit0 <- logistic0$sample(redcard_data,
-                                             num_cores = 4,
-                                             num_chains = 4,
+                                             cores = 4,
+                                             chains = 4,
                                              refresh = 1000))
 
 time0
 ```
+**Note:** Older versions of cmdstanr use `num_cores` and `num_chains` instead of `cores` and `chains`. If you get an error, [update](https://mc-stan.org/cmdstanr/) `cmdstanr`.
 
 In this case, we'll compute four chains using four cores. This computer has eight
 cores though, and we'll see how we can make use of those other cores later.
@@ -261,8 +262,11 @@ Save this as `logistic1.stan`.
 Compile this model with threading support:
 
 ```{r}
-logistic1 <- cmdstan_model("logistic1.stan", threads = TRUE)
+logistic1 <- cmdstan_model("logistic1.stan", cpp_options = list(stan_threads = TRUE))
 ```
+
+**Note:** If you get an error `Error in self$compile(...) : unused argument (cpp_options = list(stan_threads = TRUE))`, [update](https://mc-stan.org/cmdstanr/) your `cmdstanr` to the latest version (the threading interface was changed in May 2020, shortly after this tutorial was originally published).
+
 
 Set the number of threads each chain will use with `set_num_threads`:
 
@@ -283,12 +287,13 @@ Run and time the model with:
 ```{r}
 redcard_data$grainsize <- 1
 time1 = system.time(fit1 <- logistic1$sample(redcard_data,
-                                             num_cores = 4,
-                                             num_chains = 4,
+                                             cores = 4,
+                                             chains = 4,
                                              refresh = 1000))
 
 time1
 ```
+**Note:** Older versions of cmdstanr use `num_cores` and `num_chains` instead of `cores` and `chains`. If you get an error, [update](https://mc-stan.org/cmdstanr/) `cmdstanr`.
 
 Again, `elapsed` time is the time recorded as if by a stopwatch. Computing the
 ratios of the two times gives the speedup on eight cores of:
