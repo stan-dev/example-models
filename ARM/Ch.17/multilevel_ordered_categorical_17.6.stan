@@ -20,10 +20,13 @@ parameters {
 model {
   real mu_adj;
   matrix[N,n_cut] Q;
-  matrix[N,n_cut] P;
+  matrix[N,n_cut+1] P;
 
   mu_c ~ normal(0, 1000);
   mu_log_s ~ normal(0, 100);
+  
+  sigma_c ~ normal(0, 10);
+  sigma_log_s ~ normal(0, 10);
 
   for (i in 1:n_player) {
     C[i,1] ~ normal(mu_c[1], sigma_c[1]) T[0,C[i,2]];
