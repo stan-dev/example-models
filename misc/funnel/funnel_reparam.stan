@@ -6,8 +6,8 @@ transformed parameters {
   real y;
   vector[9] x;
 
-  y <- 3.0 * y_raw;
-  x <- exp(y/2) * x_raw;
+  y = 3.0 * y_raw;
+  x = exp(y/2) * x_raw;
 }
 model {
   y_raw ~ normal(0,1);
