@@ -14,7 +14,7 @@ parameters {
   vector[J] epsilon;            // error term in the regression model
 }
 model {
-  vector[N] eta;   
+  vector[N] eta;
   vector[J] theta;              // ability for person j
   alpha ~ lognormal(0.5,1);
   beta ~ normal(0,10);

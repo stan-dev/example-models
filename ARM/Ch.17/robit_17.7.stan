@@ -12,8 +12,8 @@ data {
   int<lower=0, upper=n_state> region[n_state];
   int<lower=0, upper=n_state> state[N];
   int<lower=0, upper=1> y[N];
-  vector[N] z;
-  vector[N] v_prev;
+  vector[N] z; // latent variable initialisation values
+  vector[n_state] v_prev;
 }
 parameters {
   real<lower=0> sigma_age;
@@ -48,6 +48,12 @@ model {
   b_female ~ normal(0, 100);
   b_black ~ normal(0, 100);
   b_female_black ~ normal(0, 100);
+  
+  sigma_age ~ normal(0, 10);
+  sigma_edu ~ normal(0, 10);
+  sigma_state ~ normal(0, 10);
+  sigma_region ~ normal(0, 10);
+  sigma_age_edu ~ normal(0, 10);
 
   b_age ~ normal(0, sigma_age);
   b_edu ~ normal(0, sigma_edu);

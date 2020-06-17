@@ -26,6 +26,10 @@ model {
 
   mu ~ normal(0, 100);
   mu_adj = mu + mean(b_eth) + mean(b_precint);
+  
+  sigma_epsilon ~ normal(0, 10);
+  sigma_eth ~ normal(0, 10);
+  sigma_precint ~ normal(0, 10);
 
   b_eth ~ normal(0, sigma_eth);
   b_eth_adj = b_eth - mean(b_eth);
@@ -41,3 +45,5 @@ model {
 
   stops ~ poisson_log(lambda);
 }
+// Information on the data can be found in this blog:
+// http://www.clayford.net/statistics/poisson-regression-ch-6-of-gelman-and-hill/

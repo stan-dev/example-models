@@ -1,6 +1,6 @@
 ---
 title: "Reduce Sum: A Minimal Example"
-date: "13 May 2020"
+date: "16 June 2020"
 output: html_document
 ---
 
@@ -125,20 +125,20 @@ To sample from the model run:
 
 ```{r}
 time0 = system.time(fit0 <- logistic0$sample(redcard_data,
-                                             cores = 4,
                                              chains = 4,
+                                             parallel_chains = 4,
                                              refresh = 1000))
 
 time0
 ```
-**Note:** Older versions of cmdstanr use `num_cores` and `num_chains` instead of `cores` and `chains`. If you get an error, [update](https://mc-stan.org/cmdstanr/) `cmdstanr`.
+**Note:** Older versions of cmdstanr use `num_cores`, `cores`, and `num_chains` instead of `parallel_chains`, `threads_per_chain`, and `chains`. If you get an error, [update](https://mc-stan.org/cmdstanr/) `cmdstanr`.
 
-In this case, we'll compute four chains using four cores. This computer has eight
-cores though, and we'll see how we can make use of those other cores later.
-The `elapsed` time is the time that we would have recorded if we were
-timing this process with a stop-watch, so that is the one relevant to understanding
-performance here (`system` time is time spent on system functions like I/O,
-                  and `user` time is for parallel calculations).
+In this case, we'll compute four chains running in parallel on four cores.
+This computer has eight cores though, and we'll see how we can make use of
+those other cores later. The `elapsed` time is the time that we would have
+recorded if we were timing this process with a stop-watch, so that is the
+one relevant to understanding performance here (`system` time is time spent
+on system functions like I/O, and `user` time is for parallel calculations).
 
 ## Rewriting the Model to Enable Multithreading
 
@@ -267,36 +267,29 @@ logistic1 <- cmdstan_model("logistic1.stan", cpp_options = list(stan_threads = T
 
 **Note:** If you get an error `Error in self$compile(...) : unused argument (cpp_options = list(stan_threads = TRUE))`, [update](https://mc-stan.org/cmdstanr/) your `cmdstanr` to the latest version (the threading interface was changed in May 2020, shortly after this tutorial was originally published).
 
-
-Set the number of threads each chain will use with `set_num_threads`:
-
-```{r}
-set_num_threads(2)
-```
-
-As this computer has 8 cores and we intend to run the usual 4 chains,
-we will use 2 threads per chain to make full use of the processor
-(4 chains with 2 threads each can make use of the full eight cores).
-The within-chain parallelism is generally less effiecient as compared to
-running chains in parallel, but if greater single-chain speedups are desired,
-then the user can choose to run fewer chains (i.e. 2 chains with 4 threads
-each) or use more machines.
+The computer I'm on has 8 cores and we want to make use of all of them. Running 4
+chains in parallel gives us 2 threads per chain (which makes full
+use of all 8 cores on the processor). The within-chain parallelism is generally
+less efficient as compared to running chains in parallel, but if greater
+single-chain speedups are desired, then the user can choose to run fewer
+chains (i.e. 2 chains in parallel with 4 threads each).
 
 Run and time the model with:
 
 ```{r}
 redcard_data$grainsize <- 1
 time1 = system.time(fit1 <- logistic1$sample(redcard_data,
-                                             cores = 4,
                                              chains = 4,
+                                             parallel_chains = 4,
+                                             threads_per_chain = 2,
                                              refresh = 1000))
 
 time1
 ```
-**Note:** Older versions of cmdstanr use `num_cores` and `num_chains` instead of `cores` and `chains`. If you get an error, [update](https://mc-stan.org/cmdstanr/) `cmdstanr`.
+**Note:** Older versions of cmdstanr use `num_cores`, `cores`, and `num_chains` instead of `parallel_chains`, `threads_per_chain`, and `chains`. If you get an error, [update](https://mc-stan.org/cmdstanr/) `cmdstanr`.
 
 Again, `elapsed` time is the time recorded as if by a stopwatch. Computing the
-ratios of the two times gives the speedup on eight cores of:
+ratios of the two times gives a speedup on eight cores of:
 
 ```{r}
 time0[["elapsed"]] / time1[["elapsed"]]
@@ -312,8 +305,8 @@ or model block, or do not do very much computation inside the reduce function,
 or does not get lucky with caching, the speedup will be much more limited.
 
 We can always get speedup in terms of effective sample size per time
-by running multiple chains on different cores. `reduce_sum` is not a
-replacement for that, and it is still important to run multiple chains
+by running multiple chains in parallel on different cores. `reduce_sum` is not
+a replacement for that, and it is still important to run multiple chains
 to check diagnostics. `reduce_sum` is a tool for speeding up single chain
 calculations, which can be useful for model development and on computers with
 large numbers of cores.
