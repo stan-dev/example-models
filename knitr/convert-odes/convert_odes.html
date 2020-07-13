@@ -368,19 +368,94 @@ summary {
 </div>
 
 
-<p>Cmdstan 2.24 introduces a new ODE interface intended to make it easier to use complicated data structures when working with ODEs. As such, there are a few significant user-facing changes that someone solving ODEs in Stan should be aware of:</p>
-<ul>
-<li><p>In the old ODE interface, parameters and data that are going to be used in evaluating the ODE system function are packed into one of three arrays, a <code>real[]</code> array for parameters, a <code>real[]</code> array for data that are reals, and an <code>int[]</code> array for integer data. These three arrays are passed by Stan from the ODE solve function call to the ODE system function.</p>
-<p>In the new interface, no packing is necesary. Any argument (parameter or data) can be passed from the ODE solve function to the ODE system function by appending it to the end of the ODE solve function call (and adding a matching argument declaration in the ODE system function).</p></li>
-<li><p>The new interface also uses <code>vector</code> variables instead of <code>real[]</code> variables for the states.</p></li>
-<li><p>The new interface functions are renamed <code>ode_rk45</code>, <code>ode_bdf</code>, <code>ode_adams</code>. These have default tolerances. The separate functions <code>ode_rk45_tol</code>, <code>ode_bdf_tol</code>, and <code>ode_rk45_adams</code> can be used to solve ODEs with specified tolerances.</p></li>
-</ul>
-<p>This guide is meant to show examples of using the new ODE interface as compared to the old one. For detailed information about either interface, look at the function reference guide: <a href="https://mc-stan.org/docs/2_23/functions-reference/functions-ode-solver.html">Old interface</a>, <a href="https://mc-stan.org/docs/2_23/functions-reference/functions-ode-solver.html">New interface</a></p>
+<div id="introduction" class="section level1">
+<h1>Introduction</h1>
+<p>Cmdstan 2.24 introduces a new ODE interface intended to make it easier to use complicated data structures.</p>
+<p>Stan solves for <span class="math inline">\(y(t, \theta)\)</span> at a sequence of times <span class="math inline">\(t_1, t_2, \cdots, t_N\)</span> in the ODE initial value problem defined by:</p>
+<p><span class="math display">\[
+y(t, \theta)' = f(t, y, \theta)\\
+y(t = t_0, \theta) = y_0
+\]</span></p>
+<p>For notation, <span class="math inline">\(y(t, \theta)\)</span> is the state, <span class="math inline">\(f(t, y, \theta)\)</span> is the ODE system function, and <span class="math inline">\(y_0\)</span> and <span class="math inline">\(t_0\)</span> are the initial conditions.</p>
+<p>The solution, <span class="math inline">\(y(t, \theta)\)</span>, is written explicitly in terms of <span class="math inline">\(\theta\)</span> as a reminder that the solution of an ODE initial value problem can be a function of model parameters or data. This is the usual use case: an ODE is parameterized by a set of parameters that are to be estimated.</p>
+<p>Specifying an ODE initial value problem in Stan involves writing a Stan function for the ODE system function, <span class="math inline">\(f(t, y, \theta)\)</span>. The big difference in the old and new ODE interfaces is that previously any arguments meant for the ODE system function had to be manually packed and unpacked from special argument arrays that were passed from the ODE solve function call to the ODE system function – in the new interface none of this packing and unpacking is necessary.</p>
+<p>The new interface also uses <code>vector</code> variables for the state rather than <code>real[]</code> variables.</p>
+<p>As an example, in the old solver interface the system function for the ODE <span class="math inline">\(y' = -\alpha y\)</span> would be written:</p>
+<pre class="stan"><code>functions {
+  real[] rhs(real t, real[] y, real[] theta, real[] x_r, int[] x_i) {
+    real alpha = theta[1];
+
+    real yp[1] = { -alpha * y[1] };
+
+    return yp;
+  }
+}</code></pre>
+<p>In the new interface the system function can be written:</p>
+<pre class="stan"><code>functions {
+  vector rhs(real t, vector y, real alpha) {
+    vector[1] yp = -alpha * y;
+
+    return yp;
+  }
+}</code></pre>
+<p>The new interface avoids unused arguments <code>x_r</code>, and <code>x_i</code>, and the parameter <code>alpha</code> can be passed directly instead of being packed into <code>theta</code>.</p>
+<p>For a simple function, this does not look like much, but for more complicated models with numerous arguments of different types, the packing and unpacking is tedious and error prone. This leads to models that are difficult to debug and difficult to iterate on.</p>
+</div>
+<div id="new-interface" class="section level1">
+<h1>New Interface</h1>
+<p>The new interface introduces six new functions:</p>
+<p><code>ode_bdf</code>, <code>ode_adams</code>, <code>ode_rk45</code> and <code>ode_bdf_tol</code>,<code>ode_adams_tol</code>, <code>ode_rk45_tol</code></p>
+<p>The solvers in the first columns have default tolerance settings. The solvers in the second column accept arguments for relative tolerance, absolute tolerance, and the maximum number of steps to take between output times.</p>
+<p>This is different from the old interface where tolerances are presented as overloads to the same function.</p>
+<p>The new <code>ode_bdf</code> solver interface is (the interfaces for <code>ode_adams</code> and <code>ode_rk45</code> are the same):</p>
+<pre class="stan"><code>vector[] ode_bdf(F f,
+                 vector y0,
+                 real t0, real[] times,
+                 T1 arg1, T2 arg2, ...)</code></pre>
+<p>The arguments are:</p>
+<ol style="list-style-type: decimal">
+<li><p><code>f</code> - ODE system function</p></li>
+<li><p><code>y0</code> - Initial state of the ODE</p></li>
+<li><p><code>t0</code> - Initial time of the ODE</p></li>
+<li><p><code>times</code> - Sorted array of times to which the ode will be solved (each element must be greater than t0)</p></li>
+<li><p><code>arg1, arg2, ...</code> - Arguments passed unmodified to the ODE system function. There can be any number of <code>...</code> arguments, and the <code>...</code> arguments can be any type, but they must match the types of the corresponding <code>...</code> arguments of <code>f</code>.</p></li>
+</ol>
+<p>The ODE system function should take the form:</p>
+<pre class="stan"><code>vector f(real t, vector y, T1 arg1, T2 arg2, ...)</code></pre>
+<p>The arguments are:</p>
+<ol style="list-style-type: decimal">
+<li><p><code>t</code> - Time at which to evaluate the ODE system function</p></li>
+<li><p><code>y</code> - State at which to evaluate the ODE system function</p></li>
+<li><p><code>arg1, arg2, ...</code> - Arguments passed unmodified from the ODE solver function call. The <code>...</code> must match the types of the corresponding <code>...</code> arguments of the ODE solver function call.</p></li>
+</ol>
+<p>A call to <code>ode_bdf</code> returns the solution of the ODE specified by the right hand side (<code>f</code>) and the initial conditions (<code>y0</code> and <code>t0</code>) at the time points given by the <code>times</code> argument. The solution is given by an array of vectors.</p>
+<p>The proposed <code>ode_bdf_tol</code> interface is (the interfaces for <code>ode_rk45_tol</code> and <code>ode_adams_tol</code> are the same):</p>
+<pre class="stan"><code>vector[] ode_bdf_tol(F f,
+                     vector y0,
+                     real t0, real[] times,
+                     real rel_tol, real abs_tol,
+                     int max_num_steps,
+                     ...)</code></pre>
+<p>The arguments are: 1. <code>f</code> - ODE system function</p>
+<ol start="2" style="list-style-type: decimal">
+<li><p><code>y0</code> - Initial state of the ODE</p></li>
+<li><p><code>t0</code> - Initial time of the ODE</p></li>
+<li><p><code>times</code> - Sorted array of times to which the ode will be solved (each element must be greater than t0)</p></li>
+<li><p><code>rel_tol</code> - Relative tolerance for solve (data)</p></li>
+<li><p><code>abs_tol</code> - Absolute tolerance for solve (data)</p></li>
+<li><p><code>max_num_steps</code> - Maximum number of timesteps to take in integrating the ODE solution between output time points (data)</p></li>
+<li><p><code>...</code> - Arguments passed unmodified to the ODE system function. There can be any number of <code>...</code> arguments, and the <code>...</code> arguments can be any type, but they must match the types of the corresponding <code>...</code> arguments of <code>f</code>.</p></li>
+</ol>
+<p>The <code>ode_rk45</code>/<code>ode_bdf</code>/<code>ode_adams</code> interfaces are just wrappers around the <code>ode_rk45_tol</code>/<code>ode_bdf_tol</code>/<code>ode_adams_tol</code> interfaces with defaults for <code>rel_tol</code>, <code>abs_tol</code>, and <code>max_num_steps</code>. For the RK45 solver the defaults are <span class="math inline">\(10^{-6}\)</span> for <code>rel_tol</code> and <code>abs_tol</code> and <span class="math inline">\(10^6\)</span> for <code>max_num_steps</code>. For the BDF/Adams solvers the defaults are <span class="math inline">\(10^{-10}\)</span> for <code>rel_tol</code> and <code>abs_tol</code> and <span class="math inline">\(10^8\)</span> for <code>max_num_steps</code>.</p>
+<p>For more detailed information about either interface, look at the function reference guide: <a href="https://mc-stan.org/docs/2_23/functions-reference/functions-ode-solver.html">Old interface</a>, <a href="https://mc-stan.org/docs/2_23/functions-reference/functions-ode-solver.html">New interface</a></p>
+</div>
+<div id="example-models" class="section level1">
+<h1>Example Models</h1>
 <p>The two models here come from the Stan <a href="https://github.com/stan-dev/stat_comp_benchmarks">Statistical Computation Benchmarks</a>.</p>
-<div id="sir-model" class="section level1">
-<h1>SIR Model</h1>
-<div id="ode-system-function" class="section level2">
-<h2>ODE System Function</h2>
+<div id="sir-model" class="section level2">
+<h2>SIR Model</h2>
+<div id="ode-system-function" class="section level3">
+<h3>ODE System Function</h3>
 <p>In the old SIR system function, <code>beta</code>, <code>kappa</code>, <code>gamma</code>, <code>xi</code>, and <code>delta</code>, are packed into the <code>real[] theta</code> argument. <code>kappa</code> isn’t actually a model parameter so it is not clear why it is packed in with the other parameters, but it is. Promoting <code>kappa</code> to a parameter causes there to be more states in the extended ODE sensitivity system (used to get gradients of the ODE with respect to inputs). The ODE system function looks like:</p>
 <pre class="stan"><code>functions {
   // theta[1] = beta, water contact rate
@@ -423,8 +498,8 @@ summary {
   }
 }</code></pre>
 </div>
-<div id="calling-the-ode-solver" class="section level2">
-<h2>Calling the ODE Solver</h2>
+<div id="calling-the-ode-solver" class="section level3">
+<h3>Calling the ODE Solver</h3>
 <p>In the old ODE interface, the parameters are all packed into a <code>real[]</code> array before calling the ODE solver:</p>
 <pre class="stan"><code>transformed parameters {
   real&lt;lower=0&gt; y[N_t, 4];
@@ -441,15 +516,15 @@ summary {
   }
 }</code></pre>
 </div>
-<div id="full-model" class="section level2">
-<h2>Full Model</h2>
+<div id="full-model" class="section level3">
+<h3>Full Model</h3>
 <p>The full model with the new interface can be found <a href="https://github.com/stan-dev/stat_comp_benchmarks/blob/master/benchmarks/sir/sir.stan">here</a>; the full model with the old interface can be found <a href="https://github.com/stan-dev/stat_comp_benchmarks/blob/master/benchmarks/sir/sir.stan">here</a>, and the data can be found <a href="https://github.com/stan-dev/stat_comp_benchmarks/blob/master/benchmarks/sir/sir.data.R">here</a>.</p>
 </div>
 </div>
-<div id="pkpd-model" class="section level1">
-<h1>PKPD Model</h1>
-<div id="ode-system-function-1" class="section level2">
-<h2>ODE System Function</h2>
+<div id="pkpd-model" class="section level2">
+<h2>PKPD Model</h2>
+<div id="ode-system-function-1" class="section level3">
+<h3>ODE System Function</h3>
 <p>In the old system function, parameters are manually unpacked from <code>theta</code> and <code>x_r</code>:</p>
 <pre><code>functions {
   real[] one_comp_mm_elim_abs(real t,
@@ -497,8 +572,8 @@ summary {
   }
 }</code></pre>
 </div>
-<div id="calling-the-ode-solver-1" class="section level2">
-<h2>Calling the ODE Solver</h2>
+<div id="calling-the-ode-solver-1" class="section level3">
+<h3>Calling the ODE Solver</h3>
 <p>In the old interface the <code>theta</code> and <code>x_r</code> arguments are packed manually, and the <code>x_i</code> argument is required even though it isn’t used:</p>
 <pre><code>transformed data {
   real x_r[2] = {D, V};
@@ -521,14 +596,15 @@ transformed parameters {
   }
 }</code></pre>
 </div>
-<div id="full-model-1" class="section level2">
-<h2>Full Model</h2>
+<div id="full-model-1" class="section level3">
+<h3>Full Model</h3>
 <p>The full model with the new interface can be found <a href="https://github.com/stan-dev/stat_comp_benchmarks/blob/master/benchmarks/pkpd/one_comp_mm_elim_abs.stan">here</a>; the full model with the old interface can be found <a href="https://github.com/stan-dev/stat_comp_benchmarks/blob/master/benchmarks/pkpd/one_comp_mm_elim_abs.stan">here</a>, and the data can be found <a href="https://github.com/stan-dev/stat_comp_benchmarks/blob/master/benchmarks/pkpd/one_comp_mm_elim_abs.data.R">here</a>.</p>
 </div>
-<div id="generated-quantities-only-model" class="section level2">
-<h2>Generated Quantities Only Model</h2>
+<div id="generated-quantities-only-model" class="section level3">
+<h3>Generated Quantities Only Model</h3>
 <p>There is an additional PKPD model that only uses generated quantities. It has been converted to the new interface as well.</p>
 <p>The full model with the new interface can be found <a href="https://github.com/stan-dev/stat_comp_benchmarks/blob/master/benchmarks/pkpd/sim_one_comp_mm_elim_abs.stan">here</a>; the full model with the old interface can be found <a href="https://github.com/stan-dev/stat_comp_benchmarks/blob/master/benchmarks/pkpd/sim_one_comp_mm_elim_abs.stan">here</a>, and the data can be found <a href="https://github.com/stan-dev/stat_comp_benchmarks/blob/master/benchmarks/pkpd/one_comp_mm_elim_abs.data.R">here</a>.</p>
+</div>
 </div>
 </div>
 
