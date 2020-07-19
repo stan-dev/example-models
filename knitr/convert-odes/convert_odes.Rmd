@@ -58,7 +58,7 @@ In the new interface the system function can be written:
 ```{stan, output.var = "", eval = FALSE}
 functions {
   vector rhs(real t, vector y, real alpha) {
-    vector[1] yp = [ -alpha * y ]';
+    vector[1] yp = -alpha * y;
 
     return yp;
   }
@@ -296,7 +296,7 @@ and the data can be found
 In the old system function, parameters are manually unpacked from `theta` and
 `x_r`:
 
-```
+```{stan, output.var = "", eval = FALSE}
 functions {
   real[] one_comp_mm_elim_abs(real t,
                               real[] y,
@@ -324,7 +324,7 @@ functions {
 
 In the new interface, they are passed directly and so the unpacking is avoided:
 
-```
+```{stan, output.var = "", eval = FALSE}
 functions {
   vector one_comp_mm_elim_abs(real t,
                               vector y,
@@ -353,7 +353,7 @@ functions {
 In the old interface the `theta` and `x_r` arguments are packed manually, and
 the `x_i` argument is required even though it isn't used:
 
-```
+```{stan, output.var = "", eval = FALSE}
 transformed data {
   real x_r[2] = {D, V};
   int x_i[0];
@@ -371,7 +371,7 @@ transformed parameters {
 In the new interface the arguments are simply passed at the end of the
 `ode_bdf` call (and the `transformed data` block removed):
 
-```
+```{stan, output.var = "", eval = FALSE}
 transformed parameters {
   vector[1] C[N_t] = ode_bdf(one_comp_mm_elim_abs, C0, t0, times, k_a, K_m, V_m, D, V);
 }
