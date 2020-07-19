@@ -180,8 +180,8 @@ For the BDF/Adams solvers the defaults are $10^{-10}$ for `rel_tol` and
 
 For more detailed information about either interface, look at the function
 reference guide:
-[Old interface](https://mc-stan.org/docs/2_23/functions-reference/functions-ode-solver.html),
-[New interface](https://mc-stan.org/docs/2_23/functions-reference/functions-ode-solver.html)
+[New interface](https://mc-stan.org/docs/2_24/functions-reference/functions-ode-solver.html),
+[Old interface](https://mc-stan.org/docs/2_24/functions-reference/functions-old-ode-solver.html)
 
 # Example Models
 

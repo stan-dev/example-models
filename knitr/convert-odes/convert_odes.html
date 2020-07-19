@@ -443,7 +443,7 @@ y(t = t_0, \theta) = y_0
 <li><p><code>...</code> - Sequence of arguments passed unmodified to the ODE system function. There can be any number of <code>...</code> arguments, and the <code>...</code> arguments can be any type, but they must match the types of the corresponding <code>...</code> arguments of <code>f</code>.</p></li>
 </ol>
 <p>The <code>ode_rk45</code>/<code>ode_bdf</code>/<code>ode_adams</code> interfaces are just wrappers around the <code>ode_rk45_tol</code>/<code>ode_bdf_tol</code>/<code>ode_adams_tol</code> interfaces with defaults for <code>rel_tol</code>, <code>abs_tol</code>, and <code>max_num_steps</code>. For the RK45 solver the defaults are <span class="math inline">\(10^{-6}\)</span> for <code>rel_tol</code> and <code>abs_tol</code> and <span class="math inline">\(10^6\)</span> for <code>max_num_steps</code>. For the BDF/Adams solvers the defaults are <span class="math inline">\(10^{-10}\)</span> for <code>rel_tol</code> and <code>abs_tol</code> and <span class="math inline">\(10^8\)</span> for <code>max_num_steps</code>.</p>
-<p>For more detailed information about either interface, look at the function reference guide: <a href="https://mc-stan.org/docs/2_23/functions-reference/functions-ode-solver.html">Old interface</a>, <a href="https://mc-stan.org/docs/2_23/functions-reference/functions-ode-solver.html">New interface</a></p>
+<p>For more detailed information about either interface, look at the function reference guide: <a href="https://mc-stan.org/docs/2_24/functions-reference/functions-ode-solver.html">New interface</a>, <a href="https://mc-stan.org/docs/2_24/functions-reference/functions-old-ode-solver.html">Old interface</a></p>
 </div>
 <div id="example-models" class="section level1">
 <h1>Example Models</h1>
