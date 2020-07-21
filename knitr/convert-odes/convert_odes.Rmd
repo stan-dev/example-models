@@ -1,0 +1,386 @@
+---
+title: "Upgrading to the new ODE interface"
+author: "Ben Bales & Sebastian Weber"
+date: "19 July 2020"
+output: html_document
+---
+
+# Introduction
+
+Cmdstan 2.24 introduces a new ODE interface intended to make it easier to
+specify the ODE RHS by avoiding packing and unpacking schemes required with
+the old interface.
+
+Stan solves for $y(t, \theta)$ at a sequence of times $t_1, t_2, \cdots, t_N$
+in the ODE initial value problem defined by:
+
+$$
+y(t, \theta)' = f(t, y, \theta)\\
+y(t = t_0, \theta) = y_0
+$$
+
+For notation, $y(t, \theta)$ is the state, $f(t, y, \theta)$ is the ODE system
+function, and $y_0$ and $t_0$ are the initial conditions.
+
+The solution, $y(t, \theta)$, is written explicitly in terms of $\theta$
+as a reminder that the solution of an ODE initial value problem can be a
+function of model parameters or data. This is the usual use case: an ODE
+is parameterized by a set of parameters that are to be estimated.
+
+Specifying an ODE initial value problem in Stan involves writing a Stan
+function for the ODE system function, $f(t, y, \theta)$. The big difference
+in the old and new ODE interfaces is that previously any arguments meant for
+the ODE system function had to be manually packed and unpacked from special
+argument arrays that were passed from the ODE solve function call to the ODE
+system function -- in the new interface none of this packing and unpacking
+is necessary.
+
+The new interface also uses `vector` variables for the state rather than
+`real[]` variables.
+
+As an example, in the old solver interface the system function for the ODE
+$y' = -\alpha y$ would be written:
+
+```{stan, output.var = "", eval = FALSE}
+functions {
+  real[] rhs(real t, real[] y, real[] theta, real[] x_r, int[] x_i) {
+    real alpha = theta[1];
+
+    real yp[1] = { -alpha * y[1] };
+
+    return yp;
+  }
+}
+```
+
+In the new interface the system function can be written:
+
+```{stan, output.var = "", eval = FALSE}
+functions {
+  vector rhs(real t, vector y, real alpha) {
+    vector[1] yp = -alpha * y;
+
+    return yp;
+  }
+}
+```
+
+The new interface avoids any unused arguments (such as `x_r`, and `x_i` in
+this example), and the parameter `alpha` can be passed directly instead of
+being packed into `theta`.
+
+For a simple function, this does not look like much, but for more
+complicated models with numerous arguments of different types, the packing
+and unpacking is tedious and error prone. This leads to models that are
+difficult to debug and difficult to iterate on.
+
+# New Interface
+
+The new interface introduces six new functions:
+
+`ode_bdf`, `ode_adams`, `ode_rk45` and `ode_bdf_tol`,`ode_adams_tol`,
+`ode_rk45_tol`
+
+The solvers in the first columns have default tolerance settings. The solvers
+in the second column accept arguments for relative tolerance, absolute
+tolerance, and the maximum number of steps to take between output times.
+
+This is different from the old interface where tolerances are presented
+through using the same function name with a few more arguments.
+
+To make it easier to write ODEs, the solve functions take extra arguments
+that are passed along unmodified to the user-supplied system function.
+Because there can be any number of these arguments and they can be of
+different types, they are denoted below as `...`. The types of the
+arguments represented by `...` in the ODE solve function call must match
+the types of the arguments represented by `...` in the user-supplied system
+function.
+
+The new `ode_bdf` solver interface is (the interfaces for `ode_adams` and
+`ode_rk45` are the same):
+
+```{stan, output.var = "", eval = FALSE}
+vector[] ode_bdf(F f, vector y0, real t0, real[] times, ...)
+```
+
+The arguments are:
+
+1. ```f``` - ODE system function
+
+2. ```y0``` - Initial state of the ODE
+
+3. ```t0``` - Initial time of the ODE
+
+4. ```times``` - Sorted array of times to which the ode will be solved (each
+  element must be greater than t0, but times do not need to be strictly
+  increasing)
+
+5. ```...``` - Sequence of arguments passed unmodified to the ODE system
+function. There can be any number of ```...``` arguments, and the ```...```
+arguments can be any type, but they must match the types of the corresponding
+```...``` arguments of ```f```.
+
+The ODE system function should take the form:
+
+```{stan, output.var = "", eval = FALSE}
+vector f(real t, vector y, ...)
+```
+
+The arguments are:
+
+1. ```t``` - Time at which to evaluate the ODE system function
+
+2. ```y``` - State at which to evaluate the ODE system function
+
+3. ```...``` - Sequence of arguments passed unmodified from the ODE solver
+function call. The ```...``` must match the types of the corresponding
+```...``` arguments of the ODE solver function call.
+
+A call to `ode_bdf` returns the solution of the ODE specified by the system
+function (`f`) and the initial conditions (`y0` and `t0`) at the time points given
+by the `times` argument. The solution is given by an array of vectors.
+
+The `ode_bdf_tol` interface is (the interfaces for `ode_rk45_tol`
+and `ode_adams_tol` are the same):
+
+```{stan, output.var = "", eval = FALSE}
+vector[] ode_bdf_tol(F f, vector y0, real t0, real[] times,
+                     real rel_tol, real abs_tol, int max_num_steps, ...)
+```
+
+The arguments are:
+1. ```f``` - ODE system function
+
+2. ```y0``` - Initial state of the ODE
+
+3. ```t0``` - Initial time of the ODE
+
+4. ```times``` - Sorted array of times to which the ode will be solved (each
+  element must be greater than t0, but times do not need to be strictly
+  increasing)
+
+5. ```rel_tol``` - Relative tolerance for solve (data)
+
+6. ```abs_tol``` - Absolute tolerance for solve (data)
+
+7. ```max_num_steps``` - Maximum number of timesteps to take in integrating
+  the ODE solution between output time points (data)
+
+5. ```...``` - Sequence of arguments passed unmodified to the ODE system
+function. There can be any number of ```...``` arguments, and the ```...```
+arguments can be any type, but they must match the types of the corresponding
+```...``` arguments of ```f```.
+
+The `ode_rk45`/`ode_bdf`/`ode_adams` interfaces are just wrappers around the
+`ode_rk45_tol`/`ode_bdf_tol`/`ode_adams_tol` interfaces with defaults for
+`rel_tol`, `abs_tol`, and `max_num_steps`. For the RK45 solver the defaults
+are $10^{-6}$ for `rel_tol` and `abs_tol` and $10^6$ for `max_num_steps`.
+For the BDF/Adams solvers the defaults are $10^{-10}$ for `rel_tol` and
+`abs_tol` and $10^8$ for `max_num_steps`.
+
+For more detailed information about either interface, look at the function
+reference guide:
+[New interface](https://mc-stan.org/docs/2_24/functions-reference/functions-ode-solver.html),
+[Old interface](https://mc-stan.org/docs/2_24/functions-reference/functions-old-ode-solver.html)
+
+# Example Models
+
+The two models here come from the Stan
+[Statistical Computation Benchmarks](https://github.com/stan-dev/stat_comp_benchmarks).
+
+## SIR Model
+
+### ODE System Function
+
+In the old SIR system function, `beta`, `kappa`, `gamma`, `xi`, and `delta`,
+are packed into the `real[] theta` argument. `kappa` isn't actually a model
+parameter so it is not clear why it is packed in with the other parameters,
+but it is. Promoting `kappa` to a parameter causes there to be more states
+in the extended ODE sensitivity system (used to get gradients of the ODE
+with respect to inputs). Adding states to the sensitivity system makes the
+ODE harder to solve and should always be avoided. The ODE system function looks
+like:
+
+```{stan, output.var = "", eval = FALSE}
+functions {
+  // theta[1] = beta, water contact rate
+  // theta[2] = kappa, C_{50}
+  // theta[3] = gamma, recovery rate
+  // theta[4] = xi, bacteria production rate
+  // theta[5] = delta, bacteria removal rate
+  real[] simple_SIR(real t,
+                    real[] y,
+                    real[] theta,
+                    real[] x_r,
+                    int[] x_i) {
+    real dydt[4];
+
+    dydt[1] = - theta[1] * y[4] / (y[4] + theta[2]) * y[1];
+    dydt[2] = theta[1] * y[4] / (y[4] + theta[2]) * y[1] - theta[3] * y[2];
+    dydt[3] = theta[3] * y[2];
+    dydt[4] = theta[4] * y[2] - theta[5] * y[4];
+
+    return dydt;
+  }
+}
+```
+
+For comparison, with the new interface the ODE system function can be
+rewritten to explicitly name all the parameters. No separation of data
+and parameters is necessary either -- the solver will not add more
+equations for arguments that are defined in the `data` and
+`transformed data` blocks. The state variables in the new model are also
+represented by `vector` variables instead of `real[]` variables.
+The new ODE system function is:
+
+```{stan, output.var = "", eval = FALSE}
+functions {
+  vector simple_SIR(real t,
+                    vector y,
+                    real beta,    // water contact rate
+                    real kappa,   // C_{50}
+                    real gamma,   // recovery rate
+                    real xi,      // bacteria production rate
+                    real delta) { // bacteria removal rate
+    vector[4] dydt;
+
+    dydt[1] = -beta * y[4] / (y[4] + kappa) * y[1];
+    dydt[2] = beta * y[4] / (y[4] + kappa) * y[1] - gamma * y[2];
+    dydt[3] = gamma * y[2];
+    dydt[4] = xi * y[2] - delta * y[4];
+
+    return dydt;
+  }
+}
+```
+
+### Calling the ODE Solver
+
+In the old ODE interface, the parameters are all packed into a `real[]` array
+before calling the ODE solver:
+
+```{stan, output.var = "", eval = FALSE}
+transformed parameters {
+  real<lower=0> y[N_t, 4];
+  {
+    real theta[5] = {beta, kappa, gamma, xi, delta};
+    y = integrate_ode_rk45(simple_SIR, y0, t0, t, theta, x_r, x_i);
+  }
+}
+```
+
+In the new ODE interface each of the arguments is appended on to the ODE
+solver function call. The RK45 ODE solver with default tolerances is called
+`ode_rk45`. Because the states are handled as `vector` variables, the solver
+output is an array of vectors (`vector[]`).
+
+```{stan, output.var = "", eval = FALSE}
+transformed parameters {
+  vector<lower=0>[4] y[N_t] = ode_rk45(simple_SIR, y0, t0, t, beta, kappa, gamma, xi, delta);
+}
+```
+
+### Full Model
+
+The full model with the new interface can be found
+[here](https://github.com/stan-dev/stat_comp_benchmarks/blob/feature/variadic-odes/benchmarks/sir/sir.stan);
+the full model with the old interface can be found
+[here](https://github.com/stan-dev/stat_comp_benchmarks/blob/master/benchmarks/sir/sir.stan),
+and the data can be found
+[here](https://github.com/stan-dev/stat_comp_benchmarks/blob/master/benchmarks/sir/sir.data.R).
+
+## PKPD Model
+
+### ODE System Function
+
+In the old system function, parameters are manually unpacked from `theta` and
+`x_r`:
+
+```{stan, output.var = "", eval = FALSE}
+functions {
+  real[] one_comp_mm_elim_abs(real t,
+                              real[] y,
+                              real[] theta,
+                              real[] x_r,
+                              int[] x_i) {
+    real dydt[1];
+    real k_a = theta[1]; // Dosing rate in 1/day
+    real K_m = theta[2]; // Michaelis-Menten constant in mg/L
+    real V_m = theta[3]; // Maximum elimination rate in 1/day
+    real D = x_r[1];
+    real V = x_r[2];
+    real dose = 0;
+    real elim = (V_m / V) * y[1] / (K_m + y[1]);
+
+    if (t > 0)
+      dose = exp(- k_a * t) * D * k_a / V;
+
+    dydt[1] = dose - elim;
+
+    return dydt;
+  }
+}
+```
+
+In the new interface, they are passed directly and so the unpacking is avoided:
+
+```{stan, output.var = "", eval = FALSE}
+functions {
+  vector one_comp_mm_elim_abs(real t,
+                              vector y,
+                              real k_a, // Dosing rate in 1/day
+                              real K_m, // Michaelis-Menten constant in mg/L
+                              real V_m, // Maximum elimination rate in 1/day
+                              real D,
+                              real V) {
+    vector[1] dydt;
+
+    real dose = 0;
+    real elim = (V_m / V) * y[1] / (K_m + y[1]);
+
+    if (t > 0)
+      dose = exp(- k_a * t) * D * k_a / V;
+
+    dydt[1] = dose - elim;
+
+    return dydt;
+  }
+}
+```
+
+### Calling the ODE Solver
+
+In the old interface the `theta` and `x_r` arguments are packed manually, and
+the `x_i` argument is required even though it isn't used:
+
+```{stan, output.var = "", eval = FALSE}
+transformed data {
+  real x_r[2] = {D, V};
+  int x_i[0];
+}
+...
+transformed parameters {
+  real C[N_t, 1];
+  {
+    real theta[3] = {k_a, K_m, V_m};
+    C = integrate_ode_bdf(one_comp_mm_elim_abs, C0, t0, times, theta, x_r, x_i);
+  }
+}
+```
+
+In the new interface the arguments are simply passed at the end of the
+`ode_bdf` call (and the `transformed data` block removed):
+
+```{stan, output.var = "", eval = FALSE}
+transformed parameters {
+  vector[1] C[N_t] = ode_bdf(one_comp_mm_elim_abs, C0, t0, times, k_a, K_m, V_m, D, V);
+}
+```
+### Full Model
+
+The full model with the new interface can be found
+[here](https://github.com/stan-dev/stat_comp_benchmarks/blob/feature/variadic-odes/benchmarks/one_comp_mm_elim_abs/one_comp_mm_elim_abs.stan);
+the full model with the old interface can be found
+[here](https://github.com/stan-dev/stat_comp_benchmarks/blob/master/benchmarks/pkpd/one_comp_mm_elim_abs.stan),
+and the data can be found
+[here](https://github.com/stan-dev/stat_comp_benchmarks/blob/master/benchmarks/pkpd/one_comp_mm_elim_abs.data.R).
