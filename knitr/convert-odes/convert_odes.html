@@ -11,7 +11,7 @@
 
 <meta name="author" content="Ben Bales &amp; Sebastian Weber" />
 
-<meta name="date" content="2020-07-19" />
+<meta name="date" content="2020-07-26" />
 
 <title>Upgrading to the new ODE interface</title>
 
@@ -365,14 +365,14 @@ summary {
 
 <h1 class="title toc-ignore">Upgrading to the new ODE interface</h1>
 <h4 class="author">Ben Bales &amp; Sebastian Weber</h4>
-<h4 class="date">19 July 2020</h4>
+<h4 class="date">26 July 2020</h4>
 
 </div>
 
 
 <div id="introduction" class="section level1">
 <h1>Introduction</h1>
-<p>Cmdstan 2.24 introduces a new ODE interface intended to make it easier to specify the ODE RHS by avoiding packing and unpacking schemes required with the old interface.</p>
+<p>Cmdstan 2.24 introduces a new ODE interface intended to make it easier to specify the ODE system function by avoiding packing and unpacking schemes required with the old interface.</p>
 <p>Stan solves for <span class="math inline">\(y(t, \theta)\)</span> at a sequence of times <span class="math inline">\(t_1, t_2, \cdots, t_N\)</span> in the ODE initial value problem defined by:</p>
 <p><span class="math display">\[
 y(t, \theta)' = f(t, y, \theta)\\
@@ -506,12 +506,20 @@ y(t = t_0, \theta) = y_0
 }</code></pre>
 <p>In the new ODE interface each of the arguments is appended on to the ODE solver function call. The RK45 ODE solver with default tolerances is called <code>ode_rk45</code>. Because the states are handled as <code>vector</code> variables, the solver output is an array of vectors (<code>vector[]</code>).</p>
 <pre class="stan"><code>transformed parameters {
-  vector&lt;lower=0&gt;[4] y[N_t] = ode_rk45(simple_SIR, y0, t0, t, beta, kappa, gamma, xi, delta);
+  vector&lt;lower=0&gt;[4] y[N_t] = ode_rk45(simple_SIR, y0, t0, t,
+                                       beta, kappa, gamma, xi, delta);
+}</code></pre>
+<p>The <code>ode_rk45_tol</code> function can be used to specify tolerances manually:</p>
+<pre class="stan"><code>transformed parameters {
+  vector&lt;lower=0&gt;[4] y[N_t] = ode_rk45_tol(simple_SIR, y0, t0, t,
+                                           1e-6, 1e-6, 1000,
+                                           beta, kappa, gamma, xi, delta);
 }</code></pre>
 </div>
 <div id="full-model" class="section level3">
 <h3>Full Model</h3>
-<p>The full model with the new interface can be found <a href="https://github.com/stan-dev/stat_comp_benchmarks/blob/feature/variadic-odes/benchmarks/sir/sir.stan">here</a>; the full model with the old interface can be found <a href="https://github.com/stan-dev/stat_comp_benchmarks/blob/master/benchmarks/sir/sir.stan">here</a>, and the data can be found <a href="https://github.com/stan-dev/stat_comp_benchmarks/blob/master/benchmarks/sir/sir.data.R">here</a>.</p>
+<p>The full model with the new interface is <a href="https://github.com/stan-dev/stat_comp_benchmarks/blob/master/benchmarks/sir/sir.stan">here</a> and the data is <a href="https://github.com/stan-dev/stat_comp_benchmarks/blob/master/benchmarks/sir/sir.data.R">here</a>.</p>
+<p>The full model with the old interface is <a href="https://github.com/stan-dev/stat_comp_benchmarks/blob/64b6597cd17de77e91dcfb1a9977758407017d20/benchmarks/sir/sir.stan">here</a>, and the data is <a href="https://github.com/stan-dev/stat_comp_benchmarks/blob/64b6597cd17de77e91dcfb1a9977758407017d20/benchmarks/sir/sir.data.R">here</a>.</p>
 </div>
 </div>
 <div id="pkpd-model" class="section level2">
@@ -582,12 +590,20 @@ transformed parameters {
 }</code></pre>
 <p>In the new interface the arguments are simply passed at the end of the <code>ode_bdf</code> call (and the <code>transformed data</code> block removed):</p>
 <pre class="stan"><code>transformed parameters {
-  vector[1] C[N_t] = ode_bdf(one_comp_mm_elim_abs, C0, t0, times, k_a, K_m, V_m, D, V);
+  vector[1] mu_C[N_t] = ode_bdf(one_comp_mm_elim_abs, C0, t0, times,
+                                k_a, K_m, V_m, D, V);
+}</code></pre>
+<p>The <code>ode_bdf_tol</code> function can be used to specify tolerances manually:</p>
+<pre class="stan"><code>transformed parameters {
+  vector[1] mu_C[N_t] = ode_bdf_tol(one_comp_mm_elim_abs, C0, t0, times,
+                                    1e-8, 1e-8, 1000,
+                                    k_a, K_m, V_m, D, V);
 }</code></pre>
 </div>
 <div id="full-model-1" class="section level3">
 <h3>Full Model</h3>
-<p>The full model with the new interface can be found <a href="https://github.com/stan-dev/stat_comp_benchmarks/blob/feature/variadic-odes/benchmarks/one_comp_mm_elim_abs/one_comp_mm_elim_abs.stan">here</a>; the full model with the old interface can be found <a href="https://github.com/stan-dev/stat_comp_benchmarks/blob/master/benchmarks/pkpd/one_comp_mm_elim_abs.stan">here</a>, and the data can be found <a href="https://github.com/stan-dev/stat_comp_benchmarks/blob/master/benchmarks/pkpd/one_comp_mm_elim_abs.data.R">here</a>.</p>
+<p>The full model with the new interface is <a href="https://github.com/stan-dev/stat_comp_benchmarks/blob/master/benchmarks/one_comp_mm_elim_abs/one_comp_mm_elim_abs.stan">here</a> and the data is <a href="https://github.com/stan-dev/stat_comp_benchmarks/blob/master/benchmarks/one_comp_mm_elim_abs/one_comp_mm_elim_abs.data.R">here</a>.</p>
+<p>The full model with the old interface is <a href="https://github.com/stan-dev/stat_comp_benchmarks/blob/64b6597cd17de77e91dcfb1a9977758407017d20/benchmarks/pkpd/one_comp_mm_elim_abs.stan">here</a> and the data is <a href="https://github.com/stan-dev/stat_comp_benchmarks/blob/64b6597cd17de77e91dcfb1a9977758407017d20/benchmarks/pkpd/one_comp_mm_elim_abs.data.R">here</a>.</p>
 </div>
 </div>
 </div>
