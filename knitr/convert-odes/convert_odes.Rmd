@@ -8,7 +8,7 @@ output: html_document
 # Introduction
 
 Cmdstan 2.24 introduces a new ODE interface intended to make it easier to
-specify the ODE RHS by avoiding packing and unpacking schemes required with
+specify the ODE system function by avoiding packing and unpacking schemes required with
 the old interface.
 
 Stan solves for $y(t, \theta)$ at a sequence of times $t_1, t_2, \cdots, t_N$
