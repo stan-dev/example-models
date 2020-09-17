@@ -1,0 +1,269 @@
+---
+title: "HMM Example"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(cmdstanr)
+library(posterior)
+```
+
+## Introduction
+
+CmdStan 2.24 introduced a new interface for fitting Hidden Markov models (HMMs)
+in Stan. This document is intended to provide an example use of this interface.
+
+HMMs model a process where a system probabilistically switches between $K$
+states over a sequence of $N$ points in time. It is assumed that the exact
+state of the system is unknown and must be measured at each state.
+
+HMMs are characterized in terms of the transition matrix $\Gamma_{ij}$ (each
+element being the probability of transitioning from state $i$ to state $j$
+between measurements), the types of measurements made on the system (the
+system may emit continuous or discrete measurements), and the initial state
+of the system.
+
+Any realization of an HMM is a sequence of $N$ integers in the range $[1, K]$,
+however, because of the structure of the HMM, it is not necessary to sample
+the latent states to do inference on the transition probabilities, the
+parameters of the measurement model, or the estimates of the initial state.
+Estimates of the distribution of states at each measurement time can be
+computed separately.
+
+A more complete mathematical definition of the HMM model and function interface
+is given in the [Hidden Markov Models](https://mc-stan.org/docs/2_24/functions-reference/hidden-markov-models.html)
+section of the Function Reference Guide.
+
+There are three functions
+
+- `hmm_marginal` - The likelihood of an HMM with the latent discrete states
+integrated out
+- `hmm_latent_rng` - A function to generate random realizations of an HMM
+- `hmm_hidden_state_prob` - A function to compute the distribution of latent
+states at each measurement.
+
+This guide will demonstrate how to simulate HMM realizations in R, fit the data
+with `hmm_marginal` and produce estimates of the latent states using
+`hmm_hidden_state_prob`.
+
+### Generating HMM realizations
+
+Simulating an HMM requires a set of states, the transition probabilities
+between those states, and an estimate of the initial states.
+
+For illustrative purposes, assume a three state system with states 1, 2, 3.
+
+The transitions happen as follows:
+1. In state 1 there is a 50% chance of moving to state 2 and a 50% chance of staying in state 1
+2. In state 2 there is a 25% chance of moving to state 1, a 25% change of moving to state 3, and a 50% chance of staying in state 2
+3. In state 3 there is a 50% chance of moving to state 2 and a 50% chance of staying at state 3.
+
+Assume that the system starts in state 1.
+
+```{r}
+N = 100 # 100 measurements
+K = 3   # 3 states
+states = rep(1, N)
+states[1] = 1 # Start in state 1
+for(n in 2:length(states)) {
+  if(states[n - 1] == 1)
+    states[n] = sample(c(1, 2), size = 1, prob = c(0.5, 0.5))
+  else if(states[n - 1] == 2)
+    states[n] = sample(c(1, 2, 3), size = 1, prob = c(0.25, 0.5, 0.25))
+  else if(states[n - 1] == 3)
+    states[n] = sample(c(2, 3), size = 1, prob = c(0.5, 0.5))
+}
+```
+
+The trajectory can easily be visualized:
+```{r}
+qplot(1:N, states)
+```
+
+An HMM is useful when the latent state is only measured indirectly.
+
+In this example the observations are assumed to be
+normally distributed with a state specific mean and some measurement error.
+
+```{r}
+mus = c(1.0, 5.0, 9.0)
+sigma = 2.0
+y = rnorm(N, mus[states], sd = sigma)
+```
+
+Plotting the simulated measurements gives:
+
+```{r}
+qplot(1:N, y)
+```
+
+### Fitting the HMM
+
+To make it clear how to use the HMM fit functions, the model here will fit the
+transition matrix, the initial state, and the parameters of the measurement
+model. It is not necessary to estimate all of these things in practice if some
+of them are known.
+
+The data is the previously generated sequence of $N$ measurements:
+```{stan, output.var = "", eval = FALSE}
+data {
+  int N; // Number of observations
+  real y[N];
+}
+```
+
+For the transition matrix, assume that it is known that states 1 and 3 are not
+directly connected. For $K$ states, estimating a full transition matrix means
+estimatng a matrix of $O(K^2)$ probabilities. Depending on the data available,
+this may not be possible and so it is important to take advantage of available
+modeling assumptions. The state means are estimated as an ordered vector
+to avoid mode-swap non-identifiabilities.
+
+```{stan, output.var = "", eval = FALSE}
+parameters {
+  // Rows of the transition matrix
+  simplex[2] t1;
+  simplex[3] t2;
+  simplex[2] t3;
+  
+  // Initial state
+  simplex[3] rho;
+  
+  // Parameters of measurement model
+  vector[3] mu;
+  real<lower = 0.0> sigma;
+}
+```
+
+The `hmm_marginal` function takes the transition matrix and initial state
+directly. In this case the transition matrix needs constructed from `t1`,
+`t2`, and `t3` but that is relatively easy to build.
+
+The measurement model, in contrast, is not passed directly to the HMM function.
+
+Instead, a $KxN$ matrix `log_omega` of log likelihoods is passed in. The
+$(k, n)$ entry of this matrix is the log likelihood of the $nth$ measurement
+given the system at time $n$ is actually in state $k$. For the generative
+model above, these are log normals evaluated at the three different means.
+
+```{stan, output.var = "", eval = FALSE}
+transformed parameters {
+  matrix[3, 3] gamma = rep_matrix(0, 3, 3);
+  matrix[3, N] log_omega;
+  
+  // Build the transition matrix
+  gamma[1, 1:2] = t1;
+  gamma[2, ] = t2;
+  gamma[3, 2:3] = t3;
+  
+  // Compute the log likelihoods in each possible state
+  for(n in 1:N) {
+    // The observation model could change with n, or vary in a number of
+    //  different ways (which is why log_omega is passed in as an argument)
+    log_omega[1, n] = normal_lpdf(y[n] | mu[1], sigma);
+    log_omega[2, n] = normal_lpdf(y[n] | mu[2], sigma);
+    log_omega[3, n] = normal_lpdf(y[n] | mu[3], sigma);
+  }
+}
+```
+
+With all that in place, the only thing left to do is add priors and increment
+the log density:
+```{stan, output.var = "", eval = FALSE}
+model {
+  mu ~ normal(0, 1);
+  sigma ~ normal(0, 1);
+
+  target += hmm_marginal(log_omega, Gamma, rho);
+}
+```
+
+```{r echo = TRUE, results = FALSE, message = FALSE}
+model = cmdstan_model("hmm-example.stan")
+fit = model$sample(data = list(N = N, y = y), parallel_chains = 4)
+```
+
+The estimated group means match the known ones:
+```{r}
+fit$summary("mu")
+```
+The estimated of the initial condition is not much more informative than
+the prior, but it is there:
+```{r}
+fit$summary("rho")
+```
+
+The transition probabilities from state 1 can be extracted:
+```{r}
+fit$summary("t1")
+```
+
+Similarly for state 2:
+```{r}
+fit$summary("t2")
+```
+
+And state 3:
+```{r}
+fit$summary("t3")
+```
+
+### State Probabilities
+
+Even though the latent states are not sampled directly, the distribution
+of latent states at each time point can be computed with the function
+`hmm_hidden_state_prob`:
+
+```{stan, output.var = "", eval = FALSE}
+generated quantities {
+  matrix[3, N] latent_probs = hmm_hidden_state_prob(log_omega, Gamma, rho);
+}
+```
+
+These can be plotted:
+
+```{r}
+latent_probs_df = fit$draws() %>%
+  as_draws_df %>%
+  select(starts_with("latent_probs")) %>%
+  pivot_longer(everything(),
+               names_to = c("state", "n"),
+               names_transform = list(k = as.integer, n = as.integer),
+               names_pattern = "latent_probs\\[([0-9]*),([0-9]*)\\]",
+               values_to = "latent_probs")
+
+latent_probs_df %>%
+  group_by(state, n) %>%
+  summarize(qh = quantile(latent_probs, 0.8),
+            m = median(latent_probs),
+            ql = quantile(latent_probs, 0.2)) %>%
+  ungroup() %>%
+  ggplot() +
+  geom_errorbar(aes(n, ymin = ql, ymax = qh, width = 0.0), alpha = 0.5) +
+  geom_point(aes(n, m)) +
+  facet_grid(state ~ ., labeller = "label_both") +
+  ggtitle("Ribbon is 60% posterior interval, point is median") +
+  ylab("Probability of being in state") +
+  xlab("Time (n)")
+```
+
+New simulations from the fitted HMM can be generated with `hmm_latent_rng`:
+
+```{stan, output.var = "", eval = FALSE}
+generated quantities {
+  int[N] y_sim = hmm_latent_rng(log_omega, Gamma, rho)
+}
+```
+
+These can be plotted as well:
+
+```{r}
+y_sim = fit$draws() %>%
+  as_draws_df() %>%
+  select(starts_with("y_sim")) %>%
+  as.matrix
+
+qplot(1:N, y_sim[1,])
+```
