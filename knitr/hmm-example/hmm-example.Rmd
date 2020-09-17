@@ -40,7 +40,7 @@ There are three functions
 
 - `hmm_marginal` - The likelihood of an HMM with the latent discrete states
 integrated out
-- `hmm_latent_rng` - A function to generate random realizations of an HMM
+- `hmm_latent_rng` - A function to generate random realizations from the posterior of an HMM
 - `hmm_hidden_state_prob` - A function to compute the distribution of latent
 states at each measurement.
 
