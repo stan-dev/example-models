@@ -50,6 +50,6 @@ model {
 }
 
 generated quantities {
-  matrix[3, N] latent_probs = hmm_hidden_state_prob(log_omega, Gamma, rho);
+  matrix[3, N] hidden_probs = hmm_hidden_state_prob(log_omega, Gamma, rho);
   int y_sim[N] = hmm_latent_rng(log_omega, Gamma, rho);
 }

@@ -27,7 +27,7 @@ of the system.
 
 Any realization of an HMM is a sequence of $N$ integers in the range $[1, K]$,
 however, because of the structure of the HMM, it is not necessary to sample
-the latent states to do inference on the transition probabilities, the
+the hidden states to do inference on the transition probabilities, the
 parameters of the measurement model, or the estimates of the initial state.
 Estimates of the distribution of states at each measurement time can be
 computed separately.
@@ -38,15 +38,16 @@ section of the Function Reference Guide.
 
 There are three functions
 
-- `hmm_marginal` - The likelihood of an HMM with the latent discrete states
+- `hmm_marginal` - The likelihood of an HMM with the hidden discrete states
 integrated out
-- `hmm_latent_rng` - A function to generate random realizations from the posterior of an HMM
-- `hmm_hidden_state_prob` - A function to compute the distribution of latent
-states at each measurement.
+- `hmm_latent_rng` - A function to generate draws of the hidden state from the posterior
+- `hmm_hidden_state_prob` - A function to compute the distribution of hidden states
+states at each measurement time
 
 This guide will demonstrate how to simulate HMM realizations in R, fit the data
-with `hmm_marginal` and produce estimates of the latent states using
-`hmm_hidden_state_prob`.
+with `hmm_marginal`, produce estimates of the hidden states using
+`hmm_hidden_state_prob`, and generate draws of the hidden state from the
+posterior with `hmm_latent_rng`.
 
 ### Generating HMM realizations
 
@@ -82,7 +83,8 @@ The trajectory can easily be visualized:
 qplot(1:N, states)
 ```
 
-An HMM is useful when the latent state is only measured indirectly.
+An HMM is useful when the hidden state is not measure directly (if the
+state was measured directly, it wouldn't be hidden).
 
 In this example the observations are assumed to be
 normally distributed with a state specific mean and some measurement error.
@@ -143,7 +145,7 @@ directly. In this case the transition matrix needs constructed from `t1`,
 
 The measurement model, in contrast, is not passed directly to the HMM function.
 
-Instead, a $KxN$ matrix `log_omega` of log likelihoods is passed in. The
+Instead, a $K \times N$ matrix `log_omega` of log likelihoods is passed in. The
 $(k, n)$ entry of this matrix is the log likelihood of the $nth$ measurement
 given the system at time $n$ is actually in state $k$. For the generative
 model above, these are log normals evaluated at the three different means.
@@ -189,7 +191,7 @@ The estimated group means match the known ones:
 ```{r}
 fit$summary("mu")
 ```
-The estimated of the initial condition is not much more informative than
+The estimated initial conditions are not much more informative than
 the prior, but it is there:
 ```{r}
 fit$summary("rho")
@@ -212,33 +214,33 @@ fit$summary("t3")
 
 ### State Probabilities
 
-Even though the latent states are not sampled directly, the distribution
-of latent states at each time point can be computed with the function
+Even though the hidden states are not sampled directly, the distribution
+of hidden states at each time point can be computed with the function
 `hmm_hidden_state_prob`:
 
 ```{stan, output.var = "", eval = FALSE}
 generated quantities {
-  matrix[3, N] latent_probs = hmm_hidden_state_prob(log_omega, Gamma, rho);
+  matrix[3, N] hidden_probs = hmm_hidden_state_prob(log_omega, Gamma, rho);
 }
 ```
 
 These can be plotted:
 
 ```{r}
-latent_probs_df = fit$draws() %>%
+hidden_probs_df = fit$draws() %>%
   as_draws_df %>%
-  select(starts_with("latent_probs")) %>%
+  select(starts_with("hidden_probs")) %>%
   pivot_longer(everything(),
                names_to = c("state", "n"),
                names_transform = list(k = as.integer, n = as.integer),
-               names_pattern = "latent_probs\\[([0-9]*),([0-9]*)\\]",
-               values_to = "latent_probs")
+               names_pattern = "hidden_probs\\[([0-9]*),([0-9]*)\\]",
+               values_to = "hidden_probs")
 
-latent_probs_df %>%
+hidden_probs_df %>%
   group_by(state, n) %>%
-  summarize(qh = quantile(latent_probs, 0.8),
-            m = median(latent_probs),
-            ql = quantile(latent_probs, 0.2)) %>%
+  summarize(qh = quantile(hidden_probs, 0.8),
+            m = median(hidden_probs),
+            ql = quantile(hidden_probs, 0.2)) %>%
   ungroup() %>%
   ggplot() +
   geom_errorbar(aes(n, ymin = ql, ymax = qh, width = 0.0), alpha = 0.5) +
