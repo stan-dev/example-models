@@ -1,6 +1,9 @@
 ---
 title: "HMM Example"
-output: html_document
+author: "Ben Bales, Charles Margossian"
+output:
+  html_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -181,6 +184,8 @@ model {
   target += hmm_marginal(log_omega, Gamma, rho);
 }
 ```
+
+The complete model is available on Github: [hmm-example.stan](https://github.com/stan-dev/example-models/tree/master/knitr/hmm-example/hmm-example.stan).
 
 ```{r echo = TRUE, results = FALSE, message = FALSE}
 model = cmdstan_model("hmm-example.stan")
