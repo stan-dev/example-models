@@ -1,6 +1,7 @@
 ---
 title: "HMM Example"
-author: "Ben Bales, Charles Margossian"
+author: "Ben Bales"
+date: 9-26-2020
 output:
   html_document: default
   pdf_document: default
@@ -20,20 +21,21 @@ in Stan. This document is intended to provide an example use of this interface.
 
 HMMs model a process where a system probabilistically switches between $K$
 states over a sequence of $N$ points in time. It is assumed that the exact
-state of the system is unknown and must be measured at each state.
+state of the system is unknown and must be inferred at each state.
 
 HMMs are characterized in terms of the transition matrix $\Gamma_{ij}$ (each
 element being the probability of transitioning from state $i$ to state $j$
 between measurements), the types of measurements made on the system (the
 system may emit continuous or discrete measurements), and the initial state
-of the system.
+of the system. Currently the HMM interface in Stan only supports a constant
+transition matrix. Future versions will support a transition matrix for each state.
 
-Any realization of an HMM is a sequence of $N$ integers in the range $[1, K]$,
-however, because of the structure of the HMM, it is not necessary to sample
-the hidden states to do inference on the transition probabilities, the
-parameters of the measurement model, or the estimates of the initial state.
-Estimates of the distribution of states at each measurement time can be
-computed separately.
+Any realization of an HMM's hidden state is a sequence of $N$ integers in the
+range $[1, K]$, however, because of the structure of the HMM, it is not
+necessary to sample the hidden states to do inference on the transition
+probabilities, the parameters of the measurement model, or the estimates
+of the initial state. Posterior draws from the hidden states can be computed
+separately.
 
 A more complete mathematical definition of the HMM model and function interface
 is given in the [Hidden Markov Models](https://mc-stan.org/docs/2_24/functions-reference/hidden-markov-models.html)
@@ -143,7 +145,7 @@ parameters {
 ```
 
 The `hmm_marginal` function takes the transition matrix and initial state
-directly. In this case the transition matrix needs constructed from `t1`,
+directly. In this case the transition matrix needs to be constructed from `t1`,
 `t2`, and `t3` but that is relatively easy to build.
 
 The measurement model, in contrast, is not passed directly to the HMM function.
