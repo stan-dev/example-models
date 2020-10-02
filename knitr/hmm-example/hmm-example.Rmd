@@ -1,7 +1,7 @@
 ---
 title: "HMM Example"
 author: "Ben Bales"
-date: 9-26-2020
+date: 10-2-2020
 output:
   html_document: default
   pdf_document: default
@@ -45,13 +45,16 @@ There are three functions
 
 - `hmm_marginal` - The likelihood of an HMM with the hidden discrete states
 integrated out
-- `hmm_latent_rng` - A function to generate draws of the hidden state from the posterior
-- `hmm_hidden_state_prob` - A function to compute the distribution of hidden states
-states at each measurement time
+- `hmm_latent_rng` - A function to generate draws of the hidden state that are
+implicitly integrated out of the model when using `hmm_marginal` (this is
+different than sampling more states with a posterior draw of a transition matrix
+and initial state)
+- `hmm_hidden_state_prob` - A function to compute the distributions of the
+integrated out hidden states
 
 This guide will demonstrate how to simulate HMM realizations in R, fit the data
-with `hmm_marginal`, produce estimates of the hidden states using
-`hmm_hidden_state_prob`, and generate draws of the hidden state from the
+with `hmm_marginal`, produce estimates of the distributions of the hidden states
+using `hmm_hidden_state_prob`, and generate draws of the hidden state from the
 posterior with `hmm_latent_rng`.
 
 ### Generating HMM realizations
@@ -221,7 +224,7 @@ fit$summary("t3")
 
 ### State Probabilities
 
-Even though the hidden states are not sampled directly, the distribution
+Even though the hidden states are integrated out, the distribution
 of hidden states at each time point can be computed with the function
 `hmm_hidden_state_prob`:
 
@@ -258,13 +261,19 @@ hidden_probs_df %>%
   xlab("Time (n)")
 ```
 
-New simulations from the fitted HMM can be generated with `hmm_latent_rng`:
+If it is more convenient to work with draws of the hidden states at each time
+point (instead of the probabilities provided by `hmm_hidden_state_prob`), these
+can be generated with `hmm_latent_rng`:
 
 ```{stan, output.var = "", eval = FALSE}
 generated quantities {
   int[N] y_sim = hmm_latent_rng(log_omega, Gamma, rho)
 }
 ```
+
+Note, these are the probabilities and draws of the hidden state that was
+integrated out. This is different than sampling new HMM realizations using
+posterior draws of the initial condition and the transition matrix.
 
 These can be plotted as well:
 
