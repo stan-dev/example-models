@@ -7,12 +7,13 @@ keep_tex: true
 toc: false
 documentclass: article
 bibliography: ref.bib
+urlcolor: blue
 abstract: "The Bayesian model of planetary motion is a simple but powerful example that illustrates important concepts, as well as gaps, in prescribed modeling workflows. Our focus is on Bayesian inference using Markov chains Monte Carlo for a model based on an ordinary differential equations (ODE). Our example presents unexpected multimodality, causing our inference to be unreliable and what is more, dramatically slowing down our ODE integrators. What do we do when our chains do not mix and do not forget their starting points? Reasoning about the computational statistics at hand and the physics of the modeled phenomenon, we diagnose how the modes arise and how to improve our inference. Our process for fitting the model is iterative, starting with a simplification and building the model back up, and makes extensive use of visualization."
 ---
 
 # Introduction
 
-As developers of statistical softwares, we realize that we cannot fully automate modeling.
+As developers of statistical softwares^[The authors are notably members of the Stan development team, see [mc-stan.org](https://mc-stan.org/).], we realize that we cannot fully automate modeling.
 Practitioners need to take bespoke steps to fit, evaluate, and improve their models.
 At the same time, the more modeling we do, the better prepared we usually are for the next project we undertake.
 It's not uncommon to apply hard-learned lessons from a past project to a new problem.
@@ -59,8 +60,7 @@ source("tools.r")
 set.seed(1954)
 ```
 
-All the requisite code to run this notebook can be found
-on \url{https://github.com/stan-dev/example-models/knitr/planet_motion}.
+All the requisite code to run this notebook can be found online, in the [planetary motion github repository](https://github.com/stan-dev/example-models/tree/case-study/planet/knitr/planetary_motion).
 
 # Building the model
 
@@ -72,8 +72,7 @@ We would like to estimate the following quantities:
 We assume the gravitational constant is known, $G = 1.0 \times 10^{-3}$ in some unit, and aim to evaluate the star-planet mass ratio.
 To do this, we set the planetary mass to $m = 1$.
 It remains to evaluate the solar mass, $M$.
-* The initial position vector, $q_0$, and the initial momentum vector, $p_0$
-of the planet.
+* The initial position vector, $q_0$, and the initial momentum vector, $p_0$, of the planet.
 * The subsequent position vector, $q(t)$, of the planet over time.
 * The position vector of the star, $q_*$.
 
@@ -137,7 +136,7 @@ This turns out to be quite true here where a simple one-parameter model allows u
 There are many ways to simplify a model.
 A general approach is to fix some of the parameters, which we can easily do when working with simulated data.
 We fix all the parameters, except for $k$.
-Our goal is now to characterize the posterior distribution,
+We now want to characterize the posterior distribution,
 $$
    p(k \mid q_\mathrm{obs}),
 $$
@@ -198,7 +197,7 @@ In the latter case, this also means our gradient calculations, and computation o
 
 Bearing a slight abuse of language, we use "degenerate" to mean that various values of $k$ roughly produce the same data generating process.
 We can check for degeneracy by looking at the  _posterior predictive checks_, split across chains.
-We plot $q_x$ against $t$, and for each chain, compute the median estimate for $q_\mathrm{pred}$, obtained using the `generated quantities block`.
+We plot $q_x$ against $q_y$, and for each chain, compute the median estimate for $q_\mathrm{pred}$, obtained using the `generated quantities block`.
 Note that since we fixed $\sigma = 0.01$, we expect the confidence interval to be very narrow.
 
 ```{r message=FALSE}
@@ -213,8 +212,8 @@ This is consistent with the much higher log posterior density these chains produ
 So degeneracy alone does not explain the lack of convergence.
 Nevertheless, the chains may still be getting stuck at smaller modes, in the tail of $k$'s distribution.
 
-At this point, we have taken "standard" steps to diagnose issues with our inference, notably by taking advantage of recommended tools that rstan supports.
-To fully grasp what prevents the chains from mixing and overcome this challenge, we require a more bespoke analysis.
+At this point, we have taken "standard" steps to diagnose issues with our inference.
+To fully grasp what prevents the chains from mixing, we require a more bespoke analysis.
 We summarize our reasoning, noting it involves unmentioned trials and errors, and long moments of pondering. 
 
 ## The wanderers: how do the chains even find these presumed modes?
@@ -403,7 +402,7 @@ But clearly, for this and other examples, too much dispersion can prevent certai
 One heuristic is to sample the starting point from the prior distribution, or potentially from an overdispered prior.
 
 Another perspective is to simply admit that there is no one-size-fits-all solution.
-This is very much true of other tuning parameters of our algorithm, such as the length of the warmup or the _target acceptance rate_ of HMC.
+This is very much true of other tuning parameters of our algorithm, such as the length of the warmup or the target acceptance rate of HMC.
 While defaults exist, a first attempt at fitting the model can motivate adjustments.
 In this sense, we can justify using a tighter distribution to draw the starting points after examining the behavior of the Markov chains with a broad starting distribution.
 
@@ -579,7 +578,7 @@ We now have some intuition that elliptical observations allow for local modes, b
 Remember also that for a mode to exist, it doesn't need to induce a particularly good fit; it simply needs to dominate a neighborhood.
 
 Conceptually, tweaking $q_*$ means we can move the star closer to the planet and thus increase the gravitational interaction.
-This is not unlike tweaking $k$, except we are the affecting the $r$ term in
+This is not unlike tweaking $k$, except we are affecting the $r$ term in
 $$
 \frac{\mathrm d p}{\mathrm d t} = - \frac{k}{r^3}(q - q_*).
 $$
