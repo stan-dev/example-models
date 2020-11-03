@@ -41,23 +41,30 @@ In our presentation, we try to distinguish generalizable methods, problem-specif
 
 ## R setup {-#setup}
 
-```{r message = FALSE}
+```{r include=FALSE}
 # Adjust to your setting
 .libPaths("~/Rlib/")
+setwd("~/Code/example-models/knitr/planetary_motion")
+```
 
+```{r message = FALSE}
+library(dplyr)
 library(cmdstanr)
-set_cmdstan_path("~/Rlib/cmdstan/")
-library(rstan)
+library(posterior)
 library(ggplot2)
-
 library(plyr)
 library(tidyr)
-library(dplyr)
+
 library(boot)
 library(latex2exp)
 source("tools.r")
 
 set.seed(1954)
+```
+
+```{r include=FALSE}
+# Adjust to your setting
+set_cmdstan_path("~/Rlib/cmdstan/")
 ```
 
 All the requisite code to run this notebook can be found online, in the [planetary motion github repository](https://github.com/stan-dev/example-models/tree/case-study/planet/knitr/planetary_motion).
@@ -102,23 +109,20 @@ and we set $k = 1$.
 mod <- cmdstan_model("model/planetary_motion_sim.stan")
 
 n <- 40
-sim <- mod$sample(data = list(n = n, sigma_x = 0.01, sigma_y = 0.01), 
-                  chains = 1, iter_warmup = 1, 
+sigma = 0.01
+sim <- mod$sample(data = list(n = n, sigma_x = sigma, sigma_y = sigma),
+                  chains = 1, iter_warmup = 1,
                   iter_sampling = 2, seed = 123)
 
-r_sim <- read_stan_csv(sim$output_files())
-simulation <- rstan::extract(r_sim, pars = "q_obs")$q_obs[1, , ]
-
-q_x <- simulation[, 1]
-q_y <- simulation[, 2]
+simulation <- as.vector(sim$draws(variables = "q_obs")[1, , ])
 
 q_obs <- array(NA, c(n, 2))
-q_obs[, 1] <- q_x
-q_obs[, 2] <- q_y
+q_obs[, 1] <- simulation[1:40]
+q_obs[, 2] <- simulation[41:80]
 
 sub_set <- seq(from = 1, to = 40, by = 2)
-plot <- ggplot(data = data.frame(q_x = q_x[sub_set], 
-                                 q_y = q_y[sub_set], 
+plot <- ggplot(data = data.frame(q_x = q_obs[sub_set, 1], 
+                                 q_y = q_obs[sub_set, 2], 
                                  time = sub_set), 
                aes(x = q_x, y = q_y, label = time)) +  theme_bw() +
   geom_text()
@@ -154,30 +158,35 @@ chains <- 8
 ```
 
 ```
+mod <- cmdstan_model("model/planetary_motion.stan")
 fit <- mod$sample(data = list(n = n, q_obs = q_obs),
                   chains = chains, parallel_chains = chains,
                   iter_warmup = 500,
                   iter_sampling = 500,
                   seed = 123, save_warmup = TRUE)
+
+
+fit$save_object(file = "saved_fit/fit1.RDS")
 ```
 
 ```{r }
 # The model takes a while to run, so we read in the saved output.
 r_fit1 <- readRDS("saved_fit/fit1.RDS")
-get_elapsed_time(r_fit1)
+print(r_fit1$time(), digits = 3)
 ```
 
 The first notable pathology is that some of the chains take a much longer time to run. The difference is not subtle...
 
 Let's examine the summary.
 ```{r }
-summary(r_fit1, pars = c("lp__", "k"), probs = c())[1]
+r_fit1$summary(c("lp__", "k"))[, c(1, 2, 4, 8, 9)]
 ```
 $\hat R \gg 1$. 
 Wow, these numbers are dramatic!
 Clearly the chains are not mixing and we can visualize this using trace plots.
 ```{r fig.height=3}
-traceplot(r_fit1, pars = c("lp__", "k"))
+bayesplot::mcmc_trace(r_fit1$draws(),
+                      pars = c("lp__", "k"))
 ```
 
 
@@ -200,7 +209,7 @@ We can check for degeneracy by looking at the  _posterior predictive checks_, sp
 We plot $q_x$ against $q_y$, and for each chain, compute the median estimate for $q_\mathrm{pred}$, obtained using the `generated quantities block`.
 Note that since we fixed $\sigma = 0.01$, we expect the confidence interval to be very narrow.
 
-```{r message=FALSE}
+```{r }
 data_pred <- data.frame(q_obs, 1:n)
 names(data_pred) <- c("qx", "qy", "t")
 
@@ -223,8 +232,8 @@ Based on the trace plots, the chains appear to be relatively static during the s
 We extend the trace plots to include the warmup phase.
 
 ```{r fig.height=3}
-traceplot(r_fit1, pars = c("lp__", "k"),
-          inc_warmup = TRUE)
+# TODO: added shaded area for warm-up phase.
+bayesplot::mcmc_trace(r_fit1$draws(inc_warmup = TRUE), pars = c("lp__", "k"))
 ```
 
 It is now clear that the chain's final position is mostly driven by its initial point.
@@ -316,12 +325,15 @@ plot <- ggplot() + geom_path(data = plot_data[select, ],
   geom_point(aes(x = q_obs[comp_point, 1], y = q_obs[comp_point, 2])) +
   # Add segments to compare distances.
   geom_segment(aes(x = q_obs[comp_point, 1], y = q_obs[comp_point, 2],
-                   xend = q_216[comp_point], yend = q_216[comp_point, 2]),
+                   xend = q_216[comp_point], 
+                   yend = q_216[comp_point, 2]),
                linetype = "dashed") +
   geom_segment(aes(x = q_obs[comp_point, 1], y = q_obs[comp_point, 2],
-                   xend = q_160[comp_point, 1], yend = q_160[comp_point, 2]),
+                   xend = q_160[comp_point, 1], 
+                   yend = q_160[comp_point, 2]),
                linetype = "dashed") +
-  theme(text = element_text(size = 18)) + xlab(TeX("$q_x$")) + ylab(TeX("$q_y$"))
+  theme(text = element_text(size = 18)) + 
+  xlab(TeX("$q_x$")) + ylab(TeX("$q_y$"))
   
 plot
 ```
@@ -426,10 +438,9 @@ fit <- mod$sample(data = list(n = n, q_obs = q_obs),
                   iter_sampling = 500, 
                   seed = 123, save_warmup = TRUE, refresh = 0)
 
-r_fit2 <- read_stan_csv(fit$output_files())
-summary(r_fit2, pars = c("lp__", "k"), probs = c())[1]
+fit$summary(c("lp__", "k"))[, c(1, 2, 4, 8, 9)]
 
-traceplot(r_fit2, pars = c("lp__", "k"))
+bayesplot::mcmc_trace(fit$draws(c("lp__", "k")))
 ```
 
 Everything now looks good. The chains converge near $k = 1$, and simulate predictions that are consistent with the data.
@@ -514,7 +525,13 @@ Relaxing the above a little, we may roll with a prior such as $k \sim \mathrm{No
 
 Let us fit the model, using the initial conditions we developed above, plus a broad range of values for the star's position, confined by the observations.
 ```{r }
-model_name <- "planetary_motion_star2.stan"
+mod <- cmdstan_model("model/planetary_motion_star.stan")
+
+# Process data for new model (same data, different format)
+n_select <- 40
+time <- (1:n_select) / 10
+stan_data <- list(n = n_select, q_obs = q_obs, time = time, 
+                  sigma = sigma)
 
 init_empirical <- function() {
   p0_empirical <- (q_obs[2, ] - q_obs[1, ]) / 
@@ -529,45 +546,49 @@ init_empirical <- function() {
        )
 }
 
-# Process data for new model (same data, different format)
-n_select <- 40
-time <- (1:n_select) / 10
-stan_data <- list(n = n_select, q_obs = q_obs, sigma = sigma,
-                  time = time)
-
 chains <- 8
-for (i in 1:chains) {
-  init_chain <- init_empirical()
-  with(init_chain, stan_rdump(ls(init_chain),
-                              file = paste0("init/init", i, ".r")))
+init_files <- paste0("init/planetary_motion_star/init", 
+                     1:chains, ".json")
+if (FALSE) {  # Set to TRUE to generate new inits; 
+              # else use existing inits.
+  for (i in 1:chains) {
+    init_chain <- init_empirical()
+    write_stan_json(init_chain, file = init_files[i])
+  }
 }
-
-init_files <- paste0("init/init", 1:chains, ".r")
-
-# (Code takes time to run; instead use saved output)
-# fit <- mod$sample(data = stan_data,
-#                   init = init_files,
-#                   chains = chains, parallel_chains = chains,
-#                   iter_warmup = 500,
-#                   iter_sampling = 500,
-#                   seed = 123, save_warmup = TRUE)
-r_fit <- readRDS(file = "saved_fit/planetary_motion_star2_pathology.stan.RDS")
-
-get_elapsed_time(r_fit)
 ```
-As commented before, we would've been wise not to run the algorithm for so many iterations...
+```
+# (Code takes time to run; instead use saved output)
+fit <- mod$sample(data = stan_data,
+                  init = init_files,
+                  chains = chains, parallel_chains = chains,
+                  iter_warmup = 500,
+                  iter_sampling = 500,
+                  seed = 123, save_warmup = TRUE)
+fit$save_object(file = "saved_fit/fit_star.RDS")
+```
 
+```{r }
+r_fit2 <- readRDS(file = "saved_fit/fit_star.RDS")
+print(r_fit2$time(), digits = 3)
+```
+As commented before, we would've been wise not to run the algorithm for so many iterations... Stan returns several warning messages, including divergent transitions (for 343 out of 8,000 samples) and exceeded maximum treedepths (for 28 samples).
+We can check the warning message report using `fit$cmdstan_diagnose()`.
+As before, let's examine a few diagnostics:
 ```{r, message=FALSE}
 pars <- c("lp__", "k", "q0", "p0", "star")
-summary(r_fit, pars = pars, probs = c())[1]
-traceplot(r_fit, pars = pars, inc_warmup = TRUE)
+r_fit2$summary(pars)[, c(1, 2, 4, 8, 9)]
+
+pars <- c("lp__", "k", "q0[1]", "q0[2]", "p0[1]", "p0[2]",
+          "star[1]", "star[2]")
+bayesplot::mcmc_trace(r_fit2$draws(), pars = pars)
 ```
 
 We have five well-behaved chains, which return consistent estimates, and three other chains which have with great effort ventured into other regions of the parameter space. 
 They take significantly longer to run without achieving the same log-posterior (what else is new?).
 The posterior predictive checks confirm that these three chains don not produce output consistent with the observations.
 ```{r message=FALSE, warning=FALSE}
-ppc_plot2D(r_fit, data_pred = data_pred, plot_star = TRUE)
+ppc_plot2D(r_fit2, data_pred = data_pred, plot_star = TRUE)
 ```
 The particular characteristic they share in common is that $q_0$ and $q_*$ are very close to one another.
 
@@ -673,7 +694,7 @@ init_empirical <- function() {
   p0_empirical <- (q_obs[2, ] - q_obs[1, ]) / 
     (stan_data$time[2] - stan_data$time[1])
   q0_empirical <- q_obs[1, ]
-  sigma <- 0.1
+  sigma <- 0.5
 
   list(k = abs(rnorm(1, 0, 1)),
        p0 = c(rnorm(2, p0_empirical, sigma)),
@@ -685,26 +706,36 @@ init_empirical <- function() {
 chains <- 8
 
 # create init files for each chain
-for (i in 1:chains) {
-  init_chain <- init_empirical()   # init_empirical2() # init()
-  with(init_chain, stan_rdump(ls(init_chain),
-                              file = paste0("init/init", i, ".r")))
+init_files <- paste0("init/planetary_motion_star2/init",
+                     1:chains, ".json")
+if (FALSE) {  # Set to TRUE to generate new inits; 
+              # elese use existing inits.
+  for (i in 1:chains) {
+    init_chain <- init_empirical()
+    write_stan_json(init_chain, file = init_files[i])
+  }
 }
-
-# fit <- mod$sample(data = stan_data,
-#                   init = init_files,
-#                   chains = chains, parallel_chains = chains,
-#                   iter_warmup = 500,
-#                   iter_sampling = 500,
-#                   seed = 123, save_warmup = TRUE)
-r_fit <- readRDS(file = "saved_fit/planetary_motion_star2.stan.RDS")
-
-summary(r_fit, pars = pars, probs = c())[1]
-
-ppc_plot2D(r_fit, data_pred = data_pred, plot_star = TRUE)
+```
+```
+# (Code takes time to run; instead use saved output)
+fit <- mod$sample(data = stan_data,
+                  init = init_files,
+                  chains = chains, parallel_chains = chains,
+                  iter_warmup = 500,
+                  iter_sampling = 500,
+                  seed = 123, save_warmup = TRUE)
+fit$save_object(file = "saved_fit/fit_star2.RDS")
 ```
 
-All our diagnostics now suggest we have sucessfully fitted the model.
+```{r }
+r_fit3 <- readRDS(file = "saved_fit/fit_star2.RDS")
+
+r_fit3$summary(pars)[, c(1, 2, 4, 8, 9)]
+
+ppc_plot2D(r_fit3, data_pred = data_pred, plot_star = TRUE)
+```
+
+All our diagnostics now suggest we have successfully fitted the model.
 
 # Discussion and lessons learned
 

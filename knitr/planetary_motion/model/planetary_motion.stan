@@ -49,8 +49,6 @@ transformed data {
 
 parameters {
   real<lower = 0> k;
-  // real<lower = 0> sigma_x;
-  // real<lower = 0> sigma_y;
 }
 
 transformed parameters {
@@ -60,17 +58,13 @@ transformed parameters {
 }
 
 model {
-  // sigma_x ~ normal(0, 1);
-  // sigma_y ~ normal(0, 1);
   k ~ normal(0, 1);
-  // k ~ normal(1, 0.1);
 
   q_obs[, 1] ~ normal(y[, 1], sigma_x);
   q_obs[, 2] ~ normal(y[, 2], sigma_y);
 }
 
 generated quantities {
-  // real q_pred[n, 2];
   real qx_pred[n];
   real qy_pred[n];
 

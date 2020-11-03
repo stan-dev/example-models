@@ -67,28 +67,26 @@ ppc_plot <- function(fit, chains, pred = "qx_pred", pars = "k",
 ppc_plot2D <- function(fit, pred = c("qx_pred", "qy_pred"), pars = "k", data_pred,
                        plot_star = FALSE) {
   ## TODO: add ribbons for ppcs
-  qx_pred <- rstan::extract(fit, pars = c(pred[1]), permuted = FALSE)
-  qy_pred <- rstan::extract(fit, pars = c(pred[2]), permuted = FALSE)
+  qx_pred <- fit$draws(variables = pred[1])
+  qy_pred <- fit$draws(variables = pred[2])
+
   chains <- dim(qx_pred)[2]
+  # TODO: Fix plot_star clause to not use rstan.
   if (plot_star) {
     # extract the median estimate for the star's position (for each chain)
     star <- array(NA, c(2, chains))
-    for (c in 1:chains) star[, c] <- 
-        summary(fit, pars = c("star"))$c_summary[, 5, c]
+    for (c in 1:chains) star[, c] <-
+      pull(summary(as_draws_df(fit$draws(variables = "star")[, c, ])),
+           "median")
   }
 
   for (i in 1:chains) {
-    qx_pred_chain <- qx_pred[, i, ]
-    qy_pred_chain <- qy_pred[, i, ]
+    qx_pred_chain <- as_draws_df(qx_pred[, i, ])
+    qy_pred_chain <- as_draws_df(qy_pred[, i, ])
     
-    pred_new <- as.data.frame(cbind(qx_pred_chain, qy_pred_chain)) %>% 
-      gather(factor_key = TRUE) %>%  
-      group_by(key) %>%
-      summarize(lb = quantile(value, probs = 0.05), 
-                median = quantile(value, probs = 0.5),
-                ub = quantile(value, probs = 0.95)) 
-    # %>% 
-    #   bind_cols(data_pred)
+    pred_new <- rbind(summary(qx_pred_chain)[, c(3, 6, 7)],
+                      summary(qy_pred_chain)[, c(3, 6, 7)])
+
     if (i == 1) pred <- pred_new
     if (i != 1) pred <- bind_rows(pred, pred_new)
   }
@@ -102,7 +100,7 @@ ppc_plot2D <- function(fit, pred = c("qx_pred", "qy_pred"), pars = "k", data_pre
     start <- (c - 1) * 80 + 41
     sequence_y <- c(sequence_y, start:(start + 39))
   }
-  
+
   plot_data <- data.frame(qx_pred = pred$median[sequence_x], 
                           qy_pred = pred$median[sequence_y])
   plot_data$chains <- rep(paste0("chain ", 1:chains), each = 40)

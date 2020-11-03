@@ -33,15 +33,7 @@ data {
 transformed data {
   real t0 = 0;
   int n_coord = 2;
-  // real q0[n_coord] = {1.0, 0.0};
-  // real p0[n_coord] = {0.0, 1.0};
-  // real y0[n_coord * 2] = append_array(q0, p0);
-
   real m = 1.0;
-
-  // real t[n];
-  // for (i in 1:n) t[i] = i * 1.0 / 10;
-
   int x_i[0];
 
   real<lower = 0> sigma_x = sigma;
@@ -78,14 +70,12 @@ model {
   p0[2] ~ lognormal(0, 1);  // impose p0 to be positive.
   q0 ~ normal(0, 1);
   star ~ normal(0, 0.5);
-  // star ~ normal(0, 1);
 
   q_obs[, 1] ~ normal(y[, 1], sigma_x);
   q_obs[, 2] ~ normal(y[, 2], sigma_y);
 }
 
 generated quantities {
-  // real q_pred[n, 2];
   real qx_pred[n];
   real qy_pred[n];
 
