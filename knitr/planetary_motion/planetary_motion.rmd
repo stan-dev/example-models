@@ -23,7 +23,7 @@ The specific concepts we encounter in this article include why our inference fai
 
 Given the recorded position of a planet over time, we want to estimate the physical properties of a star-planet system.
 This includes position, momentum, and gravitational interaction.
-We fit the model with Stan [@Carpenter:2017], using Hamiltonian Monte Carlo (HMC), a gradient-based Markov chain Monte Carlo (MCMC) algorithm;
+We fit the model with Stan [@Carpenter:2017], using a Hamiltonian Monte Carlo (HMC) sampler, a gradient-based Markov chain Monte Carlo (MCMC) algorithm;
 for a thorough introduction to HMC, we recommend the article by @Betancourt:2018.
 Initially, we meant the planetary motion problem to be a simple textbook example for ODE-based models; but it turns out many interesting challenges arise when we do a Bayesian analysis on this model.
 We discuss how to diagnose and fix these issues.
@@ -44,20 +44,22 @@ In our presentation, we try to distinguish generalizable methods, problem-specif
 ```{r include=FALSE}
 # Adjust to your setting
 .libPaths("~/Rlib/")
-setwd("~/Code/example-models/knitr/planetary_motion")
+# setwd("~/Code/example-models/knitr/planetary_motion")
 ```
 
 ```{r message = FALSE}
-library(dplyr)
 library(cmdstanr)
 library(posterior)
 library(ggplot2)
+library(dplyr)
 library(plyr)
 library(tidyr)
 
 library(boot)
 library(latex2exp)
 source("tools.r")
+
+bayesplot::color_scheme_set("viridisC")
 
 set.seed(1954)
 ```
@@ -233,7 +235,8 @@ We extend the trace plots to include the warmup phase.
 
 ```{r fig.height=3}
 # TODO: added shaded area for warm-up phase.
-bayesplot::mcmc_trace(r_fit1$draws(inc_warmup = TRUE), pars = c("lp__", "k"))
+bayesplot::mcmc_trace(r_fit1$draws(inc_warmup = TRUE), pars = c("lp__", "k"),
+                      n_warmup = 500)
 ```
 
 It is now clear that the chain's final position is mostly driven by its initial point.
@@ -253,7 +256,7 @@ Inevitably, some of the chains start in the far tails of $p(k \mid y)$ and canno
 Because the parameter space is one-dimensional, we can "cheat" a bit
 -- well, we've earned it by setting up a simplified problem --
 and compute the log likelihood across a grid of values for $k$ to check that the modes indeed exist.
-```{r }
+```{r fig.height=3}
 ks <- seq(from = 0.2, to = 9, by = 0.01)
 q0 <- c(1.0, 0)
 p0 <- c(0, 1.0)
@@ -297,7 +300,7 @@ $$
 where $C$ is a constant which doesn't depend on $k$.
 
 Let us now simulate trajectories for various values of $k$.
-```{r }
+```{r fig.height=4}
 k <- 0.5
 q_050 <- solve_trajectory(q0, p0, dt, k, m, n_obs, ts)
 k <- 1.6
@@ -575,13 +578,14 @@ print(r_fit2$time(), digits = 3)
 As commented before, we would've been wise not to run the algorithm for so many iterations... Stan returns several warning messages, including divergent transitions (for 343 out of 8,000 samples) and exceeded maximum treedepths (for 28 samples).
 We can check the warning message report using `fit$cmdstan_diagnose()`.
 As before, let's examine a few diagnostics:
-```{r, message=FALSE}
+```{r, message=FALSE, fig.height=3}
 pars <- c("lp__", "k", "q0", "p0", "star")
 r_fit2$summary(pars)[, c(1, 2, 4, 8, 9)]
 
 pars <- c("lp__", "k", "q0[1]", "q0[2]", "p0[1]", "p0[2]",
           "star[1]", "star[2]")
-bayesplot::mcmc_trace(r_fit2$draws(), pars = pars)
+bayesplot::mcmc_trace(r_fit2$draws(inc_warmup = TRUE), pars = pars,
+                      n_warmup = 500)
 ```
 
 We have five well-behaved chains, which return consistent estimates, and three other chains which have with great effort ventured into other regions of the parameter space. 
@@ -611,7 +615,7 @@ Our proposition is to look at _conditional likelihoods_, that is fix some of the
 This, from a certain point of view, very much amounts to studying a simplification of our model.
 To begin, we fix all parameters (based on the correct values or equivalently estimates from the well-behaving Markov chains), except for $q_*^x$.
 
-```{r, fig.height=5}
+```{r, fig.height=4}
 star_x <- seq(from = -0.5, to = 0.8, by = 0.01)
 star_s <- array(NA, dim = c(length(star_x), 2))
 star_s[, 1] <- star_x
@@ -753,14 +757,14 @@ The possibility of such ill-fitting modes implies we should always run multiple 
 This case study also raises the question of what role starting points may play.
 Ideally a Markov chain forgets its initial value but in a non-asymptotic regime this may not be the case.
 Just as there is no universal default prior, there is no universal default initial point.
-Modelers often need to depart from defaults to insure a numerically stable evaluation of the joint density and improve MCMC computation.
+Modelers often need to depart from defaults to ensure a numerically stable evaluation of the joint density and improve MCMC computation.
 At the same time we want dispersed initial points in order to have reliable convergence diagnostics and to potentially explore all the relevant modes.
-Like for other tuning parameters of an inference algorithm, picking starting points can be an iterative process, with adjustments made after a first attempt at fitting the model.
+As with other tuning parameters of an inference algorithm, picking starting points can be an iterative process, with adjustments made after a first attempt at fitting the model.
 
 We do not advocate mindlessly discarding misbehaving chains. It is important to analyze where this poor behavior comes from, and whether it hints at serious flaws in our model and in our inference. Our choice to adjust the initial estimates is based on: (a) the realization that the defaults are widely inconsistent with our expertise and (b) the understanding that the local modes do not describe a latent phenomenon of interest, as shown by our detailed analysis of how cyclical data interacts with a normal likelihood.
 
 # Acknowledgement {-#Acknowledgement}
 
-We thank Ben Bales, Matthew West, and Martin Modrák for helpful discussion.
+We thank Ben Bales, Matthew West, Martin Modrák, and Jonah Gabry for helpful discussion.
 
 # References {-#my-section}

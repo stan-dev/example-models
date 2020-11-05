@@ -66,12 +66,10 @@ ppc_plot <- function(fit, chains, pred = "qx_pred", pars = "k",
 
 ppc_plot2D <- function(fit, pred = c("qx_pred", "qy_pred"), pars = "k", data_pred,
                        plot_star = FALSE) {
-  ## TODO: add ribbons for ppcs
   qx_pred <- fit$draws(variables = pred[1])
   qy_pred <- fit$draws(variables = pred[2])
 
   chains <- dim(qx_pred)[2]
-  # TODO: Fix plot_star clause to not use rstan.
   if (plot_star) {
     # extract the median estimate for the star's position (for each chain)
     star <- array(NA, c(2, chains))
