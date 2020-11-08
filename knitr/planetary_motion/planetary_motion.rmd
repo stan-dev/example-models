@@ -2,16 +2,18 @@
 title: |
   | Bayesian Model of Planetary Motion: exploring ideas for a modeling workflow when dealing with ordinary differential equations and multimodality
 author: Charles C. Margossian^[Department of Statistics, Columbia University; contact -- charles.margossian@columbia.edu] \ and Andrew Gelman^[Department of Statistics and Political Science, Columbia University]
-output: bookdown::pdf_book
+output: bookdown::gitbook
+# output: bookdown::pdf_book
 keep_tex: true
-toc: false
+# toc: true
 documentclass: article
 bibliography: ref.bib
 urlcolor: blue
+link-citations: true
 abstract: "The Bayesian model of planetary motion is a simple but powerful example that illustrates important concepts, as well as gaps, in prescribed modeling workflows. Our focus is on Bayesian inference using Markov chains Monte Carlo for a model based on an ordinary differential equations (ODE). Our example presents unexpected multimodality, causing our inference to be unreliable and what is more, dramatically slowing down our ODE integrators. What do we do when our chains do not mix and do not forget their starting points? Reasoning about the computational statistics at hand and the physics of the modeled phenomenon, we diagnose how the modes arise and how to improve our inference. Our process for fitting the model is iterative, starting with a simplification and building the model back up, and makes extensive use of visualization."
 ---
 
-# Introduction
+## Introduction {-#inst}
 
 As developers of statistical softwares^[The authors are notably members of the Stan development team, see [mc-stan.org](https://mc-stan.org/).], we realize that we cannot fully automate modeling.
 Practitioners need to take bespoke steps to fit, evaluate, and improve their models.
@@ -33,13 +35,13 @@ This case study examines the model in the controlled setting of simulated data.
 We begin by constructing our model, using elementary notions of classical mechanics.
 After failing to fit this complete model, we develop a simpler model and build our way back to the original model.
 This step-by-step expansion allows us to isolate issues that make Bayesian inference challenging.
-Classic tools we use involve: running multiple chains, convergence diagnostics, and simulating data from the fitted model.
-The latter can be done in several ways and an agile use of plots proves extremely helpful.
+Classic tools we use involve: running multiple chains, checking convergence diagnostics, and simulating data from the fitted model.
+There are several ways to visualize simulated data and an agile use of plots proves extremely helpful.
 Running simulations for multiple parameter values allows us to understand how the parameters interact with the likelihood, and identify local modes in the posterior.
 In our presentation, we try to distinguish generalizable methods, problem-specific steps, and shortcoming in existing defaults.
 
 
-## R setup {-#setup}
+### R setup {-#setup}
 
 ```{r include=FALSE}
 # Adjust to your setting
@@ -71,7 +73,7 @@ set_cmdstan_path("~/Rlib/cmdstan/")
 
 All the requisite code to run this notebook can be found online, in the [planetary motion github repository](https://github.com/stan-dev/example-models/tree/case-study/planet/knitr/planetary_motion).
 
-# Building the model
+## Building the model {-#sec2}
 
 Consider a simple star-planet system.
 We assume the star is much more massive than the planet and approximate the position of the star as _fixed_.
@@ -85,7 +87,7 @@ It remains to evaluate the solar mass, $M$.
 * The subsequent position vector, $q(t)$, of the planet over time.
 * The position vector of the star, $q_*$.
 
-## Equations of motion
+### Equations of motion  {-#sec2.1}
 
 A more natural treatment of the problem would be using polar coordinates, but for simplicity, let's use Cartesian coordinates.
 The motion of the planet is described by Newton's law of motion, which is a second-order differential equation.
@@ -96,13 +98,13 @@ For convenience, we use Hamilton's formulation of the law, which is based on a s
 \end{eqnarray*}
 where $k = GmM = 10^{-3}M$, and $r = \sqrt{(q - q_*)^T(q - q_*)}$ is the distance between the planet and the star.
 
-We now introduce a measurement model, according to which our measurements suffer a normal error:
+Our measurements are made with a normally distributed error:
 $$
   q_\mathrm{obs} \sim \mathrm{Normal}(q, \sigma I),
 $$
 with $\sigma$ the standard deviation and $I$ the $2 \times 2$  identity matrix.
 
-## Simulation
+### Simulation {-#sec2.2}
 
 The simulation can be done in Stan, using one of its numerical integrators.
 At $t = 0$, $q_0 = (1, 0)$ and $p_0 = (0, 1)$,
@@ -131,17 +133,17 @@ plot <- ggplot(data = data.frame(q_x = q_obs[sub_set, 1],
 plot
 ```
 
-# Fitting a simple model and diagnosing inference
+## Fitting a simple model and diagnosing inference {-#sec3}
 
-A first attempt at fitting the complete model fails spectacularly: the chains do not converge and take a long time to run.
+A first attempt at fitting the complete model (`planetary_motion_star.stan`) fails spectacularly: the chains do not converge and take a long time to run.
 This is an invitation to start with a simpler model.
 A useful simplification is more manageable but still exhibits the challenges we encounter with the complete model.
 The hope is that a fix in this simple context translates into a fix in a more sophisticated setting.
-This turns out to be quite true here where a simple one-parameter model allows us to understand the fundamentally multimodal nature of the model.
+This turns out to be true here where a simple one-parameter model allows us to understand the fundamentally multimodal nature of the model.
 
 There are many ways to simplify a model.
 A general approach is to fix some of the parameters, which we can easily do when working with simulated data.
-We fix all the parameters, except for $k$.
+We fix all the parameters, except for $k$, and writhe the file `planetary_motion.stan`.
 We now want to characterize the posterior distribution,
 $$
    p(k \mid q_\mathrm{obs}),
@@ -150,9 +152,8 @@ by fitting the model with Stan.
 Since $k$ is a scalar, we could use quadrature but our goal is to understand the pathologies that frustrate our inference algorithm, so we stick to MCMC.
 As a prior, we use
 $$
-  k \sim \mathrm{Normal}^+(0, 1),
+  k \sim \mathrm{Normal}^+(0, 1).
 $$
-which is fairly uninformative.
 
 We fit 8 chains in parallel.
 ```{r }
@@ -204,9 +205,9 @@ At this point, we may formulate several hypothesis as to what may be happening:
 * The numerical integrator struggles to accurately solve the ODEs for large values of $k$. This means the ODE integrator is slower or even inaccurate. 
 In the latter case, this also means our gradient calculations, and computation of HMC could be wrong.
 
-## Is the model degenerate?
+### Is the model degenerate? {-#sec3.1}
 
-Bearing a slight abuse of language, we use "degenerate" to mean that various values of $k$ roughly produce the same data generating process.
+Bearing a slight abuse of language, we use "degenerate" to mean that wildly different values of $k$ roughly produce the same data generating process.
 We can check for degeneracy by looking at the  _posterior predictive checks_, split across chains.
 We plot $q_x$ against $q_y$, and for each chain, compute the median estimate for $q_\mathrm{pred}$, obtained using the `generated quantities block`.
 Note that since we fixed $\sigma = 0.01$, we expect the confidence interval to be very narrow.
@@ -227,14 +228,13 @@ At this point, we have taken "standard" steps to diagnose issues with our infere
 To fully grasp what prevents the chains from mixing, we require a more bespoke analysis.
 We summarize our reasoning, noting it involves unmentioned trials and errors, and long moments of pondering. 
 
-## The wanderers: how do the chains even find these presumed modes?
+### The wanderers: how do the chains even find these presumed modes?  {-#sec3.2}
 
 Given our prior, $k \sim \mathrm{normal}^+(0, 1)$, and the very strong log posterior density around $k = 1$, we may wonder: how did the chains drift to these distant modes?
 Based on the trace plots, the chains appear to be relatively static during the sampling phase.
 We extend the trace plots to include the warmup phase.
 
 ```{r fig.height=3}
-# TODO: added shaded area for warm-up phase.
 bayesplot::mcmc_trace(r_fit1$draws(inc_warmup = TRUE), pars = c("lp__", "k"),
                       n_warmup = 500)
 ```
@@ -251,11 +251,11 @@ The bounds of $k$ are thence $(\sim 0.13, 7.4)$, which is a rather large range.
 Inevitably, some of the chains start in the far tails of $p(k \mid y)$ and cannot make it back.
 
 
-## Confirming the existence of local modes
+### Confirming the existence of local modes {-#sec3.3}
 
 Because the parameter space is one-dimensional, we can "cheat" a bit
 -- well, we've earned it by setting up a simplified problem --
-and compute the log likelihood across a grid of values for $k$ to check that the modes indeed exist.
+and compute the joint distribution (i.e. unnormalized posterior) across a grid of values for $k$ to check that the modes indeed exist.
 ```{r fig.height=3}
 ks <- seq(from = 0.2, to = 9, by = 0.01)
 q0 <- c(1.0, 0)
@@ -277,24 +277,25 @@ for (i in 1:length(ks)) {
   
   lk[i] <- 
     sum(dnorm(q_obs[, 1], q_sim[, 1], sigma_x, log = T)) +
-    sum(dnorm(q_obs[, 2], q_sim[, 2], sigma_y, log = T))
+    sum(dnorm(q_obs[, 2], q_sim[, 2], sigma_y, log = T)) +
+    dnorm(k, 0, 1, log = T)
 }
 
 plot <- ggplot(data = data.frame(ks = ks, lk = lk),
                aes(x = ks, y = lk)) + theme_bw() +
   geom_line() + theme(text = element_text(size = 18)) +
-  ylab("log likelihood") + xlab("k")
+  ylab("log joint") + xlab("k")
 plot
 ```
 
 There is a strong mode at $k = 1$ and a "wiggly" tail for larger values of $k$, with some notable local modes.
 
-## Elliptical motion induces multimodality
+### Elliptical motion induces multimodality {-#sec3.4}
 
 To understand how these modes arise, we may reason about the log likelihood as a function that penalizes large distances between $q_\mathrm{obs}$ and $q(k)$, the positions we obtain when we simulate trajectories for a certain value of $k$.
 Indeed
 $$
- \log p(q_\mathrm{obs} \mid k) = C - \frac{1}{2\sigma} 
+ \log p(q_\mathrm{obs} \mid k) = C - \frac{1}{2\sigma^2} 
    ||q_\mathrm{obs} - q(k))||^2_2,
 $$
 where $C$ is a constant which doesn't depend on $k$.
@@ -342,7 +343,7 @@ plot
 ```
 
 As $k$, and therefore the gravitational force, increases, the orbit becomes shorter.
-So much so that for high enough values of $k$, the planet undergoes multiple orbits in the observed time.
+The orbit eventually gets so short that for high enough values of $k$, the planet undergoes multiple orbits in the observed time.
 We next note that for $k < 1$, the trajectory can drift arbitrarily far away from the observed ellipsis.
 On the other hand, for $k > 1$, the simulated ellipsis must be contained inside the observed ellipsis, which bounds the distance between $q_\mathrm{obs}$ and $q$.
 Finally, as we change $k$ and "rotate" the ellipsis, some of the observed and simulated positions become more aligned,
@@ -354,7 +355,7 @@ they do not describe a latent phenomenon of interest.
 It also clear, from the trace and likelihood plot, that the minor modes contribute a negligible probability mass to the posterior distribution.
 This means that any chain which doesn't explore the dominant mode wastes our precious computational resources.
 
-## Bad Markov chain, slow Markov chain?
+### Bad Markov chain, slow Markov chain? {-#sec3.5}
 
 Not only are the samples produced by the misbehaving chains essentially useless when computing summary quantities, such as expectation values and quantiles;
 they also take much longer to run!
@@ -380,12 +381,12 @@ The observed failure could have been diagnosed by running the algorithm for a sh
 which is an important perspective to keep in mind in the early stages of model development.
 
 
-## Improving the inference
+### Improving the inference {-#sec3.6}
 
 Equipped with a sound understanding of the pathology at hand, we can try to improve our inference.
 Three candidate solutions come to mind.
 
-### Build stronger priors 
+#### Build stronger priors {-#sec3.6.1}
 
 One option is to build a more informative prior to reflect our belief that a high value of $k$ is implausible; or that any data generating process that suggests the planet undergoes several orbits over the observation time is unlikely. 
 When such information is available, stronger priors can indeed improve computation.
@@ -397,19 +398,18 @@ Note further that our current prior, $k \sim \mathrm{normal}^+(0, 1)$, is alread
 In principle we could go a step further and add a hard constraint on orbital time or velocity to remove the modes. 
 
 
-### Reweight draws from each chain
+#### Reweight draws from each chain {-#sec3.6.2}
 
 One issue is that the Markov chains fail to transition from one mode to the other, meaning some chains sample over a region with a low probability mass.
 We can correct our Monte Carlo estimate using a re-weighting scheme, such as stacking [@Yao:2018].
 This strategy likely gives us reasonable Monte Carlo estimates, but: (i) we will not comprehensively explore all the modes with 8 chains, so stacking should really be treated as discarding the chains stuck at local modes and (ii) we still pay a heavy computational price, as the chains in minor modes take up to $\sim$ 1000 times longer to run.
 
-### Tune the starting points
+#### Tune the starting points {-#sec3.6.3}
 
 Stan's default initial points produce values which are inconsistent with our prior (and our domain expertise).
 In a non-asymptotic regime, the Markov chain doesn't always "forget" its starting point, and it is unlikely to do so here even if we run the chain for many _many_ more iterations.
 We can therefore not ignore this tuning parameter in our algorithm.
 What then constitutes an appropriate starting point?
-We ask this question sincerely.
 
 There are various considerations.
 In order to assess whether our chains converge, notably with $\hat R$, our starting points should be overdispersed, relative to our posterior [e.g. @Vehtari:2020].
@@ -424,7 +424,7 @@ In this sense, we can justify using a tighter distribution to draw the starting 
 This doesn't sound ideal, if failing to fit the model takes $\sim$ 2,000 seconds!
 As mentioned before, we however didn't need to wait this long to diagnose a failure in our inference and the here presented analysis could have been made with 100 MCMC draws.
 
-### Fitting the simplified model
+#### Fitting the simplified model {-#sec3.6.4}
 
 We opt for the third candidate solution and use
 $$
@@ -448,7 +448,7 @@ bayesplot::mcmc_trace(fit$draws(c("lp__", "k")))
 
 Everything now looks good. The chains converge near $k = 1$, and simulate predictions that are consistent with the data.
 
-# Building the model back up: position and momemtum
+## Building the model back up: position and momentum {-#sec4}
 
 Starting from the simplified model, we now build our way back to the original model.
 We do so by "unfixing" one or two parameters at a time.
@@ -477,17 +477,17 @@ $$
 $$
 We can then perturb these values to make sure the chains start at different points.
 
-# Expending the model to estimate the position of the star
+## Expending the model to estimate the position of the star {-#sec5}
 
 So far, we have assumed that the star was positioned at the origin, that is $q_* = (0, 0)$.
 We now relax this assumption and treat the position of the star as unknown.
 This requires adding two parameters to the model, $q_*$ (`star` in the model), and adjusting Hamilton's equations to make sure that $r$ is the distance between $q$ and $q_*$ and that $\mathrm d p / \mathrm d t$ points from the planet to the star.
 
-The assumption that the star is motionless only works if the star is much more massive than the planet.
-In the previous model, setting $q_* = (0, 0)$ enforced "motionless".
+The assumption that the position of the star is fixed only works if the star is much more massive than the planet.
+In the previous model, setting $q_* = (0, 0)$ enforced that the star stays fixed.
 In this new model, we will attempt to encode this belief in our priors.
 
-## Encoding more information in our prior
+### Encoding more information in our prior {-#sec5.1}
 
 The stellar mass doesn't explicitly appear in the model. 
 Instead, we work with
@@ -524,7 +524,7 @@ $$
 which is much more informative than what we initially used.
 Relaxing the above a little, we may roll with a prior such as $k \sim \mathrm{Normal}(1, 10^{-3})$.
 
-## A first pass at fitting the model
+### A first pass at fitting the model {-#sec5.2}
 
 Let us fit the model, using the initial conditions we developed above, plus a broad range of values for the star's position, confined by the observations.
 ```{r }
@@ -578,7 +578,7 @@ print(r_fit2$time(), digits = 3)
 As commented before, we would've been wise not to run the algorithm for so many iterations... Stan returns several warning messages, including divergent transitions (for 343 out of 8,000 samples) and exceeded maximum treedepths (for 28 samples).
 We can check the warning message report using `fit$cmdstan_diagnose()`.
 As before, let's examine a few diagnostics:
-```{r, message=FALSE, fig.height=3}
+```{r, message=FALSE, fig.height=5}
 pars <- c("lp__", "k", "q0", "p0", "star")
 r_fit2$summary(pars)[, c(1, 2, 4, 8, 9)]
 
@@ -590,17 +590,17 @@ bayesplot::mcmc_trace(r_fit2$draws(inc_warmup = TRUE), pars = pars,
 
 We have five well-behaved chains, which return consistent estimates, and three other chains which have with great effort ventured into other regions of the parameter space. 
 They take significantly longer to run without achieving the same log-posterior (what else is new?).
-The posterior predictive checks confirm that these three chains don not produce output consistent with the observations.
+The posterior predictive checks confirm that these three chains do not produce output consistent with the observations.
 ```{r message=FALSE, warning=FALSE}
 ppc_plot2D(r_fit2, data_pred = data_pred, plot_star = TRUE)
 ```
 The particular characteristic they share in common is that $q_0$ and $q_*$ are very close to one another.
 
-## Using conditional likelihoods to understand modes
+### Using conditional likelihoods to understand modes  {-#sec5.3}
 
 Once again, we need to reason about whether these local modes are mere mathematical artifacts or the manifestation of a latent phenomenon of interest.
 We now have some intuition that elliptical observations allow for local modes, because of rotating orbits and chance alignments between observed and generated data.
-Remember also that for a mode to exist, it doesn't need to induce a particularly good fit; it simply needs to dominate a neighborhood.
+<!-- Remember also that for a mode to exist, it doesn't need to induce a particularly good fit; it simply needs to dominate a neighborhood. -->
 
 Conceptually, tweaking $q_*$ means we can move the star closer to the planet and thus increase the gravitational interaction.
 This is not unlike tweaking $k$, except we are affecting the $r$ term in
@@ -681,11 +681,11 @@ plot2 <- ggplot(data = data.frame(star_x = star_data[, 1],
 plot2
 ```
 
-These figures support our conjecture and, along with the log posterior and the posterior predictive checks, suggest the modes are mathematical artefacts, much like to ones we have previously probed.
-Let us caution that the behavior of the posterior density can change quite a bit as we add more moving parts.
+These figures support our conjecture and, along with the log posterior and the posterior predictive checks, suggest the modes are mathematical artifacts, much like to ones we have previously probed.
+<!-- Let us caution that the behavior of the posterior density can change quite a bit as we add more moving parts. -->
 
 
-## Fitting the model
+### Fitting the model {-#sec5.4}
 
 At this point, we would want to reason about the expected position of the star.
 Do we have measurements from a previous experiment that suggest the star is closer to the origin (in our coordinate system)?
@@ -741,7 +741,7 @@ ppc_plot2D(r_fit3, data_pred = data_pred, plot_star = TRUE)
 
 All our diagnostics now suggest we have successfully fitted the model.
 
-# Discussion and lessons learned
+## Discussion and lessons learned  {-#sec6}
 
 When we fail to fit a model, examining a simplified model can help us understand the challenges that frustrate our inference algorithm.
 In practice it is difficult to find a simplification which is manageable and still exhibits the pathology we wish to understand.
@@ -751,7 +751,7 @@ When the model has more structure, such as in multilevel models, more elaborate 
 In the planetary motion example, we are confronted with a multimodal posterior distribution.
 This geometry prevents our chains from cohesively exploring the parameter space and leads to biased Monte Carlo estimates.
 It is important to understand how these local modes arise and what their contribution to the posterior probability mass might be. We do so using posterior predictive checks.
-It is not uncommon for minor modes, with negligible probability mass, to "trap" a Markov chain.
+It is not uncommon for minor modes, with negligible probability mass, to trap a Markov chain.
 The possibility of such ill-fitting modes implies we should always run multiple chains, perhaps more than our current default of $4$.
 
 This case study also raises the question of what role starting points may play.
@@ -763,8 +763,8 @@ As with other tuning parameters of an inference algorithm, picking starting poin
 
 We do not advocate mindlessly discarding misbehaving chains. It is important to analyze where this poor behavior comes from, and whether it hints at serious flaws in our model and in our inference. Our choice to adjust the initial estimates is based on: (a) the realization that the defaults are widely inconsistent with our expertise and (b) the understanding that the local modes do not describe a latent phenomenon of interest, as shown by our detailed analysis of how cyclical data interacts with a normal likelihood.
 
-# Acknowledgement {-#Acknowledgement}
+## Acknowledgement {-#sec7}
 
 We thank Ben Bales, Matthew West, Martin Modrák, and Jonah Gabry for helpful discussion.
 
-# References {-#my-section}
+## References {-#my-section}
