@@ -5,17 +5,18 @@ author: Charles C. Margossian^[Department of Statistics, Columbia University; co
 output: bookdown::gitbook
 # output: bookdown::pdf_book
 keep_tex: true
-# toc: true
+toc: true
+toc_float: true
 documentclass: article
 bibliography: ref.bib
 urlcolor: blue
-link-citations: true
+# link-citations: true
 abstract: "The Bayesian model of planetary motion is a simple but powerful example that illustrates important concepts, as well as gaps, in prescribed modeling workflows. Our focus is on Bayesian inference using Markov chains Monte Carlo for a model based on an ordinary differential equations (ODE). Our example presents unexpected multimodality, causing our inference to be unreliable and what is more, dramatically slowing down our ODE integrators. What do we do when our chains do not mix and do not forget their starting points? Reasoning about the computational statistics at hand and the physics of the modeled phenomenon, we diagnose how the modes arise and how to improve our inference. Our process for fitting the model is iterative, starting with a simplification and building the model back up, and makes extensive use of visualization."
 ---
 
 ## Introduction {-#inst}
 
-As developers of statistical softwares^[The authors are notably members of the Stan development team, see [mc-stan.org](https://mc-stan.org/).], we realize that we cannot fully automate modeling.
+As developers of statistical software^[One of the software we work on is Stan, see [mc-stan.org](https://mc-stan.org/).], we realize that we cannot fully automate modeling.
 Practitioners need to take bespoke steps to fit, evaluate, and improve their models.
 At the same time, the more modeling we do, the better prepared we usually are for the next project we undertake.
 It's not uncommon to apply hard-learned lessons from a past project to a new problem.
@@ -209,8 +210,9 @@ ppc_plot2D(r_fit1, data_pred = data_pred)
 
 Clearly, only the chains that landed close to $k = 1$ (chains 2, 5, and 7) are able to fit the data.
 This is consistent with the much higher log posterior density these chains produce.
-So degeneracy alone does not explain the lack of convergence.
-Nevertheless, the chains may still be getting stuck at smaller modes, in the tail of $k$'s distribution.
+Degeneracy therefore doesn't drive the lack of convergence because otherwise the different chains would produce roughly the same predictions.
+<!-- So degeneracy alone does not explain the lack of convergence. -->
+<!-- Nevertheless, the chains may still be getting stuck at smaller modes, in the tail of $k$'s distribution. -->
 
 At this point, we have taken "standard" steps to diagnose issues with our inference.
 To fully grasp what prevents the chains from mixing, we require a more bespoke analysis.
