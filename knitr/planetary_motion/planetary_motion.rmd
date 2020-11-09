@@ -5,8 +5,7 @@ author: Charles C. Margossian^[Department of Statistics, Columbia University; co
 output: bookdown::gitbook
 # output: bookdown::pdf_book
 keep_tex: true
-toc: true
-toc_float: true
+# toc: true
 documentclass: article
 bibliography: ref.bib
 urlcolor: blue
