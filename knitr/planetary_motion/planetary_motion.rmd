@@ -43,12 +43,6 @@ In our presentation, we try to distinguish generalizable methods, problem-specif
 
 ### R setup {-#setup}
 
-```{r include=FALSE}
-# Adjust to your setting
-.libPaths("~/Rlib/")
-# setwd("~/Code/example-models/knitr/planetary_motion")
-```
-
 ```{r message = FALSE}
 library(cmdstanr)
 library(posterior)
@@ -64,11 +58,6 @@ source("tools.r")
 bayesplot::color_scheme_set("viridisC")
 
 set.seed(1954)
-```
-
-```{r include=FALSE}
-# Adjust to your setting
-set_cmdstan_path("~/Rlib/cmdstan/")
 ```
 
 All the requisite code to run this notebook can be found online, in the [planetary motion github repository](https://github.com/stan-dev/example-models/tree/case-study/planet/knitr/planetary_motion).
@@ -134,8 +123,7 @@ plot
 ```
 
 ## Fitting a simple model and diagnosing inference {-#sec3}
-
-A first attempt at fitting the complete model (`planetary_motion_star.stan`) fails spectacularly: the chains do not converge and take a long time to run.
+A first attempt at fitting the complete model ([planetary_motion_star.stan](https://github.com/stan-dev/example-models/blob/master/knitr/planetary_motion/model/planetary_motion_star.stan)) fails spectacularly: the chains do not converge and take a long time to run.
 This is an invitation to start with a simpler model.
 A useful simplification is more manageable but still exhibits the challenges we encounter with the complete model.
 The hope is that a fix in this simple context translates into a fix in a more sophisticated setting.
