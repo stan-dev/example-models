@@ -209,9 +209,7 @@ ppc_plot2D(r_fit1, data_pred = data_pred)
 
 Clearly, only the chains that landed close to $k = 1$ (chains 2, 5, and 7) are able to fit the data.
 This is consistent with the much higher log posterior density these chains produce.
-Degeneracy therefore doesn't drive the lack of convergence because otherwise the different chains would produce roughly the same predictions.
-<!-- So degeneracy alone does not explain the lack of convergence. -->
-<!-- Nevertheless, the chains may still be getting stuck at smaller modes, in the tail of $k$'s distribution. -->
+Degeneracy therefore doesn't drive the lack of convergence because if it did the different chains would produce roughly the same predictions.
 
 At this point, we have taken "standard" steps to diagnose issues with our inference.
 To fully grasp what prevents the chains from mixing, we require a more bespoke analysis.
@@ -410,8 +408,8 @@ This is very much true of other tuning parameters of our algorithm, such as the 
 While defaults exist, a first attempt at fitting the model can motivate adjustments.
 In this sense, we can justify using a tighter distribution to draw the starting points after examining the behavior of the Markov chains with a broad starting distribution.
 
-This doesn't sound ideal, if failing to fit the model takes $\sim$ 2,000 seconds!
-As mentioned before, we however didn't need to wait this long to diagnose a failure in our inference and the here presented analysis could have been made with 100 MCMC draws.
+It took $\sim$ 2,000 seconds to discover the fit failed though. This is not ideal!
+As mentioned before, we don't need to wait this long to diagnose a failure in our inference. The analysis presented here could have been made with 100 MCMC draws.
 
 #### Fitting the simplified model {-#sec3.6.4}
 
@@ -451,7 +449,7 @@ Most inference problems we encounter across the models we fit can be traced back
 
 For several parameters, we adjust the starting point, especially when encoding stronger priors is neither helpful (because of the fundamental multimodality), nor possible. An example is the initial momentum, $p_0$, and the initial position, $q_0$.
 
-We have no a priori information for the direction of the momemtum.
+We have no a priori information for the direction of the momentum.
 A graphical inspection of the data suggests the planet is moving counter-clockwise.
 Recall that in our simulation, $p_0 = (1, 0)$.
 A first attempt at fitting the model shows there exists a mode at $p_0 \approx (-0.5, -1.5)$, which means the planet is moving clockwise!
