@@ -13,7 +13,9 @@ This introduction to `reduce_sum` copies directly from Richard McElreath's
 
 ## Introduction
 
-Stan 2.23 introduced `reduce_sum`, a new way to parallelize the execution of
+**Note:** This has been rewritten to use `_lupmf` which requires Cmdstan 2.25.
+
+Cmdstan 2.23 introduced `reduce_sum`, a new way to parallelize the execution of
 a single Stan chain across multiple cores. This is in addition to the already
 existing `map_rect` utility, and introduces a number of features that make it
 easier to use parallelism:
