@@ -1,6 +1,6 @@
 ---
 title: "Reduce Sum: A Minimal Example"
-date: "16 June 2020"
+date: "12 Nov 2020"
 output: html_document
 ---
 
@@ -159,7 +159,7 @@ for(n in 1:N) {
 
 Now it is clear that the calculation is the sum (up to a
 proportionality constant) of a number of conditionally independent
-Bernoulli log probability statements. So whenever we need to calculate
+Bernoulli log probability statements. Whenever we need to calculate
 a large sum where each term is independent of all others and associativity
 holds, then `reduce_sum` is useful.
 
@@ -171,9 +171,9 @@ This is because we only need this likelihood term up to a proportionality
 constant for MCMC to work and for some distributions this can make code
 run noticeably faster. Because of the way that `_lupmf` features work,
 Stan only allows them in the model block or in user-defined probability
-distribution functions, and so the function we write for `reduce_sum`
-will need to be a probability distribution function (suffixed with
-`_lpdf` or `_lpmf`) for us to use `binomial_logit_lupmf` on the inside.
+distribution functions, and for us to use `binomial_logit_lupmf` the
+function we write for `reduce_sum` will need to be a probability distribution
+function (suffixed with `_lpdf` or `_lpmf`).
 If the difference in the normalized and unnormalized functions is not
 relevant for your application, you can call your `reduce_sum` function
 whatever you like.
@@ -216,11 +216,11 @@ target += partial_sum_lupmf(n_redcards[1:M], 1, M, n_games, rating, beta) // Sum
 target += partial_sum_lupmf(n_redcards[(M + 1):N], M + 1, N, n_games, rating, beta); // Sum terms M + 1 to N
 ```
 
-By passing `partial_sum_lupmf` to `reduce_sum`, we allow Stan to
+By passing `partial_sum_lupmf` to `reduce_sum`, we tell Stan to
 automatically break up these calculations and do them in parallel.
 
 Notice the difference in how `n_redcards` is split in half (to reflect
-                                                            which terms of the sum are being accumulated) and the rest of the arguments
+which terms of the sum are being accumulated) and the rest of the arguments
 (`n_games`, `x`, and `beta`) are left alone. This distinction is important
 and more fully described in the User's Guide section on
 [Reduce-sum](https://mc-stan.org/docs/2_23/stan-users-guide/reduce-sum.html).
