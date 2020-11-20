@@ -64,25 +64,3 @@ fall into the following categories:
 ## Inference Method Names and Arguments
 
 ## Inference Result Objects
-
-
-
-
-
-
-
-
-different defaults
-Where PyStan follows RStan, 
-
-Systematic 
-
-
-
-the name 
-
-
-
-
-
-
