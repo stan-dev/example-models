@@ -1,0 +1,88 @@
+---
+title: "Stan Interfaces Rosetta (from XStan to CmdStanX)
+author: "Mitzi Morris"
+output:
+  html_document:
+    toc: yes
+    toc_depth: 2
+  pdf_document:
+    toc: yes
+    toc_depth: '2'
+---
+
+
+<style type="text/css">
+.table { width: 40%; }
+blockquote {
+    padding: 10px 20px;
+    margin: 0 0 20px;
+    font-size: 0.95em;
+    border-left: 5px solid #eee;
+}
+p.caption {
+  font-size: 0.9em;
+  font-style: italic;
+  margin-right: 10%;
+  margin-left: 10%;  
+  text-align: justify;
+}
+
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(cache=TRUE, message=FALSE, error=FALSE, warning=FALSE, comment=NA, out.width='90%', tidy.opts=list(width.cutoff=60), tidy=TRUE, fig.pos='H')
+def.chunk.hook  <- knitr::knit_hooks$get("chunk")
+knitr::knit_hooks$set(chunk = function(x, options) {
+  x <- def.chunk.hook(x, options)
+  ifelse(options$size != "normalsize", paste0("\\", options$size,"\n\n", x, "\n\n \\normalsize"), x)
+})
+```
+
+
+This note covers the differences between the RStan and PyStan interfaces
+and the newer [CmdStanR](https://mc-stan.org/cmdstanr/) and
+[CmdStanPy](https://mc-stan.org/cmdstanpy/) interfaces.
+
+All Stan interfaces provide the same essential functionality:
+they compile and run Stan programs in a programming language environment.
+CmdStan and RStan, the earliest Stan interfaces, differ slightly
+in the names and conventions used for some methods and their arguments.
+Because PyStan follows RStan while CmdStanR and CmdStanPy follow CmdStan,
+these differences persist.
+From here on out, we'll refer to RStan and PyStan as XStan
+and CmdStanR and CmdStanPy as CmdStanX.
+
+Differences in names and conventions between XStan and CmdStanX
+fall into the following categories:
+
+- Model compilation
+- Method and argument names of Stan inference algorithms
+- Accessing inference results
+
+## Model compilation
+
+## Inference Method Names and Arguments
+
+## Inference Result Objects
+
+
+
+
+
+
+
+
+different defaults
+Where PyStan follows RStan, 
+
+Systematic 
+
+
+
+the name 
+
+
+
+
+
+
