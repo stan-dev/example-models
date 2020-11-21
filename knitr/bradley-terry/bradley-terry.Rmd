@@ -3,6 +3,7 @@ title: "The Bradley-Terry Model of Ranking via Paired Comparisons"
 author: "Bob Carpenter"
 date: "19 March 2018"
 output:
+  tufte::tufte_handout: default
   tufte::tufte_html:
     toc: true
     toc_depth: 1
