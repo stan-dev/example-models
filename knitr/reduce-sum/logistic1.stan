@@ -5,22 +5,21 @@ functions {
                         vector rating,
                         vector beta) {
     return binomial_logit_lupmf(slice_n_redcards |
-                                n_games[start:end],
-                                beta[1] + beta[2] * rating[start:end]);
+                               n_games[start:end],
+                               beta[1] + beta[2] * rating[start:end]);
   }
 }
 data {
-  int N;
-  int n_redcards[N];
-  int n_games[N];
+  int<lower=0> N;
+  int<lower=0> n_redcards[N];
+  int<lower=0> n_games[N];
   vector[N] rating;
+  int<lower=1> grainsize;
 }
 parameters {
   vector[2] beta;
 }
 model {
-  int grainsize = 1;
-
   beta[1] ~ normal(0, 10);
   beta[2] ~ normal(0, 1);
 

@@ -1,6 +1,6 @@
 ---
 title: "Reduce Sum: A Minimal Example"
-date: "12 Nov 2020"
+date: "2 Dec 2020"
 output: html_document
 ---
 
@@ -13,7 +13,8 @@ This introduction to `reduce_sum` copies directly from Richard McElreath's
 
 ## Introduction
 
-**Note:** This has been rewritten to use `_lupmf` which requires Cmdstan 2.25.
+**Note:** This has been rewritten to use unnormalized distribution functions
+( `_lupdf˙/˙_lupmf`) which requires Cmdstan 2.25 or newer.
 
 Cmdstan 2.23 introduced `reduce_sum`, a new way to parallelize the execution of
 a single Stan chain across multiple cores. This is in addition to the already
@@ -168,16 +169,17 @@ holds, then `reduce_sum` is useful.
 To use `reduce_sum`, a function must be written that can be used to compute
 arbitrary sections of this sum.
 
-Note we used `binomial_logit_lupmf` instead of `binomial_logit_lpmf`.
+Note we are using `binomial_logit_lupmf` instead of `binomial_logit_lpmf`.
 This is because we only need this likelihood term up to a proportionality
 constant for MCMC to work and for some distributions this can make code
-run noticeably faster. Because of the way that `_lupmf` features work,
-Stan only allows them in the model block or in user-defined probability
-distribution functions, and for us to use `binomial_logit_lupmf` the
-function we write for `reduce_sum` will need to be a probability distribution
-function (suffixed with `_lpdf` or `_lpmf`).
-If the difference in the normalized and unnormalized functions is not
-relevant for your application, you can call your `reduce_sum` function
+run noticeably faster. There is a catch though: Stan only allows `_lupmf`
+in the model block or in user-defined probability distribution functions.
+Thus, for us to use `binomial_logit_lupmf` the, function we write for
+`reduce_sum` must be a user-defined probability distribution function
+(which means it must be suffixed with `_lpdf` or `_lpmf`).
+
+If the difference in the performance of normalized and unnormalized functions
+is not relevant for your application, you can call your `reduce_sum` function
 whatever you like.
 
 Using the reducer interface defined in
