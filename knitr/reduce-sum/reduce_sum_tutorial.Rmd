@@ -1,6 +1,6 @@
 ---
 title: "Reduce Sum: A Minimal Example"
-date: "16 June 2020"
+date: "2 Dec 2020"
 output: html_document
 ---
 
@@ -13,7 +13,10 @@ This introduction to `reduce_sum` copies directly from Richard McElreath's
 
 ## Introduction
 
-Stan 2.23 introduced `reduce_sum`, a new way to parallelize the execution of
+**Note:** This has been rewritten to use unnormalized distribution functions
+( `_lupdf˙/˙_lupmf`) which requires Cmdstan 2.25 or newer.
+
+Cmdstan 2.23 introduced `reduce_sum`, a new way to parallelize the execution of
 a single Stan chain across multiple cores. This is in addition to the already
 existing `map_rect` utility, and introduces a number of features that make it
 easier to use parallelism:
@@ -149,36 +152,49 @@ statement:
 n_redcards ~ binomial_logit(n_games, beta[1] + beta[2] * rating);
 ```
 
-can be rewritten (up to a proportionality constant) as:
+can be rewritten as:
   
 ```{stan, output.var = "", eval = FALSE}
 for(n in 1:N) {
-  target += binomial_logit_lpmf(n_redcards[n] | n_games[n], beta[1] + beta[2] * rating[n])
+  target += binomial_logit_lupmf(n_redcards[n] | n_games[n], beta[1] + beta[2] * rating[n])
 }
 ```
 
-Now it is clear that the calculation is the sum of a number of
-conditionally independent Bernoulli log probability statements. So
-whenever we need to calculate a large sum where each term is
-independent of all others and associativity holds, then `reduce_sum`
-is useful.
+Now it is clear that the calculation is the sum (up to a
+proportionality constant) of a number of conditionally independent
+Bernoulli log probability statements. Whenever we need to calculate
+a large sum where each term is independent of all others and associativity
+holds, then `reduce_sum` is useful.
 
 To use `reduce_sum`, a function must be written that can be used to compute
 arbitrary sections of this sum.
+
+Note we are using `binomial_logit_lupmf` instead of `binomial_logit_lpmf`.
+This is because we only need this likelihood term up to a proportionality
+constant for MCMC to work and for some distributions this can make code
+run noticeably faster. There is a catch though: Stan only allows `_lupmf`
+in the model block or in user-defined probability distribution functions.
+Thus, for us to use `binomial_logit_lupmf` the, function we write for
+`reduce_sum` must be a user-defined probability distribution function
+(which means it must be suffixed with `_lpdf` or `_lpmf`).
+
+If the difference in the performance of normalized and unnormalized functions
+is not relevant for your application, you can call your `reduce_sum` function
+whatever you like.
 
 Using the reducer interface defined in
 [Reduce-Sum](https://mc-stan.org/docs/2_23/functions-reference/functions-reduce.html):
   
 ```{stan, output.var = "", eval = FALSE}
 functions {
-  real partial_sum(int[] slice_n_redcards,
-                   int start, int end,
-                   int[] n_games,
-                   vector rating,
-                   vector beta) {
-    return binomial_logit_lpmf(slice_n_redcards |
-                               n_games[start:end],
-                               beta[1] + beta[2] * rating[start:end]);
+  real partial_sum_lpmf(int[] slice_n_redcards,
+                        int start, int end,
+                        int[] n_games,
+                        vector rating,
+                        vector beta) {
+    return binomial_logit_lupmf(slice_n_redcards |
+                                n_games[start:end],
+                                beta[1] + beta[2] * rating[start:end]);
   }
 }
 ```
@@ -186,22 +202,29 @@ functions {
 The likelihood statement in the model can now be written:
   
 ```{stan, output.var = "", eval = FALSE}
-target += partial_sum(n_redcards, 1, N, n_games, rating, beta); // Sum terms 1 to N in the likelihood
+target += partial_sum_lupmf(n_redcards, 1, N, n_games, rating, beta); // Sum terms 1 to N in the likelihood
 ```
 
-Equivalently it could be broken into two pieces and written like:
+Note that we're calling `partial_sum_lupmf` even though we defined the
+function `partial_sum_lpmf`. `partial_sum_lupmf` is implicitly defined when
+we write `partial_sum_lpmf` and is a special version of the function that
+will signify to all the `_lupmf` calls inside it that it is okay to drop
+constants. If we call `partial_sum_lpmf`, the `binomial_logit_lupmf` function
+call will not drop constants (and hence be slower).
+
+Equivalently this partial sum could be broken into two pieces and written like:
 
 ```{stan, output.var = "", eval = FALSE}
 int M = N / 2;
-target += partial_sum(n_redcards[1:M], 1, M, n_games, rating, beta) // Sum terms 1 to M
-target += partial_sum(n_redcards[(M + 1):N], M + 1, N, n_games, rating, beta); // Sum terms M + 1 to N
+target += partial_sum_lupmf(n_redcards[1:M], 1, M, n_games, rating, beta) // Sum terms 1 to M
+target += partial_sum_lupmf(n_redcards[(M + 1):N], M + 1, N, n_games, rating, beta); // Sum terms M + 1 to N
 ```
 
-By passing `partial_sum` to `reduce_sum`, we allow Stan to
+By passing `partial_sum_lupmf` to `reduce_sum`, we tell Stan to
 automatically break up these calculations and do them in parallel.
 
 Notice the difference in how `n_redcards` is split in half (to reflect
-                                                            which terms of the sum are being accumulated) and the rest of the arguments
+which terms of the sum are being accumulated) and the rest of the arguments
 (`n_games`, `x`, and `beta`) are left alone. This distinction is important
 and more fully described in the User's Guide section on
 [Reduce-sum](https://mc-stan.org/docs/2_23/stan-users-guide/reduce-sum.html).
@@ -211,7 +234,7 @@ likelihood:
 
 ```{stan, output.var = "", eval = FALSE}
 int grainsize = 1;
-target += reduce_sum(partial_sum, n_redcards, grainsize,
+target += reduce_sum(partial_sum_lupmf, n_redcards, grainsize,
                      n_games, rating, beta);
 ```
 
@@ -221,16 +244,20 @@ be estimated automatically (`grainsize` should be left at 1 unless specific test
 are done to
 [pick a different one](https://mc-stan.org/docs/2_23/stan-users-guide/reduce-sum.html#reduce-sum-grainsize)).
 
+Again, if we passed `partial_sum_lpmf` to `reduce_sum` instead of
+`partial_sum_lupmf` we would not take advantage of the performance benefits
+of using `bernoulli_logit_lupmf`.
+
 Making `grainsize` data (this makes it convenient to experiment with), the final
 model is:
 ```{stan, output.var = "", eval = FALSE}
 functions {
-  real partial_sum(int[] slice_n_redcards,
-                   int start, int end,
-                   int[] n_games,
-                   vector rating,
-                   vector beta) {
-    return binomial_logit_lpmf(slice_n_redcards |
+  real partial_sum_lpmf(int[] slice_n_redcards,
+                        int start, int end,
+                        int[] n_games,
+                        vector rating,
+                        vector beta) {
+    return binomial_logit_lupmf(slice_n_redcards |
                                n_games[start:end],
                                beta[1] + beta[2] * rating[start:end]);
   }
@@ -250,7 +277,7 @@ model {
   beta[1] ~ normal(0, 10);
   beta[2] ~ normal(0, 1);
 
-  target += reduce_sum(partial_sum, n_redcards, grainsize,
+  target += reduce_sum(partial_sum_lupmf, n_redcards, grainsize,
                        n_games, rating, beta);
 }
 ```
@@ -311,11 +338,11 @@ to check diagnostics. `reduce_sum` is a tool for speeding up single chain
 calculations, which can be useful for model development and on computers with
 large numbers of cores.
 
-We can do a quick check that these two methods are mixing with posterior.
+We can do a quick check that these two methods are mixing with the `posterior`
+package (https://github.com/stan-dev/posterior).
 When parallelizing a model is a good thing to do to make sure something is not
 breaking:
 ```{r}
-remotes::install_github("jgabry/posterior")
 library(posterior)
 summarise_draws(bind_draws(fit0$draws(), fit1$draws(), along = "chain"))
 ```
