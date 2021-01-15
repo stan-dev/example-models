@@ -99,35 +99,39 @@ the set of full conditional distributions by
 introducing a fixed point from the support of $p$
 and then using Brook’s Lemma to factor the set of conditional distributions
 into a joint distribution which is determined up to a proportionality constant
-(see Banerjee, Carlin, and Gelfand, 2004, sec. 3.2):
+(see Banerjee, Carlin, and Gelfand, 2004, sec. 3.2) as a Gaussian with mean and precision parameters:
 
 $$ \mathbf{\phi} \sim \mathit{N} \left(\mathbf{0}, \left[D_{\tau}(I - \alpha B)\right]^{-1} \right) $$
 
 where
 
+- $W$ is the $n \times n$ adjacency matrix where entries $\{i,i\}$ are zero and the off-diagonal elements
+are $1$ if regions $i$ and $j$ are neighbors and $0$ otherwise.
+- $D$ is the $n \times n$ diagonal where entries $\{i,i\}$ are the number of neighbors of region $i$
+and the off-diagnoal entries are $0$.
+- $D_{\tau} = \tau D$
 - $\alpha$ is between 0 and 1
-- $B$ is the $n \times n$ matrix weights matrix $W$ where entries $\{i,i\}$ are zero and the off-diagonal elements
-describe the spatial proximity of regions $i$ and $j$
+- $B$ is the scaled adjacency matrix $D^{-1}W$
 - $I$ is an $n \times n$ identity matrix
-- $D_{\tau} = \tau D$ where $D$ is an $n \times n$ diagonal matrix
 
-The construction of the spatial proximity matrix $B$ determines the class of CAR model structure.
-
-In the case where $B$ is a positive definite matrix, then the CAR model structure is a fully generative model.
-However evaluation of the joint distribution requires computing the covariance matrix described by
-$[D_{\tau}(I - \alpha B)]^{-1}$, which is computationally expensive.
+Since $D_{\tau} = \tau D$ and $B = D^{-1}W$, $[D_{\tau}(I - \alpha B)]^{-1}$
+rewrites to $[{\tau}(D - \alpha W)]^{-1}$.
+In the case where $\alpha < 0$, the precision matrix is positive definite,
+thus the joint distribution is proper.
+However evaluation of the joint distribution requires computing the determinant of this matrix,
+which is computationally expensive.
 See the Stan case study
 [Exact sparse CAR models in Stan](http://mc-stan.org/documentation/case-studies/mbjoseph-CARStan.html),
-for further discussion of CAR models.
+for discussion of how to speed up computation.
 
 ### Intrinsic Conditional Auto-Regressive (ICAR) models
 
-An Intrinsic Conditional Auto-Regressive (ICAR) model is a CAR model where:
+An Intrinsic Conditional Auto-Regressive (ICAR) model is a CAR model where $\alpha = 1$,
+so that the joint distribution simplifies to,
 
-- $\alpha = 1$
-- $D$ is an $n \times n$ diagonal matrix where $d_{i,i}$ = the number of neighbors for region $n_i$
-- $B$ is the scaled weights matrix $W / D$,  where $W$ is uses a binary encoding such that
-$w_{i,i} = 0, w_{i,j} = 1$ if $i$ is a neighbor of $j$, and $w_{i,j}=0$ otherwise
+$$\phi \sim N(0, [\tau \, (D - W)]^{-1}).$$
+
+resulting in a singular precision matrix and an improper prior distribution.
 
 The corresponding conditional distribution specification is:
 
@@ -140,11 +144,7 @@ which has a set of neighbors $j \neq i$ whose cardinality is $d_{i,i}$,
 is normally distributed with a mean equal to the average of its neighbors.
 Its variance decreases as the number of neighbors increases.
 
-The joint distribution simplifies to:
-
-$$\phi \sim N(0, [\tau \, (D - W)]^{-1}).$$
-
-which rewrites to the _pairwise difference_ formulation:
+The joint distribution, above, rewrites to the _pairwise difference_ formulation:
 
 $$ p(\phi | \tau) \propto {\tau}^{\frac{n - NC}{2}} \exp \left\{ {- \frac{\tau}{2}} \sum_{i \sim j}{({\phi}_i - {\phi}_j)}^2 \right\} $$
 
@@ -543,7 +543,7 @@ The R script
 [fit_scotland_bugs.R](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/fit_scotland_bugs.R)
 uses OpenBUGS to fit this model.
 
-```{r fit-scotland-bugs, echo = FALSE, results = FALSE }
+```{r fit-scotland-bugs, echo = FALSE, results = FALSE, eval=FALSE }
 library(R2OpenBUGS);
 library(rstan)  
 
@@ -592,7 +592,7 @@ sims = rstan::monitor(fit_bugs$sims.array,
       probs=c(0.025, 0.975), warmup=0, print=TRUE);
 ```
       
-```{r print-fit-scotland-bugs }
+```{r print-fit-scotland-bugs, eval=FALSE }
 options(digits=2);
 sims[1:10, 1:7];
 ```
