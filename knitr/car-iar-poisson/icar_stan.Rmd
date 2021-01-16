@@ -48,77 +48,76 @@ All commands should be run from the directory `stan-dev/example-models/knitr/car
 
 ## About conditional autoregressive models
 
-CAR models are used for areal data consisting of a single aggregated measure
-per areal unit, which may be a binary, count, or continuous value.
+CAR and ICAR models are used when areal data consists
+of a single aggregated measure per areal unit,
+either a binary, count, or continuous value.
 Areal units are volumes, more precisely,
 areal units partition a multi-dimensional volume D into a finite number
 of sub-volumes with well-defined boundaries.
 Areal data differs from point data, 
 which consists of measurements from a known set of geo-spatial points.
 For point data, the relationship between points is a
-continuous, real-valued distance measure.
-For areal units, the relationship between areal units is characterized in
-terms of adjacency.
+continuous, real-valued distance measure which can be calculated
+automatically for any two points on the map,
+allowing for the addition of new points to the map.
+Given a set of areal units, there is no automatic procedure
+for adding a new areal unit, thus models for areal data are
+non-generative with respect to the areal regions.
 
-Given a set of observations taken at $n$ different areal units of a region, 
+For a set of $N$ areal units, the relationship between areal units
+is described by an $N \times N$ adjacency matrix,
+which is usually written $A$ for adjacency, or $W$ for weights.
+For the binary _neighbor_ relationship,
+written $i \sim j$ where $i \neq j$, the entries in the adjacency matrix
+are $1$ if regions $n_i$ and $n_j$ are neighbors and is otherwise $0$.
+For CAR models, the neighbor relationship is symmetric but not reflexive;
+if $i \sim j$ then $j \sim i$, but a region is not its own neighbor.
+
+### Conditional Autoregressive (CAR) Models
+
+Given a set of observations taken at $N$ different areal units of a region, 
 spatial interactions between a pair of units $n_i$ and $n_j$ can be modelled conditionally
 as a spatial random variable $\mathbf{\phi}$, which is an $n$-length vector
 $\mathbf{\phi} = ({\phi}_1, \ldots, {\phi}_n)^T$.
 
-For CAR models, spatial relationship between the $n$ areal units
-are represented as an adjacency matrix $W$ with dimensions $n \times n$
-where entries $w_{i,j}$ and $w_{j,i}$ are positive when regions $i$ and $j$ are neighbors
-and zero otherwise.
-The _neighbor_ relationship $i \sim j$ is defined in terms of this matrix:
-the neighbors of region $i$ are those regions who have non-zero entries in row or column $i$.
-This encoding defines a lattice structure over the $n$ areal units.
+In the full conditional distribution, each ${\phi}_i$ is conditional
+on the sum of the weighted values of its neighbors ($w_{ij}\,\phi_j$)
+and has unknown variance
+$$\phi_i \mid \phi_j, j \neq i, \sim \mathrm{N} \left( \sum_{j = 1}^n w_{ij} \phi_j, {\sigma}^2 \right).$$
+\
+Specification of the global, or joint distribution via the local specification
+of the conditional distributions of the individual random variables
+defines a Gaussian Markov random field (GMRF).
+Besag (1974) proved that the
+corresponding joint specification of $\phi$ is a multivariate normal random variable
+centered at $0$.
+The variance of $\phi$ is specified as a precision matrix $Q$ which
+is simply the inverse of the covariance matrix $\Sigma$, i.e. $\Sigma = Q^{-1}$
+so that 
+$$\phi \sim \mathrm{N}(0, Q^{-1}).$$
 
+In order for the standard multivariate normal random variable $\phi$ to have a proper joint probability density,
+the precision matrix $Q$ must be symmetric and positive definite.
+This is accomplished by constructing the precision matrix $Q$ from the adjacency matrix $W$:
 
-### Conditional Auto-Regressive (CAR) Models
-
-Besag (1974) motivates CAR models for spatial processes using
-results from the physics of lattice systems of particles and
-the Hammersley-Clifford theorem which provides an equivalence between
-a local specification of the conditional distribution of each particle
-given its neighboring particles and the global specification
-of the joint distribution of all particles.
-This specification of the joint distribution via the local specification
-of the conditional distributions of the individual variables
-is a Markov random field (MRF) specification.
-The conditional distribution for each ${\phi}_i$ is specified in terms of a mean
-and precision parameter $\tau$ as:
-
-$$ p \left( { \phi }_i \, \vert\, {\phi}_j \, j \neq i, {{\tau}_i}^{-1} \right)
-= \mathit{N} \left( \alpha \sum_{i \sim j} {w}_{i,j} {\phi}_j,\tau_i^{-1} \right), i,j = 1, \ldots, n $$
-
-The parameter $\alpha$ controls the strength of the spatial association,
-where $\alpha = 0$ corresponds to spatial independence.
-
-The corresponding joint distribution can be uniquely determined from
-the set of full conditional distributions by
-introducing a fixed point from the support of $p$
-and then using Brook’s Lemma to factor the set of conditional distributions
-into a joint distribution which is determined up to a proportionality constant
-(see Banerjee, Carlin, and Gelfand, 2004, sec. 3.2) as a Gaussian with mean and precision parameters:
-
-$$ \mathbf{\phi} \sim \mathit{N} \left(\mathbf{0}, \left[D_{\tau}(I - \alpha B)\right]^{-1} \right) $$
+$$ Q = [D_{\tau}(I - \alpha B)] $$
 
 where
 
 - $W$ is the $n \times n$ adjacency matrix where entries $\{i,i\}$ are zero and the off-diagonal elements
 are $1$ if regions $i$ and $j$ are neighbors and $0$ otherwise.
-- $D$ is the $n \times n$ diagonal where entries $\{i,i\}$ are the number of neighbors of region $i$
-and the off-diagnoal entries are $0$.
-- $D_{\tau} = \tau D$
-- $\alpha$ is between 0 and 1
-- $B$ is the scaled adjacency matrix $D^{-1}W$
-- $I$ is an $n \times n$ identity matrix
+- $D$ is the $n \times n$ diagonal matrix where entries $\{i,i\}$ are the number of neighbors of region $i$
+and the off-diagonal entries are $0$.
+- $D_{\tau} = \tau\, D$.
+- $\alpha$ a parameter which controls the amount of spatial correlation, where 
+where $\alpha = 0$ implies spatial independence and where $\alpha = 1$ implies complete spatial correlation.
+- $B$ is the scaled adjacency matrix $D^{-1}W$.
+- $I$ is an $n \times n$ identity matrix.
 
-Since $D_{\tau} = \tau D$ and $B = D^{-1}W$, $[D_{\tau}(I - \alpha B)]^{-1}$
-rewrites to $[{\tau}(D - \alpha W)]^{-1}$.
-In the case where $\alpha < 0$, the precision matrix is positive definite,
-thus the joint distribution is proper.
-However evaluation of the joint distribution requires computing the determinant of this matrix,
+When $\alpha$ is in the interval (0,1), the precision matrix $Q$ is positive definite,
+thus the joint distribution $\phi$ is proper.
+
+Evaluation of $\phi$ requires computing the determinant of the precision matrix $Q$,
 which is computationally expensive.
 See the Stan case study
 [Exact sparse CAR models in Stan](http://mc-stan.org/documentation/case-studies/mbjoseph-CARStan.html),
@@ -127,11 +126,24 @@ for discussion of how to speed up computation.
 ### Intrinsic Conditional Auto-Regressive (ICAR) models
 
 An Intrinsic Conditional Auto-Regressive (ICAR) model is a CAR model where $\alpha = 1$,
-so that the joint distribution simplifies to,
+that is, it assumes complete spatial correlation between regions.
+(Spoiler alert: this assumption is problematic, resulting in the
+the BYM model and successors).
+The joint distribution of the ICAR model is derived from the joint distribution
+for the CAR model as follows:
+
+- since $D_{\tau} = \tau D$ and $B = D^{-1}W$, the expression $[D_{\tau}(I - \alpha B)]$
+simplifies to $[{\tau}(D - \alpha W)]$.
+- since $\alpha = 1$, it is omitted.
+
+The resulting matrix $[\tau \, (D - W)]$ is singular, thus the ICAR variate $\phi$
+is an improper prior distribution, with joint distribution:
 
 $$\phi \sim N(0, [\tau \, (D - W)]^{-1}).$$
 
-resulting in a singular precision matrix and an improper prior distribution.
+While this ICAR model is non-generating in that it cannot be used as a model for the data,
+it can be used as a prior as part of a hierarchical model, which is the role it plays in
+the BYM model.
 
 The corresponding conditional distribution specification is:
 
@@ -152,15 +164,9 @@ where $NC$ is the number of components in the graph over all areal subregions de
 $NC == 1$ when the areal graph is fully connected, i.e., every subregion can be reached from every other subregion
 via a sequence of neighbors.
 
-The above conditions for the ICAR model produce an improper distribution
-because setting $\alpha = 1$ creates a singular matrix $(D - W)$, see Besag and Kooperberg 1995.
-Furthermore, the joint distribution is non-identifiable;
+From the pairwise difference formulation, we see that the joint distribution is non-identifiable;
 adding any constant to all of the elements of $\phi$ leaves the joint distribution unchanged.
 Adding the constraint $\sum_{i} {\phi}_i = 0$ resolves this problem.
-
-While this ICAR model is non-generating in that it cannot be used as a model for the data,
-it can be used as a prior as part of a hierarchical model, which is the role it plays in
-the BYM model.
 
 ### Derivation of the _Pairwise Difference_ Formula
 
