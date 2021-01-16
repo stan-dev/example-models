@@ -109,8 +109,8 @@ are $1$ if regions $i$ and $j$ are neighbors and $0$ otherwise.
 - $D$ is the $n \times n$ diagonal matrix where entries $\{i,i\}$ are the number of neighbors of region $i$
 and the off-diagonal entries are $0$.
 - $D_{\tau} = \tau\, D$.
-- $\alpha$ a parameter which controls the amount of spatial correlation, where 
-where $\alpha = 0$ implies spatial independence and where $\alpha = 1$ implies complete spatial correlation.
+- $\alpha$ controls the amount of spatial correlation;
+$\alpha = 0$ implies spatial independence and $\alpha = 1$ implies complete spatial correlation.
 - $B$ is the scaled adjacency matrix $D^{-1}W$.
 - $I$ is an $n \times n$ identity matrix.
 
@@ -120,8 +120,8 @@ thus the joint distribution $\phi$ is proper.
 Evaluation of $\phi$ requires computing the determinant of the precision matrix $Q$,
 which is computationally expensive.
 See the Stan case study
-[Exact sparse CAR models in Stan](http://mc-stan.org/documentation/case-studies/mbjoseph-CARStan.html),
-for discussion of how to speed up computation.
+[Exact sparse CAR models in Stan](http://mc-stan.org/documentation/case-studies/mbjoseph-CARStan.html)
+for ways to speed up computation.
 
 ### Intrinsic Conditional Auto-Regressive (ICAR) models
 
