@@ -19,8 +19,9 @@ In the course of the Math library's existance, C++ has changed substantially.
 Math was originally written before C++11. It currently targets C++14. In the near
 future it will transition to C++17. With this in mind, there are many different
 ways to write Math functions. This guide tries to document best practices,
-conventions which not all functions in Math follow (or are even formally
-agreed upon by the developers).
+conventions which not all functions in Math follow, but should be followed for
+new code to keep the code from getting unweildy (the old patterns will be
+updated eventually).
 
 The title contans "Current State" to emphasize that if any information here is
 out of date or any advice does not work, it should be reported as a bug (the
@@ -240,30 +241,229 @@ also map to a variety of Eigen expressions.
 For instance, in the following code, the result `c` is not a vector, but
 a vector-like type representing the sum of `a` and `b`:
 
-```
+```cpp
 Eigen::VectorXd a(5);
 Eigen::VectorXd b(5);
 auto c = a + b;
 ```
 
-As an aside, in order to get the actual vector result, Eigen defines the
-`.eval()` operator, so `c.eval()` would return an actual `Eigen::VectorXd`.
-Similarly, Math defines the `eval` function which will evaluate an Eigen
-expression and forward anything that is not an Eigen expression.
+Similarly, there are other representations of vectors and matrices
+yet discussed, in particular matrices stored in Math's special arena
+memory or matrices stored on a GPU. In either case, it is expedient
+to not write explicit overloads for all the different types that a
+function might accept, but limit them with template meta-programs.
+
+For instance, if only base Eigen types are allowed, then a function
+that takes vector types could be defined as follows:
+
+```cpp
+template <typename T>
+T norm(const Eigen::Matrix<T, Eigen::Dynamic, 1>&);
+```
+
+A typical problem with a function like this is that `norm` can
+similarly be defined for a row vector (and the implementation is
+the same). In this case there are two signatures:
+
+```cpp
+template <typename T>
+T norm(const Eigen::Matrix<T, Eigen::Dynamic, 1>&);
+template <typename T>
+T norm(const Eigen::Matrix<T, 1, Eigen::Dynamic>&);
+```
+
+The simple solution to this problem is to move to a fully templated signature:
+
+```cpp
+template <typename T>
+return_type_t<T> norm(const T&);
+```
+
+The immediate problem here is what if there actually are differences in
+the implementations? The most common situation is that encountered when
+there is one generic templated implementation that works with any autodiff
+type, and then a second faster overload that only works with a specific
+autodiff type.
+
+There can easily be ambiguities between the two function signatures. The
+previous examples took advantage of overloads. If a function overload
+is more specialized than a template, then the C++ compiler favors the
+overload. This only works in simple cases though. The more general solution
+are template metaprograms that take advantage of C++ substitution failure
+is not an error (SFINAE) semantics. For instance, for the norm function above,
+SFINAE could be used to limit one signature to work with reverse
+mode autodiff types and one to work with anything else:
+
+```cpp
+template <typename T,
+          require_st_var<T>* = nullptr>
+return_type_t<T> norm(const T&);
+template <typename T,
+          require_not_st_var<T>* = nullptr>
+return_type_t<T> norm(const T&);
+```
+
+SFINAE should be thought of as filters on what functions are visible to the
+compiler when it does name lookup for a specific function. `require_st_var`
+should be read "require the scalar type of the argument to be a `var`". The
+meta-program `require_st_var<T>` will evaluate to a valid type if the scalar
+type of `T` is a `var`. If the scalar type of `T` is not a `var`, then
+`require_st_var<T>` does not evaluate to a valid type, and it is not possible
+to do template substitution on this signature, and the compiler treats it as
+if it does not exist. This is how SFINAE (substitution failure is not an error)
+works. Because the substitution does not work, the signature is ignored.
+This is all built similarly to C++'s
+[std::enable_if](https://en.cppreference.com/w/cpp/types/enable_if)
+template metaprogram.
+
+Again, there are many ways to solve a problem in C++. In particular there
+are cases where simple overloads or template specializations can achieve the
+same thing as the SFINAE template meta-programs. Unless there is a specific
+reason though, new functions in Math should use the SFINAE meta-programs to
+handle different implementations. These are tested to work with the broad
+set of C++ types that the relatively compact set of Stan types map to.
+
+The vast majority of the SFINAE template meta-programs in Math are special
+to Stan or Math. Documentation can be found in the
+[Doxygen](https://mc-stan.org/math/) docs. If functionality is not available,
+it new meta-programs should be added.
 
 ## Prim (fully templated)
 
 ### Exceptions
 
+Math functions are expected to validate inputs and throw exceptions.
+It should be impossible to cause a segfault by calling a
+user-facing Math function or trigger an exception that is not handled
+by Stan itself. This means that argument sizes should be checked to be
+compatible. For instance, a matrix multiply function would need to check
+that the first matrix can in fact be multiplied by the second, if this
+is not so it should throw.
+
+If a scalar argument should be positive, an exception should be thrown
+if it is not. If a matrix argument should be positive definite, the
+function should check this before operating on the matrix. This can
+lead to significant overhead in the checks, but the current library
+policy is to get informative errors back to the user, which means doing
+these checks.
+
+Error checks should be done with the functions in
+[stan/math/prim/err](https://github.com/stan-dev/math/tree/develop/stan/math/prim/err)
+which throw consistently formatted errors.
+
 ### Reference types
+
+
+Anything that is an input Eigen type
 
 ### Holders
 
+If a function returns an Eigen expression, it may be necessary to use
+the `make_holder` utility.
+
+Returning expressions is tricky because the expression may have a longer
+lifetime than the objects it operates on. For instance, returning an
+expression on a local variable leads to this situation:
+
+```cpp
+template <typename T>
+auto add_zero(const T& a) {
+  Eigen::VectorXd b = Eigen::VectorXd(a.size());
+  return a + b;
+}
+```
+
+Because the return type of this function is `auto`, it is possible
+that it returns an Eigen expression.
+
+The following code will segfault on the construction of `c` because
+by this time the temporary `b` will have been destructed.
+
+```
+Eigen::VectorXd a(5);
+Eigen::VectorXd c = add_zero(a);
+```
+
+`make_holder` can be used to extend the scope of `b` so that it does
+not immediately get destructed.
+
+```cpp
+template <typename T>
+auto add_zero(const T& a) {
+  Eigen::VectorXd b = Eigen::VectorXd(a.size());
+  return make_holder([](const auto& l, const auto& r) { return l + r; }, std::move(b));
+}
+```
+
+Returning expressions is an advanced feature and it is easy to make
+mistakes. In this regard, it is simplest to start development not
+returning expressions (in this case holders are unnecessary), and only
+add expression return types later.
+
+It is always possible to return a non-expression type by evaluating
+the Eigen expression. For convenience, there is an `eval` function
+in Math that will evaluate Eigen expressions and forward anything
+else. This is convenient because it works on non-Eigen types as well
+(as compared to the built in `.eval()` member function on Eigen
+types).
+
+The implementation of `make_holder` is
+[here](https://github.com/stan-dev/math/blob/develop/stan/math/prim/meta/holder.hpp).
+
 ### Tests
+
+
+Tests in Math are written with the Google test framework. At this
+point there are enough functions in Math that the way to get started
+is by just copying the tests of a similar Function and editing them to
+suit the new function. There are two basic sets of functions that every
+Stan function should have. First, for a function named `foo`, there
+should be a file in `test/unit/math/prim/fun` named `foo_test.cpp`.
+
+This should include tests that:
+
+1. Check that every exception is throwing in the right way at least once
+and that all edge cases are handled correctly.
+
+  For instance, if there is a `check_size_match` function, then there
+  should be a test that makes sure that if the sizes don't match, this
+  error gets thrown. It is not necessary to check the error message in
+  the tests, just check that an exception is thrown and the exception
+  type is correct.
+
+2. Check that the function returns the expect values for a couple
+suitable inputs.
+
+  For some functions these checks should be more extensive that others,
+  but there should at least be a two or three even in simple cases.
+
+The `prim` tests should only have scalar arithmetic types. No autodiff
+is tested here. The `prim` tests check that the function handles edge
+cases correctly and produces the correct output for different function
+values. The second set of tests should be in `stan/math/mix/fun` with
+the same name `foo_test.cpp`. These tests will be used to test all
+forms of the autodiff.
+
+The tests in `mix/fun` should use the `expect_ad` function to test
+all forms of autodiff. `expect_ad` takes as its first argument a
+function to test and then up to three other arguments, all with
+arithmetic scalar types. For a given function `f`, and two arguments
+`a` and `b`, `expect_ad` tests that:
+
+1. For every combination of `a` and `b`, the returned value of `f`
+matches the returned value with non-autodiff types.
+
+2. The finite difference gradients of `f` match those computed with
+autodiff.
+
+3. Any time a `f` throws with arithmetic arguments, it also throws
+with autodiff arguments.
 
 ## Reverse Mode
 
 ### Arena memory
+
+Reverse mode autodiff in Stan stores
 
 ### Arena types
 
@@ -300,3 +500,12 @@ expression and forward anything that is not an Eigen expression.
 ### `make_callback_ptr`
 
 ### `forward_as`
+
+### Nested Stacks
+
+### Scoped Stacks
+
+As an aside, in order to get the actual vector result, Eigen defines the
+`.eval()` operator, so `c.eval()` would return an actual `Eigen::VectorXd`.
+Similarly, Math defines the `eval` function which will evaluate an Eigen
+expression and forward anything that is not an Eigen expression.
