@@ -1,0 +1,302 @@
+---
+title: "Current State of Writing Functions in Stan-Math"
+author: "Stan Development Team"
+date: "24 January 2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library("cmdstanr")
+```
+
+This is meant as a basic guide for writing and maintaining functions in the
+[stan-dev/math](https://github.com/stan-dev/math) repository. This is the
+automatic differentiation (autodiff) library behind the Stan language, and
+the vast majority of the functions exposed at the Stan language level are
+implemented here in C++.
+
+In the course of the Math library's existance, C++ has changed substantially.
+Math was originally written before C++11. It currently targets C++14. In the near
+future it will transition to C++17. With this in mind, there are many different
+ways to write Math functions. This guide tries to document best practices,
+conventions which not all functions in Math follow (or are even formally
+agreed upon by the developers).
+
+The title contans "Current State" to emphasize that if any information here is
+out of date or any advice does not work, it should be reported as a bug (the
+[example-models](https://github.com/stan-dev/example-models)).
+
+This document builds on the information in the
+[Stan Math Library](https://arxiv.org/abs/1509.07164) paper.
+
+# Writing a function
+
+Basic functions in the Math library should be compatible with the autodiff
+tools in Math. The most important of these is reverse mode autodiff (this
+is what is used in Stan) but forward and mixed mode autodiff types are also
+supported. The intention behind supporting these other types is that the
+higher order derivatives will be useful for different algorithms in Stan.
+
+Because reverse mode autodiff is the component used in Stan, this is by far
+the most mature and well tested component of the Math library. Any new
+function introduced to the Math library by default are expected to support
+and be tested with the higher order automatic differentiation, but exceptions
+have been made. In particular, the differential equations solvers
+only support reverse mode autodiff (and there are a couple others).
+
+Functions in the Math library are organized according to the different
+autodiff tools they depend on.
+
+Functions with no dependencies go in `stan/math/prim/fun`. Similarly
+functions implemented with reverse mode autodiff dependences go in
+`stan/math/rev/fun`. Functions with forward mode autodiff dependencies
+go in `stan/math/fwd/fun`, and functions that depend on both autodiff
+types go in `stan/mat/mix/fun`.
+
+Note, many functions in `prim/fun` support all the different autodiff
+modes -- these folders separate functions by what they depend on, not
+what they support. Functions in `prim/fun` should be as generic as
+possible, and the `rev/fun`, `fwd/fun`, and `mix/fun` implementations
+should be used to:
+
+1. Make the autodiff'd versions of a function faster
+2. Improve the numerical behavior of certain derivatives
+3. Implement autodiff for functions that cannot be easily autodiff'd
+4. Implement autodiff using hardware that does not directly support the Stan
+autodiff types
+
+## Argument Types
+
+Functions in Math are written to interact with code generated for Stan, which
+means that the types in Stan map to Math types. The basic Stan types are `int`,
+`real`, `vector`, `row_vector`, `matrix`, and then arrays of any of these types
+(and arrays of arrays are allowed). The `vector`, `row_vector`, and `matrix`
+types are implemented using the Eigen library under the hood.
+
+The relationship between Stan types and types in Math is a one to many
+because of all the different autodiff types and details of how Eigen expressions
+work. In terms of the basic arithmetic types the mapping is fairly simple:
+
+- `int` in Stan maps to `int` in C++
+- `real` in Stan maps to `double` in C++
+- `vector` in Stan maps to `Eigen::VectorXd`
+- `row_vector` in Stan maps to `Eigen::RowVectorXd`
+- `matrix` in Stan maps to `Eigen::MatrixXd`
+- Any array type (`int[]`, `real[]`, or `T[]` for `T` any of the above types)
+map to `std::vector<C>` types where `C` is the C++ equivalent of `T`.
+
+Once reverse mode autodiff is included, there is a new type, `stan::math::var`
+that is the autodiff replacement for `double`. Excluding the `stan::math` namespace
+for brevity, this expands the list to:
+
+- `int` in Stan maps to `int` in C++
+- `real` in Stan maps to `double` or `var` in C++
+- `vector` in Stan maps to `Eigen::VectorXd` and
+`Eigen::Matrix<var, Eigen::Dynamic, 1>` in C++
+- `row_vector` in Stan maps to `Eigen::RowVectorXd` and
+`Eigen::Matrix<var, 1, Eigen::Dynamic>` in C++
+- `matrix` in Stan maps to `Eigen::MatrixXd` and
+`Eigen::Matrix<var, Eigen::Dynamic, Eigen::Dynamic>` in C++
+- Any array type (`int[]`, `real[]`, or `T[]` for `T` any of the above types)
+map to `std::vector<C>` types where `C` is the C++ equivalent of `T`.
+
+This mapping will continue to get longer as forward mode autodiff types and
+Eigen expressions are taken into account. For all intensive purposes, this list
+is too long to write out.
+
+Before diving into this though, it will be valuable to discuss in detail the
+argument and return types from simple one and two argument functions.
+
+### One Argument Functions (and computing a return type)
+
+The Stan function `real sin(real)` expects the followng C++ functions to be
+defined:
+
+```cpp
+double sin(double);
+var sin(var);
+```
+
+Note, return types are not part of a C++ function signature. They are included
+here because working autodiff makes assumptions about return types. For instance,
+a function that accepts an autodiff type should return an autodiff type.
+Similarly, the C++ signatures `double sin(const double&)`, or
+`double sin(const double)` would also work. For brevity, a discussion on the
+const-ness of arguments is deferred to later and simple pass-by-copy signatures
+are discussed for now.
+
+There are to functions above because `real` in Stan can correspond to either a
+`double` or a `var`. The simplest way to implement this function would be to
+define in `prim/fun` the generic signature:
+
+```cpp
+template <typename T>
+T sin(T);
+```
+
+Assuming the implementation is compatible with both `double` and `var`, this is
+all that is needed.
+
+A function `real norm(vector)` similarly requires the following C++ functions
+to be defined:
+
+```cpp
+double norm(Eigen::VectorXd);
+var norm(Eigen::Matrix<var, Eigen::Dynamic, 1>);
+```
+
+In this case, there is no generic `T norm(T)` function to write because the
+input argument is actually different than output type. To handle this, Stan
+provides the template metaprogram `return_type_t`. For a given template
+argument `T`, `return_type_t` computes the scalar autodiff return type.
+
+- If `T` is `double`, `return_type_t<T>` is `double`
+- If `T` is `var`, `return_type_t<T>` is `double`
+- If `T` is `Eigen::Matrix<var, Eigen::Dynamic, 1>`, `return_type_t<T>` is `double`
+- If `T` is `std::vector<var>`, `return_type_t<T>` is `var`
+
+`return_type_t` is defined recursively to always return the innermost scalar
+types. This means:
+
+- If `T` is `std::vector<S>`, `return_type_t<T>` is `return_type_t<S>`
+
+With this in mind, the appropriate generic C++ implementation for
+`real norm(vector)` is:
+
+```cpp
+template <typename T>
+return_type_t<T> norm(Eigen::Matrix<T, Eigen::Dynamic, 1>);
+```
+
+### Two Argument Functions (and least-upper-bound return type semantics)
+
+Multiple argument functions are more involved. Consider
+`real atan2(real, real)` which requires four C++ overloads:
+
+```cpp
+double atan2(double, double);
+var atan2(double, var);
+var atan2(var, double);
+var atan2(var, var);
+```
+
+In this case, the return types are a function of both input types.
+`return_type_t` is actually written to take any number of input types and
+compute from them a single scalar return type. The return type is the simplest
+type that can be constructed from all of the input types. For reverse mode
+autodiff, this means that if the scalar type of any input argument is a
+`var`, then the return type is a var.
+
+A generic signature for `real atan2(real, real)` is:
+
+```cpp
+template <typename T, typename S>
+return_type_t<T, S> atan2(T, S);
+```
+
+`return_type_t` can be used to construct non-scalar return types as well.
+For the function `vector add(vector, vector)`, the following generic
+C++ signature could be used:
+
+```
+template <typename T, typename S>
+Eigen::Matrix<return_type_t<T, S>, Eigen::Dynamic, 1> atan2(T, S);
+```
+
+### Higher Order Autodiff
+
+Adding the forward mode autodiff type simply adds more overloads. The forward mode
+autodiff type itself takes a template argument to represent the types of the
+value and gradient and allows recursive templating. This technically defines
+an infinite number of new types, but the ones of interest in Math (and the
+ones that should be tested are) `fvar<double>`, `fvar<fvar<double>>`,
+`fvar<var>` and `fvar<fvar<var>>`. These are useful for computing various
+high order derivatives. Going back to the `real sin(real)` function, Math
+is now expected to implement the following, rather expanded list of functions:
+
+```cpp
+double sin(double);
+var sin(var);
+fvar<double> sin(fvar<double>);
+fvar<fvar<double>> sin(fvar<fvar<double>>);
+fvar<var> sin(fvar<var>);
+fvar<fvar<var>> sin(fvar<fvar<var>>);
+```
+
+For the sake of performance, it may be desirable to also define `var sin(var)`,
+or similarly `fvar<double> sin(fvar<double>)` etc.
+
+`return_type_t` is defined similarly as for `var`. In general, autodiff types
+should not be mixed, and so the `return_type_t` does not need to account
+for various combinations of `var`, `fvar<double>`, etc. Sometimes it is
+useful to mix autodiff types, but it is somewhat uncommon.
+
+### Eigen Expressions (and handling argument types with SFINAE)
+
+An additional complexity of the Math library is that `vector`, `row_vector`,
+and `matrix` do not map to just templated `Eigen::Matrix` types, they can
+also map to a variety of Eigen expressions.
+
+For instance, in the following code, the result `c` is not a vector, but
+a vector-like type representing the sum of `a` and `b`:
+
+```
+Eigen::VectorXd a(5);
+Eigen::VectorXd b(5);
+auto c = a + b;
+```
+
+As an aside, in order to get the actual vector result, Eigen defines the
+`.eval()` operator, so `c.eval()` would return an actual `Eigen::VectorXd`.
+Similarly, Math defines the `eval` function which will evaluate an Eigen
+expression and forward anything that is not an Eigen expression.
+
+## Prim (fully templated)
+
+### Exceptions
+
+### Reference types
+
+### Holders
+
+### Tests
+
+## Reverse Mode
+
+### Arena memory
+
+### Arena types
+
+### matvar vs. varmat types
+
+### Reverse mode `require` metaprograms
+
+### Accessing the values and adjoints
+
+### Implementing the reverse pass
+
+#### `reverse_pass_callback`
+
+#### `make_callback_var`
+
+### Multiple argument scalar types
+
+### Tests
+
+## Pitfalls
+
+### Copying non-arena variables to lambdas used in the reverse pass
+
+### Returning arena types
+
+### `.val()` vs. `.val_op()`
+
+### Returning expressions
+
+### Const correctness, reverse mode autodiff, and arena types
+
+## Handy tricks
+
+### `make_callback_ptr`
+
+### `forward_as`
