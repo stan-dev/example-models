@@ -5,8 +5,6 @@ parameters {
 model {
 }
 generated quantities {
-    real a;
-    real b;
-    a <- fmax(x1,x2);
-    b <- fmin(x1,x2);
+    real a = fmax(x1,x2);
+    real b = fmin(x1,x2);
 }

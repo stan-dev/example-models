@@ -1,8 +1,6 @@
 transformed data {
-    real L; 
-    real H;
-    L <- -5.0;
-    H <- 5.0;
+    real L = -5; 
+    real H = 5;
 }
 parameters {
     real<lower=L,upper=H> a;
