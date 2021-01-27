@@ -9,5 +9,5 @@ parameters {
 model {
   target += log_mix(theta,
                     normal_lpdf(y | mu[1], sigma[1]),
-                    normal_lpdf(y | mu[2], sigma[2]))
+                    normal_lpdf(y | mu[2], sigma[2]));
 }

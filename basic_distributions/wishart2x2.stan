@@ -10,14 +10,8 @@
 // because positive definiteness is simple.
 
 transformed data {
-  cov_matrix[2] S;
-
-  for (i in 1:2)
-    for (j in 1:2)
-      S[i,j] <- 0.0;
-
-  S[1,1] <- 2.0;
-  S[2,2] <- 0.5;
+  cov_matrix[2] S = [[2, 0],
+                     [0, 0.5]];
 }
 parameters {
   real x;
@@ -25,17 +19,10 @@ parameters {
   real<lower=0> sd2;
 }
 transformed parameters {
-  real rho;
-  real cov;
-  matrix[2,2] W;
-
-  rho <- tanh(x);
-  cov <- rho * sd1 * sd2;
-
-  W[1,1] <- sd1 * sd1;
-  W[2,2] <- sd2 * sd2;
-  W[1,2] <- cov;
-  W[2,1] <- cov;
+  real rho = tanh(x);
+  real cov = rho * sd1 * sd2;
+  matrix[2,2] W = [[sd1^2, cov],
+                   [cov, sd2^2]];
 }
 model {
   // apply log Jacobian determinant of transform:
@@ -48,9 +35,7 @@ model {
   //   = | 0                         2 * sd2            0                     |
   //     | rho * sd2               rho * sd1        sd1 * sd2 * (1 - rho^2)   |
 
-  increment_log_prob(log(2.0 * sd1) 
-                     + log(2.0 * sd2) 
-                     + log(sd1 * sd2 * (1.0 - rho * rho)));
+  target += 2 * log2() + 2 * log(sd1) + 2 * log(sd2) + log1m(rho^2);
   
   W ~ wishart(4, S);
 }
