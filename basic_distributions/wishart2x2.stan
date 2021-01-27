@@ -35,7 +35,7 @@ model {
   //   = | 0                         2 * sd2            0                     |
   //     | rho * sd2               rho * sd1        sd1 * sd2 * (1 - rho^2)   |
 
-  target += 2 * log2() + 2 * log(sd1) + 2 * log(sd2) + log1m(rho^2);
+  target += 2 * (log2() + log(sd1) + log(sd2)) + log1m(rho^2);
   
   W ~ wishart(4, S);
 }
