@@ -21,8 +21,8 @@ parameters {
 transformed parameters {
   real rho = tanh(x);
   real cov = rho * sd1 * sd2;
-  matrix[2,2] W = [[sd1^2, cov],
-                   [cov, sd2^2]];
+  matrix[2,2] W = [[sd1 ^ 2, cov],
+                   [cov, sd2 ^ 2]];
 }
 model {
   // apply log Jacobian determinant of transform:

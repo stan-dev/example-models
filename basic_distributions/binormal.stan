@@ -7,5 +7,5 @@ parameters {
     vector[2] y;
 }
 model {
-      y ~ multi_normal(mu,Sigma);
+      y ~ multi_normal(mu, Sigma);
 }
