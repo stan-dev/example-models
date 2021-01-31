@@ -1,20 +1,20 @@
 data {
   int<lower=1> K;
   int<lower=1> N;
-  real y[N];
+  vector[N] y;
 }
 parameters {
   simplex[K] theta;
-  real mu[K];
-  real<lower=0,upper=10> sigma[K];
+  vector[K] mu;
+  vector<lower=0, upper=10>[K] sigma;
 }
 model {
-  real ps[K];              
+  vector[K] ps[N];              
   mu ~ normal(0,10);
   for (n in 1:N) {
-    for (k in 1:K)
-      ps[k] <- log(theta[k]) 
-               + normal_log(y[n],mu[k],sigma[k]);
-    increment_log_prob(log_sum_exp(ps));    
+    for (k in 1:K) {
+      ps[n][k] = normal_lupdf(y[n] | mu[k], sigma[k]);
+    }
   }
+  target += log_mix(theta, ps);  
 }
