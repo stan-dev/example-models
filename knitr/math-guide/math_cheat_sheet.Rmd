@@ -1,0 +1,420 @@
+# Autodiff types
+
+## real types
+
+`var` is the basic autodiff type for `double`
+
+```cpp
+var a = 1.0; // Declare a var
+var b = a * a; // Do math on a var
+b.grad() // Compute gradients
+std::cout << b.val(); // Print result (b = a^2) as double
+std::cout << a.adj(); // Print adjoint (db/da) as double
+```
+
+## vector, row_vector, matrix types
+
+### General purpose (Array of Structures)
+
+```cpp
+Eigen::Matrix<var, Eigen::Dynamic, Eigen::Dynamic> A =
+  Eigen::MatrixXd::Random(5, 5); // Build Eigen types and use
+                                 // vars as scalars, array
+				 // of structures
+Eigen::Matrix<var, Eigen::Dynamic, Eigen::Dynamic> B =
+  A.array().square().matrix(); // Do eigen operations as usual
+var c = sum(B);
+c.grad();
+std::cout << B.val(); // Print intermediate as Eigen::MatrixXd
+std::cout << A.adj(); // Print adjoint (dc/dA) as Eigen::MatrixXd
+std::cout << B.adj(); // Print intermediate adjoint (dc/dB) as Eigen::MatrixXd
+```
+
+Eigen vectors, row vectors, and arrays all work similarly.
+
+### Fast (Structure of Arrays)
+
+```cpp
+var_value<Eigen::MatrixXd> A =
+  Eigen::MatrixXd::Random(5, 5); // The autodiff type contains
+                                 // matrices. Struct of arrays
+                                 // Less overhead than AOS
+var_value<Eigen::MatrixXd> B =
+  A.array().square().matrix();   // Do eigen operations as usual
+var c = sum(B);
+c.grad();
+std::cout << B.val(); // Print intermediate as Eigen::MatrixXd
+std::cout << A.adj(); // Print adjoint (dc/dA) as Eigen::MatrixXd
+std::cout << B.adj(); // Print intermediate adjoint (dc/dB) as Eigen::MatrixXd
+```
+
+SOA types are not supported everywhere.
+
+```
+B = to_var_value(A); // convert to SOA
+A = from_var_value(B); // convert from AOS
+```
+
+# Memory
+
+## Resetting and clearing autodiff
+
+```cpp
+set_zero_all_adjoints(); // Sets all adjoints in autodiff to zero
+                         // Ready for new `.grad()` call
+recover_memory(); // Recovers all memory. Invalidates all autodiff
+                  // variables
+```
+
+## Allocating and freeing
+
+Memory for reverse mode autodiff stored in the arena.
+
+```
+double *ptr = ChainableStack::instance_->memalloc_
+  .alloc_array<double>(5); // Allocate memory for 5 doubles
+```
+
+Memory in the arena is free'd on `recover_memory()` call and
+not before.
+
+The arena does not call destructors for objects stored in arena.
+
+## Autodiff memory
+
+All reverse mode autodiff types inherit from `vari_base`.
+
+`vari_base` types are responsible for tracking arena memory
+and handling the autodiff tape.
+
+These are managed in three `std::vector<vari_base*>` variables:
+
+```
+ChainableStack::instance_->
+  var_stack_; // Autodiff tape, every `vari_base` represents an
+              // operation and possibly a variable
+ChainableStack::instance_->
+  var_nochain_stack_; // Every `vari_base*` points to a variable
+ChainableStack::instance_->
+  var_alloc_stack_; // Every `vari_base*` points to a `vari_base`
+                    // object whose destructor needs called on
+		    // `recover_memory()`
+```
+
+## `arena_t` helpers
+
+`arena_t` makes it easy to save memory in arena.
+
+```cpp
+Eigen::MatrixXd a =
+  Eigen::MatrixXd::Random(5, 5); // Allocate memory on heap
+arena_t<Eigen::MatrixXd> arena_a = a; // Copy memory to arena
+auto arena_a2 = to_arena(a); // Also copy memory to arena
+std::vector<double> b = { 1.0, 2.0 };
+auto arena_b = to_arena(b); // Also copy std::vector to arena
+```
+
+`arena_t` types mostly behave like their non-arena counterparts
+(they have the same member functions) except arena types do
+shallow copies (this makes pass-by-value cheap).
+
+```cpp
+arena_t<Eigen::MatrixXd> arena_a = a; // Copy memory to arena
+arena_t<Eigen::MatrixXd> arena_b =
+  arena_a; // arena_b points at the same memory as arena_a!
+```
+
+## Files and Folders
+
+### Implementation
+
+stan/math/prim/err -- Error handling functions
+stan/math/prim/meta -- Template meta-programs
+stan/math/prim/fun -- Functions
+stan/math/prim/prob -- Probability functions
+stan/math/prim/functor -- Functions that take functions
+
+All these folders exist in `stan/math/rev`. The difference
+is that functions in `stan/math/rev` depend on reverse mode
+autodiff data types and defined in `stan/math/rev/core`
+
+Functionality in `prim` may not depend on functionality in
+`rev`, but the other direction is allowed.
+
+### Tests
+
+There are test folders mirroring all the implementation
+folders. For instance:
+
+test/unit/math/prim/err
+test/unit/math/prim/meta
+test/unit/math/prim/fun
+
+For every file `stan/math/prim/fun/foo.hpp` there is a test file
+`stan/math/prim/fun/foo_test.cpp`. This should test functions
+return the expected values and error handling is working correctly.
+
+```
+TEST(TestGroup, TestName) { // Make sure TestGroup + TestName together
+  ...                       // are unique
+  EXPECT_FLOAT_EQ(a, b); // Throw if a != b
+  EXPECT_THROW(myfunc(-1.0), std::domain_error); // Expect throw on call
+  EXPECT_NO_THROW(myfunc(1.0)); // Expect no error
+  EXPECT_MATRIX_EQ(myfunc(1.0),
+    Eigen::MatrixXd::Ones(5, 5)); // Expect two matrices equal
+}
+```
+
+For every function that can be autodiffed, there should be a
+file `stan/math/mix/fun/foo_test.cpp`. These should use `expect_ad`
+to test all the AOS types. `expect_ad` assumes that the values
+and exceptions are tested in `prim` tests, and tests all AOS autodiff.
+
+`expect_ad_matvar` can be added to additionally test SOA types.
+
+```cpp
+#include <test/unit/math/test_ad.hpp>
+
+TEST(MathMixMatFun, softmax) {
+  auto f = [](const auto& x) { // Wrap function to test in lambda
+    return stan::math::softmax(x);
+  };
+  Eigen::VectorXd c =
+    Eigen::VectorXd::Random(2); // Generate test vector
+  stan::test::expect_ad(f, c); // Test all forms of Stan autodiff
+                               // of function `f` evaluated at `c`
+
+  stan::test::ad_tolerances tols; // Define custom tolerances
+  tols.hessian_hessian_ = 1e-2;
+  tols.hessian_fvar_hessian_ = 1e-2;
+
+  stan::test::expect_ad(tols, f, c); // Test with custom tolerances
+
+  stan::test::expect_ad_matvar(f, c); // Test SOA types
+  stan::test::expect_ad_matvar(tols, f, c); // With tolerances
+}
+```
+
+# Function Definitions
+
+## Template type metaprograms
+
+`scalar_type_t<T>` returns the scalar type:
+
+- `scalar_type_t<double>` is `double`
+- `scalar_type_t<std::vector<double>>` is `double`
+- `scalar_type_t<Eigen::Matrix<double, Eigen::Dynamic, 1>>` is `double`
+- `scalar_type_t<std::vector<V3>>` is `double`
+
+Similarly for autodiff types:
+
+- `scalar_type_t<var>` is `var`
+- `scalar_type_t<std::vector<var>>` is `var`
+- `scalar_type_t<Eigen::Matrix<var, Eigen::Dynamic, 1>>` is `var`
+- `scalar_type_t<var_value<Eigen::VectorXd>>` is `var`
+- `scalar_type_t<std::vector<V3>>` is `var`
+
+`promote_scalar_t` can be used to change scalar types
+
+```cpp
+using V = Eigen::Matrix<var, Eigen::Dynamic, 1>;
+using T = promote_scalar_t<double, V>;
+ // T = Eigen::Matrix<double, Eigen::Dynamic, 1>
+using S = promote_scalar_t<var, T>;
+ // S = V;
+```
+
+`value_type_t<T>` returns the first template type of
+the templated types in Stan:
+
+- `value_type_t<var>` is `var`
+- `value_type_t<std::vector<var>>` is `var`
+- `value_type_t<Eigen::Matrix<var, Eigen::Dynamic, 1>>` is `var`
+- `value_type_t<var_value<Eigen::VectorXd>>` is `Eigen::VectorXd`
+- `value_type_t<std::vector<V3>>` is `V3`
+
+`plain_type_t<T>` returns the plain type of any Eigen expression.
+
+Normally if `A * B` the product of two Eigen types, the type
+of `A` and `B` will be an Eigen expression. The plain type is
+the type returned if this expression were evaluated. If the input
+to plain type is not an expression, then the plain type is the
+type itself.
+
+```cpp
+template <typename T>
+plain_type_t<T>    // If the input is an Eigen matrix expression, then
+myfunc(const T&);  // the output is a regular matrix 
+```
+
+## Substitution Failure Is Not An Error (SFINAE)
+
+Substitution Failure Is Not An Error is the preferred way to define
+function implementations in Stan.
+
+Function argument lists are fully templated, and then template meta-programs
+are used to define which definitions are visible at argument lookup.
+
+```cpp
+template <typename T,
+	  require_st_var<T>* = nullptr>
+void myfunc(const T&) {
+  std::cout << "var" << std::endl;
+};
+
+template <typename T,
+	  require_st_arithmetic<T>* = nullptr>
+void myfunc(const T&) {
+  std::cout << "arithmetic" << std::endl;
+};
+
+int main(int argc, char** argv) {
+  myfunc(var(1.0)); // prints "var"
+  myfunc(1.0); // prints "arithmetic"
+}
+```
+
+### Differentiating between autodiff and non-autodiff function
+
+```cpp
+template <typename T, typename S,
+          require_all_not_st_var<T, S>* = nullptr>
+auto myfunc(const T&, const S&); // Use if no input has scalar type var
+
+template <typename T, typename S,
+          require_any_st_var<T, S>* = nullptr>
+auto myfunc(const T&, const S&); // Use if any input has scalar type var
+```
+
+### Differentiating between AOS and SOA implementation
+
+```cpp
+template <typename T, typename S,
+          require_all_not_st_var<T, S>* = nullptr, // no scalar type var
+	  require_all_matrix_t<T, S>* = nullptr>   // all Eigen::Matrix types
+auto myfunc(const T&, const S&);
+
+template <typename T, typename S,
+	  require_any_st_var<T, S>* = nullptr,   // any scalar type var
+          require_all_matrix_t<T, S>* = nullptr> // all Eigen::Matrix types
+auto myfunc(const T&, const S&);
+
+template <typename T, typename S,
+          require_any_var_matrix_t<T, S>* = nullptr> // any SOA matrix type
+auto myfunc(const T&, const S&);
+```
+
+### Doing an universal AOS or SOA function
+
+```cpp
+template <typename T, typename S,
+          require_all_not_st_var<T, S>* = nullptr, // no scalar type var
+	  require_all_matrix_t<T, S>* = nullptr>   // all Eigen::Matrix types
+auto myfunc(const T&, const S&);
+
+template <typename T, typename S,
+          require_any_rev_matrix_t<T, S>* = nullptr> // any SOA or AOS autodiff matrix 
+auto myfunc(const T&, const S&); // Use if any input has scalar type var
+```
+
+## Return types
+
+`return_type_t` can be used to compute the scalar autodiff return type
+for a function.
+
+```cpp
+template <typename T, typename S>
+return_type_t<T, S>          // Compute return type for functions returning
+myfunc(const T&, const S&) { // a scalar
+  ...                                          
+}
+
+template <typename T, typename S>
+Eigen::Matrix<return_type_t<T, S>, Eigen::Dynamic, 1> // Compute return type for
+                                                      // function returning a vector
+myvec_func(const T&, const S&) {
+  ...
+}
+```
+
+### SOA return types
+
+`return_var_matrix_t` can be used to compute an SOA return type if it is
+appropriate.
+
+The rule is in Math if any input type is an SOA, then the output should
+also be SOA.
+
+```cpp
+template <typename T, typename S,
+          require_any_st_var<T, S>* = nullptr> // Only relevant for
+	                                       // autodiff input
+return_var_matrix_t<Eigen::MatrixXd, T, S> // Defines a matrix SOA type
+                                           // if T or S are SOA autodiff
+					   // types, otherwise is AOS
+					   // matrix type
+myfunc(const T&, const S&) {
+  ...
+}
+```
+
+### Expressions
+
+Functions return expressions should use `make_holder` to extend the
+lifetime of any temporaries used by the expression.
+
+# Reverse Mode Implementation
+
+## value_of
+
+`value_of` returns the values of any variable. For a non-autodiff
+variable, it just forwards the argument.
+
+## reverse_pass_callback
+
+`reverse_pass_callback(f)` places a `vari_base` on the chaining autodiff
+stack that calls the lambda `f` during the reverse mode pass.
+
+```
+template <typename T, require_st_var<T>* = nullptr>
+auto myfunc(const T& a) {
+  arena_t<T> arena_a = a; // Save a copy of `a` for reverse pass
+  arena_t<plain_type_t<T>> result = // Save a copy of results for
+    arena_a.val().array().square().matrix();    // reverse pass
+  reverse_pass_callback(
+    [arena_a, result]() mutable {   // Capture arena copies of
+                                    // input and output by value
+      arena_a.adj().array() += 2 * arena_a.val().array() *
+        result.adj().array(); // Reverse pass adjoint update
+    }
+  );
+  return plain_type_t<T>(result); // Don't return arena types
+}
+```
+
+## make_callback_var
+
+`make_callback_var(x, f)` builds a SOA autodiff type with the values
+in `x` and uses the associated `vari_value` to add a callback to the
+lambda `f` on the autodiff stack. `f` is called with a reference to
+the underlying `vari_value`.
+
+```
+template <typename T, require_st_var<T>* = nullptr>
+auto myfunc(const T& a) {
+  arena_t<T> arena_a = a; // Save a copy of `a` for reverse pass
+  arena_t<plain_type_t<T>> result = // Save a copy of results for
+    ;    // reverse pass
+  return make_callback_var(a.array().square().matrix()
+    [arena_a, result]() mutable {   // Capture arena copies of
+                                    // input and output by value
+      arena_a.adj().array() += 2 * arena_a.val().array() *
+        result.adj().array(); // Reverse pass adjoint update
+    }
+  );
+  return plain_type_t<T>(result); // Don't return arena types
+}
+```
+
+`make_callback_var` is more efficient than `reverse_pass_callback`
+when returning a SOA type.

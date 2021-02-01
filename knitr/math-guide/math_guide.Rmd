@@ -353,8 +353,27 @@ which throw consistently formatted errors.
 
 ### Reference types
 
+Any time a function takes a vector or matrix type, it needs to be able
+to handle an expression. Some expressions can be expensive to evaluate, so
+when they are evaluated, they should be saved. This includes any arithmetic
+operation, a matrix multiply, or a sum, or something else. Some expressions
+are cheap to evaluate though, any of the Eigen views quality here (transpose,
+block access, segment, etc). In this case, evaluating the expression is not
+necessary -- it would only lead to another allocate and copy.
 
-Anything that is an input Eigen type
+The Math function `to_ref` is a solution for this. For a vector
+or matrix variable `x`, `to_ref(x)` returns an Eigen reference to the
+input variable `x`. If `x` was an expensive expression, it will be evaluated.
+If it was a cheap expression, the reference type won't evaluate. If it
+isn't an Eigen type, the `to_ref` just forwards.
+
+```cpp
+template <typename T,
+          require_eigen_t<T>* = nullptr>
+auto myfunc(const T& x) {
+  const auto& x_ref = to_ref(x);
+}
+```
 
 ### Holders
 
@@ -412,7 +431,6 @@ The implementation of `make_holder` is
 
 ### Tests
 
-
 Tests in Math are written with the Google test framework. At this
 point there are enough functions in Math that the way to get started
 is by just copying the tests of a similar Function and editing them to
@@ -463,25 +481,137 @@ with autodiff arguments.
 
 ### Arena memory
 
-Reverse mode autodiff in Stan stores
+Reverse mode autodiff in Math requires a huge number of temporaries and
+intermediates to be computed and saved for the reverse pass. There are
+so many allocations that the overhead of `malloc` becomes noticable. To
+avoid this, Math provides its own memory arena. The assumptions of
+the Math arena are:
+
+1. Individual objects allocated in the arena do not need their destructors
+called
+2. All objects allocated on the arena have the same lifetime (that is the
+lifetime of the stack)
+
+Because of this, the Math arena is very easy to implement and is very
+high performance (it is a `malloc` that never needs to free).
+
+Functions that use reverse mode autodiff are allowed to save whatever they
+need to the arena. Objects saved here will be available during the reverse
+pass.
+
+There is a utility for saving objects into the arena that do need
+their destructors called. This is discussed undere `make_callback_ptr`.
 
 ### Arena types
 
-### matvar vs. varmat types
+Arena types are helper functions and types for easily saving variables to
+the arena.
+
+`to_arena` is a function that takes one argument (usually an Eigen vector
+or matrix) and returns a lightweight object pointing to memory on the
+arena.
+
+`arena_t<T>` defines, for a given type `T`, the type of a lightweight
+object pointing to memory in the arena that can store a `T`.
+
+Copying a variable `x` to the arena can be done with either `to_arena` or
+`arena_t<T>`:
+
+```cpp
+template <typename T>
+auto myfunc(const T& x) {
+  auto arena_x = to_arena(x);
+}
+```
+
+```cpp
+template <typename T>
+auto myfunc(const T& x) {
+  arena_t<T> arena_x = x;
+}
+```
+
+### Array of Structures vs. Structure of Array types (AOS vs. SOA, matvar vs. varmat)
+
+There are two types of reverse mode autodiff in Math. They are colloquially
+referred to as matvar and varmat, though it is more accurate to
+refer to them as Array of Structure (AOS) and Structure of Array (SOA)
+autodiff types.
+
+The first autodiff type in Stan was `var`. A `var` is the autodiff version
+of a `double`. Constructing matrix autodiff types with `var` is as simple
+as building an Eigen matrix and filling it with vars, so
+`Eigen::Matrix<var, Eigen::Dynamic, Eigen::Dynamic>`. This is an AOS
+autodiff style.
+
+The SOA autodiff style defines vector and matrices themselves as autodiff
+variables. The SOA matrix is `var_value<Eigen::MatrixXd>`. Defining an
+entire matrix as an autodiff type makes it possible to do a number of
+optimizations that are not possible when the autodiff types are just
+variables stored inside another structure.
 
 ### Reverse mode `require` metaprograms
 
-### Accessing the values and adjoints
+Require metaprograms are useful for avoiding ambiguities between fully
+templated prim implementations and reverse mode specializations.
+
+The simplest way to do this is add a `require_any_st_var<...>` to
+the reverse mode implementation and a `require_all_not_st_var<...>` to
+the prim implementation.
+
+### Values
+
+`value_of(x)` returns the values of the variable `x`. If `x` is not an
+autodiff type, it simply forwards `x` along. The values of `x` have
+the same shape as `x`. For reverse mode autodiff, values are `double`
+variables. For higher order autodiff (`fvar<var>`, etc.) this is not
+always the case. See `value_of_rec` for a different behavior.
+
+### Values and adjoint extensions to Eigen
+
+The AOS matrix and vector autodiff types come with an extra `.val()`,
+`.val_op()`, `.adj()`, and `.adj_op()` member functions.
+
+`.val()` and `.val_op()` return expressions that evaluate to the values
+of the autodiff matrix.
+
+`.adj()` and `.adj_op()` return expressions that evaluate to the adjoints
+of the autodiff matrix.
+
+The non-`_op` versions of the functions should be preferred. If the
+code does not compile (usually an error about const-ness) try the `_op`
+versions. This can happen when multiplying the values/adjoints of an AOS
+autodiff type against other matrices.
+
+It is not safe to use `.noalias()` with the AOS value/adjoint expressions.
+
+These functions also work for SOA types, but return arena types instead.
 
 ### Implementing the reverse pass
 
 #### `reverse_pass_callback`
 
+`reverse_pass_callback` is a function for adding code to the reverse pass.
+Calling `reverse_pass_callback` with a functor `f` creates an object on the
+reverse mode stack that will call `f` when it is chain'd.
+
 #### `make_callback_var`
+
+`make_callback_var(x, f)` is similar to `reverse_pass_callback`, but it constructs
+an SOA autodiff type from the argument `x`. The function `f` is called on the
+reverse pass similarly to `reverse_pass_callback`.
 
 ### Multiple argument scalar types
 
-### Tests
+Pretend for a minute that 
+
+### Tests (SOA types)
+
+SOA tests are separate from the regular AOS tests. To test SOA types, add for
+every `expect_ad` call an `expect_ad_matvar` call. `expect_ad` builds on the
+`prim` tests by using finite derivatives to check all of the higher order
+autodiff. `expect_ad_matvar` builds on the `expect_ad` tests by checking the
+SOA autodiff agains the AOS autodiff.
 
 ## Pitfalls
 
@@ -509,3 +639,5 @@ As an aside, in order to get the actual vector result, Eigen defines the
 `.eval()` operator, so `c.eval()` would return an actual `Eigen::VectorXd`.
 Similarly, Math defines the `eval` function which will evaluate an Eigen
 expression and forward anything that is not an Eigen expression.
+
+### `value_of_rec`
