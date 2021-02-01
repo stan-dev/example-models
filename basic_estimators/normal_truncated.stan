@@ -8,7 +8,6 @@ parameters {
   real<lower=0, upper=2> sigma;
 }
 model {
-  // Truncation not yet available with vectorised distributions
   for (n in 1:N)
     y[n] ~ normal(mu, sigma) T[,U];
 }
