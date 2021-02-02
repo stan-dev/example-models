@@ -51,8 +51,8 @@ std::cout << B.adj(); // Print intermediate adjoint (dc/dB) as Eigen::MatrixXd
 SOA types are not supported everywhere.
 
 ```
-B = to_var_value(A); // convert to SOA
-A = from_var_value(B); // convert from AOS
+B = to_var_value(A); // convert from AOS to SOA
+A = from_var_value(B); // convert from SOA to AOS
 ```
 
 # Memory
