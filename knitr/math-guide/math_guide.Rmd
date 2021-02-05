@@ -152,8 +152,8 @@ provides the template metaprogram `return_type_t`. For a given template
 argument `T`, `return_type_t` computes the scalar autodiff return type.
 
 - If `T` is `double`, `return_type_t<T>` is `double`
-- If `T` is `var`, `return_type_t<T>` is `double`
-- If `T` is `Eigen::Matrix<var, Eigen::Dynamic, 1>`, `return_type_t<T>` is `double`
+- If `T` is `var`, `return_type_t<T>` is `var`
+- If `T` is `Eigen::Matrix<var, Eigen::Dynamic, 1>`, `return_type_t<T>` is `var`
 - If `T` is `std::vector<var>`, `return_type_t<T>` is `var`
 
 `return_type_t` is defined recursively to always return the innermost scalar
