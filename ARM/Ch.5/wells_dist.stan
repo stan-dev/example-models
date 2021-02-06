@@ -3,9 +3,13 @@ data {
   int<lower=0,upper=1> switched[N];
   vector[N] dist;
 }
+transformed data {
+  matrix[N,1] x = [dist']';
+}
 parameters {
-  vector[2] beta;
+  real alpha;
+  vector[1] beta;
 }
 model {
-  switched ~ bernoulli_logit(beta[1] + beta[2] * dist);
+  switched ~ bernoulli_logit_glm(x, alpha, beta);
 }

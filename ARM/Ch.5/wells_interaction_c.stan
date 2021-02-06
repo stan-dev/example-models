@@ -5,17 +5,17 @@ data {
   vector[N] arsenic;
 }
 transformed data {
-  vector[N] c_dist100;       // centering
-  vector[N] c_arsenic;
-  vector[N] inter;           // interaction
-  c_dist100 = (dist - mean(dist)) / 100.0;
-  c_arsenic = arsenic - mean(arsenic);
-  inter     = c_dist100 .* c_arsenic;
+  // centering
+  vector[N] c_dist100 = (dist - mean(dist)) / 100.0;
+  vector[N] c_arsenic = arsenic - mean(arsenic);
+  // interaction
+  vector[N] inter = c_dist100 .* c_arsenic;
+  matrix[N,3] x = [c_dist100', c_arsenic', inter']';
 }
 parameters {
-  vector[4] beta;
+  real alpha;
+  vector[3] beta;
 }
 model {
-  switched ~ bernoulli_logit(beta[1] + beta[2] * c_dist100 + beta[3] * c_arsenic
-                              + beta[4] * inter);
+  switched ~ bernoulli_logit_glm(x, alpha, beta);
 }

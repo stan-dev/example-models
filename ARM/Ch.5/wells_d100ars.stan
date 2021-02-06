@@ -5,12 +5,14 @@ data {
   vector[N] arsenic;
 }
 transformed data {
-  vector[N] dist100;         // rescaling
-  dist100 = dist / 100.0;
+  // rescaling
+  vector[N] dist100 = dist / 100.0;
+  matrix[N,2] x = [dist100', arsenic']';
 }
 parameters {
-  vector[3] beta;
+  real alpha;
+  vector[2] beta;
 }
 model {
-  switched ~ bernoulli_logit(beta[1] + beta[2] * dist100 + beta[3] * arsenic);
+  switched ~ bernoulli_logit_glm(x, alpha, beta);
 }

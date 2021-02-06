@@ -7,20 +7,17 @@ data {
   vector[N] educ;
 }
 transformed data {
-  vector[N] c_dist100;
-  vector[N] c_arsenic;
-  vector[N] da_inter;
-  vector[N] educ4;
-  c_dist100 = (dist - mean(dist)) / 100.0;
-  c_arsenic = arsenic - mean(arsenic);
-  da_inter  = c_dist100 .* c_arsenic;
-  educ4     = educ / 4.0;
+  vector[N] c_dist100 = (dist - mean(dist)) / 100.0;
+  vector[N] c_arsenic = arsenic - mean(arsenic);
+  vector[N] da_inter = c_dist100 .* c_arsenic;
+  vector[N] educ4 = educ / 4.0;
+  matrix[N,5] x = [c_dist100', c_arsenic', da_inter',
+                   assoc', educ4']';
 }
 parameters {
-  vector[6] beta;
+  real alpha;
+  vector[5] beta;
 }
 model {
-  switched ~ bernoulli_logit(beta[1] + beta[2] * c_dist100 + beta[3] * c_arsenic
-                              + beta[4] * da_inter + beta[5] * assoc 
-                              + beta[6] * educ4);
+  switched ~ bernoulli_logit_glm(x, alpha, beta);
 }

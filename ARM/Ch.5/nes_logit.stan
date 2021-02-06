@@ -3,9 +3,13 @@ data {
   vector[N] income;
   int<lower=0,upper=1> vote[N];
 }
+transformed data {
+  matrix[N,1] x = [income']';
+}
 parameters {
-  vector[2] beta;
+  real alpha;
+  vector[1] beta;
 }
 model {
-  vote ~ bernoulli_logit(beta[1] + beta[2] * income);
+  vote ~ bernoulli_logit_glm(x, alpha, beta);
 }
