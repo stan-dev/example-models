@@ -6,16 +6,15 @@ data {
   vector[N] educ;
 }
 transformed data {
-  vector[N] dist100;         // rescaling
-  vector[N] educ4;
-  dist100 = dist / 100.0;
-  educ4   = educ / 4.0;
+  // rescaling
+  vector[N] dist100 = dist / 100.0;
+  vector[N] educ4 = educ / 4.0;
+  matrix[N,3] x = [dist100', arsenic', educ4']';
 }
 parameters {
-  vector[4] beta;
+  real alpha;
+  vector[3] beta;
 }
 model {
-  switched ~ bernoulli_logit(beta[1] + beta[2] * dist100 
-                             + beta[3] * arsenic
-                             + beta[4] * educ4);
+  switched ~ bernoulli_logit_glm(x, alpha, beta);
 }
