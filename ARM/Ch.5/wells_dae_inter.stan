@@ -11,11 +11,11 @@ transformed data {
   vector[N] educ4 = educ / 4.0;
   // interaction
   vector[N] inter = dist100 .* arsenic;
-  matrix[N,3] x = [dist100', educ4', inter']';
+  matrix[N,4] x = [dist100', arsenic', educ4', inter']';
 }
 parameters {
   real alpha;
-  vector[3] beta;
+  vector[4] beta;
 }
 model {
   switched ~ bernoulli_logit_glm(x, alpha, beta);
