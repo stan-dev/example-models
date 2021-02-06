@@ -5,16 +5,17 @@ data {
   vector[N] male;
 }
 transformed data {
-  vector[N] log_earn;        // log transformation
-  vector[N] inter;           // interaction
-  log_earn = log(earn);        
-  inter    = height .* male;
+  // log transformation
+  vector[N] log_earn = log(earn);
+  // interaction
+  vector[N] inter = height .* male;
+  matrix[N,3] x = [height', male', inter']';
 }
 parameters {
-  vector[4] beta;
+  real alpha;
+  vector[3] beta;
   real<lower=0> sigma;
 }
 model {
-  log_earn ~ normal(beta[1] + beta[2] * height + beta[3] * male 
-                    + beta[4] * inter, sigma);
+  log_earn ~ normal_id_glm(x, alpha, beta, sigma);
 }

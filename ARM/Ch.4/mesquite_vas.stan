@@ -9,27 +9,20 @@ data {
   vector[N] group;
 }
 transformed data {
-  vector[N] log_weight;
-  vector[N] log_canopy_volume;
-  vector[N] log_canopy_area;
-  vector[N] log_canopy_shape;
-  vector[N] log_total_height;
-  vector[N] log_density;
-  log_weight        = log(weight);
-  log_canopy_volume = log(diam1 .* diam2 .* canopy_height);
-  log_canopy_area   = log(diam1 .* diam2);
-  log_canopy_shape  = log(diam1 ./ diam2);
-  log_total_height  = log(total_height);
-  log_density       = log(density);
+  vector[N] log_weight = log(weight);
+  vector[N] log_canopy_volume = log(diam1 .* diam2 .* canopy_height);
+  vector[N] log_canopy_area = log(diam1 .* diam2);
+  vector[N] log_canopy_shape = log(diam1 ./ diam2);
+  vector[N] log_total_height = log(total_height);
+  vector[N] log_density = log(density);
+  matrix[N,6] x = [log_canopy_volume', log_canopy_area', log_canopy_shape',
+                   log_total_height', log_density', group']';
 }
 parameters {
-  vector[7] beta;
+  real alpha;
+  vector[6] beta;
   real<lower=0> sigma;
 }
 model {
-  log_weight ~ normal(beta[1] + beta[2] * log_canopy_volume
-                      + beta[3] * log_canopy_area + beta[4] * log_canopy_shape
-                      + beta[5] * log_total_height + beta[6] * log_density
-                      + beta[7] * group,
-                      sigma);
+  log_weight ~ normal_id_glm(x, alpha, beta, sigma);
 }
