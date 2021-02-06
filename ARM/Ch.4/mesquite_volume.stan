@@ -6,15 +6,15 @@ data {
   vector[N] canopy_height;
 }
 transformed data {
-  vector[N] log_weight;
-  vector[N] log_canopy_volume;
-  log_weight        = log(weight);
-  log_canopy_volume = log(diam1 .* diam2 .* canopy_height);
+  vector[N] log_weight = log(weight);
+  vector[N] log_canopy_volume = log(diam1 .* diam2 .* canopy_height);
+  matrix[N,1] x = [log_canopy_volume']';
 }
 parameters {
-  vector[2] beta;
+  real alpha;
+  vector[1] beta;
   real<lower=0> sigma;
 }
 model {
-  log_weight ~ normal(beta[1] + beta[2] * log_canopy_volume, sigma);
+  log_weight ~ normal_id_glm(x, alpha, beta, sigma);
 }
