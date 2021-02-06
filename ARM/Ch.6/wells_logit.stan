@@ -4,13 +4,13 @@ data {
   int<lower=0,upper=1> switc[N];
 }
 transformed data {
-  vector[N] dist100;
-
-  dist100 = dist / 100.0;
+  vector[N] dist100 = dist / 100.0;
+  matrix[N,1] x = [dist100']';
 }
 parameters {
-  vector[2] beta;
+  real alpha;
+  vector[1] beta;
 } 
 model {
-  switc ~ bernoulli_logit(beta[1] + beta[2] * dist100);
+  switc ~ bernoulli_logit_glm(x, alpha, beta);
 }

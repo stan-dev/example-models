@@ -4,14 +4,13 @@ data {
   int<lower=0,upper=1> switc[N];
 }
 transformed data {
-  vector[N] dist100;
-
-  dist100 = dist / 100.0;
+  vector[N] dist100 = dist / 100.0;
+  matrix[N,1] x = [dist100']';
 }
 parameters {
-  vector[2] beta;
+  real alpha;
+  vector[1] beta;
 } 
 model {
-  for (n in 1:N)
-    switc[n] ~ bernoulli(Phi(beta[1] + beta[2] * dist100[n]));
+  switc ~ bernoulli(Phi(alpha + x * beta));
 }
