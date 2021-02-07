@@ -3,10 +3,14 @@ data {
   vector[N] final;
   vector[N] midterm;
 }
+transformed data {
+  matrix[N,1] x = [midterm']';
+}
 parameters {
-  vector[2] beta;
+  real alpha;
+  vector[1] beta;
   real<lower=0> sigma;
 } 
 model {
-  final ~ normal(beta[1] + beta[2] * midterm,sigma);
+  final ~ normal_id_glm(x, alpha, beta,sigma);
 }
