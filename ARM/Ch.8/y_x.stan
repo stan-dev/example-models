@@ -1,12 +1,13 @@
 data {
   int<lower=0> N; 
-  vector[N] x;
+  matrix[N,1] x;
   vector[N] y;
 }
 parameters {
-  vector[2] beta;
+  real alpha;
+  vector[1] beta;
   real<lower=0> sigma;
 } 
 model {
-  y ~ normal(beta[1] + beta[2] * x,sigma);
+  y ~ normal_id_glm(x, alpha, beta, sigma);
 }
