@@ -4,11 +4,14 @@ data {
   vector[N] vote_86;
   vector[N] vote_88;
 }
+transformed data {
+  matrix[N,2] x = [vote_86', incumbency_88']';
+}
 parameters {
-  vector[3] beta;
+  real alpha;
+  vector[2] beta;
   real<lower=0> sigma;
 } 
 model {
-    vote_88 ~ normal(beta[1] + beta[2] * vote_86 
-                     + beta[3] * incumbency_88,sigma);
+  vote_88 ~ normal_id_glm(x, alpha, beta, sigma);
 }

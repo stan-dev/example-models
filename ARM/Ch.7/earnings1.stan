@@ -4,10 +4,13 @@ data {
   vector[N] height;
   vector[N] male;
 } 
+transformed data {
+  matrix[N,2] x = [height', male']';
+}
 parameters {
-  vector[3] beta;
-  real<lower=0> sigma;
+  real alpha;
+  vector[2] beta;
 } 
 model {
-  earn_pos ~ bernoulli_logit(beta[1] + beta[2] * height + beta[3] * male);
+  earn_pos ~ bernoulli_logit_glm(x, alpha, beta);
 }
