@@ -3,10 +3,14 @@ data {
   vector[N] encouraged;
   vector[N] y;
 }
+transformed data {
+  matrix[N,1] x = [encouraged']';
+}
 parameters {
-  vector[2] beta;
+  real alpha;
+  vector[1] beta;
   real<lower=0> sigma;
 } 
 model {
-  y ~ normal(beta[1] + beta[2] * encouraged,sigma);
+  y ~ normal_id_glm(x, alpha, beta, sigma);
 }

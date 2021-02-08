@@ -5,14 +5,14 @@ data {
   vector[N] x;
 }
 transformed data {
-  vector[N] inter;
-
-  inter = party .* x;
+  vector[N] inter = party .* x;
+  matrix[N,3] cov = [party', x', inter']';
 }
 parameters {
-  vector[4] beta;
+  real alpha;
+  vector[3] beta;
   real<lower=0> sigma;
 } 
 model {
-  score1 ~ normal(beta[1] + beta[2] * party + beta[3] * x + beta[4] * inter,sigma);
+  score1 ~ normal_id_glm(cov, alpha, beta, sigma);
 }

@@ -10,20 +10,24 @@ transformed data {
   vector[N] site2; 
   vector[N] site3; 
   vector[N] site4; 
-  vector[N] site5; 
+  vector[N] site5;
+  matrix[N,7] x;
+
   for (i in 1:N) {
     site2[i] = site[i] == 2;
     site3[i] = site[i] == 3;
     site4[i] = site[i] == 4;
     site5[i] = site[i] == 5;
   }
+
+  x = [watched_hat', pretest', site2', site3',
+       site4', site5', setting']';
 }
 parameters {
-  vector[8] beta;
+  real alpha;
+  vector[7] beta;
   real<lower=0> sigma;
 } 
 model {
-  y ~ normal(beta[1] + beta[2] * watched_hat + beta[3] * pretest 
-             + beta[4] * site2 + beta[5] * site3 + beta[6] * site4 
-             + beta[7] * site5 + beta[8] * setting,sigma);
+  y ~ normal_id_glm(x, alpha, beta, sigma);
 }
