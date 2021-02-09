@@ -83,7 +83,7 @@ The motion of the planet is described by Newton's law of motion, which is a seco
 For convenience, we use Hamilton's formulation of the law, which is based on a system of two first-order differential equations,
 \begin{eqnarray*}
   \frac{\mathrm d q}{\mathrm d t} & = & \frac{p}{m}, \\
-  \frac{\mathrm d q}{\mathrm d t} & = & - \frac{k}{r^3} (q - q_*),
+  \frac{\mathrm d p}{\mathrm d t} & = & - \frac{k}{r^3} (q - q_*),
 \end{eqnarray*}
 where $k = GmM = 10^{-3}M$, and $r = \sqrt{(q - q_*)^T(q - q_*)}$ is the distance between the planet and the star.
 
