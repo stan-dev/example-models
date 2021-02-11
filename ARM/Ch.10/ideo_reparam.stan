@@ -5,10 +5,14 @@ data {
   vector[N] z1; //z value for party 0, 0 otherwise 
   vector[N] z2; //z value for party 1, 0 otherwise 
 }
+transformed data {
+  matrix[N,3] x = [party', z1', z2']';
+}
 parameters {
-  vector[4] beta;
+  real alpha;
+  vector[3] beta;
   real<lower=0> sigma;
 } 
 model {
-  score1 ~ normal(beta[1] + beta[2] * party + beta[3] * z1 + beta[4] * z2,sigma);
+  score1 ~ normal_id_glm(x, alpha, beta, sigma);
 }

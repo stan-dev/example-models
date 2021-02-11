@@ -4,10 +4,14 @@ data {
   vector[N] score1;
   vector[N] x;
 }
+transformed data {
+  matrix[N,2] cov = [party', x']';
+}
 parameters {
-  vector[3] beta;
+  real alpha;
+  vector[2] beta;
   real<lower=0> sigma;
 } 
 model {
-  score1 ~ normal(beta[1] + beta[2] * party + beta[3] * x,sigma);
+  score1 ~ normal_id_glm(cov, alpha, beta, sigma);
 }
