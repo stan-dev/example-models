@@ -7,8 +7,7 @@ parameters {
   real<lower=0> beta;
 }
 model { 
-  alpha ~ cauchy(0,10);
-  beta ~ cauchy(0,10);
-  for (i in 1:N)
-    y[i] ~ neg_binomial(alpha, beta);
+  alpha ~ cauchy(0, 10);
+  beta ~ cauchy(0, 10);
+  y ~ neg_binomial(alpha, beta);
 }

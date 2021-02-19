@@ -4,12 +4,14 @@ data {
   vector[N] dist;
 }
 transformed data {
-  vector[N] dist100;         // rescaling
-  dist100 = dist / 100.0;   
+  // rescaling
+  vector[N] dist100 = dist / 100.0;   
+  matrix[N,1] x = [dist100']';
 }
 parameters {
-  vector[2] beta;
+  real alpha;
+  vector[1] beta;
 }
 model {
-  switched ~ bernoulli_logit(beta[1] + beta[2] * dist100);
+  switched ~ bernoulli_logit_glm(x, alpha, beta);
 }

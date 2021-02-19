@@ -5,14 +5,15 @@ data {
   vector[N] pre_test;
 }
 transformed data {
-  vector[N] inter;           // interaction
-  inter = treatment .* pre_test;
+  // interaction
+  vector[N] inter = treatment .* pre_test;
+  matrix[N,3] x = [treatment', pre_test', inter']';
 }
 parameters {
-  vector[4] beta;
+  real alpha;
+  vector[3] beta;
   real<lower=0> sigma;
 }
 model {
-  post_test ~ normal(beta[1] + beta[2] * treatment + beta[3] * pre_test
-                     + beta[4] * inter, sigma);
+  post_test ~ normal_id_glm(x, alpha, beta, sigma);
 }

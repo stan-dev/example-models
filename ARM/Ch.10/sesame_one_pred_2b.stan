@@ -3,10 +3,14 @@ data {
   vector[N] watched_hat;
   vector[N] y;
 }
+transformed data {
+  matrix[N,1] x = [watched_hat']';
+}
 parameters {
-  vector[2] beta;
+  real alpha;
+  vector[1] beta;
   real<lower=0> sigma;
 } 
 model {
-  y ~ normal(beta[1] + beta[2] * watched_hat,sigma);
+  y ~ normal_id_glm(x, alpha, beta, sigma);
 }

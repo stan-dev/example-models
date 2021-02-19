@@ -3,10 +3,14 @@ data {
   vector[N] post_test;
   vector[N] treatment;
 }
+transformed data {
+  matrix[N,1] x = [treatment']';
+}
 parameters {
+  real alpha;
   vector[2] beta;
   real<lower=0> sigma;
 }
 model {
-  post_test ~ normal(beta[1] + beta[2] * treatment, sigma);
+  post_test ~ normal_id_glm(x, alpha, beta, sigma);
 }

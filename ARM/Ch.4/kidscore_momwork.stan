@@ -7,17 +7,21 @@ transformed data {
   vector[N] work2;
   vector[N] work3;
   vector[N] work4;
+  matrix[N,3] x;
+
   for (i in 1:N) {
     work2[i] = mom_work[i] == 2;
     work3[i] = mom_work[i] == 3;
     work4[i] = mom_work[i] == 4;
   }
+
+  x = [work2', work3', work4']';
 }
 parameters {
-  vector[4] beta;
+  real alpha;
+  vector[3] beta;
   real<lower=0> sigma;
 }
 model {
-  kid_score ~ normal(beta[1] + beta[2] * work2 + beta[3] * work3
-                     + beta[4] * work4, sigma);
+  kid_score ~ normal_id_glm(x, alpha, beta, sigma);
 }

@@ -7,25 +7,16 @@ data {
   int y[N];
 }
 transformed data {
-  vector[N] log_expo;
-
-  log_expo = log(exposure2);
+  vector[N] log_expo = log(exposure2);
+  matrix[N,3] x = [roach1', senior', treatment']';
 }
 parameters {
-  vector[4] beta;
-  vector[N] lambda;
-  real<lower=0> tau;
-} 
-transformed parameters {
+  real alpha;
+  vector[3] beta;
   real<lower=0> sigma;
-
-  sigma = 1.0 / sqrt(tau);
+  vector<multiplier=sigma>[N] lambda;
 }
 model {
-  tau ~ gamma(0.001, 0.001);
-  for (i in 1:N) {
-    lambda[i] ~ normal(0, sigma);
-    y[i] ~ poisson_log(lambda[i] + log_expo[i] + beta[1] + beta[2]*roach1[i] 
-                       + beta[3]*senior[i] + beta[4]*treatment[i]);
-  }
+  lambda ~ normal(0, sigma);
+  y ~ poisson_log_glm(x, alpha + lambda + log_expo, beta);
 }

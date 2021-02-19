@@ -5,28 +5,22 @@ data {
   vector[N] x;
   vector[N] y;
 }
+transformed data {
+  matrix[N,1] cov = [x']';
+}
 parameters {
-  real beta;
-  vector[J] eta;
+  vector[1] beta;
   real mu_a;
   real<lower=0> sigma_a;
   real<lower=0> sigma_y;
-}
-transformed parameters {
-  vector[J] a;
-  vector[N] y_hat;
-
-  a = mu_a + sigma_a * eta;
-
-  for (i in 1:N)
-    y_hat[i] = beta * x[i] + a[county[i]];
+  vector<offset=mu_a, multiplier=sigma_a>[J] alpha;
 }
 model {
-  beta ~ normal(0, 1);
-  mu_a ~ normal(0, 1);
-  eta ~ normal(0, 1);
+  beta ~ std_normal();
+  mu_a ~ std_normal();
+  alpha ~ normal(mu_a, sigma_a);
   sigma_a ~ cauchy(0, 2.5);
   sigma_y ~ cauchy(0, 2.5);
 
-  y ~ normal(y_hat, sigma_y);
+  y ~ normal_id_glm(cov, alpha[county], beta, sigma_y);
 }

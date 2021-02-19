@@ -7,19 +7,16 @@ data {
   vector[N] group;
 }
 transformed data {
-  vector[N] log_weight;
-  vector[N] log_canopy_volume;
-  vector[N] log_canopy_area;
-  log_weight        = log(weight);
-  log_canopy_volume = log(diam1 .* diam2 .* canopy_height);
-  log_canopy_area   = log(diam1 .* diam2);
+  vector[N] log_weight = log(weight);
+  vector[N] log_canopy_volume = log(diam1 .* diam2 .* canopy_height);
+  vector[N] log_canopy_area = log(diam1 .* diam2);
+  matrix[N,3] x = [log_canopy_volume', log_canopy_area', group']';
 }
 parameters {
-  vector[4] beta;
+  real alpha;
+  vector[3] beta;
   real<lower=0> sigma;
 }
 model {
-  log_weight ~ normal(beta[1] + beta[2] * log_canopy_volume
-                      + beta[3] * log_canopy_area + beta[4] * group,
-                      sigma);
+  log_weight ~ normal_id_glm(x, alpha, beta, sigma);
 }

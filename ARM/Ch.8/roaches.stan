@@ -7,14 +7,13 @@ data {
   int y[N];
 }
 transformed data {
-  vector[N] log_expo;
-
-  log_expo = log(exposure2);
+  vector[N] log_expo = log(exposure2);
+  matrix[N,3] x = [roach1', treatment', senior']';
 }
 parameters {
-  vector[4] beta;
+  real alpha;
+  vector[3] beta;
 } 
 model {
-  y ~ poisson_log(log_expo + beta[1] + beta[2] * roach1 + beta[3] * treatment
-                  + beta[4] * senior);
+  y ~ poisson_log_glm(x, alpha + log_expo, beta);
 }

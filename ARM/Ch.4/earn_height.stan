@@ -3,10 +3,14 @@ data {
   vector[N] earn;
   vector[N] height;
 }
+transformed data {
+  matrix[N,1] x = [height']';
+}
 parameters {
-  vector[2] beta;
+  real alpha;
+  vector[1] beta;
   real<lower=0> sigma;
 }
 model {
-  earn ~ normal(beta[1] + beta[2] * height, sigma);
+  earn ~ normal_id_glm(x, alpha, beta, sigma);
 }

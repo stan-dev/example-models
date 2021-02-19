@@ -8,13 +8,15 @@ data {
   vector[N] density;
   vector[N] group;
 }
+transformed data {
+  matrix[N,6] x = [diam1', diam2', canopy_height',
+                   total_height', density', group']';
+}
 parameters {
-  vector[7] beta;
+  real alpha;
+  vector[6] beta;
   real<lower=0> sigma;
 }
 model {
-  weight ~ normal(beta[1] + beta[2] * diam1 + beta[3] * diam2
-                  + beta[4] * canopy_height + beta[5] * total_height
-                  + beta[6] * density + beta[7] * group,
-                  sigma);
+  weight ~ normal_id_glm(x, alpha, beta, sigma);
 }

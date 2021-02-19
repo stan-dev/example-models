@@ -5,25 +5,17 @@ data {
   vector[N] y;
 }
 parameters {
-  vector[J] eta;
   real mu_a;
   real<lower=0> sigma_a;
   real<lower=0> sigma_y;
+  vector<offset=(10 * mu_a), multiplier=sigma_a>[J] alpha;
 }
-transformed parameters {
-  vector[J] a;
-  vector[N] y_hat;
 
-  a = 10 * mu_a + sigma_a * eta;
-
-  for (i in 1:N)
-    y_hat[i] = a[county[i]];
-}
 model {
-  mu_a ~ normal(0, 1);
-  eta ~ normal(0, 1);
+  mu_a ~ std_normal();
+  alpha ~ normal(10 * mu_a, sigma_a);
   sigma_a ~ cauchy(0, 2.5);
   sigma_y ~ cauchy(0, 2.5);
 
-  y ~ normal(y_hat, sigma_y);
+  y ~ normal(alpha[county], sigma_y);
 }

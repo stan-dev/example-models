@@ -3,10 +3,14 @@ data {
   vector[N] y;
   vector[N] y_lag;
 }
+transformed data {
+  matrix[N,1] x = [y_lag']';
+}
 parameters {
-  vector[2] beta;
+  real alpha;
+  vector[1] beta;
   real<lower=0> sigma;
 } 
 model {
-  y ~ normal(beta[1] + beta[2] * y_lag,sigma);
+  y ~ normal_id_glm(x, alpha, beta, sigma);
 }
