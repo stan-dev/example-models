@@ -4,23 +4,21 @@ functions {
    * coefficients under the ICAR model with unit variance, where
    * adjacency is determined by the adjacency array and the spatial
    * structure is a disconnected graph which has at least one
-   * connected component.  The spatial structure is described by
-   * a 2-D adjacency array over the all edges in the areal map
-   * and a series of arrays of per-component indexes.
-   * The node arrays provide per-component masks into phi, the
-   * per-node ICAR component, and corresponding masks into the
-   * edge array.  Because the Stan language lacks ragged arrays,
-   * these are all zero-padded square matrices, and additional vectors
-   * record the number of nodes and edges in each component.
-   *
-   *
-   * Each connected component has a soft sum-to-zero constraint.
-   * Singleton components don't contribute to the ICAR model.
+   * connected component.  Each connected component has a
+   * soft sum-to-zero constraint.
+
+   * The spatial structure is described by a 2-D adjacency array
+   * over the all edges in the areal map and a arrays of the
+   * indices of per-component nodes and edges which are used as
+   * masks into phi and the adjacency matrix.   Because the Stan
+   * language lacks ragged arrays, these are all square matrices,
+   * padded out with zeros; additional vectors record the number
+   * of nodes and edges in each component.
    *
    * @param phi vector of varying effects
    * @param adjacency parallel arrays of indexes of adjacent elements of phi
-   * @param num_nodes array of sizes of per-component nodes
-   * @param num_edges array of sizes of per-component edges
+   * @param node_cts array of sizes of per-component nodes
+   * @param edge_cts array of sizes of per-component edges
    * @param node_idxs array of arrays of per_component node indexes.
    * @param edge_idxs array of arrays of per_component edge indexes.
    *
@@ -28,38 +26,37 @@ functions {
    *
    * @reject if the the adjacency matrix does not have two rows
    * @reject if size mismatch between indexing arrays
-   * @reject if size mismatch between phi and dimension 2 of comp_members
+   * @reject if size mismatch between phi and node indexes columns.
    */
   real standard_icar_disconnected_lpdf(vector phi,
 				       int[ , ] adjacency,
-				       int[ ] num_nodes,
-				       int[ ] num_edges,
+				       int[ ] node_cts,
+				       int[ ] edge_cts,
 				       int[ , ] node_idxs,
 				       int[ , ] edge_idxs) {
     if (size(adjacency) != 2)
       reject("require 2 rows for adjacency array;",
              " found rows = ", size(adjacency));
       
-    if (!(size(num_nodes) == size(num_edges)
-	  && size(num_nodes) == size(node_idxs)
-	  && size(num_edges) == size(edge_idxs)))
+    if (!(size(phi) == dims(node_idxs)[2]
+	  && size(node_cts) == size(edge_cts)
+	  && size(node_cts) == size(node_idxs)
+	  && size(edge_cts) == size(edge_idxs)))
       reject("bad graph indexes, expecting ",
-	     size(num_nodes),
+	     size(node_cts),
 	     " rows for node and edge index matrices;",
              " inputs have ",
-	     size(num_nodes),
+	     size(node_cts),
 	     " and ",
-	     size(num_edges),
+	     size(edge_cts),
 	     " respectively.");
 
     real total = 0;
-    for (n in 1:size(num_nodes)) {
-      if (num_nodes[n] > 1)
-	total += -0.5 * dot_self(phi[adjacency[1, edge_idxs[n, 1:num_edges[n]]]] -
-				 phi[adjacency[2, edge_idxs[n, 1:num_edges[n]]]])
-	  + normal_lpdf(sum(phi[node_idxs[n, 1:num_nodes[n]]]) | 0, 0.001 * num_nodes[n]);
-      else
-	total += normal_lpdf(phi[node_idxs[n, 1]] | 0, inv_sqrt(1.0 * size(num_nodes)));
+    for (n in 1:size(node_cts)) {
+      if (node_cts[n] > 1)
+	total += -0.5 * dot_self(phi[adjacency[1, edge_idxs[n, 1:edge_cts[n]]]] -
+				 phi[adjacency[2, edge_idxs[n, 1:edge_cts[n]]]])
+	  + normal_lpdf(sum(phi[node_idxs[n, 1:node_cts[n]]]) | 0, 0.001 * node_cts[n]);
     }
     return total;
   }
@@ -71,8 +68,8 @@ data {
   int<lower = 1, upper = I> edges[2, J];  // node[1, j] adjacent to node[2, j]
 
   int<lower=0, upper=I> K;  // number of components in spatial graph
-  int<lower=0, upper=I> K_num_nodes[K];   // per-component nodes
-  int<lower=0, upper=J> K_num_edges[K];   // per-component edges
+  int<lower=0, upper=I> K_node_cts[K];   // per-component nodes
+  int<lower=0, upper=J> K_edge_cts[K];   // per-component edges
   int<lower=0, upper=I> K_node_idxs[K, I];  // rows contain per-component node indexes
   int<lower=0, upper=J> K_edge_idxs[K, J];  // rows contain per-component edge indexes
 
@@ -90,23 +87,24 @@ parameters {
   real beta;       // covariates
 
   // spatial effects
+  real<lower=0, upper=1> rho; // proportion unstructured vs. spatially structured variance
   real<lower = 0> sigma;  // scale of spatial effects
-  real<lower = 0, upper = 1> rho;  // proportion of spatial effect that's spatially smoothed
   vector[I] theta;  // standardized heterogeneous spatial effects
   vector[I] phi;  // standardized spatially smoothed spatial effects
 }
 transformed parameters {
   vector[I] gamma;
   // each component has its own spatial smoothing
+  // singleton nodes have distribution normal(0, 1/sqrt(K))
   for (k in 1:K) {
-    if (K_num_nodes[k] == 1) {
+    if (K_node_cts[k] == 1) {
       gamma[K_node_idxs[k,1]] =
 	theta[K_node_idxs[k,1]] + normal_lpdf(phi[K_node_idxs[k,1]] | 0, inv_sqrt(K));
     } else {
-      gamma[K_node_idxs[k, 1:K_num_nodes[k]]] = 
-	    (sqrt(1 - rho) * theta[K_node_idxs[k, 1:K_num_nodes[k]]]
+      gamma[K_node_idxs[k, 1:K_node_cts[k]]] = 
+	    (sqrt(1 - rho) * theta[K_node_idxs[k, 1:K_node_cts[k]]]
 	     + (sqrt(rho) * sqrt(1 / tau[k])
-		* phi[K_node_idxs[k, 1:K_num_nodes[k]]]) * sigma);
+		* phi[K_node_idxs[k, 1:K_node_cts[k]]]) * sigma);
     }
   }
 }
@@ -120,5 +118,23 @@ model {
   sigma ~ normal(0, 1);
   rho ~ beta(0.5, 0.5);
   theta ~ normal(0, 1);
-  phi ~ standard_icar_disconnected(edges, K_num_nodes, K_num_edges, K_node_idxs, K_edge_idxs);
+  phi ~ standard_icar_disconnected(edges, K_node_cts, K_edge_cts, K_node_idxs, K_edge_idxs);
+}
+generated quantities {
+  // posterior predictive checks
+  vector[I] eta = log_E + alpha + x * beta + gamma * sigma;
+  vector[I] y_prime = exp(eta);
+  int y_rep[I,10];
+  for (j in 1:10) {
+    if (max(eta) > 20) {
+      // avoid overflow in poisson_log_rng
+      print("max eta too big: ", max(eta));  
+      for (i in 1:I)
+	y_rep[i,j] = -1;
+    } else {
+      for (i in 1:I)
+        y_rep[i,j] = poisson_log_rng(eta[i]);
+    }
+  }
+  real logit_rho = log(rho / (1.0 - rho));
 }

@@ -96,10 +96,10 @@ index_components <- function(nb_obj) {
     }   
 
     return(list("K"=num_comps,
-                "K_num_nodes"=as.vector(table(comp_idxs)),
-                "K_num_edges"=edges_per_comp,
+                "K_node_cts"=as.vector(table(comp_idxs)),
+                "K_edge_cts"=edges_per_comp,
                 "K_node_idxs"=comp_node_idxs,
                 "K_edge_idxs"=comp_edge_idxs,
-                "K_scaling_factors"=scaling_factors))
+                "tau"=scaling_factors))
 }
 

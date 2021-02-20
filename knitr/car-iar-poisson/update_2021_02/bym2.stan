@@ -60,13 +60,12 @@ parameters {
   real beta;       // covariate
 
   // spatial effects
-  real logit_rho;  // proportion of spatial effect that's spatially smoothed
+  real<lower=0, upper=1> rho; // proportion of spatial effect that's spatially smoothed
   real<lower = 0> sigma;  // scale of spatial effects
   vector[I] theta;  // standardized heterogeneous spatial effects
   vector[I] phi;  // standardized spatially smoothed spatial effects
 }
 transformed parameters {
-  real<lower=0, upper=1> rho = inv_logit(logit_rho);
   // spatial effects (combine heterogeneous and spatially smoothed)
   vector[I] gamma = (sqrt(1 - rho) * theta + sqrt(rho) * sqrt(1 / tau) * phi) * sigma;
 }
@@ -78,11 +77,12 @@ model {
 
   // spatial hyperpriors and priors
   sigma ~ normal(0, 1);
-  logit_rho ~ normal(0, 1);
+  rho ~ beta(0.5, 0.5);
   theta ~ normal(0, 1);
   phi ~ standard_icar(edges);
 }
 generated quantities {
+  // posterior predictive checks
   vector[I] eta = log_E + alpha + x * beta + gamma * sigma;
   vector[I] y_prime = exp(eta);
   int y_rep[I,10];
@@ -97,4 +97,5 @@ generated quantities {
         y_rep[i,j] = poisson_log_rng(eta[i]);
     }
   }
+  real logit_rho = log(rho / (1.0 - rho));
 }
