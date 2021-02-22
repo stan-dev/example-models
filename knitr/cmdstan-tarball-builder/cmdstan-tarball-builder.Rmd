@@ -10,7 +10,7 @@ output:
 ## Introduction
 
 The CmdStan tarball builder Github Action can be used to automatically build a
-portable (mac/linux/windows) CmdStan tarball from a combination of `cmdstan`,
+portable (MacOS/Linux/Windows) CmdStan tarball from a combination of `cmdstan`,
 `stanc`, `stanc3`, and `math` Github branches. The goal of this Github Action is
 to make it easier to share experimental Stan work.
 
