@@ -23,7 +23,7 @@ can be used directly in [cmdstanr](https://mc-stan.org/cmdstanr/).
 
 To use the CmdStan tarball builder Github Action,
 
-1. Fork a copy of the [cmdstan repository](https://github.com/stan-dev/cmdstan).
+1. Fork a copy of the [CmdStan repository](https://github.com/stan-dev/cmdstan).
 The **Fork** button is in the upper right hand corner of the page. If you already
 have a fork of cmdstan, make sure your cmdstan fork is up to date with the
 latest `stan-dev/cmdstan` develop branch.
