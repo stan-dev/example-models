@@ -71,7 +71,7 @@ hand side of the page under **Releases**
     
 3. Specify a tag, name your release, and add a description of what makes your
 CmdStan special. There should be a link at the bottom to upload a file. Upload
-the unzipped tarball from the first step (leave it as a `.tgz` file -- don't
+the unzipped tarball from the first step (leave it as a `.tar.gz` file -- don't
 untar it to a folder).
 
     ![](attach_file.png)
