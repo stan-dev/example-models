@@ -99,5 +99,5 @@ different arguments). This can be done by pointing `devtools::install_github` at
 the appropriate repository and branch:
 
 ```
-devtools::install_github("https://github.com/stan-dev/cmdstanr/tree/develop")
+devtools::install_github("stan-dev/cmdstanr@develop")
 ```
