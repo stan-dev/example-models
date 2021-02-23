@@ -1,7 +1,7 @@
 library(SpatialEpi)
 data("scotland")
 
-source("scotland_nbs.data.R")
+source("scotland_connected_nbs.data.R")
 source("scotland_3_comp_nbs.data.R")
 source("scotland_islands_nbs.data.R")
 

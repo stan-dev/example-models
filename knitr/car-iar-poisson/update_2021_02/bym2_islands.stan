@@ -5,8 +5,9 @@ functions {
    * adjacency is determined by the adjacency array and the spatial
    * structure is a disconnected graph which has at least one
    * connected component.  Each connected component has a
-   * soft sum-to-zero constraint.
-
+   * soft sum-to-zero constraint.   Singleton nodes have
+   * distribution normal(0, 1/sqrt(K))
+   *
    * The spatial structure is described by a 2-D adjacency array
    * over the all edges in the areal map and a arrays of the
    * indices of per-component nodes and edges which are used as
@@ -34,29 +35,32 @@ functions {
 				       int[ ] edge_cts,
 				       int[ , ] node_idxs,
 				       int[ , ] edge_idxs) {
+    int num_nodes = size(phi);
+    int num_edges = dims(adjacency)[2];
+    int num_comps = size(edge_cts);
     if (size(adjacency) != 2)
       reject("require 2 rows for adjacency array;",
              " found rows = ", size(adjacency));
-      
-    if (!(size(phi) == dims(node_idxs)[2]
+    if (!(num_nodes == dims(node_idxs)[2]
 	  && size(node_cts) == size(edge_cts)
 	  && size(node_cts) == size(node_idxs)
 	  && size(edge_cts) == size(edge_idxs)))
-      reject("bad graph indexes, expecting ",
-	     size(node_cts),
-	     " rows for node and edge index matrices;",
-             " inputs have ",
-	     size(node_cts),
-	     " and ",
-	     size(edge_cts),
-	     " respectively.");
+      reject("arguments have size mismatch, expecting ",
+	     num_comps,
+	     " rows for node_cts edge_cts, node_idxs, and edge_idxs,",
+	     num_nodes,
+	     " elements in phi and columns of node_idxs, and ",
+	     num_edges,
+	     " columns of edge_idxs.");
 
     real total = 0;
-    for (n in 1:size(node_cts)) {
+    for (n in 1:num_comps) {
       if (node_cts[n] > 1)
 	total += -0.5 * dot_self(phi[adjacency[1, edge_idxs[n, 1:edge_cts[n]]]] -
 				 phi[adjacency[2, edge_idxs[n, 1:edge_cts[n]]]])
 	  + normal_lpdf(sum(phi[node_idxs[n, 1:node_cts[n]]]) | 0, 0.001 * node_cts[n]);
+      else
+	total += normal_lpdf(phi[node_idxs[n, 1]] | 0, 1);
     }
     return total;
   }
@@ -94,19 +98,12 @@ parameters {
 }
 transformed parameters {
   vector[I] gamma;
-  // each component has its own spatial smoothing
-  // singleton nodes have distribution normal(0, 1/sqrt(K))
-  for (k in 1:K) {
-    if (K_node_cts[k] == 1) {
-      gamma[K_node_idxs[k,1]] =
-	theta[K_node_idxs[k,1]] + normal_lpdf(phi[K_node_idxs[k,1]] | 0, inv_sqrt(K));
-    } else {
-      gamma[K_node_idxs[k, 1:K_node_cts[k]]] = 
-	    (sqrt(1 - rho) * theta[K_node_idxs[k, 1:K_node_cts[k]]]
-	     + (sqrt(rho) * sqrt(1 / tau[k])
-		* phi[K_node_idxs[k, 1:K_node_cts[k]]]) * sigma);
-    }
-  }
+  for (k in 1:K)
+    gamma[K_node_idxs[k, 1:K_node_cts[k]]] = 
+      (sqrt(1 - rho) * theta[K_node_idxs[k, 1:K_node_cts[k]]]
+       +
+       sqrt(rho / tau[k]) * phi[K_node_idxs[k, 1:K_node_cts[k]]])
+      * sigma;
 }
 model {
   y ~ poisson_log(log_E + alpha + x * beta + gamma * sigma);  // co-variates
@@ -116,7 +113,7 @@ model {
 
   // spatial hyperpriors and priors
   sigma ~ normal(0, 1);
-  rho ~ beta(0.5, 0.5);
+  rho ~ normal(0, 1);
   theta ~ normal(0, 1);
   phi ~ standard_icar_disconnected(edges, K_node_cts, K_edge_cts, K_node_idxs, K_edge_idxs);
 }
@@ -124,17 +121,17 @@ generated quantities {
   // posterior predictive checks
   vector[I] eta = log_E + alpha + x * beta + gamma * sigma;
   vector[I] y_prime = exp(eta);
-  int y_rep[I,10];
-  for (j in 1:10) {
-    if (max(eta) > 20) {
-      // avoid overflow in poisson_log_rng
-      print("max eta too big: ", max(eta));  
-      for (i in 1:I)
-	y_rep[i,j] = -1;
-    } else {
-      for (i in 1:I)
-        y_rep[i,j] = poisson_log_rng(eta[i]);
-    }
-  }
+  //   int y_rep[I,10];
+  //   for (j in 1:10) {
+  //     if (max(eta) > 20) {
+  //       // avoid overflow in poisson_log_rng
+  //       print("max eta too big: ", max(eta));
+  //       for (i in 1:I)
+  //   	y_rep[i,j] = -1;
+  //     } else {
+  //       for (i in 1:I)
+  //         y_rep[i,j] = poisson_log_rng(eta[i]);
+  //     }
+  //   }
   real logit_rho = log(rho / (1.0 - rho));
 }
