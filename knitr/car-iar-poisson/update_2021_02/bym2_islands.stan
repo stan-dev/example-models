@@ -113,7 +113,7 @@ model {
 
   // spatial hyperpriors and priors
   sigma ~ normal(0, 1);
-  rho ~ normal(0, 1);
+  rho ~ beta(0.5, 0.5);
   theta ~ normal(0, 1);
   phi ~ standard_icar_disconnected(edges, K_node_cts, K_edge_cts, K_node_idxs, K_edge_idxs);
 }
