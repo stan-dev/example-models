@@ -34,7 +34,7 @@ model {
               + bernoulli_lpmf(y[i] | p);
     else // s[i] == 0
       target += log_sum_exp(bernoulli_lpmf(1 | omega)   // z[i] == 1
-                            + bernoulli_lpmf(0 | p),
+                            + bernoulli_lpmf(y[i] | p),
                             bernoulli_lpmf(0 | omega)); // z[i] == 0
 }
 

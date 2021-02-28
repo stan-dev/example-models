@@ -50,7 +50,7 @@ model {
               + bernoulli_lpmf(y[i] |  p_eff[i]);
     else // s[i] == 0
       target += log_sum_exp(bernoulli_lpmf(1 |  omega)   // z[i] == 1
-                            + bernoulli_lpmf(0 | p_eff[i]),
+                            + bernoulli_lpmf(y[i] | p_eff[i]),
                             bernoulli_lpmf(0 | omega));  // z[i] == 0
 }
 
