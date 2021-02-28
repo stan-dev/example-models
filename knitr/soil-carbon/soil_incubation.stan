@@ -74,7 +74,7 @@ functions {
                      real gamma, real totalC_t0,
                      real k1, real k2, 
                      real alpha21, real alpha12,
-                     real[] x_r, int[] x_i) {
+                     data real[] x_r, data int[] x_i) {
 
     real C_t0[2];               // initial state
     real theta[4];              // ODE parameters
