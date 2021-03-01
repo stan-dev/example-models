@@ -1,10 +1,9 @@
 functions {
-  int sum(int[,] a) {
-    int s;
-    s <- 0;
-    for (i in 1:size(a))
-      for (j in 1:size(a[i]))
-        s <- s + a[i,j];
+  int sum_2darray(int[,] a) {
+    int s = 0;
+    for (i in 1:size(a)) {
+      s = s +sum(a[i]);
+    }      
     return s;
   }
 }
@@ -17,29 +16,27 @@ data {
 }
 transformed data {
   int<lower=0> N_pos;
-  int<lower=1,upper=N> n_pos[sum(y)];
+  int<lower=1,upper=N> n_pos[sum_2darray(y)];
   int<lower=1,upper=D> d_pos[size(n_pos)];
   int<lower=0> N_neg;
   int<lower=1,upper=N> n_neg[(N * D) - size(n_pos)];
   int<lower=1,upper=D> d_neg[size(n_neg)];
 
-  N_pos <- size(n_pos);
-  N_neg <- size(n_neg);
+  N_pos = size(n_pos);
+  N_neg = size(n_neg);
   {
-    int i;
-    int j;
-    i <- 1;
-    j <- 1;
+    int i = 1;
+    int j = 1;
     for (n in 1:N) {
       for (d in 1:D) {
         if (y[n,d] == 1) {
-          n_pos[i] <- n;
-          d_pos[i] <- d;
-          i <- i + 1;
+          n_pos[i] = n;
+          d_pos[i] = d;
+          i = i + 1;
         } else {
-          n_neg[j] <- n;
-          d_neg[j] <- d;
-          j <- j + 1;
+          n_neg[j] = n;
+          d_neg[j] = d;
+          j = j + 1;
         }
       }
     }
@@ -54,21 +51,21 @@ parameters {
 transformed parameters {
   vector[D] z[N];
   for (n in 1:N_pos)
-    z[n_pos[n], d_pos[n]] <- z_pos[n];
+    z[n_pos[n], d_pos[n]] = z_pos[n];
   for (n in 1:N_neg)
-    z[n_neg[n], d_neg[n]] <- z_neg[n];
+    z[n_neg[n], d_neg[n]] = z_neg[n];
 }
 model {
   L_Omega ~ lkj_corr_cholesky(4);
   to_vector(beta) ~ normal(0, 5);
-  { 
+  {
     vector[D] beta_x[N];
-    for (n in 1:N) 
-      beta_x[n] <- beta * x[n];
+    for (n in 1:N) {
+      beta_x[n] = beta * x[n];
+    }
     z ~ multi_normal_cholesky(beta_x, L_Omega);
   }
 }
 generated quantities {
-  corr_matrix[D] Omega;
-  Omega <- multiply_lower_tri_self_transpose(L_Omega);  
+  corr_matrix[D] Omega = multiply_lower_tri_self_transpose(L_Omega);  
 }
