@@ -29,7 +29,7 @@ jobs:
     
     - name: Write modified models
       run: |
-        cd example-models-new > ../test-models.txt
+        cd example-models-new
         echo "example-models-new/basic_distributions/binormal.stan" > ../test-models.txt
         git diff --name-only origin/master $GITHUB_SHA --diff-filter=AM | grep ".stan$" |  sed -e 's/^/example-models-new\//' >> ../test-models.txt
 
