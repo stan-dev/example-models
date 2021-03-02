@@ -11,6 +11,10 @@ model {
 }
 generated quantities {
   int<lower = 0, upper = 1> is_best[K];
-  for (k in 1:K)
-    is_best[k] = (theta[k] >= best_prob);
+  {
+    real best_prob = max(theta);
+    for (k in 1:K) {
+      is_best[k] = (theta[k] >= best_prob);
+    }    
+  }  
 }
