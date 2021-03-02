@@ -1,0 +1,41 @@
+name: Compile models
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+        architecture: 'x64'
+    
+    - uses: actions/checkout@v2
+      with:
+       repository: 'stan-dev/performance-tests-cmdstan'
+       submodules: recursive
+    
+    - uses: actions/checkout@v2
+      with:
+        path: 'example-models-new'
+        fetch-depth: 0
+    
+    - name: Write modified models
+      run: |
+        cd example-models-new > ../test-models.txt
+        echo "example-models-new/basic_distributions/binormal.stan" > ../test-models.txt
+        git diff --name-only origin/master $GITHUB_SHA --diff-filter=AM | grep ".stan$" |  sed -e 's/^/example-models-new\//' >> ../test-models.txt
+
+    - name: Compile all new or modified models
+      run: |
+        cd cmdstan
+        make build
+        cd ..
+        ./runPerformanceTests.py --runs=0 --tests-file test-models.txt  
