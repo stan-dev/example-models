@@ -39,7 +39,8 @@ model {
   to_vector(beta) ~ normal(0, 2);
 
   // likelihood
-  y[n] ~ categorical_logit(v[ , n]);
+  for (n in 1:N)
+    y[n] ~ categorical_logit(v[ , n]);
 }
 
 
