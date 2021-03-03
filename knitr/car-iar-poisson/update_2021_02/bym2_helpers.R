@@ -91,7 +91,7 @@ index_components <- function(nb_obj) {
             edges = nb_to_edge_array(sub_nb)
             scaling_factors[k] = scaling_factor(edges)
         } else {
-            scaling_factors[k] = 1.0/num_comps
+            scaling_factors[k] = 1.0
         }
     }   
 
