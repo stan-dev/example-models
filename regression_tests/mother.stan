@@ -350,8 +350,8 @@ transformed data {
   simplex[N] td_3d_simplex[N,M,K];
   cholesky_factor_cov[5,5] td_cfcov_54; // TODO: Change to 5,4
   cholesky_factor_cov[3] td_cfcov_33;
-  vector[2] x;
-  vector[2] y;
+  vector[2] x = [0,0]';
+  vector[2] y = [1,1]';
   real dat[0];
   int dat_int[0];
   real x_r[0, 0];

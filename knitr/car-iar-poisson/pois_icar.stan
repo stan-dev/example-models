@@ -28,7 +28,7 @@ model {
   beta0 ~ normal(0.0, 1.0);
   beta1 ~ normal(0.0, 1.0);
   sigma ~ normal(0.0, 1.0);
-  phi ~ icar_normal_lpdf(N, node1, node2);
+  phi ~ icar_normal(N, node1, node2);
   // soft sum-to-zero constraint on phi
   // more efficient than mean(phi) ~ normal(0, 0.001)
   sum(phi) ~ normal(0, 0.001 * N);

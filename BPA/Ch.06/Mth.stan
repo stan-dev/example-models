@@ -51,7 +51,7 @@ model {
               + bernoulli_logit_lpmf(y[i] | logit_p[i]);
     else // s[i] == 0
       target += log_sum_exp(bernoulli_lpmf(1 | omega)   // z[i] == 1
-                            + bernoulli_logit_lpmf(0 | logit_p[i]),
+                            + bernoulli_logit_lpmf(y[i] | logit_p[i]),
                             bernoulli_lpmf(0 | omega)); // z[i] == 0
   }
 }

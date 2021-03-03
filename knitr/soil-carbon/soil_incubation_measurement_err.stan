@@ -9,13 +9,13 @@ functions {
 
     real dC_dt[2];
 
-    k1 <- theta[1];
-    k2 <- theta[2];
-    alpha21 <- theta[3];
-    alpha12 <- theta[4];
+    k1 = theta[1];
+    k2 = theta[2];
+    alpha21 = theta[3];
+    alpha12 = theta[4];
     
-    dC_dt[1] <- -k1 * C[1] + alpha12 * k2 * C[2];
-    dC_dt[2] <- alpha21 * k1 * C[1] - k2 * C[2];
+    dC_dt[1] = -k1 * C[1] + alpha12 * k2 * C[2];
+    dC_dt[2] = alpha21 * k1 * C[1] - k2 * C[2];
 
     return dC_dt;
   }
@@ -24,7 +24,7 @@ functions {
                      real gamma, real totalC_t0,
                      real k1, real k2, 
                      real alpha21, real alpha12,
-                     real[] x_r, int[] x_i) {
+                     data real[] x_r, data int[] x_i) {
 
     real C_t0[2];               // initial state
     real theta[4];              // ODE parameters
@@ -32,19 +32,19 @@ functions {
 
     real eCO2_hat[N_t];
 
-    C_t0[1] <- gamma * totalC_t0;
-    C_t0[2] <- (1 - gamma) * totalC_t0;
+    C_t0[1] = gamma * totalC_t0;
+    C_t0[2] = (1 - gamma) * totalC_t0;
 
-    theta[1] <- k1;
-    theta[2] <- k2;
-    theta[3] <- alpha21;
-    theta[4] <- alpha12;
+    theta[1] = k1;
+    theta[2] = k2;
+    theta[3] = alpha21;
+    theta[4] = alpha12;
 
-    C_hat <- integrate_ode(two_pool_feedback, 
+    C_hat = integrate_ode(two_pool_feedback, 
                            C_t0, t0, ts, theta, x_r, x_i);
 
     for (t in 1:N_t)
-      eCO2_hat[t] <- totalC_t0 - sum(C_hat[t]);
+      eCO2_hat[t] = totalC_t0 - sum(C_hat[t]);
     return eCO2_hat;
   }
 
@@ -78,7 +78,7 @@ parameters {
 }
 transformed parameters {
   real eCO2_hat[N_t];
-  eCO2_hat <- evolved_CO2(N_t, t0, ts, gamma, totalC_t0,
+  eCO2_hat = evolved_CO2(N_t, t0, ts, gamma, totalC_t0,
                           k1, k2, alpha21, alpha12, x_r, x_i);
 }
 model {
