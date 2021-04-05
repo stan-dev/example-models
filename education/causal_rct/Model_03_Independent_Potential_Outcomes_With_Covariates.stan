@@ -1,5 +1,5 @@
 functions { 
-  real quantile(vector x, real p){
+  real quantile_user_defined(vector x, real p){
     int n;            // length of vector x
     real index;       // integer index of p
     int lo;           // lower integer cap of the index
@@ -68,9 +68,9 @@ generated quantities{
     tau_unit[n] = y1[n] - y0[n];
   }
   tau_fs = mean(tau_unit);
-  tau_qte25 = quantile(to_vector(y1), 0.25) - quantile(to_vector(y0), 0.25);
-  tau_qte50 = quantile(to_vector(y1), 0.50) - quantile(to_vector(y0), 0.50);
-  tau_qte75 = quantile(to_vector(y1), 0.75) - quantile(to_vector(y0), 0.75);
+  tau_qte25 = quantile_user_defined(to_vector(y1), 0.25) - quantile_user_defined(to_vector(y0), 0.25);
+  tau_qte50 = quantile_user_defined(to_vector(y1), 0.50) - quantile_user_defined(to_vector(y0), 0.50);
+  tau_qte75 = quantile_user_defined(to_vector(y1), 0.75) - quantile_user_defined(to_vector(y0), 0.75);
 }
 
 
