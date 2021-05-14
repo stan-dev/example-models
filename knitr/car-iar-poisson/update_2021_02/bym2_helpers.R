@@ -23,10 +23,8 @@ nb_to_edge_array <- function(nb_obj) {
     t(as_edgelist(graph_from_adjacency_matrix(adj_matrix, mode="undirected")))
 }
 
-
 # compute geometric mean of a vector
 geometric_mean <- function(x) exp(mean(log(x))) 
-
 
 # compute scaling factor for a fully connected areal map
 # accounts for differences in spatial connectivity
@@ -93,7 +91,7 @@ index_components <- function(nb_obj) {
         } else {
             scaling_factors[k] = 1.0
         }
-    }   
+    }
 
     return(list("K"=num_comps,
                 "K_node_cts"=as.vector(table(comp_idxs)),
@@ -102,4 +100,3 @@ index_components <- function(nb_obj) {
                 "K_edge_idxs"=comp_edge_idxs,
                 "tau"=scaling_factors))
 }
-
