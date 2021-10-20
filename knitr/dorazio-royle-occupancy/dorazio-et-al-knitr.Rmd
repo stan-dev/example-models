@@ -10,7 +10,7 @@ output:
 In the following paper, Dorazio et al. provide a hierarchical occupancy model for "estimating species richness and accumulation by forming these community-level attributes as functions of model-based estimators of species occurence while accounting for imperfect detection of individual species."
 
 <blockquote>
-Dorazio, R. M., Royle, J. A., Söderström, B., & Glimskär, A. (2006). [Estimating species richness and accumulation by modeling species occurrence and detectability](http://www.uvm.edu/rsenr/vtcfwru/spreadsheets/occupancy/Occupancy%20Exercises/Exercise15/Dorazio_et_al_2006.pdf). <i>Ecology</i> <b>87</b>(4), 842-854.
+Dorazio, R. M., Royle, J. A., Söderström, B., & Glimskär, A. (2006). [Estimating species richness and accumulation by modeling species occurrence and detectability](https://doi.org/10.1890/0012-9658(2006)87[842:ESRAAB]2.0.CO;2). <i>Ecology</i> <b>87</b>(4), 842-854.
 </blockquote>
 
 They apply their model to estimating total numbers of butterfly species (and of birds, with a similar format to the data).
@@ -39,7 +39,7 @@ The supercommunity size parameter $S$ is just required to be large enough to enc
 Reading the data in requires a web connection to the publisher's web site:
 
 ```{r}
-x_csv <- read.csv("http://esapubs.org/archive/ecol/E087/050/butterflyData.txt");
+x_csv <- read.csv("https://esapubs.org/archive/ecol/E087/050/butterflyData.txt");
 n <- dim(x_csv)[1];
 J <- dim(x_csv)[2];
 x <- matrix(NA, n, J)
