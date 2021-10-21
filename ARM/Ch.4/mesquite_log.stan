@@ -8,15 +8,16 @@ data {
   vector[N] density;
   vector[N] group;
 }
-transformed data {           // log transformations
+transformed data {
+  // log transformations
   vector[N] log_weight = log(weight);
   vector[N] log_diam1 = log(diam1);
   vector[N] log_diam2 = log(diam2);
   vector[N] log_canopy_height = log(canopy_height);
   vector[N] log_total_height = log(total_height);
   vector[N] log_density = log(density);
-  matrix[N,6] x = [log_diam1', log_diam2', log_canopy_height',
-                   log_total_height', log_density', group']';
+  matrix[N, 6] x = [log_diam1', log_diam2', log_canopy_height',
+                    log_total_height', log_density', group']';
 }
 parameters {
   real alpha;

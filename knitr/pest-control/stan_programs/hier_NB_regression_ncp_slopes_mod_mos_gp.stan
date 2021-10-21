@@ -2,10 +2,11 @@ functions {
   int neg_binomial_2_log_safe_rng(real eta, real phi) {
     real phi_div_exp_eta;
     real gamma_rate;
-    phi_div_exp_eta = phi/exp(eta);
+    phi_div_exp_eta = phi / exp(eta);
     gamma_rate = gamma_rng(phi, phi_div_exp_eta);
-    if (gamma_rate >= exp(20.79))
+    if (gamma_rate >= exp(20.79)) {
       return -9;
+    }
     return poisson_rng(gamma_rate);
   }
 }
@@ -13,18 +14,19 @@ data {
   int<lower=1> N;
   int<lower=1> M;
   int<lower=1> K;
-  int complaints[N];
+  array[N] int complaints;
   vector[N] traps;
   int<lower=1> J;
-  int<lower=1, upper=J> building_idx[N];
-  matrix[J,K] building_data;
+  array[N] int<lower=1, upper=J> building_idx;
+  matrix[J, K] building_data;
   vector[N] log_sq_foot;
-  int<lower=1> mo_idx[N];
+  array[N] int<lower=1> mo_idx;
 }
 transformed data {
-  real mo_gp_vec[M];
-  for (m in 1:M)
+  array[M] real mo_gp_vec;
+  for (m in 1 : M) {
     mo_gp_vec[m] = m;
+  }
 }
 parameters {
   real alpha;
@@ -51,11 +53,12 @@ transformed parameters {
   vector[M] gp_exp_quad;
   vector[M] gp;
   {
-    matrix[M, M] C = cov_exp_quad(mo_gp_vec, sigma_gp, gp_len);
+    matrix[M, M] C = gp_exp_quad_cov(mo_gp_vec, sigma_gp, gp_len);
     real var_noise = square(sigma_noise);
     matrix[M, M] L_C;
-    for (m in 1:M)
-      C[m,m] += 1e-12;
+    for (m in 1 : M) {
+      C[m, m] += 1e-12;
+    }
     L_C = cholesky_decompose(C);
     gp_exp_quad = L_C * gp_raw;
   }
@@ -65,8 +68,8 @@ transformed parameters {
 }
 model {
   beta ~ normal(-0.25, 1);
-  mu_raw ~ normal(0,1);
-  kappa_raw ~ normal(0,1);
+  mu_raw ~ normal(0, 1);
+  kappa_raw ~ normal(0, 1);
   sigma_mu ~ normal(0, 1);
   sigma_kappa ~ normal(0, 1);
   alpha ~ normal(log(4), 1);
@@ -82,14 +85,18 @@ model {
   sigma_noise ~ normal(0, 1);
   mo_noise_raw ~ normal(0, 1);
   
-  complaints ~ neg_binomial_2_log(mu[building_idx] + kappa[building_idx] .* traps 
-                                 + gp[mo_idx] + log_sq_foot, phi);
-} 
+  complaints ~ neg_binomial_2_log(mu[building_idx]
+                                  + kappa[building_idx] .* traps + gp[mo_idx]
+                                  + log_sq_foot, phi);
+}
 generated quantities {
-  int y_rep[N];
-
-  for (n in 1:N) 
-    y_rep[n] = neg_binomial_2_log_safe_rng(mu[building_idx[n]] + kappa[building_idx[n]] * traps[n]
-                                          + gp[mo_idx[n]] + log_sq_foot[n],
-                                          phi);
+  array[N] int y_rep;
+  
+  for (n in 1 : N) {
+    y_rep[n] = neg_binomial_2_log_safe_rng(mu[building_idx[n]]
+                                           + kappa[building_idx[n]]
+                                             * traps[n]
+                                           + gp[mo_idx[n]] + log_sq_foot[n],
+                                           phi);
+  }
 }

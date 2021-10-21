@@ -4,8 +4,8 @@ data {
   int N_teams;
   int N_games;
   vector[N_teams] prior_score;
-  int team_1[N_games];
-  int team_2[N_games];
+  array[N_games] int team_1;
+  array[N_games] int team_2;
   vector[N_games] score_1;
   vector[N_games] score_2;
   real df;
@@ -22,7 +22,7 @@ parameters {
 }
 transformed parameters {
   vector[N_teams] a;
-  a = b*prior_score + sigma_a*alpha;
+  a = b * prior_score + sigma_a * alpha;
 }
 model {
   alpha ~ normal(0, 1);
@@ -30,7 +30,7 @@ model {
 }
 generated quantities {
   vector[N_games] y_rep;
-  for (n in 1:N_games) {
+  for (n in 1 : N_games) {
     y_rep[n] = student_t_rng(df, a[team_1[n]] - a[team_2[n]], sigma_y);
   }
 }

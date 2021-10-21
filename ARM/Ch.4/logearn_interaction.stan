@@ -9,7 +9,7 @@ transformed data {
   vector[N] log_earn = log(earn);
   // interaction
   vector[N] inter = height .* male;
-  matrix[N,3] x = [height', male', inter']';
+  matrix[N, 3] x = [height', male', inter']';
 }
 parameters {
   real alpha;

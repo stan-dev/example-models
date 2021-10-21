@@ -13,47 +13,40 @@
  * in Equation (3.4) 
  */
 data {
-  int<lower=0> N; 
-  real x[N];
-} 
+  int<lower=0> N;
+  array[N] real x;
+}
 parameters {
   real<lower=0> alpha;
-  real<lower=0> sigma; 
+  real<lower=0> sigma;
   real<lower=0> theta;
-} 
+}
 transformed parameters {
-  real mu = log(theta) - alpha * sigma * sigma; 
-} 
-model { 
-  real lpa[N];
-  real tmp; 
+  real mu = log(theta) - alpha * sigma * sigma;
+}
+model {
+  array[N] real lpa;
+  real tmp;
   real log_tmp;
   real neg_log1p_temp;
   real log_Phi_alpha_times_sigma;
-
-  theta ~ gamma(.001, .001);   
-  alpha ~ gamma(.001, .001); 
-  sigma ~ gamma(.001, .001); 
-
-  tmp = ( sqrt(2 * pi()) 
-           * alpha 
-           * sigma 
-           * Phi(alpha * sigma) 
-           * exp(0.5 * pow(alpha * sigma, 2)) );  
+  
+  theta ~ gamma(.001, .001);
+  alpha ~ gamma(.001, .001);
+  sigma ~ gamma(.001, .001);
+  
+  tmp = sqrt(2 * pi()) * alpha * sigma * Phi(alpha * sigma)
+        * exp(0.5 * pow(alpha * sigma, 2));
   log_tmp = log(tmp);
-  neg_log1p_temp = - log1p(tmp);
+  neg_log1p_temp = -log1p(tmp);
   log_Phi_alpha_times_sigma = log(Phi(alpha * sigma));
-  for (i in 1:N) {  
-    if (theta > x[i]) 
-      lpa[i] = ( log_tmp 
-                  + neg_log1p_temp
-                  - log_Phi_alpha_times_sigma
-                  + lognormal_lpdf(x[i] | mu, sigma) ); 
-    else 
-      lpa[i] = ( neg_log1p_temp
-                  + pareto_lpdf(x[i] | theta, alpha) ); 
-  } 
+  for (i in 1 : N) {
+    if (theta > x[i]) {
+      lpa[i] = log_tmp + neg_log1p_temp - log_Phi_alpha_times_sigma
+               + lognormal_lpdf(x[i] | mu, sigma);
+    } else {
+      lpa[i] = neg_log1p_temp + pareto_lpdf(x[i] | theta, alpha);
+    }
+  }
   target += sum(lpa);
 }
-
-

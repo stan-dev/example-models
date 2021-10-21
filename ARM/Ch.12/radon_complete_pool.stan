@@ -4,7 +4,7 @@ data {
   vector[N] y;
 }
 transformed data {
-  matrix[N,1] cov = [x']';
+  matrix[N, 1] cov = [x']';
 }
 parameters {
   real alpha;

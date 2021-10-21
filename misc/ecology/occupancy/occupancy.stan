@@ -14,11 +14,11 @@
 data {
   int<lower=0> R;
   int<lower=0> T;
-  int<lower=0,upper=1> y[R,T];
+  array[R, T] int<lower=0, upper=1> y;
 }
 parameters {
-  real<lower=0,upper=1> psi1;
-  real<lower=0,upper=1> p;
+  real<lower=0, upper=1> psi1;
+  real<lower=0, upper=1> p;
 }
 model {
   // local variables to avoid recomputing log(psi1) and log(1 - psi1)
@@ -26,17 +26,17 @@ model {
   real log1m_psi1;
   log_psi1 = log(psi1);
   log1m_psi1 = log1m(psi1);
-
+  
   // priors
-  psi1 ~ uniform(0,1);
-  p ~ uniform(0,1);
+  psi1 ~ uniform(0, 1);
+  p ~ uniform(0, 1);
   
   // likelihood
-  for (r in 1:R) {
-    if (sum(y[r]) > 0)
+  for (r in 1 : R) {
+    if (sum(y[r]) > 0) {
       target += log_psi1 + bernoulli_lpmf(y[r] | p);
-    else
-      target += log_sum_exp(log_psi1 + bernoulli_lpmf(y[r] | p),
-			    log1m_psi1);
+    } else {
+      target += log_sum_exp(log_psi1 + bernoulli_lpmf(y[r] | p), log1m_psi1);
+    }
   }
 }

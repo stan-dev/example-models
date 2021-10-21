@@ -1,13 +1,13 @@
 data {
   int J;
-  int n[J];
+  array[J] int n;
   vector[J] x;
-  int y[J];
+  array[J] int y;
 }
 parameters {
   real a;
   real b;
 }
 model {
-  y ~ binomial_logit(n, a + b*x);
+  y ~ binomial_logit(n, a + b * x);
 }

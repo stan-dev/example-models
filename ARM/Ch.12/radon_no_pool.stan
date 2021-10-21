@@ -1,12 +1,12 @@
 data {
   int<lower=1> N;
-  int<lower=1> J; # number of counties
-  int<lower=1,upper=J> county[N];
+  int<lower=1> J; // number of counties
+  array[N] int<lower=1, upper=J> county;
   vector[N] x;
   vector[N] y;
 }
 transformed data {
-  matrix[N,1] cov = [x']';
+  matrix[N, 1] cov = [x']';
 }
 parameters {
   vector[1] beta;
@@ -20,7 +20,7 @@ model {
   mu_a ~ std_normal();
   sigma_a ~ cauchy(0, 2.5);
   sigma_y ~ cauchy(0, 2.5);
-
+  
   a ~ normal(mu_a, sigma_a);
   y ~ normal_id_glm(cov, a[county], beta, sigma_y);
 }

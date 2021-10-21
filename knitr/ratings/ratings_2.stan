@@ -2,7 +2,7 @@ data {
   int N;
   vector[N] y;
   int J;
-  int<lower=1, upper=J> movie[N];
+  array[N] int<lower=1, upper=J> movie;
 }
 parameters {
   vector<lower=0, upper=5>[J] theta;

@@ -1,20 +1,20 @@
-# http://www.mrc-bsu.cam.ac.uk/bugs/winbugs/Vol2.pdf
-# Page 23: Birats
-## 
+// http://www.mrc-bsu.cam.ac.uk/bugs/winbugs/Vol2.pdf
+// Page 23: Birats
+//# 
 
 data {
   int<lower=0> N;
   int<lower=0> T;
-  real x[T];
+  array[T] real x;
   real xbar;
-  real y[N,T];
-  cov_matrix[2] Omega; 
+  array[N, T] real y;
+  cov_matrix[2] Omega;
 }
 parameters {
-  vector[2] beta[N];
+  array[N] vector[2] beta;
   vector[2] mu_beta;
   real<lower=0> sigmasq_y;
-  cov_matrix[2] Sigma_beta; 
+  cov_matrix[2] Sigma_beta;
 }
 //  transformed parameters {
 //    real rho; 
@@ -23,20 +23,23 @@ parameters {
 //    //alpha0 <- mu_beta[1] - mu_beta[2] * xbar; 
 //  }
 transformed parameters {
-  real<lower=0> sigma_y; 
-  sigma_y <- sqrt(sigmasq_y); 
-} 
+  real<lower=0> sigma_y;
+  sigma_y = sqrt(sigmasq_y);
+}
 model {
   sigmasq_y ~ inv_gamma(0.001, 0.001);
   mu_beta ~ normal(0, 100);
-  Sigma_beta ~ inv_wishart(2, Omega); 
-  for (n in 1:N) 
+  Sigma_beta ~ inv_wishart(2, Omega);
+  for (n in 1 : N) {
     beta[n] ~ multi_normal(mu_beta, Sigma_beta);
-  for (n in 1:N)
-    for (t in 1:T) 
-      # centeralize x[] 
+  }
+  for (n in 1 : N) {
+    for (t in 1 : T) {
+      // centeralize x[] 
       // y[n,t] ~ normal(beta[n, 1] + beta[n, 2] * (x[t] - xbar), sqrt(sigmasq_y));
- 
-      # NOT-centeralize x[] 
-      y[n, t] ~ normal(beta[n, 1] + beta[n, 2] * x[t],  sigma_y); 
+      
+      // NOT-centeralize x[] 
+      y[n, t] ~ normal(beta[n, 1] + beta[n, 2] * x[t], sigma_y);
+    }
+  }
 }

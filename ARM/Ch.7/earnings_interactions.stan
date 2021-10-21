@@ -1,14 +1,14 @@
 data {
-  int<lower=0> N; 
+  int<lower=0> N;
   vector[N] earnings;
   vector[N] height;
   vector[N] sex1;
-} 
+}
 transformed data {
   vector[N] log_earnings = log(earnings);
   vector[N] male = 2 - sex1;
   vector[N] height_male_inter = height .* male;
-  matrix[N,3] x = [height', male', height_male_inter']';
+  matrix[N, 3] x = [height', male', height_male_inter']';
 }
 parameters {
   real alpha;
