@@ -5,14 +5,15 @@ functions {
   */
   int poisson_log_safe_rng(real eta) {
     real pois_rate = exp(eta);
-    if (pois_rate >= exp(20.79))
+    if (pois_rate >= exp(20.79)) {
       return -9;
+    }
     return poisson_rng(pois_rate);
   }
 }
 data {
   int<lower=1> N;
-  int<lower=0> complaints[N];
+  array[N] int<lower=0> complaints;
   vector<lower=0>[N] traps;
 }
 parameters {
@@ -28,9 +29,10 @@ model {
   
   // poisson_log(eta) is more efficient and stable alternative to poisson(exp(eta))
   complaints ~ poisson_log(alpha + beta * traps);
-} 
+}
 generated quantities {
-  int y_rep[N]; 
-  for (n in 1:N) 
+  array[N] int y_rep;
+  for (n in 1 : N) {
     y_rep[n] = poisson_log_safe_rng(alpha + beta * traps[n]);
+  }
 }

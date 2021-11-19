@@ -1,17 +1,15 @@
-# the original version not using transformation is in ring.stan.0
+// the original version not using transformation is in ring.stan.0
 parameters {
   real<lower=0.5, upper=1> z;
-  real<lower=0, upper=2*pi()> phi; 
-} 
+  real<lower=0, upper=2 * pi()> phi;
+}
 model {
   // p(z,phi) prop-to z
-  increment_log_prob(log(z));
-} 
+  target += log(z);
+}
 generated quantities {
   real x;
   real y;
-  x <- z * cos(phi); 
-  y <- z * sin(phi);
-} 
-
-
+  x = z * cos(phi);
+  y = z * sin(phi);
+}

@@ -1,10 +1,9 @@
 transformed data {
-  cov_matrix[2] S = [[2, 0],
-                     [0, 0.5]];
-} 
+  cov_matrix[2] S = [[2, 0], [0, 0.5]];
+}
 parameters {
-  cov_matrix[2] W; 
-} 
+  cov_matrix[2] W;
+}
 model {
-  W ~ wishart(4, S); 
-} 
+  W ~ wishart(4, S);
+}

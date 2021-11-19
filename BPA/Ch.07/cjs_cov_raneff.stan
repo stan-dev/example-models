@@ -2,110 +2,113 @@
 // User's Guide and Reference Manual"
 
 functions {
-  int first_capture(int[] y_i) {
-    for (k in 1:size(y_i))
-      if (y_i[k])
+  int first_capture(array[] int y_i) {
+    for (k in 1 : size(y_i)) {
+      if (y_i[k]) {
         return k;
+      }
+    }
     return 0;
   }
-
-  int last_capture(int[] y_i) {
-    for (k_rev in 0:(size(y_i) - 1)) {
+  
+  int last_capture(array[] int y_i) {
+    for (k_rev in 0 : (size(y_i) - 1)) {
       // Compoud declaration was enabled in Stan 2.13
       int k = size(y_i) - k_rev;
       //      int k;
       //      k = size(y_i) - k_rev;
-      if (y_i[k])
+      if (y_i[k]) {
         return k;
+      }
     }
     return 0;
   }
-
-  matrix prob_uncaptured(int nind, int n_occasions,
-                         matrix p, matrix phi) {
+  
+  matrix prob_uncaptured(int nind, int n_occasions, matrix p, matrix phi) {
     matrix[nind, n_occasions] chi;
-
-    for (i in 1:nind) {
+    
+    for (i in 1 : nind) {
       chi[i, n_occasions] = 1.0;
-      for (t in 1:(n_occasions - 1)) {
+      for (t in 1 : (n_occasions - 1)) {
         // Compoud declaration was enabled in Stan 2.13
         int t_curr = n_occasions - t;
         int t_next = t_curr + 1;
         /*
         int t_curr;
         int t_next;
-
+        
         t_curr = n_occasions - t;
         t_next = t_curr + 1;
         */
         chi[i, t_curr] = (1 - phi[i, t_curr])
-                        + phi[i, t_curr] * (1 - p[i, t_next - 1]) * chi[i, t_next];
+                         + phi[i, t_curr] * (1 - p[i, t_next - 1])
+                           * chi[i, t_next];
       }
     }
     return chi;
   }
 }
-
 data {
-  int<lower=0> nind;            // Number of individuals
-  int<lower=2> n_occasions;     // Number of capture occasions
-  int<lower=0,upper=1> y[nind, n_occasions];    // Capture-history
-  vector[n_occasions - 1] x;    // Covariate
+  int<lower=0> nind; // Number of individuals
+  int<lower=2> n_occasions; // Number of capture occasions
+  array[nind, n_occasions] int<lower=0, upper=1> y; // Capture-history
+  vector[n_occasions - 1] x; // Covariate
 }
-
 transformed data {
   int n_occ_minus_1 = n_occasions - 1;
   //  int n_occ_minus_1;
-  int<lower=0,upper=n_occasions> first[nind];
-  int<lower=0,upper=n_occasions> last[nind];
-  vector<lower=0,upper=nind>[n_occasions] n_captured;
-
+  array[nind] int<lower=0, upper=n_occasions> first;
+  array[nind] int<lower=0, upper=n_occasions> last;
+  vector<lower=0, upper=nind>[n_occasions] n_captured;
+  
   //  n_occ_minus_1 = n_occasions - 1;
-  for (i in 1:nind)
+  for (i in 1 : nind) {
     first[i] = first_capture(y[i]);
-  for (i in 1:nind)
+  }
+  for (i in 1 : nind) {
     last[i] = last_capture(y[i]);
+  }
   n_captured = rep_vector(0, n_occasions);
-  for (t in 1:n_occasions)
-    for (i in 1:nind)
-      if (y[i, t])
+  for (t in 1 : n_occasions) {
+    for (i in 1 : nind) {
+      if (y[i, t]) {
         n_captured[t] = n_captured[t] + 1;
+      }
+    }
+  }
 }
-
 parameters {
-  real beta;                          // Slope parameter
-  real<lower=0,upper=1> mean_phi;     // Mean survival
-  real<lower=0,upper=1> mean_p;       // Mean recapture
+  real beta; // Slope parameter
+  real<lower=0, upper=1> mean_phi; // Mean survival
+  real<lower=0, upper=1> mean_p; // Mean recapture
   vector[n_occ_minus_1] epsilon;
-  real<lower=0,upper=10> sigma;
+  real<lower=0, upper=10> sigma;
   // In case a weakly informative prior is used
   //  real<lower=0> sigma;
 }
-
 transformed parameters {
-  matrix<lower=0,upper=1>[nind, n_occ_minus_1] phi;
-  matrix<lower=0,upper=1>[nind, n_occ_minus_1] p;
-  matrix<lower=0,upper=1>[nind, n_occasions] chi;
+  matrix<lower=0, upper=1>[nind, n_occ_minus_1] phi;
+  matrix<lower=0, upper=1>[nind, n_occ_minus_1] p;
+  matrix<lower=0, upper=1>[nind, n_occasions] chi;
   // Compoud declaration was enabled in Stan 2.13
   real mu = logit(mean_phi);
   //  real mu;
-
+  
   //  mu = logit(mean_phi);
   // Constraints
-  for (i in 1:nind) {
-    for (t in 1:(first[i] - 1)) {
+  for (i in 1 : nind) {
+    for (t in 1 : (first[i] - 1)) {
       phi[i, t] = 0;
       p[i, t] = 0;
     }
-    for (t in first[i]:n_occ_minus_1) {
+    for (t in first[i] : n_occ_minus_1) {
       phi[i, t] = inv_logit(mu + beta * x[t] + epsilon[t]);
       p[i, t] = mean_p;
     }
   }
-
+  
   chi = prob_uncaptured(nind, n_occasions, p, phi);
 }
-
 model {
   // Priors
   // Uniform priors are implicitly defined.
@@ -116,10 +119,10 @@ model {
   //  sigma ~ normal(5, 2.5);
   beta ~ normal(0, 100);
   epsilon ~ normal(0, sigma);
-
-  for (i in 1:nind) {
+  
+  for (i in 1 : nind) {
     if (first[i] > 0) {
-      for (t in (first[i] + 1):last[i]) {
+      for (t in (first[i] + 1) : last[i]) {
         1 ~ bernoulli(phi[i, t - 1]);
         y[i, t] ~ bernoulli(p[i, t - 1]);
       }
@@ -127,11 +130,10 @@ model {
     }
   }
 }
-
 generated quantities {
   real<lower=0> sigma2;
-  vector<lower=0,upper=1>[n_occ_minus_1] phi_est;
-
+  vector<lower=0, upper=1>[n_occ_minus_1] phi_est;
+  
   sigma2 = square(sigma);
   // inv_logit was vectorized in Stan 2.13
   phi_est = inv_logit(mu + beta * x + epsilon); // Yearly survival

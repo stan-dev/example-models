@@ -9,9 +9,10 @@ parameters {
   real<lower=0> sigma;
 }
 model {
-  alpha ~ normal(0,10);    
-  beta ~ normal(0,10);
-  sigma ~ cauchy(0,5);
-  for (n in 1:N)
+  alpha ~ normal(0, 10);
+  beta ~ normal(0, 10);
+  sigma ~ cauchy(0, 5);
+  for (n in 1 : N) {
     y[n] ~ normal(alpha + beta * x[n], sigma);
+  }
 }

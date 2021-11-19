@@ -17,13 +17,13 @@ parameters {
 transformed parameters {
   matrix[1, r] F;
   F[1, 1] = 1;
-  for (i in 1:(r - 1)) {
+  for (i in 1 : (r - 1)) {
     F[1, i + 1] = lambda[i];
   }
 }
 model {
-  matrix[1,1] identity;
-  identity <- diag_matrix(rep_vector(1.0,1)); 
+  matrix[1, 1] identity;
+  identity = diag_matrix(rep_vector(1.0, 1));
   W ~ inv_wishart(1, identity);
   to_vector(G) ~ normal(0, 10);
   lambda ~ normal(0, 10);

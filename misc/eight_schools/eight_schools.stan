@@ -1,14 +1,14 @@
 data {
-  int<lower=0> J;          // number of schools
-  real y[J];               // estimated treatment effect (school j)
-  real<lower=0> sigma[J];  // std err of effect estimate (school j)
+  int<lower=0> J; // number of schools
+  array[J] real y; // estimated treatment effect (school j)
+  array[J] real<lower=0> sigma; // std err of effect estimate (school j)
 }
 parameters {
   real mu;
-  real theta[J];
+  array[J] real theta;
   real<lower=0> tau;
 }
 model {
-  theta ~ normal(mu, tau); 
-  y ~ normal(theta,sigma);
+  theta ~ normal(mu, tau);
+  y ~ normal(theta, sigma);
 }

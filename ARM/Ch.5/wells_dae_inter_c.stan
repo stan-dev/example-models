@@ -1,6 +1,6 @@
 data {
   int<lower=0> N;
-  int<lower=0,upper=1> switched[N];
+  array[N] int<lower=0, upper=1> switched;
   vector[N] dist;
   vector[N] arsenic;
   vector[N] educ;
@@ -14,8 +14,8 @@ transformed data {
   vector[N] da_inter = c_dist100 .* c_arsenic;
   vector[N] de_inter = c_dist100 .* c_educ4;
   vector[N] ae_inter = c_arsenic .* c_educ4;
-  matrix[N,6] x = [c_dist100', c_arsenic', c_educ4',
-                   da_inter', de_inter', ae_inter']';
+  matrix[N, 6] x = [c_dist100', c_arsenic', c_educ4', da_inter', de_inter',
+                    ae_inter']';
 }
 parameters {
   real alpha;

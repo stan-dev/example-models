@@ -20,13 +20,15 @@ functions {
    * @param y         Observed values
    * @return Occasion of first capture
    */
-  int first_capture(int[] y_i) {
-    for (k in 1:size(y_i))
-      if (y_i[k] != 4)
+  int first_capture(array[] int y_i) {
+    for (k in 1 : size(y_i)) {
+      if (y_i[k] != 4) {
         return k;
+      }
+    }
     return 0;
   }
-
+  
   /**
    * Return a simplex such as follows (thanks to Bob Carpenter):
    * p[1] <- exp(lp[1]) / (1.0 + exp(lp[1]) + exp(lp[2]));
@@ -38,55 +40,52 @@ functions {
    */
   vector softmax_0(vector lp) {
     vector[num_elements(lp) + 1] lp_temp;
-
-    lp_temp[1:num_elements(lp)] = lp;
+    
+    lp_temp[1 : num_elements(lp)] = lp;
     lp_temp[num_elements(lp) + 1] = 0;
     return softmax(lp_temp);
   }
 }
-
 data {
   int<lower=0> nind;
   int<lower=0> n_occasions;
-  int<lower=1,upper=4> y[nind, n_occasions];
+  array[nind, n_occasions] int<lower=1, upper=4> y;
 }
-
 transformed data {
   int n_occ_minus_1 = n_occasions - 1;
-  int<lower=0,upper=n_occasions> first[nind];
-
-  for (i in 1:nind)
+  array[nind] int<lower=0, upper=n_occasions> first;
+  
+  for (i in 1 : nind) {
     first[i] = first_capture(y[i]);
+  }
 }
-
 parameters {
-  real<lower=0,upper=1> phiA; // Survival probability at site A
-  real<lower=0,upper=1> phiB; // Survival probability at site B
-  real<lower=0,upper=1> phiC; // Survival probability at site C
-  real<lower=0,upper=1> pA;   // Recapture probability at site A
-  real<lower=0,upper=1> pB;   // Recapture probability at site B
-  real<lower=0,upper=1> pC;   // Recapture probability at site C
-  vector[2] lpsiA;            // Logit of movement probability from site A
-  vector[2] lpsiB;            // Logit of movement probability from site B
-  vector[2] lpsiC;            // Logit of movement probability from site C
+  real<lower=0, upper=1> phiA; // Survival probability at site A
+  real<lower=0, upper=1> phiB; // Survival probability at site B
+  real<lower=0, upper=1> phiC; // Survival probability at site C
+  real<lower=0, upper=1> pA; // Recapture probability at site A
+  real<lower=0, upper=1> pB; // Recapture probability at site B
+  real<lower=0, upper=1> pC; // Recapture probability at site C
+  vector[2] lpsiA; // Logit of movement probability from site A
+  vector[2] lpsiB; // Logit of movement probability from site B
+  vector[2] lpsiC; // Logit of movement probability from site C
 }
-
 transformed parameters {
   simplex[3] psiA; // Movement probability from site A
   simplex[3] psiB; // Movement probability from site B
   simplex[3] psiC; // Movement probability from site C
-  simplex[4] ps[4, nind, n_occ_minus_1];
-  simplex[4] po[4, nind, n_occ_minus_1];
-
+  array[4, nind, n_occ_minus_1] simplex[4] ps;
+  array[4, nind, n_occ_minus_1] simplex[4] po;
+  
   // Constrain the transitions such that their sum is < 1
   psiA = softmax_0(lpsiA);
   psiB = softmax_0(lpsiB);
   psiC = softmax_0(lpsiC);
-
+  
   // Define state-transition and observation matrices
-  for (i in 1:nind) {
+  for (i in 1 : nind) {
     // Define probabilities of state S(t+1) given S(t)
-    for (t in 1:n_occ_minus_1) {
+    for (t in 1 : n_occ_minus_1) {
       ps[1, i, t, 1] = phiA * psiA[1];
       ps[1, i, t, 2] = phiA * psiA[2];
       ps[1, i, t, 3] = phiA * psiA[3];
@@ -103,7 +102,7 @@ transformed parameters {
       ps[4, i, t, 2] = 0.0;
       ps[4, i, t, 3] = 0.0;
       ps[4, i, t, 4] = 1.0;
-
+      
       // Define probabilities of O(t) given S(t)
       po[1, i, t, 1] = pA;
       po[1, i, t, 2] = 0.0;
@@ -121,14 +120,13 @@ transformed parameters {
       po[4, i, t, 2] = 0.0;
       po[4, i, t, 3] = 0.0;
       po[4, i, t, 4] = 1.0;
-      }
-   }
+    }
+  }
 }
-
 model {
-  real acc[4];
-  vector[4] gamma[n_occasions];
-
+  array[4] real acc;
+  array[n_occasions] vector[4] gamma;
+  
   // Priors
   // Survival and recapture: uniform
   // Uniform priors are implicitly defined.
@@ -138,25 +136,27 @@ model {
   //  pA ~ uniform(0, 1);
   //  pB ~ uniform(0, 1);
   //  pC ~ uniform(0, 1);
-
+  
   // Normal priors on logit of all but one transition probs
   lpsiA ~ normal(0, sqrt(1000));
   lpsiB ~ normal(0, sqrt(1000));
   lpsiC ~ normal(0, sqrt(1000));
-
+  
   // Likelihood
   // Forward algorithm derived from Stan Modeling Language
   // User's Guide and Reference Manual
-  for (i in 1:nind) {
+  for (i in 1 : nind) {
     if (first[i] > 0) {
-      for (k in 1:4)
-        gamma[first[i], k] = (y[i, first[i]] == k);
-
-      for (t in (first[i] + 1):n_occasions) {
-        for (k in 1:4) {
-          for (j in 1:4)
+      for (k in 1 : 4) {
+        gamma[first[i], k] = y[i, first[i]] == k;
+      }
+      
+      for (t in (first[i] + 1) : n_occasions) {
+        for (k in 1 : 4) {
+          for (j in 1 : 4) {
             acc[j] = gamma[t - 1, j] * ps[j, i, t - 1, k]
-              * po[k, i, t - 1, y[i, t]];
+                     * po[k, i, t - 1, y[i, t]];
+          }
           gamma[t, k] = sum(acc);
         }
       }

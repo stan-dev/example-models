@@ -9,8 +9,8 @@ data {
   vector[N] group;
 }
 transformed data {
-  matrix[N,6] x = [diam1', diam2', canopy_height',
-                   total_height', density', group']';
+  matrix[N, 6] x = [diam1', diam2', canopy_height', total_height', density',
+                    group']';
 }
 parameters {
   real alpha;
