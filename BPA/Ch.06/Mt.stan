@@ -6,7 +6,7 @@ data {
 transformed data {
   array[M] int<lower=0> s; // Totals in each row
   int<lower=0> C; // Size of observed data set
-
+  
   C = 0;
   for (i in 1 : M) {
     s[i] = sum(y[i]);
@@ -23,16 +23,16 @@ model {
   // Priors are implicitly defined.
   //  omega ~ uniform(0, 1);
   //  p ~ uniform(0, 1);
-
+  
   // Likelihood
   for (i in 1 : M) {
     if (s[i] > 0) {
       // z[i] == 1
       target += bernoulli_lpmf(1 | omega) + bernoulli_lpmf(y[i] | p);
-    }
-    // s[i] == 0
-    else {
-      target += log_sum_exp(bernoulli_lpmf(1 | omega) // z[i] == 1
+    } else // s[i] == 0
+    {
+      target += log_sum_exp(bernoulli_lpmf(1 | omega)
+                            // z[i] == 1
                             + bernoulli_lpmf(y[i] | p),
                             bernoulli_lpmf(0 | omega) // z[i] == 0
                             );

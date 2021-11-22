@@ -6,7 +6,7 @@ data {
 transformed data {
   array[M] int<lower=0> s; // Detection times for each species
   int<lower=0> C; // Number of observed species
-
+  
   C = 0;
   for (i in 1 : M) {
     s[i] = sum(y[i]);
@@ -28,10 +28,10 @@ transformed parameters {
   vector[M] eps = sigma * eps_raw;
   vector[T] alpha = logit(mean_p);
   matrix[M, T] logit_p;
-
+  
   // First occasion: no term for recapture (gamma)
   logit_p[ : , 1] = alpha[1] + eps;
-
+  
   // All subsequent occasions: includes recapture term (gamma)
   for (i in 1 : M) {
     for (j in 2 : T) {
@@ -49,17 +49,17 @@ model {
   // In case a weakly informative prior is used
   //  sigma ~ normal(1.5, 0.75);
   eps_raw ~ normal(0, 1);
-
+  
   // Likelihood
   for (i in 1 : M) {
     if (s[i] > 0) {
       // z[i] == 1
       target += bernoulli_lpmf(1 | omega)
                 + bernoulli_logit_lpmf(y[i] | logit_p[i]);
-    }
-    // s[i] == 0
-    else {
-      target += log_sum_exp(bernoulli_lpmf(1 | omega) // z[i] == 1
+    } else // s[i] == 0
+    {
+      target += log_sum_exp(bernoulli_lpmf(1 | omega)
+                            // z[i] == 1
                             + bernoulli_logit_lpmf(y[i] | logit_p[i]),
                             bernoulli_lpmf(0 | omega) // z[i] == 0
                             );
@@ -70,7 +70,7 @@ generated quantities {
   matrix<lower=0, upper=1>[M, T] p = inv_logit(logit_p);
   array[M] int<lower=0, upper=1> z;
   int<lower=C> N;
-
+  
   for (i in 1 : M) {
     if (s[i] > 0) {
       // animal was detected at least once

@@ -12,7 +12,7 @@ transformed data {
   array[N, P] int T;
   for (n in 1 : N) {
     for (p in 1 : P) {
-      T[n, p] = (group[n] * (2 * p - 3) + 3) / 2;
+      T[n, p] = (group[n] * (2 * p - 3) + 3) %/% 2;
     }
   }
 }

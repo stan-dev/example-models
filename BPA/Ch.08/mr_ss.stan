@@ -106,9 +106,8 @@ model {
       if (last[i] > first[i]) {
         // Recovered
         pr = cell_prob(n_occasions, s[i], r[i], first[i], last[i] - 1);
-      }
-      // Never Recovered
-      else {
+      } else // Never Recovered
+      {
         pr = cell_prob(n_occasions, s[i], r[i], first[i], n_occasions);
       }
       1 ~ bernoulli(pr);

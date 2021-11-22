@@ -6,7 +6,7 @@ functions {
    * regions.  For example, a series of three coeffs phi[1:3] making
    * up a time series would have b1 = [phi[1], phi[2]]' and b2 =
    * [phi[2], phi[3]]'.
-   *
+   * 
    * @param phi vector of varying effects
    * @param b1 parallel vector of elements of phi
    * @param b2 second parallel vector of adjacent elemens of phi
@@ -14,10 +14,11 @@ functions {
    * @reject if b1 and b2 are not the same size
    */
   real soft_ctr_std_icar_lpdf(vector phi, vector b1, vector b2) {
-    return -0.5 * dot_self(b1 - b2) // equiv normal_lpdf(b1 | b2, 1)
+    return -0.5 * dot_self(b1 - b2)
+           // equiv normal_lpdf(b1 | b2, 1)
            + normal_lpdf(sum(phi) | 0, 0.001 * rows(phi));
   }
-
+  
   /**
    * Return the log probability density of the specified vector of
    * coefficients under the ICAR model with unit variance, where
@@ -46,9 +47,9 @@ data {
   int<lower=0> I; // number of nodes
   int<lower=0> J; // number of edges
   array[2, J] int<lower=1, upper=I> edges; // node[1, j] adjacent to node[2, j]
-
+  
   real tau; // scaling factor
-
+  
   array[I] int<lower=0> y; // count outcomes
   vector<lower=0>[I] E; // exposure
   vector[I] x; // predictor
@@ -59,7 +60,7 @@ transformed data {
 parameters {
   real alpha; // intercept
   real beta; // covariate
-
+  
   // spatial effects
   real<lower=0, upper=1> rho; // proportion of spatial effect that's spatially smoothed
   real<lower=0> sigma; // scale of spatial effects
@@ -72,10 +73,10 @@ transformed parameters {
 }
 model {
   y ~ poisson_log(log_E + alpha + x * beta + gamma * sigma); // co-variates
-
+  
   alpha ~ normal(0, 1);
   beta ~ normal(0, 1);
-
+  
   // spatial hyperpriors and priors
   sigma ~ normal(0, 1);
   rho ~ beta(0.5, 0.5);
@@ -90,7 +91,7 @@ generated quantities {
   //   for (j in 1:10) {
   //     if (max(eta) > 20) {
   //       // avoid overflow in poisson_log_rng
-  //       print("max eta too big: ", max(eta));
+  //       print("max eta too big: ", max(eta));  
   //       for (i in 1:I)
   // 	y_rep[i,j] = -1;
   //     } else {
