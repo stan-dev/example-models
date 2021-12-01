@@ -38,13 +38,16 @@ functions {
     int num_edges = dims(adjacency)[2];
     int num_comps = size(edge_cts);
     if (size(adjacency) != 2) {
-      reject("require 2 rows for adjacency array;", " found rows = ", size(
-      adjacency));
+      reject("require 2 rows for adjacency array;", " found rows = ",
+             size(adjacency));
     }
     if (!(num_nodes == dims(node_idxs)[2] && size(node_cts) == size(edge_cts)
           && size(node_cts) == size(node_idxs)
           && size(edge_cts) == size(edge_idxs))) {
-      reject("arguments have size mismatch, expecting ", num_comps, " rows for node_cts edge_cts, node_idxs, and edge_idxs,", num_nodes, " elements in phi and columns of node_idxs, and ", num_edges, " columns of edge_idxs.");
+      reject("arguments have size mismatch, expecting ", num_comps,
+             " rows for node_cts edge_cts, node_idxs, and edge_idxs,",
+             num_nodes, " elements in phi and columns of node_idxs, and ",
+             num_edges, " columns of edge_idxs.");
     }
     
     real total = 0;

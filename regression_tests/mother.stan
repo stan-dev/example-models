@@ -211,10 +211,12 @@ functions {
     abs_diff = fabs(x - y);
     avg_scale = (fabs(x) + fabs(y)) / 2;
     if ((abs_diff / avg_scale) > max_) {
-      reject("user-specified rejection, difference above ", max_, " x:", x, " y:", y);
+      reject("user-specified rejection, difference above ", max_, " x:", x,
+             " y:", y);
     }
     if ((abs_diff / avg_scale) < min_) {
-      reject("user-specified rejection, difference below ", min_, " x:", x, " y:", y);
+      reject("user-specified rejection, difference below ", min_, " x:", x,
+             " y:", y);
     }
     return abs_diff / avg_scale;
   }

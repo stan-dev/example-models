@@ -36,8 +36,8 @@ functions {
    */
   real standard_icar_lpdf(vector phi, array[,] int adjacency) {
     if (size(adjacency) != 2) {
-      reject("require 2rows for adjacency array;", " found rows = ", size(
-      adjacency));
+      reject("require 2rows for adjacency array;", " found rows = ",
+             size(adjacency));
     }
     return soft_ctr_std_icar_lpdf(phi | phi[adjacency[1]], phi[adjacency[2]]);
   }
