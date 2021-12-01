@@ -6,7 +6,7 @@ data {
 transformed data {
   vector[n] year_squared;
   vector[n] year_cubed;
-  
+
   year_squared = year .* year;
   year_cubed = year .* year .* year;
 }
@@ -18,18 +18,18 @@ parameters {
 }
 transformed parameters {
   vector[n] log_lambda;
-  
-  log_lambda = alpha + beta1 * year + +beta2 * year_squared
-               + +beta3 * year_cubed;
+
+  log_lambda = alpha + beta1 * year + beta2 * year_squared
+               + beta3 * year_cubed;
 }
 model {
   // Implicit uniform priors are used.
-  
+
   // Likelihood
   C ~ poisson_log(log_lambda);
 }
 generated quantities {
   vector[n] lambda;
-  
+
   lambda = exp(log_lambda);
 }

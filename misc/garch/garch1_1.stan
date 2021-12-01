@@ -16,7 +16,7 @@ transformed parameters {
   array[T] real<lower=0> sigma;
   sigma[1] = sigma1;
   for (t in 2 : T) {
-    sigma[t] = sqrt(alpha0 + +alpha1 * square(r[t - 1] - mu)
+    sigma[t] = sqrt(alpha0 + alpha1 * square(r[t - 1] - mu)
                     + beta1 * square(sigma[t - 1]));
   }
 }
