@@ -29,93 +29,95 @@ functions {
    * @reject if size mismatch between indexing arrays
    * @reject if size mismatch between phi and node indexes columns.
    */
-  real standard_icar_disconnected_lpdf(vector phi,
-				       int[ , ] adjacency,
-				       int[ ] node_cts,
-				       int[ ] edge_cts,
-				       int[ , ] node_idxs,
-				       int[ , ] edge_idxs) {
+  real standard_icar_disconnected_lpdf(vector phi, array[,] int adjacency,
+                                       array[] int node_cts,
+                                       array[] int edge_cts,
+                                       array[,] int node_idxs,
+                                       array[,] int edge_idxs) {
     int num_nodes = size(phi);
     int num_edges = dims(adjacency)[2];
     int num_comps = size(edge_cts);
-    if (size(adjacency) != 2)
-      reject("require 2 rows for adjacency array;",
-             " found rows = ", size(adjacency));
-    if (!(num_nodes == dims(node_idxs)[2]
-	  && size(node_cts) == size(edge_cts)
-	  && size(node_cts) == size(node_idxs)
-	  && size(edge_cts) == size(edge_idxs)))
-      reject("arguments have size mismatch, expecting ",
-	     num_comps,
-	     " rows for node_cts edge_cts, node_idxs, and edge_idxs,",
-	     num_nodes,
-	     " elements in phi and columns of node_idxs, and ",
-	     num_edges,
-	     " columns of edge_idxs.");
-
+    if (size(adjacency) != 2) {
+      reject("require 2 rows for adjacency array;", " found rows = ",
+             size(adjacency));
+    }
+    if (!(num_nodes == dims(node_idxs)[2] && size(node_cts) == size(edge_cts)
+          && size(node_cts) == size(node_idxs)
+          && size(edge_cts) == size(edge_idxs))) {
+      reject("arguments have size mismatch, expecting ", num_comps,
+             " rows for node_cts edge_cts, node_idxs, and edge_idxs,",
+             num_nodes, " elements in phi and columns of node_idxs, and ",
+             num_edges, " columns of edge_idxs.");
+    }
+    
     real total = 0;
-    for (n in 1:num_comps) {
-      if (node_cts[n] > 1)
-	total += -0.5 * dot_self(phi[adjacency[1, edge_idxs[n, 1:edge_cts[n]]]] -
-				 phi[adjacency[2, edge_idxs[n, 1:edge_cts[n]]]])
-	  + normal_lpdf(sum(phi[node_idxs[n, 1:node_cts[n]]]) | 0, 0.001 * node_cts[n]);
-      else
-	total += normal_lpdf(phi[node_idxs[n, 1]] | 0, 1);
+    for (n in 1 : num_comps) {
+      if (node_cts[n] > 1) {
+        total += -0.5
+                 * dot_self(phi[adjacency[1, edge_idxs[n, 1 : edge_cts[n]]]]
+                            - phi[adjacency[2, edge_idxs[n, 1 : edge_cts[n]]]])
+                 + normal_lpdf(sum(phi[node_idxs[n, 1 : node_cts[n]]]) | 0, 0.001
+                                                                    * node_cts[n]);
+      } else {
+        total += normal_lpdf(phi[node_idxs[n, 1]] | 0, 1);
+      }
     }
     return total;
   }
 }
 data {
   // spatial structure
-  int<lower = 0> I;  // number of nodes
-  int<lower = 0> J;  // number of edges
-  int<lower = 1, upper = I> edges[2, J];  // node[1, j] adjacent to node[2, j]
-
-  int<lower=0, upper=I> K;  // number of components in spatial graph
-  int<lower=0, upper=I> K_node_cts[K];   // per-component nodes
-  int<lower=0, upper=J> K_edge_cts[K];   // per-component edges
-  int<lower=0, upper=I> K_node_idxs[K, I];  // rows contain per-component node indexes
-  int<lower=0, upper=J> K_edge_idxs[K, J];  // rows contain per-component edge indexes
-
+  int<lower=0> I; // number of nodes
+  int<lower=0> J; // number of edges
+  array[2, J] int<lower=1, upper=I> edges; // node[1, j] adjacent to node[2, j]
+  
+  int<lower=0, upper=I> K; // number of components in spatial graph
+  array[K] int<lower=0, upper=I> K_node_cts; // per-component nodes
+  array[K] int<lower=0, upper=J> K_edge_cts; // per-component edges
+  array[K, I] int<lower=0, upper=I> K_node_idxs; // rows contain per-component node indexes
+  array[K, J] int<lower=0, upper=J> K_edge_idxs; // rows contain per-component edge indexes
+  
   vector[K] tau; // scaling factor
-
-  int<lower=0> y[I];              // count outcomes
-  vector<lower=0>[I] E;           // exposure
-  vector[I] x;                 // predictor
+  
+  array[I] int<lower=0> y; // count outcomes
+  vector<lower=0>[I] E; // exposure
+  vector[I] x; // predictor
 }
 transformed data {
   vector[I] log_E = log(E);
 }
 parameters {
-  real alpha;            // intercept
-  real beta;       // covariates
-
+  real alpha; // intercept
+  real beta; // covariates
+  
   // spatial effects
   real<lower=0, upper=1> rho; // proportion unstructured vs. spatially structured variance
-  real<lower = 0> sigma;  // scale of spatial effects
-  vector[I] theta;  // standardized heterogeneous spatial effects
-  vector[I] phi;  // standardized spatially smoothed spatial effects
+  real<lower=0> sigma; // scale of spatial effects
+  vector[I] theta; // standardized heterogeneous spatial effects
+  vector[I] phi; // standardized spatially smoothed spatial effects
 }
 transformed parameters {
   vector[I] gamma;
-  for (k in 1:K)
-    gamma[K_node_idxs[k, 1:K_node_cts[k]]] = 
-      (sqrt(1 - rho) * theta[K_node_idxs[k, 1:K_node_cts[k]]]
-       +
-       sqrt(rho / tau[k]) * phi[K_node_idxs[k, 1:K_node_cts[k]]])
-      * sigma;
+  for (k in 1 : K) {
+    gamma[K_node_idxs[k, 1 : K_node_cts[k]]] = (sqrt(1 - rho)
+                                                * theta[K_node_idxs[k, 1 : K_node_cts[k]]]
+                                                + sqrt(rho / tau[k])
+                                                  * phi[K_node_idxs[k, 1 : K_node_cts[k]]])
+                                               * sigma;
+  }
 }
 model {
-  y ~ poisson_log(log_E + alpha + x * beta + gamma * sigma);  // co-variates
-
+  y ~ poisson_log(log_E + alpha + x * beta + gamma * sigma); // co-variates
+  
   alpha ~ normal(0, 1);
   beta ~ normal(0, 1);
-
+  
   // spatial hyperpriors and priors
   sigma ~ normal(0, 1);
   rho ~ beta(0.5, 0.5);
   theta ~ normal(0, 1);
-  phi ~ standard_icar_disconnected(edges, K_node_cts, K_edge_cts, K_node_idxs, K_edge_idxs);
+  phi ~ standard_icar_disconnected(edges, K_node_cts, K_edge_cts,
+                                   K_node_idxs, K_edge_idxs);
 }
 generated quantities {
   // posterior predictive checks

@@ -1,12 +1,12 @@
 data {
   int<lower=0> N;
   vector[N] y;
-} 
+}
 parameters {
   real mu_theta;
-  real<lower=0,upper=100> sigma_theta;
+  real<lower=0, upper=100> sigma_theta;
   vector[N] theta;
-  real<lower=0,upper=100> sigma_y;
+  real<lower=0, upper=100> sigma_y;
 }
 model {
   mu_theta ~ normal(0, 1);
@@ -15,6 +15,6 @@ model {
 }
 generated quantities {
   vector[N] e_theta;
-
+  
   e_theta = theta - mu_theta;
 }

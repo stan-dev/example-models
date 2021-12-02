@@ -11,13 +11,13 @@ transformed data {
   G = rep_matrix(1, 1, 1);
 }
 parameters {
-  real<lower = 0> sigma_y;
-  real<lower = 0> sigma_theta;
+  real<lower=0> sigma_y;
+  real<lower=0> sigma_theta;
 }
 model {
   matrix[1, 1] V;
   matrix[1, 1] W;
-  V[1, 1] =  pow(sigma_y, 2);
+  V[1, 1] = pow(sigma_y, 2);
   W[1, 1] = pow(sigma_theta, 2);
   y ~ gaussian_dlm_obs(F, G, V, W, m0, C0);
 }

@@ -7,7 +7,7 @@ data {
 transformed data {
   // interaction
   vector[N] inter = treatment .* pre_test;
-  matrix[N,3] x = [treatment', pre_test', inter']';
+  matrix[N, 3] x = [treatment', pre_test', inter']';
 }
 parameters {
   real alpha;

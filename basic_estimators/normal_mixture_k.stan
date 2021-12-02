@@ -9,12 +9,12 @@ parameters {
   vector<lower=0, upper=10>[K] sigma;
 }
 model {
-  vector[K] ps[N];              
-  mu ~ normal(0,10);
-  for (n in 1:N) {
-    for (k in 1:K) {
+  array[N] vector[K] ps;
+  mu ~ normal(0, 10);
+  for (n in 1 : N) {
+    for (k in 1 : K) {
       ps[n][k] = normal_lupdf(y[n] | mu[k], sigma[k]);
     }
   }
-  target += log_mix(theta, ps);  
+  target += log_mix(theta, ps);
 }

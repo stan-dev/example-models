@@ -1,11 +1,11 @@
 data {
   int<lower=0> N;
   vector[N] y;
-  vector<lower=0,upper=1>[N] x;
+  vector<lower=0, upper=1>[N] x;
 }
 parameters {
   real a;
-  real b;                           
+  real b;
   real<lower=0> sigma_y;
 }
 model {

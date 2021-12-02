@@ -5,7 +5,7 @@ data {
   vector<lower=0, upper=200>[N] afqt;
 }
 transformed data {
-  matrix[N,2] x = [hs', afqt']';
+  matrix[N, 2] x = [hs', afqt']';
 }
 parameters {
   real alpha;

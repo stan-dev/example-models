@@ -11,4 +11,3 @@ model {
   y ~ normal(theta, sigma_y);
   theta ~ normal(mu_0, sigma_0);
 }
-

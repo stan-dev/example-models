@@ -4,9 +4,10 @@ data {
   vector[N] mom_hs;
   vector[N] mom_iq;
 }
-transformed data {           // interaction
+transformed data {
+  // interaction
   vector[N] inter = mom_hs .* mom_iq;
-  matrix[N,3] x = [mom_hs', mom_iq', inter']';
+  matrix[N, 3] x = [mom_hs', mom_iq', inter']';
 }
 parameters {
   real alpha;

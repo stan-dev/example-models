@@ -4,7 +4,7 @@ data {
   vector[N] treatment;
 }
 transformed data {
-  matrix[N,1] x = [treatment']';
+  matrix[N, 1] x = [treatment']';
 }
 parameters {
   real alpha;

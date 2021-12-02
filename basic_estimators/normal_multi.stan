@@ -1,24 +1,25 @@
 data {
   int<lower=0> N; //response variable size
   int<lower=0> J; //number of observations
-  vector[N] y[J];
-  vector[N] z[J];
+  array[J] vector[N] y;
+  array[J] vector[N] z;
   matrix[N, N] sigma;
 }
 transformed data {
-  row_vector[N] ry[J];
-  row_vector[N] rz[J];
+  array[J] row_vector[N] ry;
+  array[J] row_vector[N] rz;
   matrix[N, N] inv_sigma;
-  for (n in 1:N)
-    for (j in 1:J) {
-      ry[j][n] <- y[j][n];
-      rz[j][n] <- z[j][n];
+  for (n in 1 : N) {
+    for (j in 1 : J) {
+      ry[j][n] = y[j][n];
+      rz[j][n] = z[j][n];
     }
-  inv_sigma <- inverse_spd(sigma);
+  }
+  inv_sigma = inverse_spd(sigma);
 }
 parameters {
-  vector[N] beta[J];
-  row_vector[N] rbeta[J];
+  array[J] vector[N] beta;
+  array[J] row_vector[N] rbeta;
 }
 model {
   y ~ multi_normal(beta, sigma);
@@ -56,9 +57,7 @@ model {
   ry ~ multi_normal(rz[1], sigma);
   ry[1] ~ multi_normal(rz, sigma);
   ry[1] ~ multi_normal(rz[1], sigma);
-
-
-
+  
   y ~ multi_normal_cholesky(beta, sigma);
   y ~ multi_normal_cholesky(beta[1], sigma);
   y[1] ~ multi_normal_cholesky(beta, sigma);
@@ -94,9 +93,7 @@ model {
   ry ~ multi_normal_cholesky(rz[1], sigma);
   ry[1] ~ multi_normal_cholesky(rz, sigma);
   ry[1] ~ multi_normal_cholesky(rz[1], sigma);
-
-
-
+  
   y ~ multi_normal_prec(beta, sigma);
   y ~ multi_normal_prec(beta[1], sigma);
   y[1] ~ multi_normal_prec(beta, sigma);
@@ -105,7 +102,7 @@ model {
   y ~ multi_normal_prec(z[1], sigma);
   y[1] ~ multi_normal_prec(z, sigma);
   y[1] ~ multi_normal_prec(z[1], sigma);
-
+  
   y ~ multi_normal_prec(rbeta, sigma);
   y ~ multi_normal_prec(rbeta[1], sigma);
   y[1] ~ multi_normal_prec(rbeta, sigma);
@@ -132,8 +129,6 @@ model {
   ry ~ multi_normal_prec(rz[1], sigma);
   ry[1] ~ multi_normal_prec(rz, sigma);
   ry[1] ~ multi_normal_prec(rz[1], sigma);
-  
-  
   
   y ~ multi_student_t(10, beta, sigma);
   y ~ multi_student_t(10, beta[1], sigma);

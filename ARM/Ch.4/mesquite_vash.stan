@@ -13,8 +13,8 @@ transformed data {
   vector[N] log_canopy_area = log(diam1 .* diam2);
   vector[N] log_canopy_shape = log(diam1 ./ diam2);
   vector[N] log_total_height = log(total_height);
-  matrix[N,5] x = [log_canopy_volume', log_canopy_area', log_canopy_shape',
-                   log_total_height', group']';
+  matrix[N, 5] x = [log_canopy_volume', log_canopy_area', log_canopy_shape',
+                    log_total_height', group']';
 }
 parameters {
   real alpha;

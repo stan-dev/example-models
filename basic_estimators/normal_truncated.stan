@@ -8,6 +8,7 @@ parameters {
   real<lower=0, upper=2> sigma;
 }
 model {
-  for (n in 1:N)
-    y[n] ~ normal(mu, sigma) T[,U];
+  for (n in 1 : N) {
+    y[n] ~ normal(mu, sigma) T[ , U];
+  }
 }

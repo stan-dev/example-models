@@ -7,5 +7,7 @@ data {
 }
 generated quantities {
   vector[N] y;
-  for (n in 1:N) y[n] = normal_rng(a + b * x[n], sigma);
+  for (n in 1 : N) {
+    y[n] = normal_rng(a + b * x[n], sigma);
+  }
 }

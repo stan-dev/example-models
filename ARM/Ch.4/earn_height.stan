@@ -4,7 +4,7 @@ data {
   vector[N] height;
 }
 transformed data {
-  matrix[N,1] x = [height']';
+  matrix[N, 1] x = [height']';
 }
 parameters {
   real alpha;

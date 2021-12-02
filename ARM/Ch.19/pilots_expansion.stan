@@ -1,36 +1,37 @@
 data {
-  int<lower=0> N; 
-  int<lower=0> n_airport; 
-  int<lower=0> n_treatment; 
-  int<lower=1,upper=n_airport> airport[N];
-  int<lower=1,upper=n_treatment> treatment[N];
+  int<lower=0> N;
+  int<lower=0> n_airport;
+  int<lower=0> n_treatment;
+  array[N] int<lower=1, upper=n_airport> airport;
+  array[N] int<lower=1, upper=n_treatment> treatment;
   vector[N] y;
-} 
+}
 parameters {
   vector[n_airport] d_raw;
   vector[n_treatment] g_raw;
   real mu;
   real mu_d_raw;
   real mu_g_raw;
-  real<lower=0,upper=100> sigma_d_raw;
-  real<lower=0,upper=100> sigma_g_raw;
-  real<lower=0,upper=100> sigma_y;
+  real<lower=0, upper=100> sigma_d_raw;
+  real<lower=0, upper=100> sigma_g_raw;
+  real<lower=0, upper=100> sigma_y;
   real xi_d;
-  real<lower=0,upper=100> xi_g;
-} 
+  real<lower=0, upper=100> xi_g;
+}
 transformed parameters {
   vector[n_airport] d;
   vector[n_treatment] g;
   real<lower=0> sigma_d;
   real<lower=0> sigma_g;
   vector[N] y_hat;
-
+  
   g = xi_g * (g_raw - mean(g_raw));
   d = xi_d * (d_raw - mean(d_raw));
   sigma_g = xi_g * sigma_g_raw;
   sigma_d = fabs(xi_d) * sigma_d_raw;
-  for (i in 1:N)
+  for (i in 1 : N) {
     y_hat[i] = mu + g[treatment[i]] + d[airport[i]];
+  }
 }
 model {
   sigma_y ~ uniform(0, 100);

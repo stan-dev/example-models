@@ -1,16 +1,14 @@
-##  simulate samples from student t distribution 
-## 
-# http://www.openbugs.net/Examples/t-df.html
+//#  simulate samples from student t distribution 
+//# 
+// http://www.openbugs.net/Examples/t-df.html
 
 transformed data {
-  int d; 
-  d <- 4; 
-} 
-
+  int d;
+  d = 4;
+}
 parameters {
-  real y[1000]; 
-} 
-
+  array[1000] real y;
+}
 model {
-  y ~ student_t(d, 0, 1); 
-} 
+  y ~ student_t(d, 0, 1);
+}

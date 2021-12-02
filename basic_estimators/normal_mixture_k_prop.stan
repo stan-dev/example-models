@@ -14,19 +14,19 @@ transformed parameters {
   ordered[K] mu = mu_loc + mu_scale * cumulative_sum(mu_prop);
 }
 model {
-  vector[K] ps[N];
-
+  array[N] vector[K] ps;
+  
   // prior
-  mu_loc ~ cauchy(0, 5);               
+  mu_loc ~ cauchy(0, 5);
   mu_scale ~ cauchy(0, 5);
   sigma ~ cauchy(0, 5);
-
+  
   // likelihood
-  for (n in 1:N) {
-    for (k in 1:K) {
+  for (n in 1 : N) {
+    for (k in 1 : K) {
       ps[n][k] = normal_lupdf(y[n] | mu[k], sigma[k]);
-    } 
+    }
   }
-
+  
   target += log_mix(theta, ps);
 }
