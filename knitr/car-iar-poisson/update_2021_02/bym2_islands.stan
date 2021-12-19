@@ -52,15 +52,16 @@ functions {
 	     " elements in phi and columns of node_idxs, and ",
 	     num_edges,
 	     " columns of edge_idxs.");
-
     real total = 0;
     for (n in 1:num_comps) {
-      if (node_cts[n] > 1)
-	total += -0.5 * dot_self(phi[adjacency[1, edge_idxs[n, 1:edge_cts[n]]]] -
-				 phi[adjacency[2, edge_idxs[n, 1:edge_cts[n]]]])
-	  + normal_lpdf(sum(phi[node_idxs[n, 1:node_cts[n]]]) | 0, 0.001 * node_cts[n]);
-      else
-	total += normal_lpdf(phi[node_idxs[n, 1]] | 0, 1);
+      int nodes[node_cts[n]] = node_idxs[n, 1:node_cts[n]];
+      if (node_cts[n] > 1) {
+	int edges[edge_cts[n]] = edge_idxs[n, 1:edge_cts[n]];
+	total += -0.5 * dot_self(phi[adjacency[1, edges]] - phi[adjacency[2, edges]])
+	  + normal_lpdf(sum(phi[nodes]) | 0, 0.001 * node_cts[n]);
+      } else {
+	total += normal_lpdf(phi[nodes] | 0, 1);
+      }
     }
     return total;
   }
@@ -77,7 +78,7 @@ data {
   int<lower=0, upper=I> K_node_idxs[K, I];  // rows contain per-component node indexes
   int<lower=0, upper=J> K_edge_idxs[K, J];  // rows contain per-component edge indexes
 
-  vector[K] tau; // scaling factor
+  vector[K] tau; // per-component scaling factor
 
   int<lower=0> y[I];              // count outcomes
   vector<lower=0>[I] E;           // exposure
@@ -85,28 +86,29 @@ data {
 }
 transformed data {
   vector[I] log_E = log(E);
+  vector[I] taus;
+  for (k in 1:K) {
+    int node_idxs[K_node_cts[k]] = K_node_idxs[k, 1:K_node_cts[k]];
+    for (j in 1:size(node_idxs))
+      taus[node_idxs[j]] = tau[k];
+  }
 }
 parameters {
-  real alpha;            // intercept
-  real beta;       // covariates
+  real alpha;      // intercept
+  real beta;       // single covariate (Scotland dataset)
 
   // spatial effects
   real<lower=0, upper=1> rho; // proportion unstructured vs. spatially structured variance
-  real<lower = 0> sigma;  // scale of spatial effects
+  real<lower=0> sigma;  // scale of spatial effects
   vector[I] theta;  // standardized heterogeneous spatial effects
   vector[I] phi;  // standardized spatially smoothed spatial effects
 }
 transformed parameters {
-  vector[I] gamma;
-  for (k in 1:K)
-    gamma[K_node_idxs[k, 1:K_node_cts[k]]] = 
-      (sqrt(1 - rho) * theta[K_node_idxs[k, 1:K_node_cts[k]]]
-       +
-       sqrt(rho / tau[k]) * phi[K_node_idxs[k, 1:K_node_cts[k]]])
-      * sigma;
-}
+  vector[I] gamma = sigma * (sqrt(1 - rho) * theta
+			     + sqrt(rho ./ taus) .* phi);
+}  
 model {
-  y ~ poisson_log(log_E + alpha + x * beta + gamma * sigma);  // co-variates
+  y ~ poisson_log(log_E + alpha + x * beta + gamma);  // likelihood
 
   alpha ~ normal(0, 1);
   beta ~ normal(0, 1);
@@ -118,20 +120,6 @@ model {
   phi ~ standard_icar_disconnected(edges, K_node_cts, K_edge_cts, K_node_idxs, K_edge_idxs);
 }
 generated quantities {
-  // posterior predictive checks
-  vector[I] eta = log_E + alpha + x * beta + gamma * sigma;
-  vector[I] y_prime = exp(eta);
-  //   int y_rep[I,10];
-  //   for (j in 1:10) {
-  //     if (max(eta) > 20) {
-  //       // avoid overflow in poisson_log_rng
-  //       print("max eta too big: ", max(eta));
-  //       for (i in 1:I)
-  //   	y_rep[i,j] = -1;
-  //     } else {
-  //       for (i in 1:I)
-  //         y_rep[i,j] = poisson_log_rng(eta[i]);
-  //     }
-  //   }
-  real logit_rho = log(rho / (1.0 - rho));
+  vector[I] eta = log_E + alpha + x * beta + gamma;
+  vector[I] y_est = exp(eta);
 }

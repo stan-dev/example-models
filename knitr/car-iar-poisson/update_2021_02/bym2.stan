@@ -67,10 +67,11 @@ parameters {
 }
 transformed parameters {
   // spatial effects (combine heterogeneous and spatially smoothed)
-  vector[I] gamma = (sqrt(1 - rho) * theta + sqrt(rho / tau) * phi) * sigma;
+  vector[I] gamma = sigma * (sqrt(1 - rho) * theta
+			     + sqrt(rho / tau) * phi);
 }
 model {
-  y ~ poisson_log(log_E + alpha + x * beta + gamma * sigma);  // co-variates
+  y ~ poisson_log(log_E + alpha + x * beta + gamma);  // likelihood
 
   alpha ~ normal(0, 1);
   beta ~ normal(0, 1);
@@ -82,20 +83,6 @@ model {
   phi ~ standard_icar(edges);
 }
 generated quantities {
-  // posterior predictive checks
-  vector[I] eta = log_E + alpha + x * beta + gamma * sigma;
-  vector[I] y_prime = exp(eta);
-  //   int y_rep[I,10];
-  //   for (j in 1:10) {
-  //     if (max(eta) > 20) {
-  //       // avoid overflow in poisson_log_rng
-  //       print("max eta too big: ", max(eta));  
-  //       for (i in 1:I)
-  // 	y_rep[i,j] = -1;
-  //     } else {
-  //       for (i in 1:I)
-  //         y_rep[i,j] = poisson_log_rng(eta[i]);
-  //     }
-  //   }
-  real logit_rho = log(rho / (1.0 - rho));
+  vector[I] eta = log_E + alpha + x * beta + gamma;
+  vector[I] y_est = exp(eta);
 }
