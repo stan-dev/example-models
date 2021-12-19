@@ -6,10 +6,10 @@ data {
   int y_sample;  // for j = 1
   int n_sample;  // for j = 1
   int J_spec;
-  int y_spec [J_spec];  // no samples for j > 1
+  int y_spec [J_spec];  // unknown for j = 1
   int n_spec [J_spec];
   int J_sens;
-  int y_sens [J_sens];  // no samples for j > 1
+  int y_sens [J_sens];  // unknown for j = 1
   int n_sens [J_sens];
 }
 parameters {
