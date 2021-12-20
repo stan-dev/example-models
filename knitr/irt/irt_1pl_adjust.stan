@@ -1,8 +1,8 @@
-## ---- irt-1pl-adjust-stan ----
+//# ---- irt-1pl-adjust-stan ----
 data {
   int<lower=0> I;
   int<lower=0> J;
-  int<lower=0,upper=1> y[I,J];
+  array[I, J] int<lower=0, upper=1> y;
 }
 parameters {
   vector[I] b_raw;
@@ -11,14 +11,15 @@ parameters {
 transformed parameters {
   vector[I] b;
   vector[J] theta;
-  { 
+  {
     real mean_theta_raw;
-    mean_theta_raw <- mean(theta_raw);
-    theta <- theta_raw - mean_theta_raw;
-    b <- b_raw - mean_theta_raw;
+    mean_theta_raw = mean(theta_raw);
+    theta = theta_raw - mean_theta_raw;
+    b = b_raw - mean_theta_raw;
   }
 }
 model {
-  for (i in 1:I)
+  for (i in 1 : I) {
     y[i] ~ bernoulli_logit(theta - b[i]);
+  }
 }

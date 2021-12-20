@@ -3,9 +3,10 @@ data {
   vector[N] earn;
   vector[N] height;
 }
-transformed data {           // log transformation
+transformed data {
+  // log transformation
   vector[N] log_earn = log(earn);
-  matrix[N,1] x = [height']';
+  matrix[N, 1] x = [height']';
 }
 parameters {
   real alpha;

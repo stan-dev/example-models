@@ -3,8 +3,8 @@
 
 data {
   int<lower=1> N;
-  real x[N];
-  int<lower=0, upper=1> z[N];
+  array[N] real x;
+  array[N] int<lower=0, upper=1> z;
 }
 transformed data {
   real delta = 1e-9;
@@ -19,11 +19,12 @@ model {
   vector[N] f;
   {
     matrix[N, N] L_K;
-    matrix[N, N] K = cov_exp_quad(x, alpha, rho);
-  
+    matrix[N, N] K = gp_exp_quad_cov(x, alpha, rho);
+    
     // diagonal elements
-    for (n in 1:N)
+    for (n in 1 : N) {
       K[n, n] = K[n, n] + delta;
+    }
     
     L_K = cholesky_decompose(K);
     f = L_K * eta;
@@ -33,6 +34,6 @@ model {
   alpha ~ normal(0, 1);
   a ~ normal(0, 1);
   eta ~ normal(0, 1);
-
+  
   z ~ bernoulli_logit(a + f);
 }

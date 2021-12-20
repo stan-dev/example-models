@@ -1,7 +1,7 @@
 data {
   int N;
   vector[N] y;
-  int<lower=1, upper=2> movie[N];
+  array[N] int<lower=1, upper=2> movie;
 }
 parameters {
   vector<lower=0, upper=5>[2] theta;
@@ -19,4 +19,3 @@ model {
     }
   */
 }
-

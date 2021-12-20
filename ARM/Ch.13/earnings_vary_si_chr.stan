@@ -1,12 +1,12 @@
 data {
-  int<lower=0> N; 
+  int<lower=0> N;
   vector[N] earn;
-  int eth[N];
+  array[N] int eth;
   vector[N] height;
-} 
+}
 transformed data {
   vector[N] log_earn;
-
+  
   log_earn = log(earn);
 }
 parameters {
@@ -25,10 +25,11 @@ transformed parameters {
   vector[N] y_hat;
   a1 = 10 * mu_a1 + sigma_a1 * eta1;
   a2 = 0.1 * mu_a2 + sigma_a2 * eta2;
-
-  for (i in 1:N)
+  
+  for (i in 1 : N) {
     y_hat[i] = a1[eth[i]] + a2[eth[i]] * height[i];
-} 
+  }
+}
 model {
   mu_a1 ~ normal(0, 1);
   mu_a2 ~ normal(0, 1);

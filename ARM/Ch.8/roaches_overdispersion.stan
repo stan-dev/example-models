@@ -1,14 +1,14 @@
 data {
-  int<lower=0> N; 
+  int<lower=0> N;
   vector[N] exposure2;
   vector[N] roach1;
   vector[N] senior;
   vector[N] treatment;
-  int y[N];
+  array[N] int y;
 }
 transformed data {
   vector[N] log_expo = log(exposure2);
-  matrix[N,3] x = [roach1', senior', treatment']';
+  matrix[N, 3] x = [roach1', senior', treatment']';
 }
 parameters {
   real alpha;

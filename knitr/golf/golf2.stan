@@ -1,8 +1,8 @@
 data {
   int J;
-  int n[J];
+  array[J] int n;
   vector[J] x;
-  int y[J];
+  array[J] int y;
   real r;
   real R;
   real overshot;
@@ -16,14 +16,14 @@ model {
   vector[J] p_angle;
   vector[J] p_distance;
   vector[J] p;
-  p_angle = 2*Phi(asin((R-r)./x) / sigma_theta) - 1;
-  p_distance = Phi((distance_tolerance - overshot) ./ ((x + overshot)*sigma_distance)) -
-               Phi((- overshot) ./ ((x + overshot)*sigma_distance));
+  p_angle = 2 * Phi(asin((R - r) ./ x) / sigma_theta) - 1;
+  p_distance = Phi((distance_tolerance - overshot)
+                   ./ ((x + overshot) * sigma_distance))
+               - Phi((-overshot) ./ ((x + overshot) * sigma_distance));
   p = p_angle .* p_distance;
   y ~ binomial(n, p);
 }
 generated quantities {
   real sigma_degrees;
-  sigma_degrees = (180/pi())*sigma_theta;
+  sigma_degrees = (180 / pi()) * sigma_theta;
 }
-

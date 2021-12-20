@@ -44,24 +44,25 @@
  *   comparisons. Biometrika. 39 (3/4): 324. doi:10.2307/2334029
  */
 data {
-  int<lower = 0> K;                     // players
-  int<lower = 0> N;                     // games
-  int<lower=1, upper = K> player1[N];   // player 1 for game n
-  int<lower=1, upper = K> player0[N];   // player 0 for game n
-  int<lower = 0, upper = 1> y[N];       // winner for game n
+  int<lower=0> K; // players
+  int<lower=0> N; // games
+  array[N] int<lower=1, upper=K> player1; // player 1 for game n
+  array[N] int<lower=1, upper=K> player0; // player 0 for game n
+  array[N] int<lower=0, upper=1> y; // winner for game n
 }
 parameters {
-  vector[K] alpha;                      // ability for player n
+  vector[K] alpha; // ability for player n
 }
 model {
   alpha ~ normal(0, 1);
   y ~ bernoulli_logit(alpha[player1] - alpha[player0]);
 }
 generated quantities {
-  int<lower=1, upper=K> ranking[K];       // rank of player ability
+  array[K] int<lower=1, upper=K> ranking; // rank of player ability
   {
-    int ranked_index[K] = sort_indices_desc(alpha);
-    for (k in 1:K)
+    array[K] int ranked_index = sort_indices_desc(alpha);
+    for (k in 1 : K) {
       ranking[ranked_index[k]] = k;
+    }
   }
 }

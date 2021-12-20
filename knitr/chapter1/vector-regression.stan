@@ -1,7 +1,7 @@
 data {
   int<lower=0> N;
   int<lower=0> K;
-  matrix[N,K] X;
+  matrix[N, K] X;
   vector[N] y;
 }
 parameters {
@@ -9,5 +9,5 @@ parameters {
   real<lower=0> sigma;
 }
 model {
-  y ~ normal(X*b, sigma);
+  y ~ normal(X * b, sigma);
 }

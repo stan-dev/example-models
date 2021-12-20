@@ -7,18 +7,18 @@ data {
   int y_sample;
   int n_sample;
   int J_spec;
-  int y_spec [J_spec];
-  int n_spec [J_spec];
+  array[J_spec] int y_spec;
+  array[J_spec] int n_spec;
   int J_sens;
-  int y_sens [J_sens];
-  int n_sens [J_sens];
+  array[J_sens] int y_sens;
+  array[J_sens] int n_sens;
 }
 parameters {
-  real<lower = 0, upper = 1> p;
+  real<lower=0, upper=1> p;
   real mu_spec;
-  real<lower = 0> sigma_spec;
+  real<lower=0> sigma_spec;
   real mu_sens;
-  real<lower = 0> sigma_sens;
+  real<lower=0> sigma_sens;
   vector[J_spec] e_spec;
   vector[J_sens] e_sens;
 }

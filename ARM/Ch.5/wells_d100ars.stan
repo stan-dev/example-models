@@ -1,13 +1,13 @@
 data {
   int<lower=0> N;
-  int<lower=0,upper=1> switched[N];
+  array[N] int<lower=0, upper=1> switched;
   vector[N] dist;
   vector[N] arsenic;
 }
 transformed data {
   // rescaling
   vector[N] dist100 = dist / 100.0;
-  matrix[N,2] x = [dist100', arsenic']';
+  matrix[N, 2] x = [dist100', arsenic']';
 }
 parameters {
   real alpha;

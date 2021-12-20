@@ -1,8 +1,8 @@
-## ---- irt-1pl-vague-stan ----
+//# ---- irt-1pl-vague-stan ----
 data {
   int<lower=0> I;
   int<lower=0> J;
-  int<lower=0,upper=1> y[I,J];
+  array[I, J] int<lower=0, upper=1> y;
   real mu_theta;
   real<lower=0> sigma_theta;
   real mu_b;
@@ -15,6 +15,7 @@ parameters {
 model {
   theta ~ normal(mu_theta, sigma_theta);
   b ~ normal(mu_b, sigma_b);
-  for (i in 1:I)
+  for (i in 1 : I) {
     y[i] ~ bernoulli_logit(theta - b[i]);
+  }
 }

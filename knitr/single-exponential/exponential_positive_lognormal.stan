@@ -10,7 +10,7 @@ parameters {
 }
 model {
   vector[N] y_pred;
-  y_pred = a*exp(-b*x);
+  y_pred = a * exp(-b * x);
   y ~ lognormal(log(y_pred), sigma);
   a ~ normal(0, 10);
   b ~ normal(0, 10);

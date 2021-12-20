@@ -4,7 +4,7 @@ data {
   vector<lower=0, upper=1>[N] mom_hs;
 }
 transformed data {
-  matrix[N,1] x = [mom_hs']';
+  matrix[N, 1] x = [mom_hs']';
 }
 parameters {
   real alpha;
