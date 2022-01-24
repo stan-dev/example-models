@@ -1,9 +1,23 @@
-## Hierarchical Partial Pooling for Repeated Binary Trials in CmdStanR
+---
+title: "Hierarchical Partial Pooling for Repeated Binary Trials"
+author: "Bob Carpenter"
+date: "29 January 2016"
+output:
+  html_document:
+    theme: readable
+  pdf_document: default
+---
 
-*Bob Carpenter* <br>
-29 January 2016
+```{css style settings, echo = FALSE}
+blockquote {
+    padding: 10px 20px;
+    margin: 0 0 20px;
+    font-size: 0.9em;
+    border-left: 5px solid #eee;
+}
+```
 
-updated for CmdStanR by Mitzi Morris, 19 January 2022
+*updated for CmdStanR by Mitzi Morris, 19 January 2022*
 
 
 ### Abstract
@@ -11,19 +25,23 @@ updated for CmdStanR by Mitzi Morris, 19 January 2022
 This note illustrates the effects on posterior inference of pooling
 data (aka sharing strength) across items for repeated binary trial
 data.  It provides Stan models and R code to fit and check predictive
-models for three situations: (a) complete pooling, which assumes each
-item is the same, (b) no pooling, which assumes the items are
-unrelated, and (c) partial pooling, where the similarity among the
-items is estimated.  We consider two hierarchical models to estimate
-the partial pooling, one with a beta prior on chance of success and
-another with a normal prior on the log odds of success.  The note
-explains with working examples how to
+models for three situations:
 
-- (i) fit models in [CmdStanR](https://mc-stan.org/cmdstanr) and plot the results in R using ggplot2,
-- (ii) estimate event probabilities,
-- (iii) evaluate posterior predictive densities to evaluate model predictions on held-out data, (iv) rank items by chance of success,
-- (v) perform multiple comparisons in several settings,
-- (vi) replicate new data for posterior p-values, and (vii) perform graphical posterior predictive checks.
+1. complete pooling, which assumes each item is the same
+2. no pooling, which assumes the items are unrelated
+3. partial pooling, where the similarity among the items is estimated.
+   + a hierarchical model with with a *beta prior* on the *chance of success*
+   + a hierarchical model with a *normal prior* on the *log odds of success*
+
+We explain and give working examples of how to:
+
+- fit models in [CmdStanR](https://mc-stan.org/cmdstanr) and plot the results in R using ggplot2,
+- estimate event probabilities,
+- evaluate posterior predictive densities to evaluate model predictions on held-out data
+- rank items by chance of success,
+- perform multiple comparisons in several settings,
+- replicate new data for posterior p-values
+- perform graphical posterior predictive checks.
 
 
 ### Packages used in this notebook
@@ -31,31 +49,34 @@ explains with working examples how to
 In this notebook, we will use the [CmdStanR interface](https://mc-stan.org/cmdstanr/).
 
 ```{r comment=NA}
+# uncomment as needed to install CmdStanR, CmdStan
 #library(devtools);
 #if(!require(cmdstanr)){
 #    devtools::install_github("stan-dev/cmdstanr", dependencies=c("Depends", "Imports"))
 #}
 options(warn=-1)
 options(repr.plot.width=8, repr.plot.height=8)
+options(output.width='90%')
 library(tidyverse)
+library(ggplot2)
 library(posterior)
 library(cmdstanr)
-set_cmdstan_path("/Users/mitzi/.cmdstan/cmdstan-2.28.2")
 ```
 ```{r echo=FALSE}
 theme_jupyter <- function() {
   theme_grey() + 
-  theme(text = element_text(size=18),
-        plot.title = element_text(size=24),
-        plot.subtitle = element_text(size=20),
-        axis.title.x = element_text(size=20),
-        axis.title.y = element_text(size=20),
-        strip.text.x = element_text(size=18),
-        strip.text.y = element_text(size=18)
-       );
+  theme(text = element_text(size=12),
+        plot.title = element_text(size=rel(1.1)),
+        plot.subtitle = element_text(size=rel(1)),
+        axis.title.x = element_text(size=rel(1)),
+        axis.title.y = element_text(size=rel(1)),
+        strip.text.x = element_text(size=rel(.95)),
+        strip.text.y = element_text(size=rel(.95)),
+        axis.text.x = element_text(size=rel(0.9)),
+        axis.text.y = element_text(size=rel(0.9))
+       )
 }
 ```
-
 
 ## Repeated Binary Trials
 
@@ -89,27 +110,16 @@ downloaded 24 Dec 2015 from
 It is drawn from the 1970 Major League Baseball season from both
 leagues.
 
+We will only need a few columns of the data; we will be using
+the remaining hits and at bats to evaluate the predictive inferences for the various models.
+
 ```{r comment=NA}
-df <- read.csv("efron-morris-75-data.tsv", sep="\t");
+df <- read.csv("efron-morris-75-data.tsv", sep="\t")
 df <- with(df, data.frame(FirstName, LastName, 
                           Hits, At.Bats, 
                           RemainingAt.Bats,
-                          RemainingHits = SeasonHits - Hits));
-print(df);
-```
-
-We will only need a few columns of the data; we will be using the
-remaining hits and at bats to evaluate the predictive inferences for
-the various models.
-
-```{r comment=NA}
-M <- 10000  # total draws in the sample
-N <- dim(df)[1]
-K <- df$At.Bats
-y <- df$Hits
-K_new <- df$RemainingAt.Bats;
-y_new <- df$RemainingHits;
-names <- paste(seq(1:18), df$FirstName, df$LastName);
+                          RemainingHits = SeasonHits - Hits))
+print(df)
 ```
 
 The data separates the outcome from the initial 45 at-bats from the
@@ -140,10 +150,23 @@ data {
 }
 ```
 
-As usual, we follow the convention of naming our program
+We follow the convention of naming our program
 variables after the variables we use when we write the model out
-mathematically in a paper.  We also choose capital letters for integer
-constants and y for the main observed variable(s).
+mathematically in a paper.  We choose capital letters for integer
+constants, here <code>N</code> and <code>K</code>, 
+and we use a lowercase <code>y</code> for the main observed variable(s).
+We try to use these abstract names for data and parameters
+instead of dataset-specific names such as "hits" and "at-bats"
+because these basic models are useful in many domains,
+as mentioned above.
+
+Because we shall develop four models all of which use the same
+data and transformed data, we create a Stan program which
+contains just the data and transformed data blocks "data-blocks.stan"
+and use Stan's [include directive](https://mc-stan.org/docs/reference-manual/includes-section.html)
+to use this across all four models.
+Because the models contain <code>#include</code> directives, we need to
+specify the `include_paths` when instantiating or compiling the model.
 
 ## Pooling
 
@@ -234,8 +257,7 @@ as
 
 ```
 model {
-  ...
-  y ~ binomial(K, phi);
+  y ~ binomial(K, phi); // likelihood
 }
 ```
 
@@ -265,39 +287,40 @@ vectorized form can be up to an order of magnitude or more faster in
 some cases, depending on how many repeated calculations can be
 avoided.
 
-The actual Stan program in <code>pool.stan</code> has many more
+The actual Stan program in <code>pool.stan</code> includes many
 derived quantities that will be used in the rest of this note; see
 the appendix for the full code of all of the models discussed.
 
-
-We wish to create a posterior sample of size 10,000 draws.
-To do this we first call the `cmdstan_model()` function which instantiates a CmdStanModel object from a file containing a Stan program.
+We must first instantiate a CmdStanModel object then call its <code>sample</code> method.
+To do this we first call the `cmdstan_model()` function
+which instantiates a CmdStanModel object from a file containing a Stan program.
+Because these models contain a number of [include directives](https://mc-stan.org/docs/reference-manual/includes-section.html), 
+we use the `include_paths` argument to pass in the path to the current directory.
 
 ```{r}
-pool_model <- cmdstan_model(stan_file='pool.stan')
+pool_model <- cmdstan_model(stan_file='pool.stan', include_paths=c('include'))
 ```
 
-draws we first instantiate a
-To fit the model to the dataThe model can be fit as follows, with `M` being the total number of
-draws in the complete posterior sample (each chain is by default split
-into half warmup and half sampling iterations and 4 chains are being
-run).
+We create the R data structures corresponding to the model inputs.
+In addition, we define the desired size of the MCMC sample,
+here we set it to $10,000$ draws.
+```{r comment=NA}
+N <- dim(df)[1]
+K <- df$At.Bats
+y <- df$Hits
+K_new <- df$RemainingAt.Bats
+y_new <- df$RemainingHits
 
-To fit the model we first create a named list containing the values for all input data variables.
+M <- 10000  # total draws in the sample
+```
+We pass the data into the `sample` method as a list of name, value pairs.
 By default, CmdStanR runs 4 chains with 1000 warmup and sampling iterations per chain.
-To generate a sample of 10,000 draws, we specify the per-chain number of sampling iterations to be 2500.
+To generate a sample with a total of $M = 10000$ draws,
+we specify the per-chain sampling iterations to be $M / 4$.
 
 ```{r comment=NA}
-# These were computed in the 2nd code chunk above
-#N <- dim(df)[1]
-#K <- df$At.Bats
-#y <- df$Hits
-#K_new <- df$RemainingAt.Bats;
-#y_new <- df$RemainingHits;
-
 baseball_data = list(N=N, K=K, y=y, K_new=K_new, y_new=y_new)
-fit_pool <- pool_model$sample(data=baseball_data, iter_sampling=2500)
-
+fit_pool <- pool_model$sample(data=baseball_data, iter_sampling=M/4, refresh=0)
 ```
 
 The posterior sample for <code>phi</code> can be summarized as
@@ -353,29 +376,29 @@ parameter $\theta_n \in [0,1]$ for each item $n$.
 
 The prior on each $\theta_n$ is uniform,
 
-$
+$$
 p(\theta_n) = \mathsf{Uniform}(\theta_n \, | \, 0,1),
-$
+$$
 
 and the $\theta_n$ are assumed to be independent, 
 
-$
+$$
 p(\theta) = \prod_{n=1}^N \mathsf{Uniform}(\theta_n \, | \, 0,1).
-$
+$$
 
 The likelihood then uses the chance of success $\theta_n$ for item $n$
 in modeling the number of successes $y_n$ as
 
-$
+$$
 p(y_n \, | \, \theta_n) = \mathsf{Binomial}(y_n \, | \, K_n, \theta_n).
-$
+$$
 
 Assuming the $y_n$ are independent (conditional on $\theta$), this
 leads to the total data likelihood
 
-$
+$$
 p(y \, | \, \theta) = \prod_{n=1}^N \mathsf{Binomial}(y_n \, | \, K_n, \theta_n).
-$
+$$
 
 The Stan program for no pooling only differs in declaring the ability
 parameters as an $N$-vector rather than a scalar.
@@ -411,15 +434,14 @@ in <code>no-pool.stan</code>, which is shown in the appendix.
 This model can be fit the same way as the last model.
 
 ```{r results='hide', comment=NA}
-no_pool_model <- cmdstan_model(stan_file='no-pool.stan')
-fit_no_pool <- no_pool_model$sample(data=baseball_data, iter_sampling=2500)
-
+no_pool_model <- cmdstan_model(stan_file='no-pool.stan', include_paths=c('include'))
+fit_no_pool <- no_pool_model$sample(data=baseball_data, iter_sampling=M/4, refresh=0)
 ```
 
 Now we examine the per-player chance of success `theta`
 
 ```{r comment=NA}
-fit_no_pool$print('theta');
+fit_no_pool$print('theta', max_rows=18)
 ```
 
 Now there is a separate line for each item's estimated $\theta_n$.
@@ -477,10 +499,10 @@ assume a <a
 href="https://en.wikipedia.org/wiki/Beta_distribution">beta
 distribution</a> as the prior as it is scaled to values in $[0, 1]$,
 
-$
+$$
 p(\theta_n \, | \, \alpha, \beta)
 \ = \ \mathsf{Beta}(\theta_n \, | \, \alpha, \beta),
-$
+$$
 
 where $\alpha, \beta > 0$ are the parameters of the prior.  The beta
 distribution is the conjugate prior for the binomial, meaning that the
@@ -492,25 +514,25 @@ observations and thus a uniform distribution.  Each $\theta_n$ will be
 modeled as conditionally independent given the prior parameters, so
 that the complete prior is
 
-$
+$$
 p(\theta \, | \, \alpha, \beta) 
 = \prod_{n=1}^N \mathsf{Beta}(\theta_n \, | \, \alpha, \beta).
-$
+$$
 
 The parameters $\alpha$ and $\beta$ are themselves given priors
 (sometimes called hyperpriors).  Rather than parameterize $\alpha$ and
 $\beta$ directly, we will instead put priors on $\phi \in [0, 1]$
 and $\kappa > 0$, and then define
 
-$
+$$
 \alpha = \kappa \, \phi
-$
+$$
 
 and
 
-$
+$$
 \beta = \kappa \, (1 - \phi).
-$
+$$
 
 This reparameterization is convenient, because 
 
@@ -523,15 +545,15 @@ inversely related to the variance).
 We will follow Gelman et al. (2013, Chapter 5) in providing a prior
 that factors into a uniform prior on $\phi$,
 
-$
+$$
 p(\phi) = \mathsf{Uniform}(\phi \, | \, 0, 1), 
-$
+$$
 
 and a Pareto prior on $\kappa$,
 
-$
+$$
 p(\kappa) = \mathsf{Pareto}(\kappa \, | \, 1, 1.5) \propto \kappa^{-2.5}.
-$
+$$
 
 with the restriction $\kappa > 1$.  In general, for functions $f$ and
 $g$, we write $f(x) \propto g(x)$ if there is some constant $c$ such
@@ -580,22 +602,14 @@ except that this time we set the pseudorandom number generator seed here to 1234
 so that we can consistently generate the exact set of draws.
 
 ```{r results='hide', comment=NA}
-hier_model <- cmdstan_model(stan_file='hier.stan')
-fit_hier <- hier_model$sample(data=baseball_data, iter_sampling=2500, seed=1234)
+hier_model <- cmdstan_model(stan_file='hier.stan', include_paths=c('include'))
+fit_hier <- hier_model$sample(data=baseball_data,
+                              iter_sampling=M/4,
+			      seed=1234,
+			      refresh=0,
+			      show_messages=FALSE)
 ```
-
-The console output contains a number of error messages of the form
-```
-
-Warning: 8 of 10000 (0.0%) transitions ended with a divergence.
-This may indicate insufficient exploration of the posterior distribution.
-Possible remedies include: 
-  * Increasing adapt_delta closer to 1 (default is 0.8) 
-  * Reparameterizing the model (e.g. using a non-centered parameterization)
-  * Using informative or weakly informative prior distributions 
-
-```
-
+The sampler prints a warning about divergent transitions.
 CmdStan's [diagnose](https://mc-stan.org/docs/cmdstan-guide/diagnose.html) utility provides more checks on the MCMC sample.
 
 ```{r}
@@ -652,11 +666,12 @@ target acceptance rate (<code>adapt_delta</code>).
 
 ```{r results='hide', comment=NA}
 fit_hier <- hier_model$sample(data=baseball_data,
-                              iter_sampling=2500,
-                              iter_warmup=2000,
+                              iter_sampling=M/4,
+                              iter_warmup=M/4,
                               seed=1234,
                               step_size=0.01,
-                              adapt_delta=0.95)
+                              adapt_delta=0.95,
+			      refresh=0)
 ```
 
 Now it runs without divergent translations.
@@ -710,9 +725,8 @@ reproduce that figure here for our running example.
 
 ```{r}
 # extract model fit as R dataframe/ tibble for ggplot2
-hier_df = as_draws_df(fit_hier$draws())
+hier_df = fit_hier$draws(format="df");
 
-library(ggplot2);
 bda_plot <- function(df, x_lab, y_lab) {
   ggplot(df, aes(x=x, y=y)) +
     geom_point(shape=19, alpha=0.15) +
@@ -777,11 +791,11 @@ chance-of-success $\theta_n \in [0,1]$.  In this section, we consider
 an alternative parameterization in terms of the log-odds $\alpha_n$, which are
 defined by the logit transform as
 
-$
+$$
 \alpha_n 
 = \mathrm{logit}(\theta_n) 
 = \log \, \frac{\theta_n}{1 - \theta_n}.
-$
+$$
 
 For example, $\theta_n = 0.25$ corresponds to odds of $.25$ to $.75$
 (equivalently, $1$ to $3$), or log-odds of $\log .25 / .75 = -1.1$.
@@ -789,17 +803,17 @@ For example, $\theta_n = 0.25$ corresponds to odds of $.25$ to $.75$
 We will still use a binomial likelihood, only now we have logit as a
 so-called "link" function.
 
-$
+$$
 p(y_n \, | \, K_n, \alpha_n) 
 \ = \ \mathsf{Binomial}(y_n \, | \, K_n, \ \mathrm{logit}^{-1}(\alpha_n))
-$
+$$
 
 The inverse logit function is the logistic sigmoid from which logistic
 regression gets its name,
 
-$
+$$
 \mathrm{logit}^{-1}(\alpha_n) = \frac{1}{1 + \exp(-\alpha_n)} = \theta_n.
-$
+$$
 
 By construction, for any $\alpha_n \in (-\infty, \infty)$,
 $\mathrm{logit}^{-1}(\alpha_n) \in (0, 1)$; the sigmoid converts
@@ -810,24 +824,24 @@ practice, we only know the result will be in $[0, 1]$.
 Stan has a binomial probability function with a built-in logit link
 function, with which we can define the likelihood directly as
 
-$
+$$
 p(y_n \, | \, K_n, \alpha_n) 
 \ = \ \mathsf{BinomialLogit}(y_n \, | \, K_n, \alpha_n)
 \ = \ \mathsf{Binomial}(y_n \, | \, K_n, \ \mathrm{logit}^{-1}(\alpha_n)).
-$
+$$
 
 We use a simple normal hierarchical prior,
 
-$
+$$
 p(\alpha_n \, | \, \mu, \sigma)
 = \mathsf{Normal}(\alpha_n \, | \, \mu, \sigma).
-$
+$$
 
 Then one level up, we use a weakly informative hyperprior for $\mu$,
 
-$
+$$
 p(\mu) = \mathsf{Normal}(\mu \, | \, -1, 1),
-$
+$$
 
 which places 95% of the prior probability for $\mu$ in the interval
 $(-3, 1)$, which inverse-logit transforms to the interval $(0.05,
@@ -838,11 +852,11 @@ value should obviously be changed for other applications.
 The prior scale $\sigma > 0$ can be taken to be a truncated normal
 (half normal, here):
 
-$
+$$
 p(\sigma)
 \ = \ 2 \, \mathsf{Normal}(\sigma \, | \, 0, 1)
 \ \propto \ \mathsf{Normal}(\sigma \, | \, 0, 1).
-$
+$$
 
 This is a fairly broad prior in this case, being on the log-odds
 scale.
@@ -878,8 +892,11 @@ appendix at the end of this document).
 
 ```{r results='hide', comment=NA}
 hier_logit_centered_model <- cmdstan_model(stan_file='hier-logit-centered.stan')
-fit_hier_logit_centered <- hier_logit_centered_model$sample(data=baseball_data, iter_sampling=2500, seed=1234)
-
+fit_hier_logit_centered <- hier_logit_centered_model$sample(data=baseball_data,
+                                                            iter_warmup=M/4,
+							    iter_sampling=M/4,
+							    seed=1234,
+							    refresh=0)
 ```
 
 ```{r comment=NA}
@@ -947,50 +964,62 @@ random-walk Metropolis samplers (Papaspiliopoulos et al. 2003).  This
 basically amounts to changing the parameterization over which sampling
 is done, taking now a standard unit normal prior for a new variable,
 
-$
+$$
 \alpha^{\mathrm{std}}_n = \frac{\alpha_n - \mu}{\sigma}.
-$
+$$
 
 Then we can parameterize in terms of $\alpha^{\mathrm{std}}$, which
 has a standard-normal distribution
 
-$
+$$
 p(\alpha^{\mathrm{std}}_n) = \mathsf{Normal}(\alpha^{\mathrm{std}}_n \, | \, 0, 1).
-$
+$$
 
 We can then define our original $\alpha$ as a derived quantity
 
-$
+$$
 \alpha_n = \mu + \sigma \, \alpha^{\mathrm{std}}_n.
-$
+$$
 
-We code this implicitly in the Stan model by defining the
-likelihood as
+This decouples the sampling distribution
+for $\alpha^{\mathrm{std}}$ from $\mu$ and $\sigma$, greatly reducing
+their correlation in the posterior.  
 
-$
-p(y_n \, | \, \alpha^{\mathrm{std}}_n, \mu, \sigma, K)
-\ = \
-\mathsf{BinomialLogit}(K_n, \ \mu + \sigma \, \alpha_n).
-$
+Prior to Stan 2.19, a Stan implementation directly encoded the math.
+```
+parameters {
+  real mu; // population mean of success log-odds
+  real<lower=0> sigma; // population sd of success log-odds
+  vector[N] alpha_std; // success log-odds (standardized)
+}
+model {
+  vector[N] alpha = mu + sigma * alpha_std;
+  ...
+  alpha_std ~ normal(0, 1); // prior (hierarchical)
+  y ~ binomial_logit(K, alpha); // likelihood
+}
+```
 
-This decouples the sampling distribution for $\alpha^{\mathrm{std}}$
-from $\mu$ and $\sigma$, greatly reducing their correlation in the
-posterior.  
+Since Stan version 2.19, the Stan language's
+[affine transform](https://mc-stan.org/docs/reference-manual/univariate-data-types-and-variable-declarations.html) construct provides a more efficient way to do this.
 
-The Stan program's parameter declaration and model directly follow the
-definition.
+> Real variables may be declared on a space that has been transformed using an affine transformation $x\mapsto \mu + \sigma * x$ with offset $\mu$ and (positive) multiplier $\sigma$, using a syntax similar to that for bounds. While these transforms do not change the asymptotic sampling behaviour of the resulting Stan program (in a sense, the model the program implements), they can be useful for making the sampling process more efficient by transforming the geometry of the problem to a more natural multiplier and to a more natural offset for the sampling process, for instance by facilitating a non-centered parameterisation.
+
+Specifying the affine transform in the parameter declaration for 
+$\alpha^{\mathrm{std}}$ eliminates the need for intermediate variables
+and makes it easier to see the hierarchical structure of the model.
 
 ```
 parameters {
-  real mu;                       // population mean of success log-odds
-  real<lower=0> sigma;           // population sd of success log-odds
-  vector[N] alpha_std;           // success log-odds
+  real mu; // population mean of success log-odds
+  real<lower=0> sigma; // population sd of success log-odds
+  vector<offset=mu, multiplier=sigma>[N] alpha_std; // success log-odds (standardized)
 }
 model {
-  mu ~ normal(-1, 1);                             // hyperprior
-  sigma ~ normal(0, 1);                           // hyperprior
-  alpha_std ~ normal(0, 1);                       // prior
-  y ~ binomial_logit(K, mu + sigma * alpha_std);  // likelihood
+  mu ~ normal(-1, 1); // hyperprior
+  sigma ~ normal(0, 1); // hyperprior
+  alpha_std ~ normal(mu, sigma); // prior (hierarchical)
+  y ~ binomial_logit(K, alpha_std); // likelihood
 }
 ```
 
@@ -1006,10 +1035,7 @@ computed as a generated quantity.
 
 ```
 generated quantities {
-  vector[N] theta;  // chance of success
-  ...
-  for (n in 1:N)
-    theta[n] <- inv_logit(mu + sigma * alpha_std[n]);
+  vector[N] theta = inv_logit(alpha_std);
   ...
 }
 ```
@@ -1020,13 +1046,14 @@ The full Stan program for the hierarchical logistic model is in
 It is fit and the values are extracted as follows.
 
 ```{r results='hide', comment=NA}
-hier_logit_model <- cmdstan_model(stan_file='hier-logit.stan')
+hier_logit_model <- cmdstan_model(stan_file='hier-logit.stan', include_paths=c('include'))
 fit_hier_logit <- hier_logit_model$sample(data=baseball_data,
-                                          iter_sampling=2500,
-                                          iter_warmup=2000,
+                                          iter_sampling=M/4,
+                                          iter_warmup=M/4,
                                           seed=1234,
                                           step_size=0.01,
-                                          adapt_delta=0.99);
+                                          adapt_delta=0.99,
+					  refresh=0)
 ```
 
 We can print as before.
@@ -1037,7 +1064,7 @@ fit_hier_logit$print(c("alpha_std", "theta", "mu", "sigma"), max_rows=100)
 
 It is clear from the wide posteriors for the $\theta_n$ that there is
 considerable uncertainty in the estimates of chance-of-success on an
-item-by-item basis.  With an 90% interval of $(0.02, 0.37)$ for `sigma`,
+item-by-item basis.  With an 90% interval of $(0.02, 0.36)$ for `sigma`,
 it is clear that the data is consistent with complete pooling
 (i.e., $\sigma = 0$).
 
@@ -1094,7 +1121,7 @@ successes $y_n$ for the first $K_n$ trials versus the median and 80\%
 intervals for the estimated chance-of-success parameters $\theta_n$ in
 the posterior.  The following R code reproduces a similar plot for our data.
 
-```{r}
+```{r, out.width="110%"}
 # summary statistics - quantiles 10%, 50%, 90%
 ss_quantiles <- function(draws_df) {
   apply(select(draws_df, starts_with('theta')), 2, quantile, probs = c(0.1, 0.5, 0.9));
@@ -1334,22 +1361,22 @@ intervals (Gneiting et al. 2007).
 
 The log of posterior predictive density is defined in the obvious way as
 
-$
+$$
 \log p(\tilde{y} \, | \, y)
 = \log \int_{\Theta} p(\tilde{y} \, | \, \theta) 
                      \ p(\theta \, | \, y)
                      \ \mathrm{d}\theta.
-$
+$$
 
 This is not a posterior expectation, but rather the log of a posterior
 expectation.  In particular, it should not be confused with the
 posterior expectation of the log predictive density, which is given by
 
-$
+$$
  \int_{\Theta} \left( \log p(\tilde{y} \, | \, \theta) \right) 
                \ p(\theta \, | \, y)  
                \ \mathrm{d}\theta.
-$
+$$
 
 Although this is easy to compute in Stan in a stable fashion, it does
 not produce the same answer (as we show below).
@@ -1359,11 +1386,11 @@ inequality](https://en.wikipedia.org/wiki/Jensen%27s_inequality) shows
 that the expectation of the log is less than or equal to the log of
 the expectation,
 
-$
+$$
 \log \int_{\Theta} p(\tilde{y} \, | \, \theta) \ p(\theta \, | \, y) \ \mathrm{d}\theta
 \ \leq \
 \int_{\Theta} \left( \, \log p(\tilde{y} \, | \, \theta) \, \right) \ p(\theta \, | \, y) \ \mathrm{d}\theta.
-$
+$$
 
 We'll compute both expectations and demonstrate Jensen's inequality in
 our running example.
@@ -1372,31 +1399,39 @@ The integer variables <code>K_new[n]</code> and <code>y_new[n]</code>
 declared in the data block hold the number of at bats (trials) 
 and the number of hits (successes) for player (item) <code>n</code>.
 To code the evaluation of the held out data in Stan, we declare a
-generated quantities variable (<code>log_p_news</code>) to hold the
-log density of each data point and define it in the obvious way.
+generated quantities variable (<code>log_p_new</code>)
+which is the sum of the per-item posterior predictive log densities.
 
+Because we are computing this quantity across all models,
+we put the code into its own file named "gq-postpred.stan"
+and Stan's include directive in all models.
+Include directive in the model's <code>generated quantities</code> block.
 ```
 generated quantities {
   ...
-  real log_p_new;        // posterior predictive log density remaining trials
-  vector[N] log_p_news;  // posterior predictive log density for item
-  ...
-  for (n in 1:N)
-    log_p_news[n] <- binomial_log(y_new[n], K_new[n], theta[n]);
-  log_p_new <- sum(log_p_news);
+  #include gq-postpred.stan
   ...
 }
 ```
 
+First we compute the posterior predictive density for the remaining trials.
+```
+  // posterior predictive log density remaining trials
+  real log_p_new = 0;
+  for (n in 1 : N) {
+    log_p_new = log_p_new + binomial_lpmf(y_new[n] | K_new[n], theta[n]);
+  }
+```
+    
 The posterior mean for <code>log_p_new</code> will give us
 
-$
+$$
  \int_{\Theta} \left( \log p(\tilde{y} \, | \, \theta) \right) 
                \ p(\theta \, | \, y)  
                \ \mathrm{d}\theta
 \ \approx \
 \frac{1}{M} \, \sum_{m=1}^M \log p(y^{\mathrm{new}} \, | \, \theta^{(m)}).
-$
+$$
 
 This calculation is included in all four of the models we have
 previously fit and can be displayed directly as follows as the
@@ -1422,11 +1457,11 @@ The straight path to calculate this would be to define a generated
 quantity $p(y^{\mathrm{new}} \, | y)$, look at the posterior mean
 computed by Stan, and takes its log.   That is, 
 
-$
+$$
 \log p(y^{\mathrm{new}} \, | \, y)
 \ \approx \
 \log \frac{1}{M} \, \sum_{m=1}^M p(y^{\mathrm{new}} \, | \, \theta^{(m)}).
-$
+$$
 
 Unfortunately, this won't work in most cases because when we try to
 compute $p(y^{\mathrm{new}} \, | \, \theta^{(m)})$ directly, it is prone
@@ -1446,32 +1481,32 @@ To avoid underflow, we're going to use the
 [log-sum-of-exponentials](https://en.wikipedia.org/wiki/LogSumExp)
 trick, which begins by noting the obvious,
 
-$
+$$
 \log \frac{1}{M} \, \sum_{m=1}^M \ p(y^{\mathrm{new}} \, | \, \theta^{(m)}).
 \ = \
 \log \frac{1}{M} \, \sum_{m=1}^M
                      \ \exp \left( \log p(y^{\mathrm{new}} \, | \, \theta^{(m)}) \right).
-$
+$$
 
 We'll then write that last expression as
 
-$
+$$
 -\log M 
 +  \mathrm{log\_sum\_exp \, }_{m=1}^M
         \ \log p(y^{\mathrm{new}} \, | \, \theta^{(m)})
-$
+$$
 
 We can compute $\mathrm{log\_sum\_exp}$ stably by subtracting the max value.
 Suppose $u = u_1, \ldots, u_M$, and $\max(u)$ is the largest $u_m$.
 We can calculate
 
-$
+$$
 \mathrm{log\_sum\_exp \, }_{m=1}^M \ u_m
 \ = \
 \log \sum_{m=1}^M \exp(u_m)
 \ = \
 \max(u) + \log \sum_{m=1}^M \exp(u_m - \max(u)).
-$
+$$
 
 Because $u_m - \max(u) \leq 0$, the exponentiations cannot overflow.
 They may underflow to zero, but this will not lose precision because
@@ -1531,14 +1566,7 @@ pseudorandom number generator, which corresponds to the binomial
 sampling distribution (likelihood) in this case.
 
 ```
-generated quantities {
-  ...
-  int<lower=0> z[N];  // posterior prediction remaining trials
-  ...
-  for (n in 1:N)
-    z[n] <- binomial_rng(K_new[n], theta[n]);
-  ...
-}
+  array[N] int<lower=0> z = binomial_rng(K_new, theta);
 ```
 
 This formulation makes it clear that there are two sources of
@@ -1562,8 +1590,14 @@ sense we define below).
 The number of remaining at-bats $K^{\mathrm{new}}$ was printed out in
 the original table along with the actual number of hits.
 
-```{r comment=NA}
-fit_pool$print('z', max_rows=18)
+```{r}
+print(df)
+```
+
+We examine the 80% intervals on the basic hierarchical model for <code>z</code>, the posterior predictions for the rest of the season.
+
+```{r}
+fit_hier$print('z', "mean", "median", ~quantile(.x, probs = c(0.1, 0.9)), max_rows=18)
 ```
 
 Translating the posterior number of hits into a season batting
@@ -1571,7 +1605,7 @@ average, $\frac{y_n + z_n}{K_n + K^{\mathrm{new}}_n}$,
 we get an 80% posterior interval of
 
 $$
-\left( \frac{18 + 93}{45 + 367}, \frac{18 + 147}{45 + 367} \right) 
+\left( \frac{18 + 93}{45 + 367}, \frac{18 + 145}{45 + 367} \right) 
 \ = \
 (0.269, 0.400).
 $$
@@ -1600,7 +1634,7 @@ predictive 50% interval for predicted batting average (success rate)
 in his remaining at bats (trials); the observed success rate in the
 remainder of the season is shown as a blue dot.
 
-```{r comment=NA}
+```{r comment=NA, out.width="110%"}
 # N is number of players
 y_new_25_pool <- c(NA, N);
 y_new_25_no_pool <- c(NA, N);
@@ -1747,7 +1781,7 @@ over parameters and data. For example, the probability of player $n$'s
 batting average being 0.400 or better conditioned on the data $y$ is
 defined by the conditional event probability
 
-$
+$$
 \mathrm{Pr}\left[
 \frac{(y_n + z_n)}{(45 + K^{\mathrm{new}}_n)} \geq 0.400 
 \, \Big| \, 
@@ -1759,19 +1793,19 @@ y
        \ p(z_n \, | \, \theta_n, K^{\mathrm{new}}_n)
        \ p(\theta \, | \, y, K)
        \ \mathrm{d}\theta.
-$
+$$
 
 The indicator function $\mathrm{I}[c]$ evaluates to 1 if the condition
 $c$ is true and 0 if it is false.  Because it is just another
 expectation with respect to the posterior, we can calculate this event
 probability using MCMC as
 
-$
+$$
 \mathrm{Pr}\left[\frac{(y_n + z_n)}{(45 + K^{\mathrm{new}}_n)} \geq
 0.400 \, \Big| \, y \right]
 \ \approx \
 \frac{1}{M} \, \sum_{m=1}^M \mathrm{I}\left[\frac{(y_n + z_n^{(m)})}{(45 + K^{\mathrm{new}}_n)} \geq 0.400\right].
-$
+$$
 
 This event is about the season batting average being greater than
 0.400.  What if we care about ability (chance of success), not batting
@@ -1780,7 +1814,7 @@ the question of whether $\mathrm{Pr}[\theta_n > 0.4]$.  This is
 defined as a weighted average over the prior and computed via MCMC as
 the previous case.
 
-$
+$$
 \mathrm{Pr}\left[\theta_n \geq 0.400 \, | \, y \right]
 \ = \
 \int_{\Theta}
@@ -1789,25 +1823,26 @@ $
        \ \mathrm{d}\theta
 \ \approx \
 \frac{1}{M} \, \sum_{m=1}^M \mathrm{I}[\theta_n^{(m)} \geq 0.400].
-$
+$$
 
-In Stan, we just declare and define the indicators directly in the
-generated quantities block.
-
+This logic is part of the include file `gq-postpred.stan`.
 ```
-generated quantities {
-  ...
-  int<lower=0, upper=1> some_ability_gt_350;  // Pr[some theta > 0.35]
-  int<lower=0, upper=1> avg_gt_400[N];        // Pr[season avg of n] >= 0.400
-  int<lower=0, upper=1> ability_gt_400[N];    // Pr[chance-of-success of n] >= 0.400
-  ...
-  some_ability_gt_350 <- (max(theta) > 0.35);
-  for (n in 1:N)
-    avg_gt_400[n] <- (((y[n] + z[n]) / (0.0 + K[n] + K_new[n])) > 0.400);
-  for (n in 1:N)
-    ability_gt_400[n] <- (theta[n] > 0.400);
-  ...
-}
+  // posterior predictions on new data
+  array[N] int<lower=0> z = binomial_rng(K_new, theta); 
+
+  // Pr[some theta > 0.35]  
+  int<lower=0, upper=1> some_ability_gt_350 = max(theta) > 0.35;
+  // Pr[some player ability > 400]
+  array[N] int<lower=0, upper=1> ability_gt_400;
+  for (n in 1 : N) {
+    ability_gt_400[n] = theta[n] > 0.400;
+  }
+  // Pr[some player season average > 400]
+  array[N] int<lower=0, upper=1> avg_gt_400;
+  for (n in 1 : N) {
+    // y[n] - observed, z[n] - expected hits in rest of season
+    avg_gt_400[n] = ((y[n] + z[n]) / (0.0 + K[n] + K_new[n])) > 0.400;
+  }
 ```
 
 The indicator function is not explicitly specified because Stan's
@@ -1827,11 +1862,6 @@ sample size estimate and no evidence of non-convergence in the form
 for $\hat{R}$ values much greater than 1.  The NaN values in the
 $\hat{R}$ column arise when every posterior draw is the same; there is
 zero sample variance, and so $\hat{R}$ is not defined.
-
-```{r comment=NA}
-# players of interest
-message(c(names[1], "\n", names[5], "\n", names[10]));
-```
 
 ```{r comment=NA}
 pars_to_print <- c("some_ability_gt_350", 
@@ -1947,19 +1977,21 @@ rank (a value ranging from $1$ to $N$) of the second player.  First,
 we define a local variable <code>dsc</code>, and sort it into
 descending order.
 
+We encapsulate this logic into its own program file "gq-ranking.stan"
+and include it in the model's generated quantities block.
 ```
-generated quantities {
-  ...
-  int<lower=1, upper=N> rnk[N];   // rnk[n] is rank of player n
-  ...
+  array[N] int<lower=1, upper=N> rnk; // rank of player n
   {
-    int dsc[N];
-    dsc <- sort_indices_desc(theta);
-    for (n in 1:N)
-      rnk[dsc[n]] <- n;
+    array[N] int dsc;
+    dsc = sort_indices_desc(theta);
+    for (n in 1 : N) {
+      rnk[dsc[n]] = n;
+    }
   }
-  ...
-}
+  array[N] int<lower=0, upper=1> is_best; // Pr[player n highest chance of success]
+  for (n in 1 : N) {
+    is_best[n] = rnk[n] == 1;
+  }
 ```
 
 After the call to <code>sort_indices_desc</code>, <code>dsc[n]</code>
@@ -1981,7 +2013,7 @@ pooling model, where every player is assumed to have the same ability.
 We can print just the ranks and the 80% central interval for the basic pooling model.
 
 ```{r comment=NA}
-fit_hier$print("rnk", max_rows=18);
+fit_hier$print("rnk", "mean", "median", ~quantile(.x, probs = c(0.1, 0.9)), max_rows=18);
 ```
 
 It is again abundantly clear from the posterior intervals that our
@@ -1993,8 +2025,7 @@ mortality, the posterior distribution over ranks was plotted for each
 hospital.  It is now straightforward to reproduce that figure here for
 the baseball data.
 
-```{r comment=NA}
-library(ggplot2);
+```{r comment=NA, out.width="110%"}
 rnk_hier <- matrix(fit_hier$draws('rnk'), M, N);
 df_rank <- data.frame(list(name = rep(as.character(df[[1,2]]), M),
                            rank = rnk_hier[, 1]));
@@ -2013,7 +2044,7 @@ rank_plot <-
                    labels=c("0.0", "0.1", "0.2")) + 
   ggtitle("Rankings for Partial Pooling Model") +
   theme_jupyter();
-options(repr.plot.width=20, repr.plot.height=16)
+#options(repr.plot.width=20, repr.plot.height=16)
 rank_plot;
 ```
 
@@ -2048,18 +2079,13 @@ already computed or we could compute it directly as above.  Because
 $\mathrm{Pr}[\theta_n = \theta_{n'}] = 0$ for $n \neq n'$, we don't
 have to worry about ties.
 
-We define a new generated quantity for the value of the indicator and
-define it using the already-computed ranks.
-
+The generated quantities variable `is_best` is defined
+using the already-computed ranks.
 ```
-generated quantities {
-  ...
-  int<lower=0, upper=1> is_best[N];  // Pr[player n highest chance of success]
-  ...
-  for (n in 1:N)
-    is_best[n] <- (rnk[n] == 1);
-  ...
-}
+  array[N] int<lower=0, upper=1> is_best; // Pr[player n highest chance of success]
+  for (n in 1 : N) {
+    is_best[n] = rnk[n] == 1;
+  }
 ```
 
 This means that <code>is_best[n]</code> will be 1 if player
@@ -2075,7 +2101,7 @@ probability.
 
 We can then plot the results for the four models.
 
-```{r comment=NA}
+```{r comment=NA, out.width="80%"}
 df_is_best_for <- function(name, draws) {
   is_best <- rep(NA, N);
   for (n in 1:N) {
@@ -2100,7 +2126,7 @@ is_best_plot <-
   scale_x_discrete(name="player", breaks=c(1, 5, 10, 15)) +
   ggtitle("Who is the Best Player?") +
   theme_jupyter();
-options(repr.plot.width=12, repr.plot.height=4)
+#options(repr.plot.width=12, repr.plot.height=4)
 is_best_plot;
 ```
 
@@ -2196,7 +2222,7 @@ p_B
 \mathrm{I}[T(y^{\mathrm{rep} \ (m)}) \geq T(y)].
 $$
 
-<!-- #region -->
+
 In Stan, the test statistics are first defined for the observed data.
 Because they are functions purely of variables defined in the data
 block, they can be defined in the transformed data block so that they
@@ -2212,46 +2238,38 @@ transformed data {
   real sd_y = sd(to_vector(y));    // sample std dev successes
 }
 ```
-
-The code to generate the replicated data is in the generated
-quantities block.
-
-```
-generated quantities {
-  ...
-  array[N] int<lower=0> y_rep = binomial_rng(K, theta);
-  ...
-}
-```
-
-Then the posterior predictive test statistics are defined in the generated quantities
-block and the actual $p$-value indicators are computed and assigned to
-integer values.  The calls to <code>to_vector()</code> convert an
+The calls to <code>to_vector()</code> convert an
 array of integers to an array of real values so that they are
 appropriately typed to be the input to the standard deviation
 calculation.
 
+Then the posterior predictive test statistics are defined in the generated quantities
+block and the actual $p$-value indicators are computed and assigned to
+integer values. 
+The last part of included file "gq-postpred.stan" computes these values.
 ```
-generated quantities {
-  ...
+  // replications for existing items  
+  array[N] int<lower=0> y_rep = binomial_rng(K, theta);
+  
+  // posterior predictive min replicated successes, test stat p_val
   real<lower=0> min_y_rep = min(y_rep);
   int<lower=0, upper=1> p_min = min_y_rep >= min_y;
 
-  real<lower=0> max_y_rep = max(y_rep);
+  // posterior predictive max replicated successes, test stat p_val
+  real<lower=0> max_y_rep = max(y_rep); 
   int<lower=0, upper=1> p_max = max_y_rep >= max_y;
-  
+
+  // posterior predictive sample mean replicated successes, test stat p_val
   real<lower=0> mean_y_rep = mean(to_vector(y_rep));
   int<lower=0, upper=1> p_mean = mean_y_rep >= mean_y;
 
+  // posterior predictive sample std dev replicated successes, test stat p_val
   real<lower=0> sd_y_rep = sd(to_vector(y_rep));
   int<lower=0, upper=1> p_sd = sd_y_rep >= sd_y;
-}
 ```
-
 
 The fit from the Stan program can then be used to display the Bayesian
 $p$-values for each of the models.
-<!-- #endregion -->
 
 ```{r comment=NA}
 pars_to_print <- c("p_min", "p_max", "p_mean", "p_sd");
@@ -2278,7 +2296,7 @@ shows the posterior predictive distribution for the test statistic,
 the observed value as a vertical line, and the p-value for each of the
 tests.  Here is the plot for the basic hierarchical model.
 
-```{r comment=NA}
+```{r comment=NA, out.width="120%"}
 y_min <- min(y);
 y_max <- max(y);
 y_mean <- mean(y);
@@ -2321,7 +2339,7 @@ post_test_stat_plot <-
              colour = "blue", size = 0.5) +
   ggtitle("Posterior p-values") +
   theme_jupyter();
-options(repr.plot.width=16, repr.plot.height=16)
+#options(repr.plot.width=16, repr.plot.height=16)
 post_test_stat_plot;
 ```
 
@@ -2827,4 +2845,27 @@ lines <- readLines(file_path, encoding="ASCII");
 for (n in 1:length(lines)) cat(lines[n],'\n');
 ```
 
+####  <code>data-blocks.stan</code>
+
+```{r echo=FALSE, comment=NA}
+file_path <- "include/data-blocks.stan";
+lines <- readLines(file_path, encoding="ASCII");
+for (n in 1:length(lines)) cat(lines[n],'\n');
+```
+
+####  <code>include-gq-postpred.stan</code>
+
+```{r echo=FALSE, comment=NA}
+file_path <- "include/gq-postpred.stan";
+lines <- readLines(file_path, encoding="ASCII");
+for (n in 1:length(lines)) cat(lines[n],'\n');
+```
+
+####  <code>include-gq-ranking.stan</code>
+>
+```{r echo=FALSE, comment=NA}
+file_path <- "include/gq-ranking.stan";
+lines <- readLines(file_path, encoding="ASCII");
+for (n in 1:length(lines)) cat(lines[n],'\n');
+```
 
