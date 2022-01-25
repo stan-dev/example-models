@@ -163,7 +163,7 @@ as mentioned above.
 Because we shall develop four models all of which use the same
 data and transformed data, we create a Stan program which
 contains just the data and transformed data blocks "data-blocks.stan"
-and use Stan's [include directive](https://mc-stan.org/docs/reference-manual/includes-section.html)
+and use Stan's [include directive](https://mc-stan.org/docs/reference-manual/includes.html)
 to use this across all four models.
 Because the models contain <code>#include</code> directives, we need to
 specify the `include_paths` when instantiating or compiling the model.
@@ -869,7 +869,7 @@ examples, all of which have been translated to Stan).
 
 #### Centered Parameterization
 
-We will begin with the natural centered parameterization, but we must point out ahead of time that this is not the optimal way to code this model in Stan.  The centered parameterization directly follows the mathematical presentation.
+We will begin with the natural centered parameterization, but we must point out ahead of time that this is not the optimal way to code this model in Stan.  The centered parameterization directly follows the above 
 
 ```
 parameters {
@@ -985,7 +985,9 @@ This decouples the sampling distribution
 for $\alpha^{\mathrm{std}}$ from $\mu$ and $\sigma$, greatly reducing
 their correlation in the posterior.  
 
-Prior to Stan 2.19, a Stan implementation directly encoded the math.
+Prior to Stan 2.19, a Stan implementation directly encoded the above reparameterization,
+introducing a new variable `alpha_std` which has a standard normal distribution,
+thus decoupling the sampling distribution of `alpha_std` from `mu` and `sigma`.
 ```
 parameters {
   real mu; // population mean of success log-odds
@@ -1009,6 +1011,7 @@ Specifying the affine transform in the parameter declaration for
 $\alpha^{\mathrm{std}}$ eliminates the need for intermediate variables
 and makes it easier to see the hierarchical structure of the model.
 
+
 ```
 parameters {
   real mu; // population mean of success log-odds
@@ -1023,6 +1026,8 @@ model {
 }
 ```
 
+This reformulation is functionally equivalent to the previous version,
+but now the tranformation is handled directly by Stan.
 Because the parameters to the prior for $\sigma$ are constants, the
 normalization for the half-prior (compared to the full prior) is
 constant and does not need to be included in the notation.  This only
