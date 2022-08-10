@@ -11,9 +11,6 @@ parameters {
   real<lower=0> sigma;
 }
 model {
-  vector[N] eta;
-  for (i in 1:N)
-    eta[i] = alpha[county[i]] + beta * x[i];
   sigma ~ normal(0, 5);
-  y ~ normal(eta, sigma);  
+  y ~ normal(alpha[county] + beta * x, sigma);  
 }
