@@ -9,7 +9,11 @@ parameters {
   real<lower=0> sigma;
 }
 model {
-  sigma ~ normal(0, 5);
   y ~ normal(alpha + beta * x, sigma);
+  alpha ~ normal(0, 10);
+  beta ~ normal(0, 10);
+  sigma ~ normal(0, 10);
 }
-
+generated quantities {
+  array[N] real y_rep = normal_rng(alpha + beta * x, sigma);
+}
