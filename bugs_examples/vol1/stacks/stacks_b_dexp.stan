@@ -52,8 +52,8 @@ generated quantities {
   }
   b0 = beta0 - mean_x * b;
   
-  outlier_1 = step(fabs((Y[1] - mu[1]) / sigma) - 2.5);
-  outlier_3 = step(fabs((Y[3] - mu[3]) / sigma) - 2.5);
-  outlier_4 = step(fabs((Y[4] - mu[4]) / sigma) - 2.5);
-  outlier_21 = step(fabs((Y[21] - mu[21]) / sigma) - 2.5);
+  outlier_1 = step(abs((Y[1] - mu[1]) / sigma) - 2.5);
+  outlier_3 = step(abs((Y[3] - mu[3]) / sigma) - 2.5);
+  outlier_4 = step(abs((Y[4] - mu[4]) / sigma) - 2.5);
+  outlier_21 = step(abs((Y[21] - mu[21]) / sigma) - 2.5);
 }

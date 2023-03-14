@@ -12,7 +12,7 @@ generated quantities {
   real alpha = normal_rng(log(4), 0.1);
   real beta = normal_rng(-0.25, 0.1);
   real beta_super = normal_rng(-0.5, 0.1);
-  real inv_phi = fabs(normal_rng(0, 1));
+  real inv_phi = abs(normal_rng(0, 1));
   
   for (n in 1 : N) {
     log_sq_foot[n] = normal_rng(1.5, 0.1);
