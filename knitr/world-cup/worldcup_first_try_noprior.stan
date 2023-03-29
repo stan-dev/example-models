@@ -16,7 +16,7 @@ transformed data {
   vector[N_games] sqrt_dif;
   dif = score_1 - score_2;
   for (i in 1 : N_games) {
-    sqrt_dif[i] = (step(dif[i]) - 0.5) * sqrt(fabs(dif[i]));
+    sqrt_dif[i] = (step(dif[i]) - 0.5) * sqrt(abs(dif[i]));
   }
 }
 parameters {

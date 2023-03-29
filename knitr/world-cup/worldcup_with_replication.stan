@@ -15,7 +15,7 @@ transformed data {
   vector[N_games] sqrt_dif;
   dif = score_1 - score_2;
   for (i in 1 : N_games) {
-    sqrt_dif[i] = (step(dif[i]) - 0.5) * sqrt(fabs(dif[i]));
+    sqrt_dif[i] = (step(dif[i]) - 0.5) * sqrt(abs(dif[i]));
   }
 }
 parameters {
@@ -38,5 +38,5 @@ generated quantities {
   for (n in 1 : N_games) {
     y_rep[n] = student_t_rng(df, a[team_1[n]] - a[team_2[n]], sigma_y);
   }
-  y_rep_original_scale = y_rep .* fabs(y_rep);
+  y_rep_original_scale = y_rep .* abs(y_rep);
 }

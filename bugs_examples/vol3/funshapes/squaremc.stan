@@ -10,8 +10,8 @@
  */
 parameters {
   real<lower=-1, upper=1> x_raw;
-  real<lower=-(1 - sqrt(1 - square(1 - fabs(x_raw)))),
-       upper=(1 - sqrt(1 - square(1 - fabs(x_raw))))> y_raw;
+  real<lower=-(1 - sqrt(1 - square(1 - abs(x_raw)))),
+       upper=(1 - sqrt(1 - square(1 - abs(x_raw))))> y_raw;
 }
 transformed parameters {
   real<lower=-1, upper=1> x;
@@ -20,5 +20,5 @@ transformed parameters {
   y = ((y_raw > 0) ? 1 : -1) - y_raw;
 }
 model {
-  target += log1m(sqrt(1 - square(1 - fabs(x_raw))));
+  target += log1m(sqrt(1 - square(1 - abs(x_raw))));
 }

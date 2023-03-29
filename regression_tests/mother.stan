@@ -6,17 +6,12 @@
 //      generate_transform_inits_method(prog.parameter_decl_, o);
 
 functions {
-  int foo(int n);
-  
   int foo(int n) {
     if (n == 0) {
       return 1;
     }
     return n * foo(n - 1);
   }
-  
-  array[] real sho(real t, array[] real y, array[] real theta,
-                   data array[] real x, data array[] int x_int);
   
   array[] real sho(real t, array[] real y, array[] real theta,
                    data array[] real x, data array[] int x_int) {
@@ -208,8 +203,8 @@ functions {
   real relative_diff(real x, real y, real max_, real min_) {
     real abs_diff;
     real avg_scale;
-    abs_diff = fabs(x - y);
-    avg_scale = (fabs(x) + fabs(y)) / 2;
+    abs_diff = abs(x - y);
+    avg_scale = (abs(x) + abs(y)) / 2;
     if ((abs_diff / avg_scale) > max_) {
       reject("user-specified rejection, difference above ", max_, " x:", x,
              " y:", y);

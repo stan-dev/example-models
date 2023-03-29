@@ -58,7 +58,7 @@ model {
   }
   
   for (k in 1 : K) {
-    sigma_b[k] = fabs(xi[k]) * sqrt(Sigma_b_raw[k, k]);
+    sigma_b[k] = abs(xi[k]) * sqrt(Sigma_b_raw[k, k]);
     for (k_prime in 1 : K) {
       rho_b[k, k_prime] = Sigma_b_raw[k, k_prime]
                           / sqrt(Sigma_b_raw[k, k]
