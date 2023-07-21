@@ -86,10 +86,11 @@ data {
 transformed data {
   vector[I] log_E = log(E);
   vector[I] taus;
-  for (k in 1:K) {
-    int node_idxs[K_node_cts[k]] = K_node_idxs[k, 1:K_node_cts[k]];
-    for (j in 1:size(node_idxs))
+  for (k in 1 : K) {
+    array[K_node_cts[k]] int node_idxs = K_node_idxs[k, 1 : K_node_cts[k]];
+    for (j in 1 : size(node_idxs)) {
       taus[node_idxs[j]] = tau[k];
+    }
   }
 }
 parameters {

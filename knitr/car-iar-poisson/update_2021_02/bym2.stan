@@ -69,11 +69,10 @@ parameters {
 }
 transformed parameters {
   // spatial effects (combine heterogeneous and spatially smoothed)
-  vector[I] gamma = sigma * (sqrt(1 - rho) * theta
-			     + sqrt(rho / tau) * phi);
+  vector[I] gamma = sigma * (sqrt(1 - rho) * theta + sqrt(rho / tau) * phi);
 }
 model {
-  y ~ poisson_log(log_E + alpha + x * beta + gamma);  // likelihood
+  y ~ poisson_log(log_E + alpha + x * beta + gamma); // likelihood
   alpha ~ normal(0, 1);
   beta ~ normal(0, 1);
   

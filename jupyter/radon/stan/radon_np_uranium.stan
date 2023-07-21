@@ -1,10 +1,10 @@
 data {
-  int<lower=1> N;  // observations
-  int<lower=1> J;  // counties
+  int<lower=1> N; // observations
+  int<lower=1> J; // counties
   array[N] int<lower=1, upper=J> county;
-  vector[N] y;     // radon
-  vector[N] x;     // floor
-  vector[N] u;     // uranium
+  vector[N] y; // radon
+  vector[N] x; // floor
+  vector[N] u; // uranium
 }
 parameters {
   vector[J] alpha;
@@ -18,5 +18,6 @@ model {
   sigma ~ normal(0, 10);
 }
 generated quantities {
-  array[N] real y_rep = normal_rng(alpha[county] + beta[1] * x + beta[2] * u, sigma);
+  array[N] real y_rep = normal_rng(alpha[county] + beta[1] * x + beta[2] * u,
+                                   sigma);
 }
