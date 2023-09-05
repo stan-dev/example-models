@@ -1,0 +1,555 @@
+---
+title: "Instrumental Variables Analysis of Randomized Experiments with One-Sided Noncompliance"
+author: 
+  - name: JoonHo Lee (jlee296@ua.edu)
+  - name: Avi Feller
+  - name: Sophia Rabe-Hesketh
+date: "April 26, 2023"
+editor: source
+execute:
+  echo: true
+  warning: false
+  message: false
+bibliography: references.bib
+# format:
+#   html:
+#     toc: true
+#     toc-expand: 4
+#     toc-location: right
+#     toc-title: Contents
+#     number-sections: true
+#     number-depth: 3
+#     embed-resources: true
+format:
+  docx:
+    toc: true
+    number-sections: true
+    highlight-style: github
+---
+
+```{r basic_setup, include=FALSE}
+# Set working directory
+setwd("~/Documents/Bayesian-causal-inference/Case_study_2")
+
+# Call libraries
+if (!requireNamespace("pacman", quietly = TRUE)) {
+  install.packages("pacman")
+}
+
+pacman::p_load(
+  tidyverse,    # For data manipulation and visualization
+  rstan,        # Stan interface for R
+  rstanarm,     # Bayesian applied regression modeling
+  bayesplot,    # Bayesian data visualization
+  patchwork,    # Combining multiple plots
+  parallel      # Parallel computing
+)
+
+# Set Stan options
+options(mc.cores = parallel::detectCores()) # Use all available cores
+rstan_options(auto_write = TRUE)            # Save compiled models for faster future use
+Sys.setenv(LOCAL_CPPFLAGS = '-march=native') # Optimize code for local architecture
+```
+
+## Introduction
+
+In this document, we demonstrate how to implement Bayesian inference for causal effects in randomized experiments with one-sided noncompliance using Stan. Specifically, we aim to replicate the analysis presented in @imbens1997bayesian. Noncompliance refers to situations where some units, assigned to receive a particular treatment level, do not comply with their assignment and instead receive an alternative treatment [@imbens2015causal]. One-sided noncompliance denotes an asymmetric scenario where only units assigned to receive the active treatment can potentially circumvent their assigned treatment and receive the control treatment. In contrast, all units assigned to receive the control treatment comply with their assignment.
+
+Initially, we define causal estimands and additional assumptions that allow us to estimate *local* average effects for the treatment of interest, specifically, averages for subsets of units. Subsequently, we analyze an example dataset using Stan according to the model-based estimation strategy suggested by @imbens1997bayesian. We then present Stan models with and without the exclusion restriction assumption, showcasing a significant advantage of the Bayesian model-based approach that enables us to assess the sensitivity of the treatment effect estimate to the assumption. All source code for this case study is available on GitHub at [joonho112/Bayesian-causal-inference/Case_study_2](https://github.com/joonho112/Bayesian-causal-inference/tree/master/Case_study_2).
+
+
+## Data Example
+
+We demonstrate the application of the methods using data from a randomized experiment investigating the impact of vitamin A supplements on infant mortality in Indonesia. The data, previously analyzed by @sommer1991estimating, can be found in the table below:
+
+|   Compliance <br/> Type | Assignment <br/> $Z_{i}$ | Receipt <br/> $W_{i}^{\text{obs}}$ | Survival <br/> $Y_{i}^{\text{obs}}$ | Number of units <br/> ($N$ = 23,682) |
+|--------------:|--------------:|--------------:|--------------:|--------------:|
+|             never-taker |                        1 |                                  0 |                                   0 |                                   34 |
+|             never-taker |                        1 |                                  0 |                                   1 |                                2,385 |
+|                complier |                        1 |                                  1 |                                   0 |                                   12 |
+|                complier |                        1 |                                  1 |                                   1 |                                9,663 |
+| complier or never-taker |                        0 |                                  0 |                                   0 |                                   74 |
+| complier or never-taker |                        0 |                                  0 |                                   1 |                               11,514 |
+|        *(not observed)* |                        0 |                                  1 |                                   0 |                                    0 |
+|        *(not observed)* |                        0 |                                  1 |                                   1 |                                    0 |
+
+: \[Table 1\] Sommer-Zeger vitamin A supplement data
+
+In this experiment, Indonesian villages were randomly assigned to receive or not to receive vitamin A supplements.[^1] The assignment to the supplements is denoted by $Z_{i} \in {0, 1 }$. However, some individuals in villages assigned to the treatment group either chose not to take or did not gain access to the vitamin supplements, while none of the individuals assigned to the control group received the supplements. The receipt of the supplements, considered the treatment of main interest, is denoted by $W_{i}^{\text{obs}} \in {0, 1 }$. Noncompliance in this setting is one-sided because all units assigned to the control condition complied with this assignment. The binary outcome variable $Y_{i}^{\text{obs}}$ indicates an infant's survival.
+
+[^1]: This setting involves treatment being randomized at the group (village) level, while noncompliance occurs at the individual level. @imbens1997bayesian mention that the authors did not have access to village indicators, which prevents them from accounting for the clustering resulting from the village-level randomization.
+
+In principle, eight different combinations of the three observed binary variables, $Z_{i}$, $W_{i}^{\text{obs}}$, and $Y_{i}^{\text{obs}}$, are possible. However, since all units assigned to the control condition complied with the assignment, the two combinations with $Z_{i} = 0$ and $W_{i}^{\text{obs}} = 1$ were not observed in the sample. The following R code loads the dataset based on the counts of the six combinations of observed variables shown in Table 1.
+
+
+```{r}
+# Load data: Sommer-Zeger example from Imbens and Rubin (1997)
+Z <- c(rep(1, 34 + 2385 + 12 + 9663), 
+       rep(0, 74 + 11514))
+
+W <- c(rep(0, 34 + 2385), 
+       rep(1, 12 + 9663), 
+       rep(0, 74 + 11514))
+
+Y <- c(rep(0, 34),
+       rep(1, 2385),
+       rep(0, 12),
+       rep(1, 9663),
+       rep(0, 74),
+       rep(1, 11514))
+```
+
+
+We then organize the data into a list format suitable for use with Stan.
+
+```{r}
+# Collect data into a list form
+stan_data <- list(N = length(Y), Y = Y, Z = Z, W = W)
+```
+
+
+## Causal Estimands
+
+### Setup
+
+First, let's define potential outcomes to fit the instrumental variable settings. For unit $i$, the observed treatment status $W_{i}^{\text{obs}}$ is
+
+$$
+W_i^{\mathrm{obs}}=W_i\left(Z_i\right)= \begin{cases}W_i(0) & \text { if } Z_i=0, \\ W_i(1) & \text { if } Z_i=1. \end{cases}
+$$
+
+$W_{i}(0)$ is the treatment that unit $i$ would receive if assigned to the control ($Z_{i} = 0$). $W_{i}(1)$ is the treatment that unit $i$ would receive if assigned to the treatment ($Z_{i} = 1$). The pair of potential responses to treatment assignment for unit $i$, $(W_{i}(0), W_{i}(1))$, describes the compliance behavior. For unit $i$,
+
+$$
+G_{i} = \begin{cases}
+c & \text{(unit $i$ is a complier),} & \text{if $W_{i}(z) = z$, for $z = 0, 1$},  \\
+n & \text{(unit $i$ is a never-taker),} & \text{if $W_{i}(z) = 0$, for $z = 0, 1$},  \\
+a & \text{(unit $i$ is an always-taker),} & \text{if $W_{i}(z) = 1$, for $z = 0, 1$},  \\
+d & \text{(unit $i$ is a defier),} & \text{if $W_{i}(z) = 1-z$, for $z = 0, 1$}. 
+\end{cases}
+$$
+
+We denote the proportions of the four compliance types in the population as $\pi_{g} = \Pr(G_{i} = g)$ for $g \in {c, n, a, d}$. The compliance behavior $G_{i}$ is a latent pre-treatment variable because it is not fully observed and is unaffected by the treatments.
+
+In the one-sided noncompliance case, all units assigned to the control group comply with the assignment, meaning $W_{i}(0) = 0$ for all units. Consequently, the monotonicity assumption ($W_{i}(1) \geq W_{i}(0)$) is automatically satisfied, ruling out the presence of defiers ($d$) in the super-population. We also cannot distinguish always-takers ($a$) from compliers ($c$) in this case because their behaviors are identical (i.e., $W_i(1) = 1$ and $W_i(0) = 0$ because always-takers do not have access to the treatment). We will refer to this group as compliers and consider alwyas-takers to be absent.  
+
+For the primary outcome, we define the potential outcome, $Y_{i}(z, w)$, as the outcome observed if unit $i$ were assigned treatment $z$ and received treatment $w$. The observed outcome for unit $i$ is:
+
+$$
+Y_{i}^{\text{obs}} = Y_{i}(Z_{i}, W_{i}(Z_{i})) = \begin{cases}
+Y_{i}(0, 0), & \text{if $Z_{i} = 0, W_i(0) = 0$}, (c~\text{or}~n), \\ 
+Y_{i}(0, 1), & \text{if $Z_{i} = 0, W_i(0) = 1$}, (\text{not possible})\\
+Y_{i}(1, 0), & \text{if $Z_{i} = 1, W_i(1) = 0$}, (n), \\
+Y_{i}(1, 1), & \text{if $Z_{i} = 1, W_i(1) = 1$}, (c).
+\end{cases}
+$$
+
+In the one-sided noncompliance setting, where both always-takers ($a$) and defiers ($d$) are absent, we can infer the compliance type for all units with $Z_{i} = 1$. Units with ($Z_{i} = 1, W_i(1) = 0$) must be never-takers, while units with ($Z_{i} = 1, W_i(1) = 1$) must be compliers. However, for units with $Z_{i} = 0$, we cannot determine their compliance types. The combination ($Z_{i} = 0, W_i(0) = 1$) cannot occur, as $W_{i}(0) = 0$ for all units $i$. On the other hand, if a unit has ($Z_{i} = 0, W_i(0) = 0$), we can only infer that it is a complier or a never-taker, as the observed behavior aligns with both compliance types.
+
+
+### Intention-to-treat effects
+
+Now consider the intention-to-treat (ITT) effect, the average effect of treatment assignment $Z_{i}$ on the outcome $Y_{i}$. We can decompose the super-population ITT effect in the one-sided noncompliance case into a weighted average of the subgroup effects by two compliance types (compliers and never-takers):
+
+$$
+\begin{equation}
+\begin{split}
+\text{ITT}_{Y} &= \sum_{g \in \{c, n\}}{\mathbb{E}[Y_{i}(1, W_{i}(1))-Y_{i}(0, W_{i}(0))|G_{i} = g]} \cdot\Pr(G_{i} = g) \\
+&= \mathbb{E}[Y_{i}(1, 1)-Y_{i}(0, 0)|G_i = c] \cdot \pi_c + \mathbb{E}[Y_{i}(1, 0)-Y_{i}(0, 0)|G_i = n] \cdot \pi_n \\
+&= \text{ITT}_Y^{c} \cdot\pi_c + \text{ITT}_Y^n \cdot \pi_n
+\end{split}
+\end{equation}
+$$
+The two sub-population effects on $Y$ by compliance type cannot be directly estimated from the observed data because the latent compliance behavior for units assigned to the control condition ($Z_{i} = 0$) remains unknown. However, under an additional assumption called exclusion restrictions, we can still disentangle the ITT effects by compliance status. Exclusion restrictions capture the idea that there is no direct effect of assignment $Z_{i}$ on the outcome $Y_i$ not mediated by the treatment received $W_i$ [@imbens2015causal]. For all units with $G_i = n$ (never-takers), the exclusion restriction stipulates that $Y_i(1, 0)$ must equal $Y_i(0, 0)$. In other words, the potential outcomes for never-takers, who would not receive the treatments even if assigned to them, are unaffected by the assignment $Z_i$.
+
+Since the super-population average ITT effect for never-takers ($\text{ITT}_Y^n$) equals zero under the *exclusion restriction*, the ITT effect on the primary outcome $\text{ITT}_Y$ can be simplified as follows:
+
+$$
+\begin{equation}
+\begin{split}
+\text{ITT}_{Y} &= \mathbb{E}[Y_{i}(1, 1)-Y_{i}(0, 0)|G_i = c] \cdot \pi_c \\
+&= \mathbb{E}[Y_{i}(1)-Y_{i}(0)|G_i = c] \cdot \pi_c \\
+&= \text{ITT}_Y^{c} \cdot\pi_c. 
+\end{split}
+\end{equation}
+$$
+
+Note that we are dropping the $z$ argument in the potential outcomes because $z$ is always equal to $w$ for compliers. Our primary estimand of interest, the complier average causal effect ($\text{ITT}_Y^{c}$, CACE), is now the ITT effect of $Z_i$ on the outcome $Y_i$ ($\text{ITT}_{Y}$) divided by the proportion of compliers in the population ($\pi_c$). This straightforward moment-based instrumental variable estimator for CACE can be estimated easily using two unbiased estimators: the sample average difference in treatment receipt status by assignment status ($\widehat{\text{ITT}}_{W}$) and the difference in outcome by assignment status ($\widehat{\text{ITT}}_{Y}$). For details, see Chapter 23 of @imbens2015causal.
+
+
+## Model-Based Analysis
+
+The moment-based estimator relies on the differences in sample averages across distinct groups, consequently disregarding individual-level information about compliance status. In contrast, @imbens1997bayesian devised a model-based, or simulation, approach to estimating causal effects in randomized experiments with noncompliance, which emphasizes each individual's compliance status. This alternative method to the standard ratio estimator offers a more nuanced perspective on causal effects.
+
+The model-based estimation strategy offers several advantages over the moment-based approach. Firstly, it establishes a systematic framework for evaluating the effects of various restrictions on the joint distribution of observed variables [@imbens2015causal]. In the context of our one-sided noncompliance example, the model-based method enables us to assess the sensitivity of the CACE estimate to the exclusion restriction for never-takers, which will be elaborated upon later in this document. Secondly, the model-based approach yields more accurate estimates if the proposed parametric model is approximately correct, especially in cases of small sample sizes or a low proportion of compliers [@page2015principal]. Lastly, it provides a flexible means to extend the model to scenarios involving covariates or complex compliance statuses (e.g., @feller2016compared).
+
+### **Stan** model *with* exclusion restriction for never-takers
+
+#### Data block
+
+``` stan
+data {
+  int<lower=1> N;              // Sample size N 
+  int<lower=0,upper=1> Z[N];   // Treatment assigned Z
+  int<lower=0,upper=1> W[N];   // Treatment received W  
+  int<lower=0,upper=1> Y[N];   // Outcome Y  
+}
+``` 
+
+For the model's data inputs, we initially encode three observed binary variables ($Z_{i}$, $W_{i}^{\text{obs}}$, and $Y_{i}^{\text{obs}}$) along with the number of units in the sample ($N$). 
+
+
+#### Parameters block 
+
+``` stan
+parameters {
+  // Population probability of being a complier
+  real<lower=0,upper=1> pi_c;
+  
+  // Probabilities for the binomial outcome distributions
+  real<lower=0,upper=1> eta_c0;
+  real<lower=0,upper=1> eta_c1;
+  real<lower=0,upper=1> eta_n;
+} 
+```
+
+Next, we define a comprehensive parameter vector $\theta$ for the model. In the one-sided noncompliance setting without defiers and always-takers ($\pi_{a}=\pi_{d}=0$), we only need to specify the population probability of a unit being a complier, denoted as $\pi_{c} = \Pr(G_i = c|Z_i)$. This is because the probability of being a never-taker, represented by $\pi_{n}$, is given by $1-\pi_{c}$.
+
+For binary outcomes, we assume that the outcome distribution for each compliance type follows a binomial distribution, with the probability of infant survival for compliance type $g \in {c, n}$ when assigned $z \in {0, 1}$, denoted as $\eta_{gz}$. There are four relevant scalar parameters for the outcome distributions: $\eta_{c0}$, $\eta_{c1}$, $\eta_{n0}$, and $\eta_{n1}$. However, due to the exclusion restriction, we assume that the model parameters for never-takers are identical under $z = 0$ and $z = 1$ (i.e., $\eta_{n0} = \eta_{n1} = \eta_{n}$), as their potential outcomes are assumed to be unaffected by the treatment assignment $Z_i$. Consequently, the complete parameter vector $\theta$ comprises four parameters: $(\pi_{c}, \eta_{c0}, \eta_{c1}, \eta_{n})$. 
+
+
+#### Model block
+
+``` stan
+model {
+  // Prior for Complier probability
+  // implicit prior: pi_c ~ Unif(0, 1)
+  
+  // Priors for outcome model parameters
+  eta_c0 ~ beta(2, 2);  
+  eta_c1 ~ beta(2, 2);  
+  eta_n ~ beta(2, 2); 
+
+  // Likelihood
+  for(n in 1:N){
+    
+    // Complier (assigned to treatment)
+    if(Z[n] == 1 && W[n] == 1){
+      target += log(pi_c) + bernoulli_lpmf(Y[n] | eta_c1) ;
+    }
+    
+    // Never-taker (assigned to treatment)
+    else if(Z[n] == 1 && W[n] == 0){
+      target +=  log(1 - pi_c) + bernoulli_lpmf(Y[n] | eta_n);
+    }
+    
+    // Complier or Never-taker (assigned to control)
+    else if(Z[n] == 0 && W[n] == 0){
+      target += log_sum_exp(
+        log(1 - pi_c) + bernoulli_lpmf(Y[n] | eta_n),  // Never-taker
+        log(pi_c) + bernoulli_lpmf(Y[n] | eta_c0)      // Complier
+      );    
+    }
+  }
+}
+```
+
+The model block in the Stan program defines prior distributions and the likelihood. The initial portion of the model section specifies prior distributions for the parameters. By not explicitly providing a prior for $\pi_c$, Stan automatically assigns $\pi_c$ an implicit uniform prior, $\pi_c \sim \text{Unif}(0, 1)$. Following @imbens1997bayesian, conjugate Beta priors for the binomial outcome distributions with $\alpha = \beta = 2$ are employed for $(\eta_{c0}, \eta_{c1}, \eta_{n})$.
+
+The crux of the model-based estimation lies in utilizing a full likelihood that incorporates individual-level information about compliance status. To define the actual observed data likelihood function for the parameters, we first partition the set of $N$ units into subsets representing each pattern of missing and observed data. In the one-sided noncompliance setting described above, there are three possible values for $(Z_i, W_i^{\text{obs}})$: $(0, 0)$, $(1, 0)$, and $(1, 1)$. We denote the mutually exclusive and collectively exhaustive subsets by $\mathcal{S}(0, 0)$, $\mathcal{S}(1, 0)$, and $\mathcal{S}(1, 1)$.
+
+For the set $\mathcal{S}(1, 1)$, we can infer that units exhibiting this pattern of observed compliance behavior are compliers, as there are no always-takers. Similarly, under the monotonicity assumption, we can deduce that units in the set $\mathcal{S}(1, 0)$ are never-takers. For these two sets, the likelihood contribution from the $i$th unit is proportional to the conditional distribution of observed outcomes $f(Y_{i}^{\text{obs}}|G_i = g, Z_i = z, \eta_{gz})$, with weights determined by the compliance type probability $\Pr(G_i = g | Z_{i} = z)$.
+
+For the set $\mathcal{S}(0, 0)$, we cannot definitively infer the compliance type of the units, as both compliers and never-takers receive the control treatment after being assigned to the control group. Consequently, the observed outcome $Y_{i}^{\text{obs}}$ can originate from two different outcome distributions: $f(Y_{i}^{\text{obs}}|G_i = c, Z_i = 0, \eta_{c0})$ or $f(Y_{i}^{\text{obs}}|G_i = n, Z_i = 0, \eta_{n})$. Therefore, we model the likelihood contribution for the $i$th unit in the set $\mathcal{S}(0, 0)$ as a mixture of these two outcome distributions, where $Y_{i}^{\text{obs}}$ is drawn from the distribution for compliers with probability $\Pr(G_i = c | Z_{i} = 0)$, and $Y_{i}^{\text{obs}}$ is drawn from the distribution for never-takers with probability $\Pr(G_i = n | Z_{i} = 0)$.
+
+Given these specifications for the outcome distributions and the probabilities of compliance type for the three subsets, we can express the full likelihood function in terms of the observed data as follows:
+
+$$
+\begin{equation}
+\begin{split}
+\Pr(\mathbf{W}^{\text{obs}}, \mathbf{Y}^{\text{obs}} | \mathbf{Z}^{\text{obs}}, \boldsymbol{\theta}) &= \prod_{i \in \mathcal{S}(1, 1)}{\Pr(G_i = c|Z_{i} = 1) \cdot f(Y_{i}^{\text{obs}}|G_i = c, Z_i = 1, \eta_{c1})} \times \\
+& \hspace{10mm} \prod_{i \in \mathcal{S}(1, 0)}{\Pr(G_i = n | Z_{i} = 1) \cdot f(Y_{i}^{\text{obs}} | G_i = n, Z_i = 1, \eta_{n})} \times \\
+& \hspace{20mm} \prod_{i \in \mathcal{S}(0, 0)}{\Big[\Pr(G_i = c | Z_{i} = 0) \cdot f(Y_{i}^{\text{obs}} | G_i = c, Z_i = 0, \eta_{c0})} \\
+& \hspace{40mm} +\Pr(G_i = n | Z_{i} = 0) \cdot f(Y_{i}^{\text{obs}} | G_i = n, Z_i = 0, \eta_{n}) \Big].
+\end{split}
+\end{equation}
+$$
+
+Since there is no built-in Stan function to address the specific mixture structure of this likelihood function, we directly construct the likelihood function in the model block. We work with the log-likelihood because Stan's execution relies on evaluating a log probability function for a given set of parameters. By taking the natural logarithm of the likelihood function defined above, the log of a product of terms within the likelihood function is transformed into a sum of the log of the terms.
+
+Note that the likelihood function is expressed as an increment to the log probability function using the `target +=` statement. The model accumulates the log contributions from the mixture components within each of the three observed data subsets, $\mathcal{S}(1, 1)$, $\mathcal{S}(1, 0)$, and $\mathcal{S}(0, 0)$. For never-takers assigned to treatment, for example, two components are calculated and added as log contributions to the total log probability: 
+
+(1) the log of the probability of being a never-taker given treatment assignment (`log(1 - pi_c)`) and 
+
+(2) the log Bernoulli probability mass evaluated at the point `Y[n]` given the probability of survival of an infant for never-takers (`bernoulli_lpmf(Y[n] | eta_n)`).
+
+For the set $\mathcal{S}(0, 0)$, the log sum of exponentials function `(log_sum_exp())` is employed to define mixtures on the log scale. The `log_sum_exp(a, b)` function is equivalent to `log(exp(a) + exp(b))`, but provides more numerical stability (see [Chapter 5 of the Stan User's Guide](https://mc-stan.org/docs/stan-users-guide/summing-out-the-responsibility-parameter.html)). By using this function, we calculate the log-likelihood contributions for units in the subset $\mathcal{S}(0, 0)$, which are drawn from a mixture of outcome distributions for two compliance types: compliers and never-takers.
+
+
+#### Transformed Parameters Block
+
+``` stan
+transformed parameters {
+  // Superpopulation complier average causal effect (CACE)
+  // in per-1000 units
+  real CACE; 
+  CACE = (eta_c1 - eta_c0)*10^3;
+}
+```
+
+The estimand of primary interest is the super-population complier average causal effect (CACE), denoted as $\eta_{c1}-\eta_{c0}$. We can include an optional transformed parameters block to generate the posterior distribution for the CACE, which is defined as a function of the declared parameters. We rescaled the CACE estimates by simply multiplying the original estimates by $10^{3}$. The resulting CACE estimate represents the causal effect of vitamin A supplements on infant mortality per 1,000 individuals, specifically for compliers in the population.
+
+
+#### Model estimation
+
+The code blocks specified above are combined in the Stan program `Model_01_CACE_with_Exclusion_Restriction.stan`. This program is then fit to the Sommer-Zeger vitamin A supplement data:
+
+```{r, results="hide", warning=FALSE, cache=TRUE}
+# Compile and run the stan model
+stan_fit_ER <- stan(
+  file = "Model_01_CACE_with_Exclusion_Restriction.stan", 
+  data = stan_data, 
+  iter = 1000, chains = 4
+)
+```
+
+The posterior means and standard deviations of the parameters can be displayed as follows:
+
+```{r}
+print(stan_fit_ER, probs = c(0.05, 0.5, 0.95), digits = 3)
+```
+
+Before interpreting the results, it is necessary to check that the chains have converged for each parameter. The $\hat{R}$ statistics shown in the rightmost column of the model summary are all less than 1.1. Additionally, the effective sample size estimates are sufficient for inference. According to the @gelman1992inference criterion for convergence, it seems that Stan has produced an adequate approximation of the posterior. We can plot the posterior distribution of CACE with the exclusion restriction as follows:
+
+
+```{r, fig.width=7, fig.height=5}
+#| code-fold: true
+#| code-summary: "Click this to see the code that produced this plot"
+# Extract posterior draws of CACE
+df_CACE <- rstan::extract(stan_fit_ER) %>% 
+  pluck("CACE") %>% 
+  {. ->> vec_CACE} %>%
+  as_tibble() %>% 
+  set_names("CACE")
+
+# Plot the histogram of CACE with exclusion restriction
+ggplot(data = df_CACE, aes(x = CACE)) +
+  geom_histogram(
+    bins = 40, color = "black", fill = "gray95"
+  ) +
+  geom_vline(
+    xintercept = quantile(vec_CACE, probs = c(0.05, 0.50, 0.95)), 
+    color = "red", linetype = "longdash"
+  ) + 
+  geom_text(
+    x = 3.8, y = 25, 
+    label = "Median = 3.20", 
+    color = "red", size = 4
+  ) +
+  scale_x_continuous(
+    name = "CACE (in per 1,000 units)", 
+    breaks = seq(from = -4, to = 10, by = 2)
+  ) +
+  labs(
+    title = "Histogram of CACE with exclusion restriction", 
+    subtitle = "with median and 90% credible interval"
+  ) +
+  theme_bw() + 
+  theme(panel.grid = element_blank())
+```
+
+This histogram replicates Figure 3 from @imbens1997bayesian. With exclusion restriction for never-takers, the posterior mean of the CACE is 3.20, and the 90% credible interval is (1.28, 5.17) per 1,000 individuals. This result suggests that receiving vitamin A treatment is highly likely to have a positive effect on infant survival for compliers in the population.
+
+
+### **Stan** model *without* exclusion restriction for never-takers
+
+In this section, we assess the sensitivity of the CACE estimate to the exclusion restriction for never-takers. Without the exclusion restriction, the potential outcomes for never-takers are assumed to be affected by the treatment assignment $Z_i$. Consequently, we assume that the outcome model parameters under different treatment assignments, $\eta_{n0}$ and $\eta_{n1}$, are not the same for never-takers. Now, the complete parameter vector is $\theta = (\pi_{c}, \eta_{c0}, \eta_{c1}, \eta_{n0}, \eta_{n1})$, which is coded as follows in the Stan program:
+
+``` stan
+parameters {
+  // Population probability of being a complier
+  real<lower=0,upper=1> pi_c;
+  
+  // Probabilities for the binomial outcome distributions
+  real<lower=0,upper=1> eta_c0;
+  real<lower=0,upper=1> eta_c1;
+  real<lower=0,upper=1> eta_n0;
+  real<lower=0,upper=1> eta_n1;
+} 
+```
+
+The model block is nearly identical to the one specified in the previous section, sharing the same prior distributions and likelihood. We use the same conjugate Beta priors for the binomial outcome distributions with $\alpha = \beta = 2$ for $(\eta_{c0}, \eta_{c1}, \eta_{n0}, \eta_{n1})$. The full likelihood function maintains the same mixture structure defined across the three data subsets $\mathcal{S}(0, 0)$, $\mathcal{S}(1, 0)$, and $\mathcal{S}(1, 1)$. 
+
+The only difference is the parameterization of the outcome distributions for never-takers. Instead of using a common parameter $\eta_{n}$ for modeling the conditional distributions of observed outcomes regardless of treatment assignment, we use separate outcome model parameters for $f(Y_{i}^{\text{obs}}|G_i = n, Z_i = 0, \eta_{n0})$ and $f(Y_{i}^{\text{obs}}|G_i = n, Z_i = 1, \eta_{n1})$:
+
+``` stan
+model {
+  // Prior for Complier probability
+  // implicit prior: pi_c ~ Unif(0, 1)
+  
+  // Priors for outcome model parameters
+  eta_c0 ~ beta(2, 2);  
+  eta_c1 ~ beta(2, 2);  
+  eta_n0 ~ beta(2, 2);
+  eta_n1 ~ beta(2, 2);
+
+  // Likelihood
+  for (n in 1:N) {
+  
+    // Complier (assigned to treatment)
+    if (Z[n] == 1 && W[n] == 1) {
+      target += log(pi_c) + bernoulli_lpmf(Y[n] | eta_c1);
+    }
+    
+    // Never-taker (assigned to treatment)
+    else if (Z[n] == 1 && W[n] == 0) {
+      target += log(1 - pi_c) + bernoulli_lpmf(Y[n] | eta_n1);
+    }
+    
+    // Complier or Never-taker (assigned to control)
+    else if (Z[n] == 0 && W[n] == 0) {
+      target += log_sum_exp(
+        log(1 - pi_c) + bernoulli_lpmf(Y[n] | eta_n0),  // Never-taker
+        log(pi_c) + bernoulli_lpmf(Y[n] | eta_c0)       // Complier
+      );
+    }
+  }
+}
+```
+
+In addition to the main causal estimand, the super-population complier average causal effect (CACE, $\eta_{c1} - \eta_{c0}$), we can now define the super-population average causal effect of treatment assignment on outcomes for never-takers ($\eta_{n1} - \eta_{n0}$) in the `transformed parameters` block. We will refer to this as the "NACE" (Never-taker Average Causal Effect):
+
+``` stan
+transformed parameters {
+  // Super-population average causal effects 
+  real CACE;
+  real NACE;
+  
+  CACE = (eta_c1 - eta_c0) * 10^3;
+  NACE = (eta_n1 - eta_n0) * 10^3;
+}
+```
+
+The Stan program `Model_02_CACE_without_Exclusion_Restriction.stan` is subsequently fit to the example dataset:
+
+```{r, results="hide", warning=FALSE, cache=TRUE}
+# Compile and run the stan model
+stan_fit_noER <- stan(
+  file = "Model_02_CACE_without_Exclusion_Restriction.stan", 
+  data = stan_data, 
+  iter = 1000, chains = 4
+)
+```
+
+The CACE and NACE estimates, without assuming exclusion restriction for never-takers, are presented in the table below. The $\hat{R}$ statistics and effective sample size estimates indicate that the chains have converged for each parameter:
+
+```{r}
+print(stan_fit_noER, probs = c(0.05, 0.5, 0.95), digits = 3)
+```
+
+
+
+```{r, fig.width=7, fig.height=5}
+#| code-fold: true
+#| code-summary: "Click this to see the code that produced this plot"
+# Extract posterior draws of CACE
+df_CACE <- rstan::extract(stan_fit_noER) %>% 
+  pluck("CACE") %>% 
+  {. ->> vec_CACE} %>%
+  as_tibble() %>% 
+  set_names("CACE")
+
+# Plot the histogram of CACE with exclusion restriction
+ggplot(data = df_CACE, aes(x = CACE)) +
+  geom_histogram(
+    bins = 40, color = "black", fill = "gray95"
+  ) +
+  geom_vline(
+    xintercept = quantile(vec_CACE, probs = c(0.05, 0.50, 0.95)), 
+    color = "red", linetype = "longdash"
+  ) + 
+  geom_text(
+    x = 3.8, y = 25, 
+    label = "Median = 2.65", 
+    color = "red", size = 4
+  ) +
+  scale_x_continuous(
+    name = "CACE (in per 1,000 units)", 
+    breaks = seq(from = -4, to = 10, by = 2)
+  ) +
+  labs(
+    title = "Histogram of CACE without exclusion restriction", 
+    subtitle = "with median and 90% credible interval"
+  ) +
+  theme_bw() + 
+  theme(panel.grid = element_blank())
+```
+
+
+The histogram above replicates Figure 1 from @imbens1997bayesian. The 90% credible interval of the posterior distribution indicates that the true CACE, without exclusion restriction, likely falls within the range of -0.37 to 6.12 per 1,000 individuals. 
+
+
+```{r, fig.width=7, fig.height=5}
+#| code-fold: true
+#| code-summary: "Click this to see the code that produced this plot"
+# Extract posterior draws of 
+df_NACE <- rstan::extract(stan_fit_noER) %>% 
+  pluck("NACE") %>% 
+  {. ->> vec_NACE} %>%
+  as_tibble() %>% 
+  set_names("NACE")
+
+# Plot the histogram of NACE with exclusion restriction
+ggplot(data = df_NACE, aes(x = NACE)) +
+  geom_histogram(
+    bins = 40, color = "black", fill = "gray95"
+  ) +
+  geom_vline(
+    xintercept = quantile(vec_NACE, probs = c(0.05, 0.50, 0.95)), 
+    color = "red", linetype = "longdash"
+  ) + 
+  geom_text(
+    x = 3.8, y = 25, 
+    label = "Median = 1.97", 
+    color = "red", size = 4
+  ) +
+  scale_x_continuous(
+    name = "NACE (in per 1,000 units)", 
+    breaks = seq(from = -30, to = 30, by = 2)
+  ) +
+  labs(
+    title = "Histogram of NACE without exclusion restriction", 
+    subtitle = "with median and 90% credible interval"
+  ) +
+  theme_bw() + 
+  theme(panel.grid = element_blank())
+```
+
+
+We also replicate Figure 2 from @imbens1997bayesian, which represents the posterior distribution for NACE. Under the exclusion restriction, the NACE is constrained to be 0 because $\eta_{n0} = \eta_{n1}$. Without the exclusion restriction, however, the NACE has a posterior distribution that is centered around 0, lending credibility to the exclusion restriction [@imbens1997bayesian].
+
+
+```{r, fig.width=7, fig.height=5}
+#| code-fold: true
+#| code-summary: "Click this to see the code that produced this plot"
+# Plot joint posterior distribution of CACE and NACE
+ggplot(data = bind_cols(df_CACE, df_NACE), aes(x = CACE, y = NACE)) +
+  geom_point(size = 2, shape = 3) + 
+  geom_vline(xintercept = 0, color = "blue") + 
+  geom_hline(yintercept = 0, color = "blue") + 
+  labs(title = "Joint posterior distribution of CACE and NACE") + 
+  theme_bw() + 
+  theme(panel.grid = element_blank()) 
+```
+
+
+Next, we plot the joint posterior distribution of CACE and NACE without the exclusion restriction, replicating Figure 4 from @imbens1997bayesian. From the plot, we observe that in order to believe that CACE has a *negative* effect, one must also believe that NACE has a strong *positive* effect. Since this combination of hypotheses does not seem plausible, we can confidently conclude that receiving treatment has a positive effect on the outcome, even without imposing the exclusion restriction for never-takers [@imbens1997bayesian].
+
+
+## Conclusion
+
+This document illustrates the application of Bayesian inference for estimating causal effects in randomized experiments with one-sided noncompliance using Stan. The methodology depends on two primary assumptions: unconfoundedness of treatment assignment, and an exclusion restriction that negates the effect of assignment on outcomes for noncompliers. The first assumption is intrinsic to randomized experiments, while the second necessitates more subject-matter knowledge and can be reinforced through design measures like double-blinding.
+
+Our demonstration highlights the Bayesian model-based approach's ability to assess the sensitivity of the treatment effect estimate to the exclusion restriction assumption, by performing the analysis both with and without this assumption. Without the exclusion restriction, inference might be imprecise, even in large samples. However, with the exclusion restriction, the complier average causal effect (CACE) can be more accurately estimated using Bayesian model-based approaches compared to traditional econometric instrumental variables approaches [@imbens1997bayesian].
+
+
