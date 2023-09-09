@@ -6,7 +6,6 @@ data {
 }
 parameters {
   vector[N] phi;
-  real sigma;
 }
 model {
   target += -0.5 * dot_self(phi[node1] - phi[node2]);
