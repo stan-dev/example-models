@@ -266,8 +266,8 @@ These are declared in the data block of a Stan program as follows:
 data {
   int<lower=0> N;
   int<lower=0> N_edges;
-  int<lower=1, upper=N> node1[N_edges];
-  int<lower=1, upper=N> node2[N_edges];
+  array[N_edges] int<lower=1, upper=N> node1; // node1[i] adjacent to node2[i]
+  array[N_edges] int<lower=1, upper=N> node2; // and node1[i] < node2[i]
 ```
 Stan's multiple indexing feature allows multiple indexes to be provided for containers
 (i.e., arrays, vectors, and matrices) in a single index position on that container,
@@ -303,8 +303,10 @@ parameters {
 }
 model {
   target += -0.5 * dot_self(phi[node1] - phi[node2]);
-  // soft sum-to-zero constraint on phi)
-  sum(phi) ~ normal(0, 0.001 * N);  // equivalent to mean(phi) ~ normal(0,0.001)
+  
+  // soft sum-to-zero constraint on phi,
+  // equivalent to mean(phi) ~ normal(0,0.01)
+  sum(phi) ~ normal(0, 0.01 * N);
 }
 ```
 
@@ -519,8 +521,11 @@ The R script
 fits the model to the data.
 
 ```{r fit-scotland }
-library(rstan)   
-options(mc.cores = parallel::detectCores())  
+library(devtools)
+if(!require(cmdstanr)){
+  devtools::install_github("stan-dev/cmdstanr", dependencies=c("Depends", "Imports"))
+}
+library(cmdstanr)   
 
 source("mungeCARdata4stan.R")  
 source("scotland_data.R")
@@ -534,8 +539,21 @@ node1 = nbs$node1;
 node2 = nbs$node2;
 N_edges = nbs$N_edges;
 
-bym_scot_stanfit = stan("bym_predictor_plus_offset.stan", data=list(N,N_edges,node1,node2,y,x,E), control=list(adapt_delta = 0.97, stepsize = 0.1), chains=3, warmup=9000, iter=10000, save_warmup=FALSE);
-print(bym_scot_stanfit, pars=c("beta0", "beta1", "sigma_phi", "tau_phi", "sigma_theta", "tau_theta", "mu[5]", "phi[5]", "theta[5]"), probs=c(0.025, 0.5, 0.975));
+data = list(N=N,N_edges=N_edges,node1=node1,node2=node2,y=y,x=x,E=E)
+
+bym_model = cmdstan_model("bym_predictor_plus_offset.stan");
+scot_stanfit = bym_model$sample(
+         data = data,
+         parallel_chains = 4,
+         iter_warmup = 5000,
+         iter_sampling = 5000);
+
+options(digits=3)
+scot_stanfit$summary(variables = c("lp__", "beta0", "beta1",
+                                   "sigma_phi", "tau_phi",
+                                   "sigma_theta", "tau_theta",
+                                   "mu[5]","phi[5]","theta[5]"),
+                     ~quantile(.x, probs = c(0.025, 0.5, 0.975)))
 ```
 
 The priors on all parameters match the priors on the corresponding WinBUGS model in the file
