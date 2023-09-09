@@ -517,15 +517,16 @@ To test this model with real data, we ran it on the version of the Scotland Lip 
 [scotland_data.R](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/scotland_data.R),
 described in the previous section.
 The R script
-[fit_scotland.R](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/fit_scotland.R)
+[fit_scotland_bym.R](https://github.com/stan-dev/example-models/tree/master/knitr/car-iar-poisson/fit_scotland_bym.R)
 fits the model to the data.
 
-```{r fit-scotland }
+```{r bym-fit-scotland }
 library(devtools)
 if(!require(cmdstanr)){
   devtools::install_github("stan-dev/cmdstanr", dependencies=c("Depends", "Imports"))
 }
 library(cmdstanr)   
+options(digits=3)
 
 source("mungeCARdata4stan.R")  
 source("scotland_data.R")
@@ -539,21 +540,25 @@ node1 = nbs$node1;
 node2 = nbs$node2;
 N_edges = nbs$N_edges;
 
-data = list(N=N,N_edges=N_edges,node1=node1,node2=node2,y=y,x=x,E=E)
+data = list(N=N,
+            N_edges=N_edges,
+            node1=node1,
+            node2=node2,
+            y=y,
+            x=x,
+            E=E);
 
 bym_model = cmdstan_model("bym_predictor_plus_offset.stan");
-scot_stanfit = bym_model$sample(
+
+bym_scot_stanfit = bym_model$sample(
          data = data,
          parallel_chains = 4,
-         iter_warmup = 5000,
-         iter_sampling = 5000);
-
-options(digits=3)
-scot_stanfit$summary(variables = c("lp__", "beta0", "beta1",
-                                   "sigma_phi", "tau_phi",
-                                   "sigma_theta", "tau_theta",
-                                   "mu[5]","phi[5]","theta[5]"),
-                     ~quantile(.x, probs = c(0.025, 0.5, 0.975)))
+	 refresh=0);
+         
+bym_scot_stanfit$summary(variables = c("lp__", "beta0", "beta1",
+                                       "sigma_phi", "tau_phi",
+                                       "sigma_theta", "tau_theta",
+                                       "mu[5]","phi[5]","theta[5]"));
 ```
 
 The priors on all parameters match the priors on the corresponding WinBUGS model in the file
@@ -572,7 +577,6 @@ library(R2OpenBUGS);
 library(rstan)  
 
 source("scotland_data.R");
-
 
 iter = 100000;
 burn =  90000;
@@ -700,17 +704,22 @@ The R script
 fits the model to the data.  This code includes details on how to compute the scaling factor using the INLA library.
 
 ```{r fit-scotland-bym2 }
-library(rstan)   
-options(mc.cores = parallel::detectCores())  
-
+library(devtools)
+if(!require(cmdstanr)){
+  devtools::install_github("stan-dev/cmdstanr", dependencies=c("Depends", "Imports"))
+}
+if(!require(INLA)){
+install.packages("INLA",repos=c(getOption("repos"),INLA="https://inla.r-inla-download.org/R/stable"), dep=TRUE)
+}
+library(cmdstanr)   
 library(INLA)
 
 source("mungeCARdata4stan.R")  
 source("scotland_data.R")
 y = data$y;
+x = 0.1 * data$x;
 E = data$E;
 K = 1;
-x = 0.1 * data$x;
 
 nbs = mungeCARdata4stan(data$adj, data$num);
 N = nbs$N;
@@ -733,16 +742,31 @@ Q_inv = inla.qinv(Q_pert, constr=list(A = matrix(1,1,nbs$N),e=0))
 #Compute the geometric mean of the variances, which are on the diagonal of Q.inv
 scaling_factor = exp(mean(log(diag(Q_inv))))
 
-scot_stanfit = stan("bym2_predictor_plus_offset.stan", data=list(N,N_edges,node1,node2,y,x,E,scaling_factor), warmup=5000, iter=6000);
+data = list(N=N,
+            N_edges=N_edges,
+            node1=node1,
+            node2=node2,
+            y=y,
+            x=x,
+            E=E,
+            scaling_factor=scaling_factor);
 
-print(scot_stanfit, pars=c("beta0", "beta1", "rho", "sigma", "log_precision", "logit_rho", "mu[5]", "phi[5]", "theta[5]"), probs=c(0.025, 0.5, 0.975));
+bym2_model = cmdstan_model("bym2_predictor_plus_offset.stan");
+
+bym2_scot_stanfit = bym2_model$sample(
+                                   data=data,
+                                   parallel_chains=4,
+				   refresh=0);
+
+bym2_scot_stanfit$summary(variables = c("beta0", "beta1",
+                                       "sigma", "rho",
+                                       "mu[5]","phi[5]","theta[5]"))
 ```
 
-To see how this re-parameterization affects the fit, we reprint the results of fitting the Scotland data using the previous version of the BYM model,
-printing only the parameters and generated quantities shared by these two models:
+To see how this re-parameterization affects the fit, we reprint the above results, showing only the parameters and generated quantities shared by these two models:
 
 ```{r print-fit-scotland-bym }
-print(bym_scot_stanfit, pars=c("beta0", "beta1", "mu[5]"), probs=c(0.025, 0.5, 0.975));
+bym_scot_stanfit$summary(variables = c("beta0", "beta1", "mu[5]"));
 ```
 
 As a further check, we compare the results of using Stan implementation of the BYM2 model to fit the Scotland lip cancer dataset with the results obtained by using INLA's implementation of the BYM2 model.  The script to run INLA using package R-INLA is in file
@@ -755,8 +779,6 @@ After fitting the model, we print the values for the fixed effects parameters, i
 (Intercept) -0.2215948 0.1265029 -0.4711830 -0.2215091 0.02705429 -0.2214959 1.472228e-08
 x            0.3706808 0.1320332  0.1054408  0.3725290 0.62566048  0.3762751 4.162445e-09
 ```
-
-
 
 ## Bigger data: from 56 counties in Scotland to 1921 census tracts in New York City
 
@@ -804,8 +826,7 @@ fits the BYM2 Stan model to the 2001 NYC traffic accident data and saves the res
 library(maptools);
 library(spdep);
 library(rgdal)
-library(rstan);
-options(mc.cores = 3);
+library(cmdstanr);
 
 load("nyc_subset.data.R");
 
@@ -828,14 +849,28 @@ node2 = nbs$node2;
 N_edges = nbs$N_edges;
 scaling_factor = scale_nb_components(nb_nyc_subset)[1];
 
-bym2_stan = stan_model("bym2_offset_only.stan");
-bym2_fit = sampling(bym2_stan, data=list(N,N_edges,node1,node2,y,E,scaling_factor), control = list(adapt_delta = 0.97), chains=3, warmup=7000, iter=8000, save_warmup=FALSE);
+data = list(N=N,
+            N_edges=N_edges,
+            node1=node1,
+            node2=node2,
+            y=y,
+            E=E,
+            scaling_factor=scaling_factor);
 
-print(bym2_fit, digits=3, pars=c("beta0", "rho", "sigma", "mu[1]", "mu[2]", "mu[3]", "mu[500]", "mu[1000]", "mu[1500]", "mu[1900]", "phi[1]", "phi[2]", "phi[3]", "phi[500]", "phi[1000]", "phi[1500]", "phi[1900]", "theta[1]", "theta[2]", "theta[3]", "theta[500]", "theta[1000]", "theta[1500]", "theta[1900]"), probs=c(0.025, 0.5, 0.975));
+bym2_model = cmdstan_model("bym2_offset_only.stan");
+bym2_fit = bym2_model$sample(data=data, parallel_chains=4, refresh=0);
+
+bym2_fit$summary(
+             variables = c(
+                 "beta0", "rho", "sigma",
+                 "mu[1]", "mu[2]", "mu[3]", "mu[500]", "mu[1000]", "mu[1500]", "mu[1900]",
+                 "phi[1]", "phi[2]", "phi[3]", "phi[500]", "phi[1000]", "phi[1500]", "phi[1900]",
+                 "theta[1]", "theta[2]", "theta[3]", "theta[500]", "theta[1000]", "theta[1500]", "theta[1900]"));
 
 save(bym2_fit, file="nyc_bym2_fit.data.R");
+
 ```
-The Rhat values indicate good convergences, and the n_eff numbers, while low for `rho` and `sigma`, are sufficient.  ICAR models require a large number of warmup iterations; for this model, at least 7000 are required for a good fit.   On a 2015 13-inch MacBook pro with 2 CPUs, running 3 chains took for a total of 8000 iterations took 5 hours to fit.
+The Rhat values indicate good convergences, and the n_eff numbers, while low for `rho` and `sigma`, are sufficient.
 
 ### Visual comparisons of data and model fits
 
@@ -1028,7 +1063,8 @@ Funded in part by the National Institute of Child Health and Human Development, 
 
 #### R Packages
 
-* Statistics: [RStan](http://mc-stan.org/users/interfaces/rstan.html), [RStanArm](http://mc-stan.org/users/interfaces/rstanarm.html), [R2OpenBugs](https://cran.r-project.org/web/packages/R2OpenBugs), OpenBUGS, [R-INLA](http://www.r-inla.org).
+* Statistics: [CmdStanR](http://mc-stan.org/cmdstanr),
+[R2OpenBugs](https://cran.r-project.org/web/packages/R2OpenBugs), OpenBUGS, [R-INLA](http://www.r-inla.org).
 
 * Plots and supporting libraries: [ggplot2](http://ggplot2.org),  [ggmap](https://cran.r-project.org/web/packages/ggmap), [dplyr](https://cran.r-project.org/web/packages/dplyr), [tidy](https://cran.r-project.org/web/packages/tidy)
 
@@ -1039,12 +1075,12 @@ Funded in part by the National Institute of Child Health and Human Development, 
 ### Licenses
 
 <small>
-**Code:** Copyright (2018) Columbia University.  Released under the
+**Code:** Copyright (2018-2023) Columbia University.  Released under the
 [BSD 3-clause license](https://opensource.org/licenses/BSD-3-Clause).
 </small>
 
 <small>
-**Text:** Copyright (2018) Mitzi Morris.  Released under the
+**Text:** Copyright (2018-2023) Mitzi Morris.  Released under the
 the [CC BY-NC 4.0
 license](https://creativecommons.org/licenses/by-nc/4.0/).
 </small>

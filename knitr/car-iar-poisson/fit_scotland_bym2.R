@@ -1,14 +1,19 @@
-library(rstan)   
-options(mc.cores = parallel::detectCores())  
-
+library(devtools)
+if(!require(cmdstanr)){
+  devtools::install_github("stan-dev/cmdstanr", dependencies=c("Depends", "Imports"))
+}
+if(!require(INLA)){
+install.packages("INLA",repos=c(getOption("repos"),INLA="https://inla.r-inla-download.org/R/stable"), dep=TRUE)
+}
+library(cmdstanr)   
 library(INLA)
 
 source("mungeCARdata4stan.R")  
 source("scotland_data.R")
 y = data$y;
+x = 0.1 * data$x;
 E = data$E;
 K = 1;
-x = 0.1 * data$x;
 
 nbs = mungeCARdata4stan(data$adj, data$num);
 N = nbs$N;
@@ -31,18 +36,23 @@ Q_inv = inla.qinv(Q_pert, constr=list(A = matrix(1,1,nbs$N),e=0))
 #Compute the geometric mean of the variances, which are on the diagonal of Q.inv
 scaling_factor = exp(mean(log(diag(Q_inv))))
 
-scot_stanfit_soft = stan("bym2_predictor_plus_offset_soft.stan",
-                         data=list(N,N_edges,node1,node2,y,x,E,scaling_factor),
-                         control=list(adapt_delta = 0.97, stepsize = 0.1),
-                         chains=3, warmup=5000, iter=6000, save_warmup=FALSE);
+data = list(N=N,
+            N_edges=N_edges,
+            node1=node1,
+            node2=node2,
+            y=y,
+            x=x,
+            E=E,
+            scaling_factor=scaling_factor);
 
+bym2_model = cmdstan_model("bym2_predictor_plus_offset.stan");
 
+bym2_scot_stanfit = bym2_model$sample(
+                                   data=data,
+                                   parallel_chains=4,
+                                   refresh=0);
 
-scot_stanfit_hard = stan("bym2_predictor_plus_offset_hard.stan",
-                         data=list(N,N_edges,node1,node2,y,x,E,scaling_factor),
-                         control=list(adapt_delta = 0.97, stepsize = 0.1),
-                         chains=3, warmup=5000, iter=6000, save_warmup=FALSE);
-
-print(scot_stanfit_soft, pars=c("lp__", "beta0", "beta1", "rho", "sigma", "mu[5]", "phi[5]", "theta[5]"), probs=c(0.025, 0.5, 0.975));
-print(scot_stanfit_hard, pars=c("lp__", "beta0", "beta1", "rho", "sigma", "mu[5]", "phi[5]", "theta[5]"), probs=c(0.025, 0.5, 0.975));
+bym2_scot_stanfit$summary(variables = c("beta0", "beta1",
+                                       "sigma", "rho",
+                                       "mu[5]","phi[5]","theta[5]"))
 
