@@ -38,7 +38,7 @@ of the initial state. Posterior draws from the hidden states can be computed
 separately.
 
 A more complete mathematical definition of the HMM model and function interface
-is given in the [Hidden Markov Models](https://mc-stan.org/docs/2_24/functions-reference/hidden-markov-models.html)
+is given in the [Hidden Markov Models](https://mc-stan.org/docs/functions-reference/hidden-markov-models.html)
 section of the Function Reference Guide.
 
 There are three functions
@@ -120,7 +120,7 @@ The data is the previously generated sequence of $N$ measurements:
 ```{stan, output.var = "", eval = FALSE}
 data {
   int N; // Number of observations
-  real y[N];
+  array[N] real y;
 }
 ```
 
@@ -267,7 +267,7 @@ can be generated with `hmm_latent_rng`:
 
 ```{stan, output.var = "", eval = FALSE}
 generated quantities {
-  int[N] y_sim = hmm_latent_rng(log_omega, Gamma, rho)
+  array[N] int y_sim = hmm_latent_rng(log_omega, Gamma, rho);
 }
 ```
 
