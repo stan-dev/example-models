@@ -1,8 +1,8 @@
 data {
-  int<lower=1> N;               // Sample size N 
-  int<lower=0, upper=1> Z[N];   // Treatment assigned Z
-  int<lower=0, upper=1> W[N];   // Treatment received W  
-  int<lower=0, upper=1> Y[N];   // Outcome Y  
+  int<lower=1> N;                    // Sample size N 
+  array[N] int<lower=0, upper=1> Z;  // Treatment assigned Z
+  array[N] int<lower=0, upper=1> W;  // Treatment received W
+  array[N] int<lower=0, upper=1> Y;  // Outcome Y
 }
 
 parameters {
@@ -57,3 +57,4 @@ model {
     }
   }
 }
+
