@@ -15,12 +15,6 @@ parameters {
   real<lower=0, upper=1> eta_n;
 }  
 
-transformed parameters {
-  // Superpopulation complier average causal effect (CACE)
-  // in per-1000 units
-  real CACE = (eta_c1 - eta_c0) * 10^3;
-}
-
 model {
   // Define local variables for efficiency
   real log_pi_c = log(pi_c);
@@ -57,4 +51,12 @@ model {
     }
   }
 }
+
+generated quantities {
+  // Superpopulation complier average causal effect (CACE)
+  // in per-1000 units
+  real CACE = (eta_c1 - eta_c0) * 10^3;
+}
+
+
 

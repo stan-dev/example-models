@@ -296,17 +296,17 @@ Note that the likelihood function is expressed as an increment to the log probab
 For the set $\mathcal{S}(0, 0)$, the built-in function in Stan, `log_mix()`, is employed to define mixtures on the log scale. The `log_mix(p, a, b)` function internally calculates the log-weighted mixture of `a` and `b` using the weight `p`, which provides a more numerically stable solution for mixtures (see [Chapter 5 of the Stan User's Guide](https://mc-stan.org/docs/stan-users-guide/vectorizing-mixtures.html)). By adopting this function, we directly determine the log-likelihood contributions for units in the subset $\mathcal{S}(0, 0)$, which originate from a mixture of outcome distributions for two compliance types: compliers and never-takers.
 
 
-#### Transformed Parameters Block
+#### Generated quantities Block
 
 ``` stan
-transformed parameters {
+generated quantities {
   // Superpopulation complier average causal effect (CACE)
   // in per-1000 units
   real CACE = (eta_c1 - eta_c0) * 10^3;
 }
 ```
 
-The estimand of primary interest is the super-population complier average causal effect (CACE), denoted as $\eta_{c1}-\eta_{c0}$. We can include an optional transformed parameters block to generate the posterior distribution for the CACE, which is defined as a function of the declared parameters. We rescaled the CACE estimates by simply multiplying the original estimates by $10^{3}$. The resulting CACE estimate represents the causal effect of vitamin A supplements on infant mortality per 1,000 individuals, specifically for compliers in the population.
+The estimand of primary interest is the super-population complier average causal effect (CACE), denoted as $\eta_{c1}-\eta_{c0}$. We can include an optional `generated quantities` block to generate the posterior distribution for the CACE, which is defined as a function of the declared parameters. We rescaled the CACE estimates by simply multiplying the original estimates by $10^{3}$. The resulting CACE estimate represents the causal effect of vitamin A supplements on infant mortality per 1,000 individuals, specifically for compliers in the population.
 
 
 #### Model estimation
@@ -354,7 +354,7 @@ ggplot(data = df_CACE, aes(x = CACE)) +
   ) + 
   geom_text(
     x = 3.8, y = 25, 
-    label = "Median = 3.19", 
+    label = paste0("Median = ", round(median(df_CACE$CACE), 2)), 
     color = "blue", size = 5
   ) +
   scale_x_continuous(
@@ -369,7 +369,15 @@ ggplot(data = df_CACE, aes(x = CACE)) +
   theme(panel.grid = element_blank())
 ```
 
-This histogram replicates Figure 3 from @imbens1997bayesian. Under the exclusion restriction for never-takers, the posterior mean of the CACE is 3.23. The 90% credible interval spans from 1.40 to 5.13 per 1,000 individuals, while the 99% credible interval ranges from 0.38 to 6.38. These findings suggest that vitamin A treatment is likely to confer a positive effect on infant survival among compliers in the studied population.
+```{r}
+#| echo: false
+CACE_mean <- df_CACE$CACE %>% mean() %>% round(2)
+CACE_CI_90 <- df_CACE$CACE %>% quantile(probs = c(0.05, 0.95)) %>% round(2)
+CACE_CI_99 <- df_CACE$CACE %>% quantile(probs = c(0.005, 0.995)) %>% round(2)
+```
+
+
+This histogram replicates Figure 3 from @imbens1997bayesian. Under the exclusion restriction for never-takers, the posterior mean of the CACE is `r CACE_mean`. The 90% credible interval spans from `r CACE_CI_90[1]` to `r CACE_CI_90[1]` per 1,000 individuals, while the 99% credible interval ranges from `r CACE_CI_99[1]` to `r CACE_CI_90[2]`. These findings suggest that vitamin A treatment is likely to confer a positive effect on infant survival among compliers in the studied population.
 
 In practical terms, given a CACE of 3.23, it means that for every 1,000 complier infants, about an additional 3.23 infants are expected to survive due to the vitamin A treatment, compared to their counterparts who did not receive the intervention. To fully grasp the practical significance of the CACE, one must consider other relevant data, the overarching landscape of infant health, and any potential disadvantages or expenses related to the treatment. For instance, in regions grappling with high infant mortality rates, even marginal improvements in survival rates might carry substantial importance. The cost-effectiveness and safety profile of the vitamin A treatment further accentuate its potential benefits, especially if it is both affordable and exhibits minimal side effects.
 
@@ -435,10 +443,10 @@ model {
 }
 ```
 
-In addition to the main causal estimand, the super-population complier average causal effect (CACE, $\eta_{c1} - \eta_{c0}$), we can now define the super-population average causal effect of treatment assignment on outcomes for never-takers ($\eta_{n1} - \eta_{n0}$) in the `transformed parameters` block. We will refer to this as the "NACE" (Never-taker Average Causal Effect):
+In addition to the main causal estimand, the super-population complier average causal effect (CACE, $\eta_{c1} - \eta_{c0}$), we can now define the super-population average causal effect of treatment assignment on outcomes for never-takers ($\eta_{n1} - \eta_{n0}$) in the `generated quantities` block. We will refer to this as the "NACE" (Never-taker Average Causal Effect):
 
 ``` stan
-transformed parameters {
+generated quantities {
   // Super-population average causal effects 
   real CACE = (eta_c1 - eta_c0) * 10^3;
   real NACE = (eta_n1 - eta_n0) * 10^3;
@@ -487,7 +495,7 @@ ggplot(data = df_CACE, aes(x = CACE)) +
   ) + 
   geom_text(
     x = 3.8, y = 25, 
-    label = "Median = 2.71", 
+    label = paste0("Median = ", round(median(df_CACE$CACE), 2)), 
     color = "blue", size = 5
   ) +
   scale_x_continuous(
@@ -502,8 +510,14 @@ ggplot(data = df_CACE, aes(x = CACE)) +
   theme(panel.grid = element_blank())
 ```
 
+```{r}
+#| echo: false
+CACE_mean <- df_CACE$CACE %>% mean() %>% round(2)
+CACE_CI_90 <- df_CACE$CACE %>% quantile(probs = c(0.05, 0.95)) %>% round(2)
+CACE_CI_99 <- df_CACE$CACE %>% quantile(probs = c(0.005, 0.995)) %>% round(2)
+```
 
-The histogram above replicates Figure 1 from @imbens1997bayesian. The 90% credible interval of the posterior distribution indicates that the true CACE, without exclusion restriction, likely falls within the range of -0.37 to 6.11 per 1,000 individuals. 
+The histogram above replicates Figure 1 from @imbens1997bayesian. The 90% credible interval of the posterior distribution indicates that the true CACE, without exclusion restriction, likely falls within the range of `r CACE_CI_90[1]` to `r CACE_CI_90[2]` per 1,000 individuals. 
 
 
 ```{r, fig.width=7, fig.height=5}
@@ -527,7 +541,7 @@ ggplot(data = df_NACE, aes(x = NACE)) +
   ) + 
   geom_text(
     x = 3.8, y = 25, 
-    label = "Median = 1.77", 
+    label = paste0("Median = ", round(median(df_NACE$NACE), 2)), 
     color = "blue", size = 5
   ) +
   scale_x_continuous(
@@ -541,7 +555,6 @@ ggplot(data = df_NACE, aes(x = NACE)) +
   theme_bw() + 
   theme(panel.grid = element_blank())
 ```
-
 
 We also replicate Figure 2 from @imbens1997bayesian, which represents the posterior distribution for NACE. Under the exclusion restriction, the NACE is constrained to be 0 because $\eta_{n0} = \eta_{n1}$. Without the exclusion restriction, however, the NACE has a posterior distribution that is centered around 0, lending credibility to the exclusion restriction [@imbens1997bayesian].
 

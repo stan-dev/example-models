@@ -16,12 +16,6 @@ parameters {
   real<lower=0, upper=1> eta_n1;
 } 
 
-transformed parameters {
-  // Super-population average causal effects 
-  real CACE = (eta_c1 - eta_c0) * 10^3;
-  real NACE = (eta_n1 - eta_n0) * 10^3;
-}
-
 model {
   // Define local variables for efficiency
   real log_pi_c = log(pi_c);
@@ -59,4 +53,11 @@ model {
     }
   }
 }
+
+generated quantities {
+  // Super-population average causal effects 
+  real CACE = (eta_c1 - eta_c0) * 10^3;
+  real NACE = (eta_n1 - eta_n0) * 10^3;
+}
+
 
