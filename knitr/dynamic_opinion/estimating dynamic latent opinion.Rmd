@@ -33,9 +33,9 @@ cmdstanr::set_cmdstan_path("C:/cmdstan")
 
 
 
-Public opinion data are typically analyzed when researchers are interested in the opinions of individuals and subgroups. But sometimes we are more interested in the average opinion in a society at a point in time. In such studies of *macro-opinion*, our attention turns to trends across time, or patterns across societies. Yet this is where problems arise. Existing cross-national surveys field questions intermittently. Question wording varies across projects and sometimes across time as well. All of this makes it hard to produce a single measure of opinion on a given topic that includes all relevant public opinion data and which can be used to make comparisons across time and space. 
+Public opinion data are typically analyzed when researchers are interested in the opinions of individuals and subgroups. But sometimes we are more interested in the average opinion in a society at a point in time. In such studies of *macro-opinion*, our attention turns to trends across time, or patterns across societies. Yet this is where problems arise. Existing cross-national surveys field questions intermittently. The wording of questions also varies across projects and sometimes across time as well. All of this makes it hard to produce a single measure of opinion on a given topic that includes all relevant public opinion data and which can be used to make comparisons across time and space. 
 
-This case study describes a method for doing so, based on the following articles: @claassen2019pa; @claassen2020ajps; @claassen2020apsr. I begin by describing the model and its coding in Stan. I then outline the data I use -- public support for a democratic system of government -- and explain how to set the model up in R. After fitting the model using `cmdstanr`, I explore some model checks before extracting and examining key quantities of interest.
+This case study describes a method for doing so, based on [@claassen2019pa; @claassen2020ajps; @claassen2020apsr]. I begin by describing the model and its coding in Stan. I then outline the data I use -- public support for a democratic system of government -- and explain how to set the model up in R. After fitting the model using `cmdstanr`, I explore some model checks before extracting and examining key quantities of interest.
 
 
 # Model
