@@ -33,7 +33,7 @@ cmdstanr::set_cmdstan_path("C:/cmdstan")
 
 
 
-Public opinion data are typically analyzed when researchers are interested in the opinions of individuals and subgroups. But sometimes we are more interested in the average opinion in a society at a point in time. In such studies of *macro-opinion*, our attention turns to trends across time, or patterns across societies. Yet this is where problems arise. Existing cross-national surveys field questions intermittently. The wording of questions also varies across projects and sometimes across time as well. All of this makes it hard to produce a single measure of opinion on a given topic that includes all relevant public opinion data and which can be used to make comparisons across time and space. 
+Public opinion data are typically analyzed when researchers are interested in the opinions of individuals and subgroups. But sometimes we are more interested in the average opinion in a society at a point in time. In such studies of *macro-opinion*, our attention turns to trends across time, or patterns across societies. Yet this is where problems arise. Existing cross-national surveys field questions intermittently. The wording of questions varies across projects and sometimes across time as well. All of this makes it hard to produce a single measure of opinion on a given topic that includes all relevant public opinion data and which can be used to make comparisons across time and space. 
 
 This case study describes a method for doing so, based on [@claassen2019pa; @claassen2020ajps; @claassen2020apsr]. I begin by describing the model and its coding in Stan. I then outline the data I use -- public support for a democratic system of government -- and explain how to set the model up in R. After fitting the model using `cmdstanr`, I explore some model checks before extracting and examining key quantities of interest.
 
@@ -380,13 +380,12 @@ theta_l95 = apply(theta_t, 1, quantile, probs = c(0.025))
 theta_pe_sd = apply(theta_t, 1, sd)
 
 # collate into dataset
-theta_df = data.frame(Country = cnt_names[r_map$Cntry], ISO3c = cnt_iso[r_map$Cntry],
-                      Year = r_map$Yr + year0, SupDem = theta_pe, 
-                      SupDem_u95 = theta_u95, SupDem_l95 = theta_l95, 
-                      SupDem_sd = theta_pe_sd)
+theta_df = data.frame(Country = cnt_names[r_map$Cntry], Year = r_map$Yr + year0, 
+                      SupDem = theta_pe, SupDem_u95 = theta_u95, 
+                      SupDem_l95 = theta_l95, SupDem_sd = theta_pe_sd)
 
 # plot theta by country
-iso_plot = sort(unique(theta_df$ISO3c))
+cnt_plot = sort(unique(theta_df$Country))
 par(mfrow = c(18, 8), mar = c(0.75, 0.75, 0.2, 0.2), cex = 0.8, tcl = -0.1,
     mgp = c(1.2, 0.3, 0), las = 1)
 for (i in 1:n_cntrys) {
@@ -394,15 +393,15 @@ for (i in 1:n_cntrys) {
        ylim = c(-3, 4), axes = FALSE)
   abline(h = c(2, 0, -2), lwd = 0.75, lty = 3, col = rgb(0.5, 0.5, 0.5, 0.5))
   abline(v = seq(1980, 2020, by = 10), lwd = 0.75, lty = 3, col = rgb(0.5, 0.5, 0.5, 0.5))
-  lines(x = theta_df[theta_df$ISO3c == iso_plot[i], "Year"],
-        y = theta_df[theta_df$ISO3c == iso_plot[i], "SupDem"],
+  lines(x = theta_df[theta_df$Country == cnt_plot[i], "Year"],
+        y = theta_df[theta_df$Country == cnt_plot[i], "SupDem"],
         lwd = 1.5, col = rgb(0, 0.4, 0, 1))
-  polygon(x = c(theta_df[theta_df$ISO3c == iso_plot[i], "Year"],
-              rev(theta_df[theta_df$ISO3c == iso_plot[i], "Year"])),
-          y = c(theta_df[theta_df$ISO3c == iso_plot[i], "SupDem_u95"],
-              rev(theta_df[theta_df$ISO3c == iso_plot[i], "SupDem_l95"])),
+  polygon(x = c(theta_df[theta_df$Country == cnt_plot[i], "Year"],
+              rev(theta_df[theta_df$Country == cnt_plot[i], "Year"])),
+          y = c(theta_df[theta_df$Country == cnt_plot[i], "SupDem_u95"],
+              rev(theta_df[theta_df$Country == cnt_plot[i], "SupDem_l95"])),
           col = rgb(0, 0.4, 0, 0.4), border = NA)
-  text(1988, 3.5, iso_plot[i], adj = 0, cex = 0.65)
+  text(1988, 3.5, cnt_plot[i], adj = 0, cex = 0.65)
   axis(side = 1, at = seq(1980, 2020, by = 10), labels = c(1980, 1990, 2000, 2010, 2020),
        mgp = c(1, -0.3, 0), cex.axis = 0.5, lwd = 1)
   axis(side = 2, at = c(-2, 0, 2, 4), mgp = c(1, 0.15, 0), cex.axis = 0.5, lwd = 1)
