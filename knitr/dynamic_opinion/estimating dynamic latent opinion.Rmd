@@ -1,0 +1,468 @@
+---
+title: "Estimating dynamic cross-national opinion using existing survey data"
+author: "Christopher Claassen "
+date: "`r Sys.Date()`"
+output: 
+  html_document: 
+    toc: true
+    toc_float: true
+    toc-title: Contents
+    highlight: "haddock"
+    theme: "flatly"
+bibliography: ClaassenBib.bib  
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# libraries
+library(arm)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(bayesplot)
+library(cmdstanr)
+
+# options
+options("cmdstanr_verbose" = FALSE)
+stanc_options = list("O1")
+options(mc.cores = parallel::detectCores())
+set.seed(929)
+cmdstanr::set_cmdstan_path("C:/cmdstan")
+```
+
+
+
+Public opinion data are typically analyzed when researchers are interested in the opinions of individuals and subgroups. But sometimes we are more interested in the average opinion in a society at a point in time. In such studies of *macro-opinion*, our attention turns to trends across time, or patterns across societies. Yet this is where problems arise. Existing cross-national surveys field questions intermittently. Question wording varies across projects and sometimes across time as well. All of this makes it hard to produce a single measure of opinion on a given topic that includes all relevant public opinion data and which can be used to make comparisons across time and space. 
+
+This case study describes a method for doing so, based on the following articles: @claassen2019pa; @claassen2020ajps; @claassen2020apsr. I begin by describing the model and its coding in Stan. I then outline the data I use -- public support for a democratic system of government -- and explain how to set the model up in R. After fitting the model using `cmdstanr`, I explore some model checks before extracting and examining key quantities of interest.
+
+
+# Model
+
+
+The observed number of respondents $x$ offering an affirmative opinion (e.g. in support of democracy) for each country $i$, year $t$, and survey item $k$, is modeled as a binomial distributed count:
+\begin{equation}
+  x_{ikt} \sim \text{Binomial}(s_{ikt},~ \pi_{ikt}).
+\end{equation}
+
+Following @mcgann2014, I use a beta prior on the probability parameter. This allows for some additional dispersion in the observed survey responses, i.e., it captures sources of error over and above simple sampling error:
+
+\begin{equation}
+  \pi_{ikt} \sim \text{Beta}(\alpha_{ikt},~ \beta_{ikt})
+ \end{equation}
+
+The two shape parameters of the beta distribution can be reparameterized as a vector of expectation parameters $\eta$ and a dispersion parameter $\phi$:
+
+\begin{align}
+  \alpha_{ikt} &= \phi\eta_{ikt}\\
+  \beta_{ikt} &= \phi(1-\eta_{ikt})
+ \end{align}
+
+The expectation parameters are then modeled as a function of the latent country-year estimates $\theta$ as well as some additional parameters: 
+
+\begin{equation}
+  \eta_{ikt} = \text{logit}^{-1}(\lambda_{k} + \delta_{ik} + \gamma_k\theta_{it} )
+\end{equation}
+
+Two item parameters, $\lambda$ and $\gamma$, are included. The former allows for item-specific bias that may inflate or deflate the probability of agreement regardless of true latent opinion $\theta$. This is comparable to an item difficulty parameter in item-response theoretic (IRT) models. $\gamma$ is an item slope that allows items to have different magnitude effects on latent opinion, analogous to the item discrimination parameters used in IRT models. 
+
+I furthermore include an additional parameter $\delta$ that allows item bias to vary by country. For example, questions about military regimes will have different connotations (and bias) where military regimes have previously ruled.  
+
+All item parameters are modeled hierarchically, which will be helpful if observed survey data are sparse when grouped by country, by item, and by item-country combinations.
+
+\begin{equation}
+  \delta_{ik} \sim \text{N}(0,~ \sigma^2_{\delta})
+\end{equation}
+
+The $\lambda$ and $\gamma$ parameters are modeled jointly using a hierarchical bivariate normal prior:
+
+\begin{equation}
+\begin{pmatrix}
+  \lambda_k \\
+  \gamma_k \\
+\end{pmatrix}  
+\sim \text{N} 
+\begin{bmatrix}
+  \begin{pmatrix}
+    \mu_{\lambda} \\ 
+    \mu_{\gamma} \\
+  \end{pmatrix}  
+  ,
+  \begin{pmatrix}
+  \sigma^2_\lambda                  	& \rho \sigma_\lambda \sigma_\gamma \\
+  \rho \sigma_\lambda \sigma_\gamma   	& \sigma^2_\gamma \\
+  \end{pmatrix}  
+\end{bmatrix}  
+\end{equation}
+
+Finally, latent opinion is allowed to evolve over time using a simple dynamic linear model where the current level of latent opinion is a function of the previous year's level plus some random noise (e.g., @caughey2015):
+
+\begin{equation}
+  \theta_{it} \sim \text{N}(\theta_{i, t-1},~ \sigma^2_\theta)
+\end{equation}
+
+
+# Stan code
+
+The `data` block includes data, dimensions (of various grouping factors), and several index vectors. In terms of data, we have the vectors `x`, and `samp`, which are the number of respondents who, respectively, offered and were asked an opinion for each country, year and item combination. N is the number of national opinions we have in our data -- there may be more than one per country-year if a survey has included multiple items or if multiple surveys were run in a country and year. R, in contrast, is the number of country-by-year estimates of latent opinion. The model only estimates the latent opinion for country $j$ starting with the year in which the first survey was fielded in country $j$. As such, R $<$ J $\times$ T.
+
+```{stan, output.var = "dynamic_crossnat_latent_opinion_model.stan"}
+data{
+  int<lower=1> N; // number of national survey opinions
+  int<lower=1> J; // number of countries
+  int<lower=1> K; // number of items
+  int<lower=1> P; // number of items-country combinations  
+  int<lower=1> R; // number of national opinion estimates
+  array[N] int<lower=1,upper=J> jj; // country j for opinion n
+  array[N] int<lower=1,upper=K> kk; // item k for opinion n
+  array[N] int<lower=1,upper=P> pp; // item-country p for opinion n
+  array[N] int<lower=1,upper=R> rr; // estimate r for opinion n
+  array[N] int<lower=1> x; // vector of survey responses, count
+  array[N] int<lower=1> samp; // vector of sample sizes
+  array[K] int<lower=1> it_len; // number of countries for each item
+  array[J] int<lower=1> est_pos; // indicator showing cntry start for estimate vector	
+  array[J] int<lower=1> len_theta_ts; // indicator for length of each cntry ts
+  real mn_resp_log; // observed response mean proportion on logit scale
+}
+
+parameters{
+  real<lower=0> sigma_theta; // opinion evolution error SD
+  real<lower=0> sigma_delta; // item-country intercept error SD
+  row_vector[J] theta_init; // initial latent traits for year 0
+  real<lower=0> phi; // dispersion parameter
+  corr_matrix[2] Omega; // correlation matrix for item pars
+  vector<lower=0>[2] tau; // cor -> cov conversion
+  real mu_lambda; // item intercept expectation
+  vector[P] delta_ncp; // redundant parameters for item-country effects
+  vector[R] theta_ncp; // redundant parameters for latent opinion
+  matrix[K,2] Gamma_ncp; // non-centered parameters for item parameters
+}
+
+transformed parameters{
+  // dynamic model with non-centered parameters
+  vector[R] theta; // R-vector of theta values	
+  for (j in 1:J) {                  
+    theta[est_pos[j]] = theta_init[j] 
+	+ sigma_theta * theta_ncp[est_pos[j]];
+	for (i in 1:(len_theta_ts[j]-1)) {
+	  theta[(est_pos[j]+i)] = theta[(est_pos[j]+i-1)] 
+	  + sigma_theta * theta_ncp[(est_pos[j]+i)];
+	}
+  }
+  // variance-covariance matrix for item ints and slopes
+  matrix[2,2] Sigma = quad_form_diag(Omega, tau);  
+  // non-centered item-country parameters
+  vector[P] delta = sigma_delta * delta_ncp; 
+  // item parameter models with non-centered parameters
+  real mu_gamm = 1; // item slope expectation
+  matrix[K,2] Gamma; // matrix of item intercepts and slopes 
+  for (k in 1:K) 
+    Gamma[k] = [ mu_lambda , mu_gamm ] + Gamma_ncp[k] * Sigma;
+  vector[K] lambda = Gamma[,1]; // K estimated item intercepts
+  vector[K] gamm = Gamma[,2]; // K estimated item slopes
+  // fitted values model
+  vector<lower=0,upper=1>[N]eta = inv_logit(lambda[kk]+ delta[pp] 
+    + gamm[kk] .* theta[rr]);  
+  // reparamaterise beta distr parameters
+  vector<lower=0>[N] beta_par1 = phi * eta; 
+  vector<lower=0>[N] beta_par2 = phi * (1 - eta); 
+}
+
+model{
+  // response model
+  x ~ beta_binomial(samp, beta_par1, beta_par2); 
+  // priors
+  phi ~ gamma(3, 0.04); 				
+  sigma_theta ~ normal(0, 1); 
+  sigma_delta ~ normal(0, 1); 
+  tau ~ normal(0, 1);
+  Omega ~ lkj_corr(2);
+  mu_lambda ~ normal(mn_resp_log, 0.5);
+  theta_init ~ normal(0, 1);
+  theta_ncp ~ normal(0, 1);
+  to_vector(Gamma_ncp) ~ normal(0, 1);
+  // standard normal prior for item-country effects, centered within items
+  int pos; // local variable indicating which item to evaluate	
+  pos = 1;
+  for (k in 1:K) { 
+    segment(delta_ncp, pos, it_len[k]) ~ normal(0, 1);
+    pos = pos + it_len[k];
+  }
+}
+
+generated quantities {
+  vector[N] x_pred; // fitted data to check model
+  vector[N] log_lik; // log lik for WAIC calc
+  for (i in 1:N) {
+    x_pred[i] = beta_binomial_rng(samp[i], beta_par1[i], beta_par2[i]);
+    log_lik[i] = beta_binomial_lpmf(x[i] | samp[i], beta_par1[i], beta_par2[i]); 
+  }
+}
+```
+
+To faciliate the estimation of a non-rectagular panel of latent opinion, latent estimates are stored as a vector `theta`, which allows the use of vectorized code and speeds up estimation. This is where the various index vectors, e.g., `jj`, `kk`, etc., come into play. The non-centralized parameterization proved necessary for convergence of `theta` and its error standard deviation `sigma_theta`, hence the `theta` model being specified in the `tranformed parameters` block. The item and item-country parameters `lambda`, `gamma`, and `delta` are similarly estimated using non-centralized parametetrizaions and coded within the `tranformed parameters` block.
+
+Latent opinion is linked to observed survey data using the $\eta$ estimates. Since $\eta$ are the probability parameter for the beta-binomial response model, these parameters are inverse-logit transformed to be constrained to the [0,1] interval. 
+
+The response model linking $\eta$ to the observed data $x$ is specfied in the `model` block, using the `beta_binomial` distribution. $\eta$ is reparameterized as the two beta-binomial shape parameters (coded as `beta_par1` and `beta_par2` in the model). 
+
+To aid with model identification, the expectation of the item intercepts $\lambda$ is centered on the logit-transformed mean percentage agreement observed in $x$ while the expectation of the item slopes $\gamma$ is fixed at 1.
+
+Variance parameters are given weakly-informative half-normal priors, e.g., $\sigma_\theta \sim \text{N}^{+}(0,~ 1)$ and the beta-binomial dispersion parameter $\phi$ is given a $\Gamma(3,~ 0.04)$ prior. The variance-covariance matrix of item intercepts and slopes is decomposed into the product of the variances for each vector of parameters and a $2\times2$ correlation matrix $\Omega$, which is given an LKJ prior as described in the stan documentation. Finally, the initial values of latent opinion for each country receive a $\text{N}(0,~ 1)$ prior.
+
+To aid in model checking, log-likelihood and predicted response count vectors are included in the `generated quantities` block but these are not examined here.
+
+
+# Data and Set up
+
+Support for democracy is the extent to which a national public approves of a democratic system and rejects any autocratic alternatives. It is measured using survey questions that ask respondents to evaluate the appropriateness or desirability of democracy; compare democracy to some undemocratic alternative; or evaluate one of these undemocratic forms of government. Data were collected from cross-national survey projects that ran surveys between 1988 and 2020. The dataset includes 4,536 nationally aggregated survey responses gathered by 16 survey projects in 162 countries and territories and is available [here](http://chrisclaassen.com/docs/Support%20for%20democracy%20raw%201122.csv).
+
+I load the opinion dataset and drop countries for which we have survey data from only one point in time. Data for 144 countries and up to 32 years (1988 to 2020) remain.
+
+```{r}
+# load data
+supdem = read.csv("Support for democracy edit 1122.csv")
+
+# drop countries with less than 2 years of data
+cnt_obs_yrs = rowSums(table(supdem$Country, supdem$Year) > 0)
+supdem = supdem[supdem$Country %in% levels(factor(supdem$Country))[cnt_obs_yrs > 1], ]
+
+# check
+head(supdem)
+length(unique(supdem$Country))
+
+```
+
+Next, I extract the dimensions of the grouping factors -- country, item, year, etc. -- and create index vectors. Both of these will be needed for our vectorized Stan code.
+
+```{r}
+# factorise
+supdem$Country = as.factor(as.character(supdem$Country))
+supdem$ISO3c = as.factor(as.character(supdem$ISO3c))
+supdem$Item = as.factor(as.character(supdem$Item))
+supdem$ItemCnt = as.factor(as.character(supdem$ItemCnt))
+supdem$Project = as.factor(as.character(supdem$Project))
+
+# identify first year to estimate for each country
+year0 = 1987 # set year 0 
+supdem$Year = supdem$Year - year0
+cnt_start_yr = by(supdem$Year, supdem$Country, min, simplify = TRUE)
+
+# extract dimensions
+n_items = length(levels(supdem$Item))
+n_cntrys = length(levels(supdem$Country))
+n_yrs = 2020 - year0 # estimates up to 2020
+n_resp = dim(supdem)[1]
+n_itm_cnt = length(levels(supdem$ItemCnt))
+
+# extract country, year, item index vectors
+cntrys = as.numeric(factor(supdem$Country))
+cnt_names = levels(supdem$Country)
+cnt_iso = levels(supdem$ISO3c)
+items = as.numeric(factor(supdem$Item))
+yrs = supdem$Year
+itm_cnts = as.numeric(factor(supdem$ItemCnt))
+mean_resp.log = logit(mean(supdem$Response))
+
+# create item-country length indicator for items
+item_ind_kp = rep(0, length(levels(supdem$ItemCnt)))
+for(i in 1:length(levels(supdem$Item))) {
+  item_ind_kp[grepl(levels(supdem$Item)[i], levels(supdem$ItemCnt))] = i
+}
+item_ind_len = sapply(
+  lapply(levels(supdem$Item), function(x) grep(x, levels(supdem$ItemCnt))), 
+  length)
+
+# length of each estimated mood series
+len_theta_ts = rep(0, n_cntrys)
+for(i in 1:n_cntrys){
+  len_theta_ts[i] = length(cnt_start_yr[i]:n_yrs)
+}
+theta_n = sum(len_theta_ts)  
+
+# create R-length vector indicating which country each estimate corresponds to
+cntrys_r = rep(0, theta_n)
+pos = 1
+for(i in 1:n_cntrys) {
+  cntrys_r[pos:(len_theta_ts[i] + pos - 1)] = (rep(i, len_theta_ts[i]))
+  pos = pos + len_theta_ts[i]
+}
+
+# create R-length vector indicating which year each estimate corresponds to
+year_r = rep(0, theta_n)
+pos = 1
+for(i in 1:n_cntrys) {
+  year_r[pos:(len_theta_ts[i] + pos-1)] = cnt_start_yr[i]:n_yrs
+  pos = pos + len_theta_ts[i]
+}
+
+# create R-length vector indicating which opinion observation each estimate corresponds to
+n_map = data.frame(Obs = 1:n_resp, Cntry = cntrys, Yr = yrs)
+r_map = data.frame(Est = 1:theta_n, Cntry = cntrys_r, Yr = year_r)
+n_r_merg = merge(n_map, r_map, by = c("Cntry", "Yr"), all.x = TRUE)
+n_r_merg = n_r_merg[order(n_r_merg$Obs), ]
+
+# create vector indicating the start positions for each country estimate series
+est_pos = rep(1, n_cntrys)
+est_pos[1] = 1
+for(i in 2:n_cntrys) {
+  est_pos[i] = est_pos[i-1] + len_theta_ts[i-1]
+}
+```
+
+
+# Model fitting and checking
+
+
+The model is compiled and fit in R using cmdstanr. It proves helpful to set the `adapt_delta` parameter to 0.90, somewhat higher than the default of 0.80. 
+
+```{r, warning=FALSE, message=FALSE, results=FALSE}
+# specify data for stan
+dat_1 = list(N = n_resp, K = n_items, J = n_cntrys, P = n_itm_cnt, R = theta_n,
+             jj = cntrys, pp = itm_cnts, kk = items, rr = n_r_merg$Est,
+             it_len = item_ind_len, est_pos = est_pos, len_theta_ts = len_theta_ts,
+             x = supdem$RespN, samp = supdem$Sample, mn_resp_log = mean_resp.log)
+
+# parameters to save
+pars_1 = c("Sigma", "Omega", "sigma_delta", "sigma_theta", "phi", "mu_lambda", "lambda",
+           "gamm", "delta", "theta", "x_pred", "log_lik")
+
+# compile model
+stan_mod = cmdstan_model('dynamic_crossnat_latent_opinion_model.stan', quiet = TRUE)
+
+# Stan fit
+stan_fit = stan_mod$sample(
+  data = dat_1, chains = 4, init = 1, parallel_chains = 4,
+  iter_warmup = 1000, iter_sampling = 1000, refresh = 0,
+  adapt_delta = 0.90, max_treedepth = 12, save_warmup = FALSE
+)
+```
+
+Once complete, convergence is verified using `cmdstanr`'s `diagnostic_summary()` function as well as an examination of parameters with the largest Rhats. There are no divergences, the estimated Bayesian Fraction of Missing Information is greater than 0.2, and Rhats are no greater than 1.01.
+
+```{r, warning=FALSE, message=FALSE, fig.height=5, out.width="100%"}
+# Examine model fit
+res = stan_fit
+res$diagnostic_summary()
+sum = res$summary(pars_1)
+print(sum[order(sum$rhat, decreasing = TRUE), ], n = 10)
+
+# traceplot
+tp_pars = c("Sigma[1,1]", "Sigma[2,2]", "Omega[1,2]", "sigma_theta", "sigma_delta",
+            "mu_lambda", "phi", "lambda[31]", "gamm[31]", "delta[23]", "theta[423]",
+            "theta[2092]")
+tp = bayesplot::mcmc_trace(res$draws(tp_pars), np = nuts_params(res))
+tp
+```
+
+A traceplot confirms that parameters have converged. 
+
+
+# Extracting and examining latent opinion estimates
+
+Now that the model has converged, we can extract and examine the estimates of most interest: country-year latent opinion, $\theta$. 
+
+```{r, warning=FALSE, message=FALSE, fig.height=12, out.width="100%"}
+# extract theta
+theta_out = apply(res$draws("theta"), 3, as.vector)
+
+# standardize
+theta_mean = mean(as.vector(theta_out))
+theta_sd = sd(as.vector(theta_out))
+theta_std = (theta_out - theta_mean) / theta_sd
+
+# extract PEs and SEs
+theta_t = apply(theta_std, 1, function(x) t(x) )
+theta_pe = apply(theta_t, 1, mean)
+theta_u95 = apply(theta_t, 1, quantile, probs = c(0.975))
+theta_l95 = apply(theta_t, 1, quantile, probs = c(0.025))
+theta_pe_sd = apply(theta_t, 1, sd)
+
+# collate into dataset
+theta_df = data.frame(Country = cnt_names[r_map$Cntry], ISO3c = cnt_iso[r_map$Cntry],
+                      Year = r_map$Yr + year0, SupDem = theta_pe, 
+                      SupDem_u95 = theta_u95, SupDem_l95 = theta_l95, 
+                      SupDem_sd = theta_pe_sd)
+
+# plot theta by country
+iso_plot = sort(unique(theta_df$ISO3c))
+par(mfrow = c(18, 8), mar = c(0.75, 0.75, 0.2, 0.2), cex = 0.8, tcl = -0.1,
+    mgp = c(1.2, 0.3, 0), las = 1)
+for (i in 1:n_cntrys) {
+  plot(x = (year0 + 1):2020, y = rep(0,length((year0 + 1):2020)), type = "n",
+       ylim = c(-3, 4), axes = FALSE)
+  abline(h = c(2, 0, -2), lwd = 0.75, lty = 3, col = rgb(0.5, 0.5, 0.5, 0.5))
+  abline(v = seq(1980, 2020, by = 10), lwd = 0.75, lty = 3, col = rgb(0.5, 0.5, 0.5, 0.5))
+  lines(x = theta_df[theta_df$ISO3c == iso_plot[i], "Year"],
+        y = theta_df[theta_df$ISO3c == iso_plot[i], "SupDem"],
+        lwd = 1.5, col = rgb(0, 0.4, 0, 1))
+  polygon(x = c(theta_df[theta_df$ISO3c == iso_plot[i], "Year"],
+              rev(theta_df[theta_df$ISO3c == iso_plot[i], "Year"])),
+          y = c(theta_df[theta_df$ISO3c == iso_plot[i], "SupDem_u95"],
+              rev(theta_df[theta_df$ISO3c == iso_plot[i], "SupDem_l95"])),
+          col = rgb(0, 0.4, 0, 0.4), border = NA)
+  text(1988, 3.5, iso_plot[i], adj = 0, cex = 0.65)
+  axis(side = 1, at = seq(1980, 2020, by = 10), labels = c(1980, 1990, 2000, 2010, 2020),
+       mgp = c(1, -0.3, 0), cex.axis = 0.5, lwd = 1)
+  axis(side = 2, at = c(-2, 0, 2, 4), mgp = c(1, 0.15, 0), cex.axis = 0.5, lwd = 1)
+  box(lwd = 0.75)
+}
+```
+
+I standardize $\theta$ to have mean of 0 and standard deviation of 1 before plotting the point estimates and 95\% credible intervals by country (some discussion of these results can be found in @claassen2020apsr).
+
+# Examining item parameters
+
+Finally I extract and examine the item parameters, $\lambda$ and $\gamma$. This allows us to examine whether all survey items are contributing the expected information to the latent variable. 
+
+```{r, warning=FALSE, message=FALSE, fig.height=7, out.width="100%"}
+# examine item pars
+item_names = levels(supdem$Item)
+item_pars = data.frame(item_int = res$summary("lambda")[,2],
+                       item_slope = res$summary("gamm")[,2])
+rownames(item_pars) = item_names
+names(item_pars) = c("lambda", "gamma")
+item_pars$project = as.character(supdem$Project[match(item_names, supdem$Item)])
+
+# extract 100 draws from posteriors of ints and slopes
+lambda_out = apply(res$draws("lambda"), 3, as.vector)
+gamma_out = apply(res$draws("gamm"), 3, as.vector)
+theta_samp_100 = theta_std[sample(1:dim(theta_std)[1], 100), ]
+
+# adjust intercepts and slopes to account for standardization of theta
+item_pars_std = item_pars
+item_pars_std[,1] = item_pars[,1] + (item_pars[,2] * theta_mean)
+lambda_out_std = lambda_out + (gamma_out * theta_mean)
+item_pars_std[,2] = item_pars[,2] * theta_sd
+gamma_out_std = gamma_out * theta_sd
+
+# plot iccs
+draw_ind = sample(1:dim(lambda_out)[1], 100)
+par(mfrow = c(9, 7), mar = c(1, 1, 0.2, 0.2), tcl = -0.1, las = 1, cex = 0.8)
+for(i in 1:dim(item_pars_std)[1]){
+  curve(arm::invlogit(item_pars_std[i, 1] + x * item_pars_std[i, 2]), -3, 3, type = "l",
+        xlab = "", ylab = "", xaxt = "n", yaxt = "n", yaxs = "i",
+        col = rgb(1, 1, 1, 1), ylim = c(0, 1))
+  abline(h = 0.5, lty = 3, lwd = 0.75, col = rgb(0.5, 0.5, 0.5, 0.5))
+  abline(v = 0, lty = 3, lwd = 0.75, col = rgb(0.5, 0.5, 0.5, 0.5))
+  curve(arm::invlogit(item_pars_std[i, 1] + x * item_pars_std[i, 2]), -3, 3,
+        type = "l", lwd = 1.5, col = rgb(0, 0.5, 0, 1), add = TRUE)
+  for(j in 1:100){
+    curve(arm::invlogit(lambda_out_std[draw_ind[j], i] + x * gamma_out_std[draw_ind[j], i]),
+          -3, 3, type = "l", lwd = 1, col = rgb(0, 0.5, 0, 0.1), add = TRUE)
+  }
+  text(-3, 0.15, rownames(item_pars_std)[i], adj = 0, cex = 0.7)
+  axis(2, at = c(0, .5, 1), labels = c("0.0", "0.5", "1.0"), mgp = c(1.5, 0.2, 0),
+       cex.axis = 0.5)
+  axis(1, at = c(-2, 0, 2), mgp = c(1, -0.3, 0), cex.axis = 0.5)
+}
+```
+
+I plot these parameters in the form of item characteristic curves, which show the relationship between latent opinion (x-axis) and the population percentage supporting / agreeing with the item in question (y-axis). Steeper curves indicate items with greater discriminative power. Curves that appear shifted upwards indicate items that are "easy", i.e., they tend to attract supportive responses even when latent opinion is negative.
+
+All of the included items show decent discriminative qualities, likely because they were selected based on an extensive literature that has examined these survey data.
+
+
+# References
+
