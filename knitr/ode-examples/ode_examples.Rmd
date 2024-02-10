@@ -1,0 +1,437 @@
+---
+title: "ODEs with Forcing Functions and Events in Stan"
+author: "Imad Ali"
+date: "10/7/2019"
+output: 
+  html_document:
+    theme: sandstone
+    toc: TRUE
+---
+
+```{r setup, include=FALSE}
+library(deSolve)
+library(rstan)
+library(bayesplot)
+rstan_options(auto_write = TRUE)
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+The purpose of this set of examples is to go over how to implement events and forcing functions in ordinary differential equations (ODEs) using [RStan](https://mc-stan.org/rstan/). Recall that an ODE is an equation that relates a function of an independent variable to the derivative of that function. The solution of an ODE involves finding the function that satifies the equation.
+
+An ODE can have external variables and events that impact the system and therefore the solution. A **forcing function** is a function that allows an external variable to influence the model as a function of time. Typically, a series of points define a forcing function so the evaluation of the function at each time step defined by the ODE needs to be interpolated (e.g. constant or linear). An **event** occurs when the dependent variable suddenly changes (e.g. a value is added/multiplied to the dependent variable). This causes a discontinuity in the variable's sequence.
+
+We will consider the following ODE from Soetaert et al (2012). This is a stylized example from pharmacokinetics where the concentration of a drug is modeled in the intestines and blood. The first equation $\frac{dy_1}{dt}$ governs the elimination of a drug from the intestines. The second equation $\frac{dy_2}{dt}$ governs the intake of that drug from the intestines and into the blood and the subsequent elimination from the blood. The ODE is defined as,
+
+$$
+\begin{align*}
+\frac{dy_1}{dt} &= -ay_1 \\
+\frac{dy_2}{dt} &= ay_1 - by_2\\
+\end{align*}
+$$
+
+where the independent variable is $t$ and the parameters $a$ and $b$ are known. 
+
+In the sections that follow we will find numerical solutions to the ODE above,
+
+1. without any event or forcing function
+2. with a forcing function that defines a continuous external effect at various time intervals
+3. with a set of events that define the uptake of the drug
+4. with both the forcing function defined in (2) and the events defined in (3).
+
+In the final section we will also show how to treat the ODE as a density where we know the numerical solution and would like to infer the parameters that generated that solution.
+
+In each case we will find the solution using the R package [deSolve](https://cran.r-project.org/web/packages/deSolve/index.html) (a popular package used to numerically solve ODEs) and then find the equivalent solution using the integrators provided in the Stan language. We use the same example throughout so that the user can clearly understand the changes made to the Stan program when implementing forcing functions and events, as it is not trivial. (Note that by means do we claim that the use of forcing functions and events in this exposition is appropriate given this or any pharmacokinetic model.) 
+
+
+
+## No Event or Forcing Function
+
+Here we model the ODE as is using the initial values $y_1 = 3, y_2 = 6$ and parameters $a = 6, b = 0.6$. Within the context of the pharmacokinitic model one could assume that some concentration of the drug exists in the patient and we would like to simulate its elimination. The solution using deSolve is provided below.
+
+```{r ode, fig.align='center', fig.width=10, fig.height=5}
+# time sequence
+times <- seq(from = 1, to = 10, by = 0.1)
+times_desolve <- c(times[1] - (times[2]-times[1]), times)
+# parameters
+pars <- list(a = 6, b = 0.6)
+# initial state values
+yini <- c(Intestine = 3, Blood = 6)
+# ODE
+two_comp_fun <- function(t, y, p) {
+  list2env(p, environment())
+  dy1 <- -a*y[1]
+  dy2 <- a*y[1] - b*y[2]
+  return(list(c(dy1,dy2)))
+}
+
+sim_desolve <- ode(func = two_comp_fun, times = times_desolve, y = yini, parms = pars, method = "bdf")
+plot(sim_desolve)
+```
+
+The comparable solution using Stan is computed below. For details see the Stan program defined in `models/two_comp.stan`.
+
+```{r}
+stan_data <- list(theta = unlist(pars),
+                  ts = times,
+                  T = length(times),
+                  K = length(unlist(pars)),
+                  S = length(yini),
+                  y0 = unname(yini),
+                  t0 = times_desolve[1])
+tc_stan <- stan("models/two_comp.stan", data = stan_data, algorithm = "Fixed_param", iter = 1, chains = 1)
+```
+
+Below we overlay the solution using Stan on top of the solution defined by deSolve. 
+
+```{r, fig.align='center', fig.width=10, fig.height=5}
+sim_tc_stan <- as.matrix(tc_stan)
+sim_tc_stan <- cbind(time = times,
+                           y1 = unname(sim_tc_stan[,grep("^y_hat\\[[[:digit:]]+,1\\]$", colnames(sim_tc_stan))]),
+                           y2 = unname(sim_tc_stan[,grep("^y_hat\\[[[:digit:]]+,2\\]$", colnames(sim_tc_stan))]))
+
+par(mfrow = c(1,2))
+plot(sim_desolve[,"time"], sim_desolve[,"Intestine"], type = "l", lwd = 4,
+     main = "Intestine",
+     xlab = "time", ylab = "")
+lines(sim_tc_stan[,"time"], sim_tc_stan[,"y1"], col = "#CCFF00")
+legend("topright", c("deSolve","Stan"), col = c("#000000","#CCFF00"), pch = c(15,15), pt.cex = 2, cex = 0.8)
+
+plot(sim_desolve[,"time"], sim_desolve[,"Blood"], type = "l", lwd = 4,
+     main = "Blood",
+     xlab = "time", ylab = "")
+lines(sim_tc_stan[,"time"], sim_tc_stan[,"y2"], col = "#CCFF00")
+legend("topright", c("deSolve","Stan"), col = c("#000000","#CCFF00"), pch = c(15,15), pt.cex = 2, cex = 0.8)
+
+```
+
+
+
+## Forcing Function
+
+Now we assume that we have a forcing function that introduces a constant external effect from time steps 3 to 5 and 7 to 9 that increases the concentration in the intestines by 3 (otherwise 0). The solution in deSolve is provided below and is acheived by defining the forcing function using the `approxfun` function provided in R. This function allows us to perform either constant of linear interpolation. 
+
+```{r ode_force, fig.align='center', fig.width=10, fig.height=5}
+# forcing function (constant interpolation)
+force <- approxfun(c(0,3,5,7,9), c(0,3,0,3,0), method = "constant", rule = 2)
+# ODE with forcing function
+two_comp_fun <- function(t, y, p) {
+  list2env(p, environment())
+  dy1 <- -a*y[1] + force(t)
+  dy2 <- a*y[1] - b*y[2]
+  return(list(c(dy1,dy2)))
+}
+
+sim_desolve <- ode(func = two_comp_fun, times = times_desolve, y = yini, parms = pars, method = "bdf")
+plot(sim_desolve)
+```
+
+The solution in Stan is computed below. Note that in order to achieve comparable results we had to implement an identical version of the forcing function in the `functions {}` block in Stan. For details see the Stan program `models/two_comp_f.stan`.
+
+```{r}
+# create stan data
+stan_data <- list(theta = unlist(pars),
+                  ts = times,
+                  T = length(times),
+                  K = length(unlist(pars)),
+                  S = length(yini),
+                  y0 = yini,
+                  t0 = times_desolve[1])
+tc_force_stan <- stan("models/two_comp_f.stan", data = stan_data, algorithm = "Fixed_param", iter = 1, chains = 1)
+```
+
+Below we overlay the solution using Stan on top of the solution defined by deSolve. 
+
+```{r, fig.align='center', fig.width=10, fig.height=5}
+sim_tc_force_stan <- as.matrix(tc_force_stan)
+sim_tc_force_stan <- cbind(time = times,
+                           y1 = unname(sim_tc_force_stan[,grep("^y_hat\\[[[:digit:]]+,1\\]$", colnames(sim_tc_force_stan))]),
+                           y2 = unname(sim_tc_force_stan[,grep("^y_hat\\[[[:digit:]]+,2\\]$", colnames(sim_tc_force_stan))]))
+
+par(mfrow = c(1,2))
+plot(sim_desolve[,"time"], sim_desolve[,"Intestine"], type = "l", lwd = 4,
+     main = "Intestine",
+     xlab = "time", ylab = "")
+lines(sim_tc_force_stan[,"time"], sim_tc_force_stan[,"y1"], col = "#CCFF00")
+legend("topright", c("deSolve","Stan"), col = c("#000000","#CCFF00"), pch = c(15,15), pt.cex = 2, cex = 0.8)
+
+plot(sim_desolve[,"time"], sim_desolve[,"Blood"], type = "l", lwd = 4,
+     main = "Blood",
+     xlab = "time", ylab = "")
+lines(sim_tc_force_stan[,"time"], sim_tc_force_stan[,"y2"], col = "#CCFF00")
+legend("topright", c("deSolve","Stan"), col = c("#000000","#CCFF00"), pch = c(15,15), pt.cex = 2, cex = 0.8)
+
+```
+
+
+
+## Event
+
+Now assume that there is no concentration of the drug in the patient at the initial time $t_0$ by specifying the initial state values as $y_1 = 0$ and $y_2 = 0$. Additionally a dose event takes place at each time step in the sequence $2, 3, 4, \ldots, 9$. The dose increases the concentration of the drug in the intestines by a value of 2. The solution in deSolve is provided below and is accomplished by passing an event table to the `ode` function.
+
+```{r ode_event, fig.align='center', fig.width=10, fig.height=5}
+yini <- c(Intestine = 0, Blood = 0)
+# event table
+dose <- data.frame(var = "Intestine",
+                   time = seq(2,9,by=1),
+                   value = 2,
+                   method = "add")
+# ODE
+two_comp_fun <- function(t, y, p) {
+  list2env(p, environment())
+  dy1 <- -a*y[1]
+  dy2 <- a*y[1] - b*y[2]
+  return(list(c(dy1,dy2)))
+}
+
+sim_desolve <- ode(func = two_comp_fun, times = times_desolve, y = yini, parms = pars, method = "bdf", events = list(data = dose))
+plot(sim_desolve)
+```
+
+The solution in Stan is computed below. The way events are captured in the ODE defined is to stop the integrator at each time step defined by the event, incorporate the event (in this case via the addition operation), and then start the integrator again. This is done in the Stan program `models/two_comp_e.stan`.
+
+```{r}
+# break up time into event segments
+seg <- dose$time
+seg_indxs <- which(times %in% seg)
+
+if (tail(seg_indxs,1) != length(times)) {
+  seg_indxs <- c(seg_indxs, length(times))
+}
+
+if (seg_indxs[1] != 1) {
+  seg_indxs <- c(1, seg_indxs)
+}
+
+# for readability create a Stan event table
+seg_start <- head(seg_indxs, -1) + 1
+seg_start[1] <- 1
+seg_end <- tail(seg_indxs, -1) 
+seg_value <- cbind(dose$value, 0)
+seg_value <- rbind(yini, seg_value)
+
+# create stan data
+stan_data <- list(theta = unlist(pars),
+                  ts = times,
+                  T = length(times),
+                  E = nrow(seg_value),
+                  S = ncol(seg_value),
+                  K = length(unlist(pars)),
+                  y0 = seg_value,
+                  t0 = times[seg_start] - (times[2]-times[1]),
+                  start = seg_start,
+                  end = seg_end)
+
+# simulate from ode
+tc_event_stan <- stan("models/two_comp_e.stan", data = stan_data, algorithm = "Fixed_param", iter = 1, chains = 1)
+
+```
+
+Below we overlay the solution using Stan on top of the solution defined by deSolve. 
+
+```{r, fig.align='center', fig.width=10, fig.height=5}
+sim_tc_event_stan <- as.matrix(tc_event_stan)
+sim_tc_event_stan <- cbind(time = times,
+                           y1 = unname(sim_tc_event_stan[,grep("^y_hat\\[[[:digit:]]+,1\\]$", colnames(sim_tc_event_stan))]),
+                           y2 = unname(sim_tc_event_stan[,grep("^y_hat\\[[[:digit:]]+,2\\]$", colnames(sim_tc_event_stan))]))
+
+par(mfrow = c(1,2))
+
+plot(sim_desolve[,"time"], sim_desolve[,"Intestine"], type = "l", lwd = 4,
+     main = "Intestine",
+     xlab = "time", ylab = "")
+lines(sim_tc_event_stan[,"time"], sim_tc_event_stan[,"y1"], col = "#CCFF00")
+legend("topleft", c("deSolve","Stan"), col = c("#000000","#CCFF00"), pch = c(15,15), pt.cex = 2, cex = 0.8)
+
+plot(sim_desolve[,"time"], sim_desolve[,"Blood"], type = "l", lwd = 4,
+     main = "Blood",
+     xlab = "time", ylab = "")
+lines(sim_tc_event_stan[,"time"], sim_tc_event_stan[,"y2"], col = "#CCFF00")
+legend("bottomright", c("deSolve","Stan"), col = c("#000000","#CCFF00"), pch = c(15,15), pt.cex = 2, cex = 0.8)
+
+```
+
+
+
+## Event and Forcing Function
+
+Now we include both the event and forcing function described in the previous sections. The deSolve solution is provided below.
+
+```{r ode_event_force, fig.align='center', fig.width=10, fig.height=5}
+# forcing function
+force <- approxfun(c(0,3,5,7,9), c(0,3,0,3,0), method = "constant", rule = 2)
+# event table
+dose <- data.frame(var = "Intestine",
+                   time = seq(2,9,by=1),
+                   value = 2,
+                   method = "add")
+# ODE
+two_comp_fun <- function(t, y, p) {
+  list2env(p, environment())
+  dy1 <- -a*y[1] + force(t)
+  dy2 <- a*y[1] - b*y[2]
+  return(list(c(dy1,dy2)))
+}
+
+sim_desolve <- ode(func = two_comp_fun, times = times_desolve, y = yini, parms = pars, method = "bdf", events = list(data = dose))
+plot(sim_desolve)
+```
+
+The comparable solution using Stan is provided below. For details see the Stan program `models/two_comp_ef.stan`.
+
+```{r}
+# break up time into event segments
+seg <- dose$time
+seg_indxs <- which(times %in% seg)
+
+if (tail(seg_indxs,1) != length(times)) {
+  seg_indxs <- c(seg_indxs, length(times))
+}
+
+if (seg_indxs[1] != 1) {
+  seg_indxs <- c(1, seg_indxs)
+}
+
+# for readability create a Stan event table
+seg_start <- head(seg_indxs, -1) + 1
+seg_start[1] <- 1
+seg_end <- tail(seg_indxs, -1) 
+seg_value <- cbind(dose$value, 0)
+seg_value <- rbind(yini, seg_value)
+
+# create stan data
+stan_data <- list(theta = unlist(pars),
+                  ts = times,
+                  T = length(times),
+                  E = nrow(seg_value),
+                  S = ncol(seg_value),
+                  K = length(unlist(pars)),
+                  y0 = seg_value,
+                  t0 = times[seg_start] - (times[2]-times[1]),
+                  start = seg_start,
+                  end = seg_end)
+
+# simulate from ode
+tc_event_force_stan <- stan("models/two_comp_ef.stan", data = stan_data, algorithm = "Fixed_param", iter = 1, chains = 1)
+```
+
+Below we overlay the solution using Stan on top of the solution defined by deSolve. 
+
+```{r, fig.align='center', fig.width=10, fig.height=5}
+sim_tc_event_force_stan <- as.matrix(tc_event_force_stan)
+sim_tc_event_force_stan <- cbind(time = times,
+                           y1 = unname(sim_tc_event_force_stan[,grep("^y_hat\\[[[:digit:]]+,1\\]$", colnames(sim_tc_event_force_stan))]),
+                           y2 = unname(sim_tc_event_force_stan[,grep("^y_hat\\[[[:digit:]]+,2\\]$", colnames(sim_tc_event_force_stan))]))
+
+par(mfrow = c(1,2))
+plot(sim_desolve[,"time"], sim_desolve[,"Intestine"], type = "l", lwd = 4,
+     main = "Intestine",
+     xlab = "time", ylab = "")
+lines(sim_tc_event_force_stan[,"time"], sim_tc_event_force_stan[,"y1"], col = "#CCFF00")
+legend("topleft", c("deSolve","Stan"), col = c("#000000","#CCFF00"), pch = c(15,15), pt.cex = 2, cex = 0.8)
+
+plot(sim_desolve[,"time"], sim_desolve[,"Blood"], type = "l", lwd = 4,
+     main = "Blood",
+     xlab = "time", ylab = "")
+lines(sim_tc_event_force_stan[,"time"], sim_tc_event_force_stan[,"y2"], col = "#CCFF00")
+legend("bottomright", c("deSolve","Stan"), col = c("#000000","#CCFF00"), pch = c(15,15), pt.cex = 2, cex = 0.8)
+```
+
+
+
+## Estimation
+
+All the examples above involve simulation and assume that we know the value of the parameters. Alternatively, we can use Stan to infer the parameters used to generate the numerical solution (once we have observed the solution). This means that we can treat the observed solution as our outcome variable and infer the parameters $a$ and $b$ that generated the solution.
+
+As an example we use the ODE defined in the previous section along with its numerical solution computed in Stan. To resemble real data with measurment error we add some arbitrary noise to this solution (this could be done in the simulation itself within the `generated quantities {}` block). Below we overlay the true solution along with the solution with noise. 
+
+```{r ode_event_force_fit, fig.width=10, fig.height=5}
+# add noise to the solution
+y <- sim_tc_event_force_stan
+y[,2] <- y[,2] + rnorm(length(times), 0, 0.1)
+y[,3] <- y[,3] + rnorm(length(times), 0, 0.1)
+
+y[,2] <- ifelse(y[,2] < 0, 0, y[,2])
+y[,3] <- ifelse(y[,3] < 0, 0, y[,3])
+
+par(mfrow = c(1,2))
+plot(sim_tc_event_force_stan[,"time"], sim_tc_event_force_stan[,"y1"], type = "l", lwd = 4,
+     main = "Intestine",
+     xlab = "time", ylab = "")
+lines(y[,"time"], y[,"y1"], col = "#FF6688")
+legend("topleft", c("Stan","Stan with noise"), col = c("#000000","#FF6688"), pch = c(15,15), pt.cex = 2, cex = 0.8)
+
+plot(sim_tc_event_force_stan[,"time"], sim_tc_event_force_stan[,"y2"], type = "l", lwd = 4,
+     main = "Blood",
+     xlab = "time", ylab = "")
+lines(y[,"time"], y[,"y2"], col = "#FF6688")
+legend("bottomright", c("Stan","Stan with noise"), col = c("#000000","#FF6688"), pch = c(15,15), pt.cex = 2, cex = 0.8)
+```
+
+To estimate the parameters $a$ and $b$ we move the integrator specification from the `generated quantities {}` block to the `model {}` block. In addition to the integrator we incorporate the following pieces into the `model {}` block of the Stan program:
+
+**Likelihood**
+$$
+y \sim \mathcal{N}(\hat{y}, \sigma)
+$$
+
+**Priors**
+$$
+\begin{align*}
+\sigma &\sim \mathcal{N}(0, 0.1) \\
+a &\sim \mathcal{N}(5, 1) \\
+b &\sim \mathcal{N}(0, 1) \\
+\end{align*}
+$$
+
+Where $y$ is the data we acquired from simulation in the previous section (with noise added) and $\hat{y}$ is the simulation computed by the ODE integrator in the Stan program. Essentially we are modeling $y$ according to the deterministic process that generates $\hat{y}$ along with some measurement error. For details on how this is implemented see the Stan program `models/two_comp_ef_fit.stan`. Below we fit the model to the data. 
+
+```{r ode_event_force_fit_cache, results='hide', warning=FALSE, cache=TRUE}
+stan_data$y <- y[,-1]
+tc_event_force_fit <- stan("models/two_comp_ef_fit.stan", data = stan_data, chains = 4, iter = 500, cores = 4)
+```
+
+Looking at the parameter values and diagnostics we find that we appropriately recovered the parameters that generated the data. 
+
+```{r}
+print(tc_event_force_fit)
+```
+
+```{r, fig.align='center', fig.width=15, fig.height=5}
+mcmc_trace(as.array(tc_event_force_fit), regex_pars = "theta|sigma")
+```
+
+Using these results the user can continue with useful Bayesian post-estimation steps, such as generating posterior predictions and constructing credible intervals.
+
+
+
+## References
+
+Gabry, J. & Mahr, T. (2019) _bayesplot: Plotting for Bayesian Models_. R package version 1.7.0, mc-stan.org/bayesplot.  
+
+Mattuck, A., Miller, H., Orloff, J., & Lewis, J. (2011) _Differential Equations_. Massachusetts Institute of Technology: MIT OpenCourseWare. https://ocw.mit.edu.  
+
+Soetaert, K., Cash, J., & Mazzia F. (2012) _Solving Differential Equations in R_. Use R!  
+
+Soetaert, K., Petzoldt, T., & Setzer, R.W. (2010). Solving Differential Equations in R: Package deSolve. _Journal of Statistical Software_. 33(9), 1-25. http://www.jstatsoft.org/v33/i09/.  
+
+Stan Development Team (2019) _Stan Modeling Language User's Guide_. Version 2.20. http://mc-stan.org.  
+
+Stan Development Team (2019) _RStan: the R interface to Stan_. R package version 2.19.1, http://mc-stan.org/.  
+
+
+
+## Computing Environment
+
+```{r}
+devtools::session_info("rstan")
+```
+
+
+
+## Licences
+
+Code (c) 2019 Imad Ali, BSD 3.  
+
+Text (c) 2019 Imad Ali, licensed under CC-BY-NC 4.0.  
