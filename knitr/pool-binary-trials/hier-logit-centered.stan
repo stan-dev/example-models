@@ -15,9 +15,5 @@ model {
   y ~ binomial_logit(K, alpha); // likelihood
 }
 generated quantities {
-  vector[N] theta; // chance of success
-  
-  for (n in 1 : N) {
-    theta[n] = inv_logit(alpha[n]);
-  }
+  vector[N] theta = inv_logit(alpha);
 }
