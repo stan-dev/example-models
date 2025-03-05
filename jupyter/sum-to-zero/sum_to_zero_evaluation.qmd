@@ -113,6 +113,7 @@ def display_side_by_side(
     display(HTML(html_code))
 ```
 
+
 ## Introducing the `sum_to_zero_vector` Constrained Parameter Type
 
  
@@ -211,8 +212,11 @@ Since the models are equivalent, we expect that all three implementations
 should produce the same estimates; what differs is the speed of computation,
 as measured by effective samples per second.
 
+Included in the GitHub repository for this notebook are a series of helper functions.
 
-
+* [utils_dataviz.py](https://github.com/stan-dev/example-models/tree/master/jupyter/sum-to-zero/stan/utils_dataviz.py) - summarize and plot the posterior sample.
+* [utils_bym2.py](https://github.com/stan-dev/example-models/tree/master/jupyter/sum-to-zero/stan/utils_bym2.py) - compute data inputs to the BYM2 model.
+* [utils_nyc_map.py](https://github.com/stan-dev/example-models/tree/master/jupyter/sum-to-zero/stan/utils_nyc_map.py) - munge the New York City census tract map.
 
 ## Multi-level Models with Group-level Categorical Predictors
 
@@ -239,7 +243,7 @@ In order to fit this model, we need to put a sum-to-zero constraint on the categ
 ### The Stan model
 
 
-The full model is in file `stan/binomial_4_preds_ozs.stan`.
+The full model is in file [binomial_4_preds_ozs.stan](https://github.com/stan-dev/example-models/tree/master/jupyter/sum-to-zero/stan/binomial_4_preds_ozs.stan).
 It provides an estimate of the true prevalence based on binary tests with
 a given (or unknown) test sensitivity and specificity as follows.
 
@@ -314,7 +318,7 @@ the model is a priori well-specified with respect to the data.
 each sample provides a datasets from a different set of regression covariates
 and with different amounts of per-demographic data.
 
-The full data-generating program is in file `stan/gen_binomial_4_preds.stan`.
+The full data-generating program is in file [gen_binomial_4_preds.stan](https://github.com/stan-dev/example-models/tree/master/jupyter/sum-to-zero/stan/binomial_4_preds_ozs.stan).
 Here we show the nested loop which generates the modeled and unmodeled data inputs.
 
 ```stan
@@ -546,6 +550,8 @@ true_params
 
 #### Model 1: `sum_to_zero_vector`
 
+This model is in file [binomial_4_preds_ozs.stan](https://github.com/stan-dev/example-models/tree/master/jupyter/sum-to-zero/stan/binomial_4_preds_ozs.stan).
+
 ```{python}
 binomial_ozs_mod = CmdStanModel(stan_file=os.path.join('stan', 'binomial_4preds_ozs.stan'))
 ```
@@ -563,7 +569,8 @@ binomial_ozs_fit_lg = binomial_ozs_mod.sample(data=data_large, parallel_chains=4
 
 #### Model 2:  Hard sum-to-zero constraint
 
-Run the sampler to get posterior estimates of the model conditioned on the data. 
+This model is in file [binomial_4_preds_hard.stan](https://github.com/stan-dev/example-models/tree/master/jupyter/sum-to-zero/stan/binomial_4_preds_hard.stan).
+
 
 ```{python}
 binomial_hard_mod = CmdStanModel(stan_file=os.path.join('stan', 'binomial_4preds_hard.stan'))
@@ -576,6 +583,8 @@ binomial_hard_fit_lg = binomial_hard_mod.sample(data=data_large, parallel_chains
 ```
 
 #### Model 3:  soft sum-to-zero constraint
+
+This model is in file [binomial_4_preds_soft.stan](https://github.com/stan-dev/example-models/tree/master/jupyter/sum-to-zero/stan/binomial_4_preds_soft.stan).
 
 ```{python}
 binomial_soft_mod = CmdStanModel(stan_file=os.path.join('stan', 'binomial_4preds_soft.stan'))
@@ -792,6 +801,7 @@ corresponding computations in the transformed parameters and generated quantitie
 
 To do this, we delete the likelihood statement, and any statements that generate auxiliary variables it needs.
 The model parameters block is unchanged.
+The model is in file [binomial_4preds_ozs_ppc.stan](https://github.com/stan-dev/example-models/tree/master/jupyter/sum-to-zero/stan/binomial_4preds_ozs_ppc.stan).
 
 **binomial_4preds_ozs_ppc.stan**
 
@@ -903,9 +913,10 @@ print("\n\nSmall dataset, marginal variances beta age - hard sum-to-zero constra
 
 ### Discussion
 
-For the multi-level model, the `sum_to_zero_vector` provides fast results and good effective sample sizes for both datasets.
-Model `stan/binomial_4_preds_ozs.stan` shows how to properly scale the variance of
-a `sum_to_zero_vector` constrained parameter in order to put a standard normal prior on it.
+* For a multi-level model group-level categorical predictors the `sum_to_zero_vector` provides fast results and good effective sample sizes for both datasets.
+
+* Model [binomial_4preds_ozs.stan](https://github.com/stan-dev/example-models/tree/master/jupyter/sum-to-zero/stan/binomial_4preds_ozs.stan).
+shows how to properly scale the variance of a `sum_to_zero_vector` constrained parameter in order to put a standard normal prior on it.
 
 **Workflow Practices**
 
@@ -1013,12 +1024,12 @@ model {
 
 In this section, we compare three ways of implementing the sum-to-zero constraint on `phi`.
 
-* In model `bym2_ozs.stan`, `phi` is declared as a `sum_to_zero_vector`.
+* In model [bym2_ozs.stan](https://github.com/stan-dev/example-models/tree/master/jupyter/sum-to-zero/stan/bym2_ozs.stan), `phi` is declared as a `sum_to_zero_vector`.
 
-* In model `bym2_ozs_hard.stan`, `phi_raw` is the unconstrained parameter of size `N - 1`,
+* In model [bym2_hard.stan](https://github.com/stan-dev/example-models/tree/master/jupyter/sum-to-zero/stan/bym2_hard.stan), `phi_raw` is the unconstrained parameter of size `N - 1`,
 and the N-length parameter `phi` is computed in the `transformed parameters` block.
 
-* In model `bym2_soft.stan`, `phi` is declared as an ordinary vector,
+* In model [bym2_soft.stan](https://github.com/stan-dev/example-models/tree/master/jupyter/sum-to-zero/stan/bym2_soft.stan), `phi` is declared as an ordinary vector,
 and the sum-to-zero constraint is combined with the prior:
 
 ```stan
@@ -1071,7 +1082,8 @@ The inputs to the BYM2 model are
 The scaling factor `tau` was introduced by Riebler et al so that the
 variance of the spatial and ordinary random effects are both approximately equal to 1,
 thus allowing for a straightforward estimate of the amount of spatial and non-spatial variance.
-We have written a helper function called `get_scaling_factor`, in file `utils_bym2.py`
+We have written a helper function called `get_scaling_factor`, in file
+[utils_bym2.py](https://github.com/stan-dev/example-models/tree/master/jupyter/sum-to-zero/utils_bym2.py)
 which takes as its argument the neighbor graph and computes the geometric mean of the
 corresponding adjacency matrix.
 
@@ -1288,8 +1300,9 @@ They provide the following recommendations:
 * **Impose a sum-to-zero constraint on each connected component**
 
 We have followed these recommendations and implemented this model in Stan.
-The full model is in file `stan/bym2_multicomp.stan`.
-The full implementation details can be found in the notebook
+The full model is in file
+[bym2_multicomp.stan](https://github.com/stan-dev/example-models/tree/master/jupyter/sum-to-zero/stan/bym2_multicomp.stan)
+For an in-depth discussion of this model, see notebook
 * [The BYM2_multicomp model in Stan](https://github.com/mitzimorris/geomed_2024/blob/main/python-notebooks/h6_bym2_multicomp.ipynb)
 
 For this case study, we provide 2 implementations of the BYM2_multicomp model:
@@ -1326,15 +1339,15 @@ number of connected components.
 * In the `transformed parameters` block, we apply the constraining transform.
 
 ```stan
-  vector[N_connected] phi = zero_sum_components_lp(phi_raw, component_idxs, component_sizes);
+  vector[N_connected] phi = zero_sum_components(phi_raw, component_idxs, component_sizes);
 ```
 
 The constraining transform is broken into two functions:
 
-* function `zero_sum_constrain_lp`, the actual constraining transform, which corresponds directly
+* function `zero_sum_constrain`, the actual constraining transform, which corresponds directly
 to the built-in `zero_sum_vector` transform.
 
-* function `zero_sum_constrain_components_lp`, which handles the slicing, and calls `zero_sum_constrain_lp` on each component.
+* function `zero_sum_constrain_components`, which handles the slicing, and calls `zero_sum_constrain` on each component.
 
 ```stan
   /**
@@ -1343,7 +1356,7 @@ to the built-in `zero_sum_vector` transform.
    * @param y unconstrained zero-sum parameters
    * @return vector z, the vector whose slices sum to zero
    */
-  vector zero_sum_constrain_lp(vector y) {
+  vector zero_sum_constrain(vector y) {
     int N = num_elements(y);
     vector[N + 1] z = zeros_vector(N + 1);
     real sum_w = 0;
@@ -1359,7 +1372,7 @@ to the built-in `zero_sum_vector` transform.
   }
 ```
 
-* `zero_sum_components_lp`: slices vector `phi` by component, applies constraining transform to each.
+* `zero_sum_components`: slices vector `phi` by component, applies constraining transform to each.
 
 ```stan
   /**
@@ -1370,7 +1383,7 @@ to the built-in `zero_sum_vector` transform.
    * @param sizes component sizes
    * @return vector phi_ozs, the vector whose slices sum to zero
    */
-  vector zero_sum_components_lp(vector phi,
+  vector zero_sum_components(vector phi,
                                 array[ , ] int idxs,
                                 array[] int sizes) {
     vector[sum(sizes)] phi_ozs;
@@ -1378,13 +1391,23 @@ to the built-in `zero_sum_vector` transform.
     int idx_ozs = 1;
     for (i in 1:size(sizes)) {
       phi_ozs[idx_ozs : idx_ozs + sizes[i] - 1] =
-        zero_sum_constrain_lp(segment(phi, idx_phi, sizes[i] - 1));
+        zero_sum_constrain(segment(phi, idx_phi, sizes[i] - 1));
       idx_phi += sizes[i] - 1;
       idx_ozs += sizes[i];
     }
     return phi_ozs;
   }
 ```
+
+::: {.callout-note}
+The constraining transform is a linear operation, leading to a constant Jacobian determinant
+which is therefore not included.
+As of Stan 2.36, transforms which include a Jacobian adjustment can do so with the
+`jacobian +=` statement and must have names ending in `_jacobian`.
+See section [functions implementing change-of-variable adjustments](https://mc-stan.org/docs/stan-users-guide/user-functions.html#functions-implementing-change-of-variable-adjustments) in the Stan User's Guide
+chapter on user-defined functions for details.
+:::
+
 
 #### Data Assembly
 
@@ -1451,18 +1474,19 @@ bym2_multicomp_ozs_summary[['Mean', 'StdDev', 'ESS_bulk', 'ESS/sec', 'R_hat']].r
 
 #### Model Comparison
 
-We can compare the `sum_to_zero_vector` implementation to an implementation
-of the soft sum-to-zero constraint.
-In the `bym2_soft.stan` model, the soft sum-to-zero constraint is combined directly
-with the ICAR prior:
+We can compare the `sum_to_zero_vector` implementation to the corresponding soft sum-to-zero constraint.
+The full model is in file [bym2_multicomp_soft.stan](https://github.com/stan-dev/example-models/tree/master/jupyter/sum-to-zero/stan/bym2_multicomp_soft.stan)
+
+In model [bym2_soft.stan](https://github.com/stan-dev/example-models/tree/master/jupyter/sum-to-zero/stan/bym2_soft.stan) 
+the soft sum-to-zero constraint is combined directly with the ICAR prior:
 
 ```stan
   target += (-0.5 * dot_self(phi[neighbors[1]] - phi[neighbors[2]])
 	     + normal_lupdf(sum(phi) | 0, 0.001 * rows(phi)));
 ```
 
-For the BYM2_multicomp model, split this into two parts.
-The ICAR prior is applied to `phi`, and then we iterate through the
+For the BYM2_multicomp model, this operation is carried out in two steps.
+First the ICAR prior is applied to `phi`, next we iterate through the
 components, applying the sum-to-zero constraint to each in turn.
 
 ```stan
@@ -1526,11 +1550,11 @@ Before Stan 2.36, for this model and dataset, the soft sum-to-zero constraint
 was much faster than the hard sum-to-zero constraint.  Here we show that the
 `sum_to_zero_vector` greatly improves the run time.
 
-For the BYM2_multicomp model, `stan/bym2_multicomp.stan` shows how to implement the `sum_to_zero_vector`
-constraining transform as a Stan function.
+For the BYM2_multicomp model,
+model [bym2_multicomp.stan](https://github.com/stan-dev/example-models/tree/master/jupyter/sum-to-zero/stan/bym2_multicomp.stan)
+shows how to implement the `sum_to_zero_vector` constraining transform as a Stan function.
 A comparable implementation using the soft sum-to-zero implementation is painfully slow.
-Both implementation get exactly the same estimates, which simply confirms that
-both models are correctly implemented.
+Both implementation get exactly the same estimates, which simply confirms that both models are correctly implemented.
 The dramatic difference in run times speaks for itself.
 
 ## Conclusion: the `sum_to_zero_vector` just works!
