@@ -545,6 +545,8 @@ model {
     to_vector(p_1d_vec[n]) ~ normal(0, 1);
     to_vector(p_1d_row_vec[n]) ~ normal(0, 1);
     to_vector(p_1d_simplex[n]) ~ normal(0, 1);
+    to_vector(to_matrix(p_real_3d_ar[n])) ~ normal(0, 1);
+
     for (m in 1 : M) {
       for (k in 1 : K) {
         to_vector(p_3d_vec[n, m, k]) ~ normal(d_3d_vec[n, m, k], 1);
