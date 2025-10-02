@@ -2,6 +2,8 @@
 
 This repository holds open source Stan models, data simulators, and real data.  There are models translating those found in books, most of the BUGS examples, and some basic examples used in the manual.
 
+**[Open Interactive Browser](https://magland.github.io/example-models)** - View, run, and/or edit these Stan examples directly in your browser using Stan Playground in embedded mode.
+
 #### Books
 
 * [Applied Regression Modeling](https://github.com/stan-dev/example-models/wiki/ARM-Models) (Gelman and Hill 2007)

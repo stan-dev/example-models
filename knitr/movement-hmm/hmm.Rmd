@@ -425,10 +425,10 @@ observing finite subsequences of this unbounded sequence.
 \node[state] (C) [right of=B] {$z_3$};
 \node[circle] (D) [right of=C] {$\cdots$};
 \node[state] (E) [right of=D] {$z_N$};
-\path (A) edge [left] node {{}} (B);
-\path (B) edge [left] node {{}} (C);
-\path (C) edge [left] node {{}} (D);
-\path (D) edge [left] node {{}} (E);
+\path (A) edge [left] node { {} } (B);
+\path (B) edge [left] node { {} } (C);
+\path (C) edge [left] node { {} } (D);
+\path (D) edge [left] node { {} } (E);
 \end{tikzpicture}
 ```
 

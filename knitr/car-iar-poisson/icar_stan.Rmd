@@ -147,7 +147,7 @@ the BYM model.
 
 The corresponding conditional distribution specification is:
 
-$$ p \left( { \phi }_i \, \vert\, {\phi}_j \, j \neq i, {{\tau}_i}^{-1} \right)
+$$ p \left( { \phi }_i \, \vert\, {\phi}_j \, j \neq i, { {\tau}_i}^{-1} \right)
 = \mathit{N} \left( \frac{\sum_{i \sim j} {\phi}_{i}}{d_{i,i}}, \frac{1}{d_{i,i} {\tau}_i} \right)$$
 
 where $d_{i,i}$ is the number of neighbors for region $n_i$.
@@ -194,16 +194,16 @@ $$
 \log p(\phi) &=  -{\frac{1}{2}} {\phi}^T [D - W] \phi + \mbox{const} \\
 &= -{\frac{1}{2}} \left( \sum_{i,j} {\phi}_i {[D - W]}_{i,j} {\phi}_j \right) + \mbox{const} \\
 &= -{\frac{1}{2}} \left( \sum_{i,j} {\phi}_i\,{\phi}_j D_{i,j} - \sum_{i,j} {\phi}_i\,{\phi}_j W_{i,j} \right) + \mbox{const} \\
-&= -{\frac{1}{2}} \left( \sum_{i} {{\phi}_i}^2\,D_{i,i} - \sum_{i \sim j} 2\ {\phi}_i\,{\phi}_j \right) + \mbox{const} \\
-&= -{\frac{1}{2}} \left( \sum_{i \sim j} ({{\phi}_i}^2 + {{\phi}_j}^2) - \sum_{i \sim j} 2\ {\phi}_i\,{\phi}_j \right) + \mbox{const} \\
-&= -{\frac{1}{2}} \left( \sum_{i \sim j} {{\phi}_i}^2 - 2\ {\phi}_i\,{\phi}_j + {{\phi}_j}^2 \right) + \mbox{const} \\
+&= -{\frac{1}{2}} \left( \sum_{i} { {\phi}_i}^2\,D_{i,i} - \sum_{i \sim j} 2\ {\phi}_i\,{\phi}_j \right) + \mbox{const} \\
+&= -{\frac{1}{2}} \left( \sum_{i \sim j} ({ {\phi}_i}^2 + { {\phi}_j}^2) - \sum_{i \sim j} 2\ {\phi}_i\,{\phi}_j \right) + \mbox{const} \\
+&= -{\frac{1}{2}} \left( \sum_{i \sim j} { {\phi}_i}^2 - 2\ {\phi}_i\,{\phi}_j + { {\phi}_j}^2 \right) + \mbox{const} \\
 &= -{\frac{1}{2}} \left( \sum_{i \sim j} {({\phi}_i - {\phi}_j)}^2 \right) + \mbox{const}
 \end{align}
 $$
 
 Since $D$ is the diagonal matrix where $D_{i,i}$ is the number of neighbors and
 the off-diagonal entries have value $0$.
-The expression $\sum_{i,j} {\phi}_i\,{\phi}_j D_{i,j}$ rewrites to terms ${{\phi}_i}^2$ where the number of each ${\phi_i}$ terms is given by $D_{i,i}$.
+The expression $\sum_{i,j} {\phi}_i\,{\phi}_j D_{i,j}$ rewrites to terms ${ {\phi}_i}^2$ where the number of each ${\phi_i}$ terms is given by $D_{i,i}$.
 For each pair of adjacent regions $\{i,j\}$ and $\{j,i\}$, one ${\phi}^2$ term each is contributed, so we can rewrite this in terms of $i \sim j$.
 Since $W$ is the adjacency matrix where $w_{ii} = 0, w_{ij} = 1$ if $i$ is a neighbor of $j$, and $w_{ij}=0$ otherwise,
 the expression $\sum_{i,j} {\phi}_i\,{\phi}_j W_{i,j}$ rewrite to terms
