@@ -1,21 +1,15 @@
-// fixes a calculation error in planetary_motion_star.stan.
-
 functions {
-  array[] real ode(real t, array[] real y, array[] real theta,
-                   array[] real x_r, array[] int x_i) {
-    vector[2] q = to_vector({y[1], y[2]});
-    vector[2] s = to_vector({theta[2], theta[3]});
+  vector ode(real t, vector y, real k, vector star, real m) {
+    vector[2] q = y[1:2];
+    vector[2] p = y[3:4];
     
-    real r_cube = pow(dot_self(q - s), 1.5);
-    vector[2] p = to_vector({y[3], y[4]});
-    real m = x_r[1];
-    real k = theta[1];
+    real r_cube = pow(dot_self(q - star), 1.5);
     
     vector[4] dydt;
-    dydt[1 : 2] = p ./ m;
-    dydt[3 : 4] = -k * (q - s) ./ r_cube;
+    dydt[1:2] = p / m;
+    dydt[3:4] = -k * (q - star) / r_cube;
     
-    return to_array_1d(dydt);
+    return dydt;
   }
 }
 data {
@@ -29,7 +23,6 @@ transformed data {
   real t0 = 0;
   int n_coord = 2;
   real m = 1.0;
-  array[0] int x_i;
   
   real<lower=0> sigma_x = sigma;
   real<lower=0> sigma_y = sigma;
@@ -41,17 +34,13 @@ transformed data {
 }
 parameters {
   real<lower=0> k;
-  array[n_coord] real q0;
-  array[n_coord] real p0;
-  array[n_coord] real star;
+  vector[n_coord] q0;
+  vector[n_coord] p0;
+  vector[n_coord] star;
 }
 transformed parameters {
-  array[n_coord * 2] real y0 = append_array(q0, p0);
-  array[n_coord + 1] real theta = append_array({k}, star);
-  
-  array[n, n_coord * 2] real y = integrate_ode_rk45(ode, y0, t0, time, theta,
-                                                    {m}, x_i, rel_tol,
-                                                    abs_tol, max_steps);
+  vector[n_coord * 2] y0 = append_row(q0, p0);
+  array[n] vector[n_coord * 2] y = ode_rk45_tol(ode, y0, t0, time, rel_tol, abs_tol, max_steps, k, star, m);
 }
 model {
   k ~ normal(1, 0.001); // prior derive based on solar system 
